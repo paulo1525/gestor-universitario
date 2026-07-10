@@ -40,6 +40,13 @@ Materiais submetidos nunca são publicados automaticamente. A Comissão deve con
 
 As turmas do 1.º ano serão mantidas como base para o 2.º ano, permitindo apenas trocas pontuais que respeitem as vagas e não provoquem desequilíbrios na distribuição final.
 
+### Enquadramento regulamentar considerado
+
+- no 2.º e 3.º anos são constituídas obrigatoriamente **20 turmas**;
+- a diferença entre a turma com menos e a turma com mais estudantes não deve exceder **três estudantes**;
+- um exemplo de distribuição normal é existirem turmas entre 14 e 17 estudantes;
+- uma distribuição fora desse intervalo pode ser proposta, mas fica pendente de validação pela Direção do Mestrado Integrado em Medicina.
+
 ### Objetivo do MVP
 
 Permitir que os representantes de turma registem a constituição atual das turmas e as preferências dos estudantes, para que a Comissão valide uma proposta final equilibrada e preserve ao máximo as turmas existentes.
@@ -75,7 +82,7 @@ Permitir que os representantes de turma registem a constituição atual das turm
 
 1. A Comissão cria as turmas, define as capacidades e associa cada representante à sua turma.
 2. O representante autentica-se e abre o formulário da turma atribuída.
-3. Insere cada aluno com nome completo, número mecanográfico e preferência: ficar ou mudar.
+3. Preenche a turma num formulário em lote, com linhas dinâmicas para nome completo, número mecanográfico e preferência: ficar ou mudar.
 4. Quando escolhe mudar, indica obrigatoriamente a turma de destino preferida.
 5. O representante revê a lista e submete a versão completa da turma dentro do prazo.
 6. A Comissão valida duplicados, omissões e eventuais conflitos entre submissões.
@@ -89,7 +96,7 @@ Permitir que os representantes de turma registem a constituição atual das turm
 - lista explícita de utilizadores autorizados e controlo de acesso por perfil e turma;
 - importação e exportação em CSV;
 - gestão de turmas, capacidades e prazos;
-- formulário do representante com nome completo, número mecanográfico e preferência de cada aluno;
+- formulário em lote do representante, com linhas que podem ser acrescentadas ou removidas dinamicamente;
 - bloqueio automático dos alunos que preferem ficar;
 - validação de campos obrigatórios, números mecanográficos duplicados, omissões e conflitos;
 - submissões versionadas, com possibilidade de correção até ao prazo definido;
@@ -140,7 +147,6 @@ Esta opção permite desenvolver rapidamente, manter tipagem de ponta a ponta e 
 
 ### Decisões necessárias antes da implementação
 
-- número de turmas e capacidade mínima/máxima de cada uma;
 - lista dos representantes e respetiva turma;
 - possibilidade de cada aluno indicar apenas uma ou várias turmas de destino;
 - regras de prioridade e desempate;
