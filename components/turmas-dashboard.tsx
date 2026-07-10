@@ -116,14 +116,16 @@ export function TurmasDashboard() {
 
       <aside className={`sidebar ${menuAberto ? "sidebar--open" : ""}`} aria-label="Navegação principal">
         <div className="brand">
-          <Image
-            className="brand__logo"
-            src="/logo-comissao-curso-fmup-2025-2031.png"
-            alt="Comissão de Curso FMUP 2025–2031"
-            width={58}
-            height={58}
-            priority
-          />
+          <span className="brand__logo-frame">
+            <Image
+              className="brand__logo"
+              src="/logo-comissao-curso-fmup-2025-2031.png"
+              alt="Comissão de Curso FMUP 2025–2031"
+              width={58}
+              height={58}
+              priority
+            />
+          </span>
           <div>
             <span className="brand__name">Gestor Universitário</span>
             <span className="brand__context">Comissão de Curso</span>
