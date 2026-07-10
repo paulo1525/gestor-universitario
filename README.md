@@ -3,10 +3,21 @@
 Plataforma digital da Comissão de Curso de Medicina 2025–2031.
 
 <p align="center">
-  <img src="docs/assets/logo-comissao-curso-fmup-2025-2031.jpeg" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
+  <img src="public/logo-comissao-curso-fmup-2025-2031.jpeg" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
 </p>
 
-> **Estado atual:** planeamento. Este repositório ainda não contém código da aplicação.
+> **Estado atual:** protótipo visual da gestão das turmas, ainda com dados fictícios e sem autenticação ou base de dados.
+
+## Executar o protótipo
+
+Requisitos: Node.js 20 ou superior e pnpm.
+
+```bash
+pnpm install
+pnpm dev
+```
+
+A aplicação fica disponível em `http://localhost:3000`. Nesta fase, todas as alterações existem apenas na memória do navegador e desaparecem ao atualizar a página.
 
 ## Visão da plataforma
 
