@@ -118,7 +118,7 @@ export function TurmasDashboard() {
         <div className="brand">
           <Image
             className="brand__logo"
-            src="/logo-comissao-curso-fmup-2025-2031.jpeg"
+            src="/logo-comissao-curso-fmup-2025-2031.png"
             alt="Comissão de Curso FMUP 2025–2031"
             width={58}
             height={58}
