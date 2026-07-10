@@ -3,7 +3,7 @@
 Plataforma digital da Comissão de Curso de Medicina 2025–2031.
 
 <p align="center">
-  <img src="public/logo-comissao-curso-fmup-2025-2031.jpeg" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
+  <img src="public/logo-comissao-curso-fmup-2025-2031.png" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
 </p>
 
 > **Estado atual:** protótipo visual da gestão das turmas, ainda com dados fictícios e sem autenticação ou base de dados.
