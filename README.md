@@ -2,7 +2,26 @@
 
 Plataforma digital da Comissão de Curso de Medicina 2025–2031.
 
+<p align="center">
+  <img src="docs/assets/logo-comissao-curso-fmup-2025-2031.jpeg" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
+</p>
+
 > **Estado atual:** planeamento. Este repositório ainda não contém código da aplicação.
+
+## Visão da plataforma
+
+O Gestor Universitário será o ponto central de comunicação, organização e partilha de recursos da Comissão de Curso. A gestão das turmas do 2.º ano será a primeira aplicação, seguindo-se os módulos abaixo.
+
+### Módulos previstos
+
+- **Avisos importantes:** faixa destacada no topo da aplicação, com nível de prioridade, período de exibição e ligação para informação adicional.
+- **Feedback e sugestões:** formulário que permite enviar opiniões à Comissão de forma anónima, sem guardar a identidade do autor, sujeito a medidas contra abuso.
+- **Envio de materiais para a CC:** estudantes autorizados podem submeter materiais, identificando cadeira, ano, tipo de documento e origem; a Comissão revê antes de publicar.
+- **Biblioteca de estudo:** área organizada por cadeira para sebentas, compêndios, exames anteriores e outros recursos académicos aprovados, com pesquisa e controlo de versões.
+- **Cadeiras e horários:** página central com cadeiras do ano, horários, documentos relevantes e ligações úteis, atualizada pela Comissão.
+- **Contactos e identidade:** apresentação do logótipo e do email oficial da Comissão de Curso.
+
+Materiais submetidos nunca são publicados automaticamente. A Comissão deve confirmar a origem, remover dados pessoais e rejeitar conteúdos obtidos ilegitimamente, avaliações futuras ou ainda ativas e materiais cuja partilha viole direitos aplicáveis.
 
 ## Primeira aplicação: turmas do 2.º ano
 
@@ -16,12 +35,12 @@ Permitir que os representantes de turma registem a constituição atual das turm
 
 ### Autenticação e autorização
 
-- A opção preferencial é a **Autenticação Federada da U.Porto (AAI)**, com as credenciais institucionais e o segundo fator de autenticação geridos pela Universidade.
-- A integração da aplicação na AAI depende de autorização e configuração técnica pela UPdigital; não deve ser considerada garantida antes dessa aprovação.
-- Como alternativa temporária, poderá ser usado acesso sem palavra-passe por ligação ou código enviado para o email institucional. Esta alternativa confirma o controlo do email, mas não equivale ao início de sessão federado da U.Porto.
-- Ter uma conta U.Porto válida não concede acesso automaticamente: o utilizador tem também de constar da lista de pessoas autorizadas da aplicação.
-- A autorização será baseada no número mecanográfico e no email institucional previamente registados, com um perfil e âmbito definidos.
-- O domínio do email, por si só, nunca será usado como única medida de segurança.
+- A aplicação terá **autenticação própria por código temporário enviado para o email institucional**, sem integração com a AAI ou o diretório Microsoft Entra da U.Porto.
+- O utilizador introduz o email, recebe um código de utilização única e usa-o para iniciar uma sessão segura.
+- Ter um email institucional válido não concede acesso automaticamente: o endereço tem também de constar da lista de pessoas autorizadas da aplicação.
+- Cada utilizador autorizado terá um perfil e um âmbito definidos, como Comissão ou representante de uma turma específica.
+- Os códigos terão validade curta, limite de tentativas e pedidos, utilização única e serão guardados apenas de forma protegida.
+- A resposta ao pedido de código não revelará se determinado endereço existe na lista, reduzindo a possibilidade de enumeração de utilizadores.
 
 ### Regras funcionais propostas
 
@@ -55,7 +74,7 @@ Permitir que os representantes de turma registem a constituição atual das turm
 
 ### Funcionalidades do MVP
 
-- autenticação U.Porto AAI, condicionada a aprovação institucional, ou alternativa temporária por email institucional;
+- autenticação por código temporário enviado para emails institucionais previamente autorizados;
 - lista explícita de utilizadores autorizados e controlo de acesso por perfil e turma;
 - importação e exportação em CSV;
 - gestão de turmas, capacidades e prazos;
@@ -79,7 +98,7 @@ Permitir que os representantes de turma registem a constituição atual das turm
 
 - **Aplicação:** Next.js e TypeScript;
 - **Base de dados:** PostgreSQL com Supabase;
-- **Autenticação:** U.Porto AAI através de SAML/Shibboleth, se autorizada; alternativa a definir por email institucional;
+- **Autenticação:** código temporário enviado por email, com sessões seguras e lista de endereços autorizados;
 - **Alojamento:** Vercel;
 - **Qualidade:** testes automáticos e GitHub Actions.
 
@@ -115,23 +134,20 @@ Esta opção permite desenvolver rapidamente, manter tipagem de ponta a ponta e 
 - possibilidade de cada aluno indicar apenas uma ou várias turmas de destino;
 - regras de prioridade e desempate;
 - tratamento de casos excecionais e reclamações;
-- aprovação da UPdigital para integração com a AAI e atributos de identidade que serão disponibilizados;
-- alternativa de autenticação caso a integração institucional não seja autorizada a tempo;
+- domínios institucionais aceites e lista inicial de endereços autorizados;
+- serviço de envio de emails transacionais e respetivos limites;
 - datas das fases de pedido, revisão e publicação;
 - responsável pelo tratamento dos dados e prazo de conservação.
 
 ## Roteiro
 
-1. Validar regras e modelo de dados com a Comissão.
+1. Validar regras e modelo de dados da gestão de turmas com a Comissão.
 2. Criar protótipo dos ecrãs e testar o fluxo sem dados reais.
-3. Implementar autenticação, importação e pedidos.
-4. Implementar e testar o motor de trocas.
+3. Implementar autenticação por email, importação e formulários das turmas.
+4. Implementar e testar o motor de permutações.
 5. Criar painel administrativo, auditoria e exportação.
-6. Fazer teste-piloto com dados fictícios.
-7. Realizar revisão de segurança/RGPD e lançar a aplicação.
-
-## Referências institucionais
-
-- [Autenticação Federada — UPdigital](https://www.up.pt/portal/pt/updigital/servicos/contas-passwords/autenticacao-federada/)
-- [Microsoft Office 365 — UPdigital](https://www.up.pt/portal/pt/updigital/servicos/contas-passwords/office-uporto/)
+6. Fazer teste-piloto com dados fictícios e realizar revisão de segurança/RGPD.
+7. Lançar a gestão de turmas.
+8. Acrescentar avisos, contactos e feedback anónimo.
+9. Acrescentar cadeiras, horários, submissão de materiais e biblioteca de estudo.
 
