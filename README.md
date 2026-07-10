@@ -35,7 +35,7 @@ Permitir que os representantes de turma registem a constituição atual das turm
 
 ### Autenticação e autorização
 
-- A aplicação terá **autenticação própria por código temporário enviado para o email institucional**, sem integração com a AAI ou o diretório Microsoft Entra da U.Porto.
+- A aplicação terá **autenticação própria por código temporário enviado para o email institucional**.
 - O utilizador introduz o email, recebe um código de utilização única e usa-o para iniciar uma sessão segura.
 - Ter um email institucional válido não concede acesso automaticamente: o endereço tem também de constar da lista de pessoas autorizadas da aplicação.
 - Cada utilizador autorizado terá um perfil e um âmbito definidos, como Comissão ou representante de uma turma específica.
