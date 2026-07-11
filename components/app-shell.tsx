@@ -16,6 +16,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
   const [menuAberto, setMenuAberto] = useState(false);
   const { user, logout, setFontScale } = useAuth();
   const roleLabel = user?.role === "admin" ? "Administrador" : user?.role === "representative" ? "Representante" : "Estudante";
+  const stopPreview=async()=>{await fetch("/api/admin/preview-user",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({userId:null})});window.location.href="/admin"};
 
   return (
     <div className="app-shell">
@@ -57,6 +58,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
         </header>
         <main id="conteudo-principal" className="main-content">{children}</main>
       </div>
+      {user?.preview&&<button className="preview-user-toggle" onClick={()=>void stopPreview()}><span>A ver como</span><strong>{user.fullName}</strong><small>Voltar ao meu perfil</small></button>}
     </div>
   );
 }

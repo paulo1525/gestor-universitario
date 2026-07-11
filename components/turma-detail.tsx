@@ -8,7 +8,10 @@ type Detail={class:{id:number;status:string;submittedAt:number|null};students:Al
 export function TurmaDetail({turma}:{turma:Turma;alunosIniciais:Aluno[]}){
  const [data,setData]=useState<Detail|null>(null),[mode,setMode]=useState<"list"|"form"|"tickets">("list"),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
  const [name,setName]=useState(""),[number,setNumber]=useState(""),[preference,setPreference]=useState<"stay"|"move">("stay"),[ticketText,setTicketText]=useState(""),[destinations,setDestinations]=useState<number[]>([]);
- const load=useCallback(async()=>{const response=await fetch(`/api/classes/${turma.id}`,{cache:"no-store"});const next=await response.json() as Detail;setData(next);setDestinations(next.students.find(s=>s.isSelf)?.destinations||[])},[turma.id]); useEffect(()=>{void load()},[load]);
+ const load=useCallback(async()=>{const response=await fetch(`/api/classes/${turma.id}`,{cache:"no-store"});const next=await response.json() as Detail;setData(next);setDestinations(next.students.find(s=>s.isSelf)?.destinations||[])},[turma.id]);
+ // A leitura remota inicializa o estado da página.
+ // eslint-disable-next-line react-hooks/set-state-in-effect
+ useEffect(()=>{void load()},[load]);
  const own=useMemo(()=>data?.students.find(s=>s.isSelf),[data]);
  async function add(e:FormEvent){e.preventDefault();setBusy(true);const r=await fetch(`/api/classes/${turma.id}/students`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({fullName:name,studentNumber:number,preference})});const d=await r.json() as {error?:string};setMessage(r.ok?"Aluno guardado. A preferência ficou bloqueada para o representante.":d.error||"Não foi possível guardar.");if(r.ok){setName("");setNumber("");void load()}setBusy(false)}
  async function submit(){if(!confirm("Depois da submissão, o representante deixa de poder alterar diretamente a lista. Continuar?"))return;const r=await fetch(`/api/classes/${turma.id}/submit`,{method:"POST",headers:{"content-type":"application/json"}});const d=await r.json() as {error?:string};setMessage(r.ok?"Turma submetida. Os alunos já podem ordenar os seus destinos.":d.error||"Não foi possível submeter.");void load()}

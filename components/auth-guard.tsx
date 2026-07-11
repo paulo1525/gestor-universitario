@@ -36,9 +36,9 @@ export function AuthGuard({ children, allowDuringMaintenance = false }: { childr
   }, []);
 
   useEffect(() => {
-    if (!loading && user && maintenance && user.role !== "admin" && !allowDuringMaintenance) router.replace("/manutencao/");
+    if (!loading && user && maintenance && user.role !== "admin" && !user.preview && !allowDuringMaintenance) router.replace("/manutencao/");
   }, [allowDuringMaintenance, loading, maintenance, router, user]);
 
-  if (loading || !user || maintenance === null || (maintenance && user.role !== "admin" && !allowDuringMaintenance)) return <main className="auth-loading"><ShieldCheck size={28} aria-hidden="true" /><strong>A validar a sessão segura…</strong></main>;
+  if (loading || !user || maintenance === null || (maintenance && user.role !== "admin" && !user.preview && !allowDuringMaintenance)) return <main className="auth-loading"><ShieldCheck size={28} aria-hidden="true" /><strong>A validar a sessão segura…</strong></main>;
   return children;
 }

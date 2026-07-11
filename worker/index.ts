@@ -391,7 +391,7 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null };
+type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null; preview?:boolean; actorId?:string };
 async function currentUser(request: Request, env: Env): Promise<CurrentUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
@@ -401,7 +401,23 @@ async function currentUser(request: Request, env: Env): Promise<CurrentUser | nu
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department };
+  const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department };
+  const previewId=cookieValue(request,"gu_preview_user");
+  if(row.email.toLowerCase()===PERMANENT_ADMIN_EMAIL&&previewId){
+    const target=await env.DB.prepare("SELECT id,email,full_name,role,font_scale,class_representative,represented_class,commission_department FROM users WHERE id=? AND status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;commission_department:string|null}>();
+    if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,commissionDepartment:target.commission_department,preview:true,actorId:row.id};
+  }
+  return base;
+}
+
+async function handlePreviewUser(request:Request,env:Env):Promise<Response>{
+  const token=cookieValue(request,SESSION_COOKIE); if(!token)return json({error:"Sessão inválida."},401);
+  const real=await env.DB.prepare("SELECT u.email FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(await sha256(`${token}:${env.AUTH_PEPPER}`),Date.now()).first<{email:string}>();
+  if(real?.email.toLowerCase()!==PERMANENT_ADMIN_EMAIL)return json({error:"Esta função está reservada ao administrador principal."},403);
+  const body=await parseJson(request),userId=typeof body?.userId==="string"?body.userId:"";
+  if(userId&&!(await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active'").bind(userId).first()))return json({error:"Utilizador inválido."},404);
+  const cookie=userId?`gu_preview_user=${userId}; Path=/; Secure; SameSite=Strict; Max-Age=14400`:`gu_preview_user=; Path=/; Secure; SameSite=Strict; Max-Age=0`;
+  return json({ok:true},200,{"set-cookie":cookie});
 }
 
 async function handleAccessibilityPreference(request: Request, env: Env): Promise<Response> {
@@ -597,6 +613,7 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method === "POST" && pathname === "/api/auth/logout") return handleLogout(request, env);
   if (request.method === "POST" && pathname === "/api/auth/session-preference") return handleSessionPreference(request, env);
   if (request.method === "PATCH" && pathname === "/api/auth/accessibility") return handleAccessibilityPreference(request, env);
+  if (request.method === "PUT" && pathname === "/api/admin/preview-user") return handlePreviewUser(request,env);
   if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
     return user ? json({ user }) : json({ user: null }, 401);

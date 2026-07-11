@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type FontScale = "small" | "normal" | "large";
-export type AuthUser = { email: string; fullName: string; role: "student" | "representative" | "admin"; fontScale: FontScale; classRepresentative?:boolean; representedClass?:number|null; commissionDepartment?:string|null };
+export type AuthUser = { email: string; fullName: string; role: "student" | "representative" | "admin"; fontScale: FontScale; classRepresentative?:boolean; representedClass?:number|null; commissionDepartment?:string|null;preview?:boolean };
 type AuthState = { user: AuthUser | null; loading: boolean; refresh: () => Promise<void>; logout: () => Promise<void>; setFontScale: (fontScale: FontScale) => Promise<void> };
 
 const AuthContext = createContext<AuthState | null>(null);
