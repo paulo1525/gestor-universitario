@@ -273,6 +273,8 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .save-message { flex: 1; color: var(--green); font-size: 10px; font-weight: 700; }
 
 /* Authentication */
+.profile__logout { width:36px; height:36px; display:grid; flex:0 0 auto; place-items:center; margin-left:auto; border:0; border-radius:8px; color:inherit; background:transparent; cursor:pointer; }
+.profile__logout:hover,.profile__logout:focus-visible { color:var(--gold); background:rgba(255,255,255,.08); outline:none; }
 .auth-page { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 560px) minmax(360px, 1fr); background: #111; }
 .auth-card { min-height: 100vh; padding: clamp(32px, 6vw, 72px); background: var(--surface); }
 .auth-brand { display: flex; align-items: center; gap: 15px; margin-bottom: 44px; }

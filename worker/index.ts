@@ -285,6 +285,40 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   return createSessionResponse(env, request, { id: userId, email, full_name: pending.full_name, role }, body?.rememberMe === true);
 }
 
+async function ensureOperationalSchema(env: Env): Promise<void> {
+  const columns = await env.DB.prepare("PRAGMA table_info(users)").all<{ name: string }>();
+  const names = new Set(columns.results.map((column) => column.name));
+  const additions = [
+    ["status", "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending', 'suspended', 'banned'))"],
+    ["status_reason", "ALTER TABLE users ADD COLUMN status_reason TEXT"],
+    ["status_until", "ALTER TABLE users ADD COLUMN status_until INTEGER"],
+    ["last_login_at", "ALTER TABLE users ADD COLUMN last_login_at INTEGER"],
+    ["commission_position", "ALTER TABLE users ADD COLUMN commission_position TEXT CHECK (commission_position IN ('principal_admin', 'president', 'vice_president', 'treasurer', 'member'))"],
+    ["commission_department", "ALTER TABLE users ADD COLUMN commission_department TEXT CHECK (commission_department IN ('management', 'studies', 'curricular_units', 'recreation_image'))"],
+  ] as const;
+  for (const [name, statement] of additions) {
+    if (names.has(name)) continue;
+    try {
+      await env.DB.prepare(statement).run();
+    } catch (error) {
+      const refreshed = await env.DB.prepare("PRAGMA table_info(users)").all<{ name: string }>();
+      if (!refreshed.results.some((column) => column.name === name)) throw error;
+    }
+  }
+  await env.DB.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL, updated_by TEXT REFERENCES users(id) ON DELETE SET NULL);
+    CREATE TABLE IF NOT EXISTS admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, target_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, action TEXT NOT NULL, details TEXT, created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS commission_positions (code TEXT PRIMARY KEY, label TEXT NOT NULL, authority_level TEXT NOT NULL CHECK (authority_level IN ('supreme', 'core', 'moderator')), rank INTEGER NOT NULL UNIQUE);
+    CREATE TABLE IF NOT EXISTS commission_departments (code TEXT PRIMARY KEY, label TEXT NOT NULL, rank INTEGER NOT NULL UNIQUE);
+    INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('maintenance_mode', '${env.MAINTENANCE_MODE === "true" ? "true" : "false"}', ${Date.now()});
+    INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('maintenance_message', 'A área de gestão encontra-se temporariamente indisponível enquanto preparamos novas funcionalidades.', ${Date.now()});
+    INSERT OR IGNORE INTO commission_positions (code, label, authority_level, rank) VALUES ('principal_admin', 'Administrador Principal', 'supreme', 1), ('president', 'Presidente', 'core', 2), ('vice_president', 'Vice-Presidente', 'core', 3), ('treasurer', 'Tesoureiro/a', 'core', 4), ('member', 'Vogal', 'moderator', 5);
+    INSERT OR IGNORE INTO commission_departments (code, label, rank) VALUES ('management', 'Núcleo de Gestão', 1), ('studies', 'Estudos e Sebentas', 2), ('curricular_units', 'Unidades Curriculares', 3), ('recreation_image', 'Recreativo e Imagem', 4);
+  `);
+  await env.DB.prepare("UPDATE users SET commission_position = 'principal_admin', commission_department = 'studies', role = 'admin' WHERE email = ? AND commission_position IS NULL")
+    .bind(env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()).run();
+}
+
 async function createSessionResponse(env: Env, request: Request, user: { id: string; email: string; full_name: string; role: string }, rememberMe: boolean): Promise<Response> {
   const token = bytesToBase64(randomBytes(32)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const now = Date.now();
@@ -360,8 +394,12 @@ async function maintenanceConfig(env: Env): Promise<{ maintenanceMode: boolean; 
 
 async function handleAdminUsers(request: Request, env: Env, admin: { id: string }): Promise<Response> {
   if (request.method === "GET") {
-    const users = await env.DB.prepare("SELECT id, email, full_name, role, status, status_reason, status_until, email_verified_at, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC").all();
-    return json({ users: users.results });
+    const [users, positions, departments] = await Promise.all([
+      env.DB.prepare("SELECT id, email, full_name, role, status, status_reason, status_until, commission_position, commission_department, email_verified_at, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC").all(),
+      env.DB.prepare("SELECT code, label, authority_level, rank FROM commission_positions ORDER BY rank").all(),
+      env.DB.prepare("SELECT code, label, rank FROM commission_departments ORDER BY rank").all(),
+    ]);
+    return json({ users: users.results, positions: positions.results, departments: departments.results });
   }
   const body = await parseJson(request);
   const id = typeof body?.id === "string" ? body.id : "";
@@ -370,13 +408,17 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
   const status = body?.status;
   const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 300) : "";
   const statusUntil = typeof body?.statusUntil === "number" && Number.isFinite(body.statusUntil) ? body.statusUntil : null;
+  const commissionPosition = body?.commissionPosition === null ? null : String(body?.commissionPosition || "");
+  const commissionDepartment = body?.commissionDepartment === null ? null : String(body?.commissionDepartment || "");
   if (!id || validateFullName(fullName) || !["student", "representative", "admin"].includes(String(role)) || !["active", "pending", "suspended", "banned"].includes(String(status))) return json({ error: "Dados do utilizador inválidos." }, 400);
+  if (commissionPosition && !["principal_admin", "president", "vice_president", "treasurer", "member"].includes(commissionPosition)) return json({ error: "Cargo da Comissão inválido." }, 400);
+  if (commissionDepartment && !["management", "studies", "curricular_units", "recreation_image"].includes(commissionDepartment)) return json({ error: "Departamento da Comissão inválido." }, 400);
   if (id === admin.id && (role !== "admin" || status !== "active")) return json({ error: "Não pode retirar o seu próprio acesso administrativo." }, 400);
   const target = await env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(id).first<{ id: string; email: string }>();
   if (!target) return json({ error: "Utilizador não encontrado." }, 404);
   await env.DB.batch([
-    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, status = ?, status_reason = ?, status_until = ?, updated_at = ? WHERE id = ?").bind(fullName, role, status, reason || null, status === "suspended" ? statusUntil : null, Date.now(), id),
-    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, status, reason: reason || null, statusUntil }), Date.now()),
+    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, status = ?, status_reason = ?, status_until = ?, commission_position = ?, commission_department = ?, updated_at = ? WHERE id = ?").bind(fullName, role, status, reason || null, status === "suspended" ? statusUntil : null, commissionPosition || null, commissionDepartment || null, Date.now(), id),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, status, reason: reason || null, statusUntil, commissionPosition: commissionPosition || null, commissionDepartment: commissionDepartment || null }), Date.now()),
   ]);
   if (status !== "active") await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id).run();
   return json({ ok: true });
@@ -419,6 +461,7 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
 
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
+  await ensureOperationalSchema(env);
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
   if (request.method === "GET" && pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env) });
   if (request.method === "POST" && pathname === "/api/auth/register") return handleRegister(request, env);

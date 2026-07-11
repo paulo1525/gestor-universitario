@@ -43,7 +43,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
 
         <div className="sidebar__footer">
           <div className="security-note"><ShieldCheck aria-hidden="true" size={18} /><div><strong>Sessão protegida</strong><span>Email institucional confirmado</span></div></div>
-          <button className="profile" type="button" onClick={() => void logout()} title="Terminar sessão"><span className="avatar" aria-hidden="true">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{roleLabel}</small></span><LogOut aria-hidden="true" size={17} /></button>
+          <div className="profile"><span className="avatar" aria-hidden="true">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{roleLabel}</small></span><button className="profile__logout" type="button" onClick={() => void logout()} title="Terminar sessão" aria-label="Terminar sessão"><LogOut aria-hidden="true" size={17} /></button></div>
         </div>
       </aside>
 
