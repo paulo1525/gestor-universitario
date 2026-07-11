@@ -368,21 +368,23 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .admin-stats article { display:flex; align-items:center; gap:13px; padding:16px; border:1px solid var(--line); border-radius:12px; background:#fff; }
 .admin-stats article>svg { padding:9px; box-sizing:content-box; border-radius:10px; color:#806000; background:var(--gold-soft); }
 .admin-stats strong,.admin-stats span { display:block; } .admin-stats strong { font-size:20px; } .admin-stats span { color:var(--muted); font-size:9px; }
-.admin-settings { padding:0; margin-bottom:16px; overflow:hidden; }
-.admin-settings__header { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:14px; padding:18px; border-bottom:1px solid var(--line); background:#fafaf7; }
+.admin-settings { padding:0; margin-bottom:16px; overflow:hidden; background:#fff; }
+.admin-settings__header { min-height:76px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:14px; padding:16px 20px; border-bottom:1px solid var(--line); background:#fff; }
 .admin-settings__icon { display:grid; place-items:center; width:38px; height:38px; border-radius:10px; color:#806000; background:var(--gold-soft); }
 .admin-settings__icon svg { width:19px; }
+.admin-settings__header .eyebrow { margin-bottom:4px; }
 .admin-settings h2 { margin:0 0 3px; font-size:15px; } .admin-settings p { margin:0; color:var(--muted); font-size:9px; }
 .switch { display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--line); border-radius:10px; background:#fff; font-size:9px; cursor:pointer; }
 .switch input { width:18px; height:18px; accent-color:var(--green); }
 .switch span { display:grid; gap:2px; } .switch small { color:var(--muted); font-size:8px; font-weight:500; }
-.maintenance-editor { display:grid; gap:8px; padding:18px 18px 12px; }
+.maintenance-editor { display:grid; gap:8px; padding:18px 20px 12px; }
 .maintenance-editor>span { display:flex; align-items:center; justify-content:space-between; font-size:9px; }
 .maintenance-editor>span small { color:var(--muted); font-variant-numeric:tabular-nums; }
 .maintenance-editor textarea { min-height:112px; padding:12px 14px; border:1px solid #d8d8d2; border-radius:10px; resize:vertical; outline:0; color:var(--ink); background:#fff; font:inherit; font-size:10px; line-height:1.55; }
 .maintenance-editor textarea:focus { border-color:#947000; box-shadow:0 0 0 3px rgba(246,201,69,.2); }
-.admin-settings__actions { display:flex; justify-content:flex-end; padding:0 18px 18px; }
-.admin-settings__actions .button { min-width:136px; }
+.admin-settings__actions { min-height:60px; display:flex; justify-content:flex-end; align-items:center; padding:10px 20px 14px; background:#fff; }
+.admin-settings__actions .button { min-width:128px; }
+.settings-notice { display:flex; align-items:center; min-height:38px; margin:0 20px; padding:9px 12px; border:1px solid #cce8d8; border-radius:8px; }
 .admin-users { overflow:hidden; } .admin-users .panel__header { padding:18px; } .admin-users select,.admin-users input { min-height:36px; padding:0 9px; border:1px solid #d8d8d2; border-radius:8px; background:#fff; font-size:9px; }
 .admin-users .search-field { width:250px; height:40px; flex:0 1 250px; padding:0 12px; border-color:#d8d8d2; border-radius:10px; background:#fff; }
 .admin-users .search-field input { width:100%; min-height:0; padding:0; border:0; border-radius:0; outline:0; background:transparent; font-size:10px; }
@@ -511,7 +513,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .destination-editor h3 { margin:0; font-size:15px; }
 .destination-editor p { margin:0; color:var(--muted); font-size:10px; }
 .destination-editor .button { grid-column:1/-1; justify-self:end; margin-top:5px; }
-.deadline-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:18px 18px 0; }
+.deadline-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:18px 20px 4px; }
 .ticket-admin-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px}.ticket-admin-card{display:grid;gap:10px;padding:16px;border:1px solid var(--line);border-radius:12px;background:#fafaf8}.ticket-admin-card header{display:flex;justify-content:space-between;color:var(--muted);font-size:9px}.ticket-admin-card header span{display:flex;align-items:center;gap:6px;color:#725700;font-weight:800}.ticket-admin-card h3{margin:0;font-size:14px}.ticket-admin-card>small{color:var(--muted)}.ticket-admin-card p{min-height:42px;margin:0;font-size:10px;line-height:1.55}.ticket-admin-card label{display:grid;gap:5px;font-size:9px;font-weight:800}.ticket-admin-card select,.ticket-admin-card textarea{padding:9px;border:1px solid #d7d7d1;border-radius:8px;background:#fff;font-size:10px}.ticket-admin-card textarea{min-height:80px;resize:vertical}.ticket-admin-card .button{justify-self:end}.verification-hero{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:20px;border:1px solid;border-radius:14px}.verification-hero svg{width:30px;height:30px}.verification-hero strong,.verification-hero span{display:block}.verification-hero strong{font-size:16px}.verification-hero span{margin-top:4px;font-size:10px}.verification-hero.is-ready{color:var(--green);border-color:#b9ddc8;background:var(--green-soft)}.verification-hero.is-blocked{color:#8b3b24;border-color:#efc8bc;background:#fff0eb}.verification-list{display:grid;gap:8px;padding:18px}.verification-issue{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--line);border-radius:10px}.verification-issue svg{flex:0 0 auto}.verification-issue strong,.verification-issue small{display:block}.verification-issue strong{font-size:10px}.verification-issue small{margin-top:3px;color:var(--muted);font-size:8px}.verification-issue.blocker{color:#9b3f29;background:#fff8f5}.verification-issue.warning{color:#856000;background:#fffcf0}
 .admin-row-actions{display:flex;gap:6px}.preview-user-toggle{position:fixed;z-index:100;right:20px;bottom:20px;display:grid;gap:2px;min-width:210px;padding:12px 16px;border:2px solid var(--gold);border-radius:12px;color:#fff;background:#151515;box-shadow:0 16px 45px rgba(0,0,0,.35);text-align:left;cursor:pointer}.preview-user-toggle span,.preview-user-toggle small{color:#bbb;font-size:9px}.preview-user-toggle strong{font-size:11px}.preview-user-toggle small{color:var(--gold)}
 .admin-row-actions .admin-save-user:first-child{width:142px;font-size:0}.admin-row-actions .admin-save-user:first-child::after{content:"◉  Visualizar permissões";font-size:9px}.class-deadline-settings{margin-bottom:16px}.deadline-fields small{color:var(--muted);font-size:8px;font-weight:500}

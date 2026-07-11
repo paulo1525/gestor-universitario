@@ -549,21 +549,29 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
 async function handleAdminSettings(request: Request, env: Env, admin: { id: string }): Promise<Response> {
   if (request.method === "GET") return json({ ...await maintenanceConfig(env), ...await classSettings(env) });
   const body = await parseJson(request);
-  const enabled = body?.maintenanceMode === true;
-  const message = typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim().slice(0, 500) : "";
-  if (!message) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+  const section = typeof body?.section === "string" ? body.section : "";
+  if (!['maintenance', 'deadline'].includes(section)) return json({ error: "Indique a configuração que pretende guardar." }, 400);
+  const now = Date.now();
+  if (section === 'maintenance') {
+    const enabled = body?.maintenanceMode === true;
+    const message = typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim().slice(0, 500) : "";
+    if (!message) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_mode', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(String(enabled), now, admin.id),
+      env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_message', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(message, now, admin.id),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, action, details, created_at) VALUES (?, 'settings_updated', ?, ?)").bind(admin.id, JSON.stringify({ section, maintenanceMode: enabled }), now),
+    ]);
+    return json({ ok: true, maintenanceMode: enabled, maintenanceMessage: message });
+  }
   const openAt = typeof body?.openAt === "string" ? body.openAt : "";
   const closeAt = typeof body?.closeAt === "string" ? body.closeAt : "";
   if (!Number.isFinite(Date.parse(openAt)) || !Number.isFinite(Date.parse(closeAt)) || Date.parse(openAt) >= Date.parse(closeAt)) return json({ error: "Defina um início e fim válidos para o prazo." }, 400);
-  const now = Date.now();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_mode', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(String(enabled), now, admin.id),
-    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_message', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(message, now, admin.id),
     env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('classes_open_at', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(openAt, now, admin.id),
     env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('classes_close_at', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(closeAt, now, admin.id),
-    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, action, details, created_at) VALUES (?, 'settings_updated', ?, ?)").bind(admin.id, JSON.stringify({ maintenanceMode: enabled }), now),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, action, details, created_at) VALUES (?, 'settings_updated', ?, ?)").bind(admin.id, JSON.stringify({ section, openAt, closeAt }), now),
   ]);
-  return json({ ok: true, maintenanceMode: enabled, maintenanceMessage: message, openAt, closeAt });
+  return json({ ok: true, openAt, closeAt });
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
