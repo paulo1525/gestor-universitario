@@ -16,15 +16,13 @@ Para cada estudante são usados:
 
 Quem escolhe **Ficar na Turma X** mantém imediatamente a turma atual e não precisa de preencher situações, destinos ou colegas. Quem escolhe mudar permanece na turma atual se nenhuma alternativa válida for possível, salvo situações excecionais que fiquem pendentes de decisão manual.
 
-## Ordem de prioridade
+## Preferências, rede de apoio e colegas
 
-Para cada estudante que pretende mudar, o motor constrói uma lista sem repetições:
+As preferências são sempre individuais. Um colega que também pretende mudar nunca acrescenta automaticamente a sua turma atual à lista de outra pessoa. Para cada ligação, o motor considera apenas destinos escolhidos por ambos, minimiza primeiro a pior posição nas duas listas e depois a soma das posições. Sem destino comum, a ligação fica não satisfeita e os estudantes são calculados individualmente.
 
-1. turma da rede de apoio, quando indicada;
-2. turmas dos colegas selecionados, pela ordem em que foram associados;
-3. restantes turmas escolhidas pelo estudante, pela ordem original.
+A rede de apoio indicada numa turma refere-se a alguém que **vai permanecer nessa turma**. A rede na primeira preferência favorece esse destino; a rede noutra turma só pode ser indicada a partir da segunda preferência.
 
-A indicação de um colega é uma **prioridade suave**, não uma garantia. O colega serve para favorecer a turma em que está registado. A colocação continua dependente da existência de uma solução global válida.
+As ligações entre até seis colegas são prioridades suaves avaliadas pela colocação final proposta. Não ultrapassam o equilíbrio, a capacidade nem as escolhas expressas pelos estudantes.
 
 ## Limites e cálculo
 
