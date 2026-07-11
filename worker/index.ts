@@ -595,6 +595,26 @@ async function handleOwnDestinations(request:Request,env:Env,user:CurrentUser):P
   await env.DB.batch([env.DB.prepare("DELETE FROM student_destinations WHERE student_id=?").bind(student.id),env.DB.prepare("UPDATE class_students SET preference=?,updated_at=? WHERE id=?").bind(destinations.length?'move':'stay',now,student.id),...destinations.map((id,rank)=>env.DB.prepare("INSERT INTO student_destinations (student_id,destination_class,rank,updated_by,updated_at) VALUES (?,?,?,?,?)").bind(student.id,id,rank+1,user.id,now)),env.DB.prepare("INSERT INTO class_audit_log (class_id,student_id,actor_user_id,action,details,created_at) VALUES (?,?,?,'student_preference_updated',?,?)").bind(student.class_id,student.id,user.id,JSON.stringify({destinations}),now)]); return json({ok:true});
 }
 
+async function handleGlobalTickets(request:Request,env:Env,user:CurrentUser):Promise<Response>{
+ if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
+ if(request.method==="GET"){const result=await env.DB.prepare(`SELECT t.*,s.full_name student_name,s.student_number,u.full_name created_by_name FROM class_tickets t LEFT JOIN class_students s ON s.id=t.student_id JOIN users u ON u.id=t.created_by ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'review' THEN 1 ELSE 2 END,t.created_at DESC`).all();return json({tickets:result.results});}
+ const body=await parseJson(request),id=String(body?.id||""),status=String(body?.status||""),response=String(body?.response||"").trim().slice(0,1000);
+ if(!id||!["open","review","information_needed","accepted","rejected","completed"].includes(status))return json({error:"Estado do pedido inválido."},400);
+ if(["accepted","rejected","completed"].includes(status)&&response.length<5)return json({error:"Registe uma resposta antes de concluir o pedido."},400);
+ const now=Date.now();await env.DB.batch([env.DB.prepare("UPDATE class_tickets SET status=?,response=?,resolved_by=CASE WHEN ? IN ('accepted','rejected','completed') THEN ? ELSE resolved_by END,updated_at=? WHERE id=?").bind(status,response||null,status,user.actorId||user.id,now,id),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'class_ticket_updated',?,?)").bind(user.actorId||user.id,JSON.stringify({id,status}),now)]);return json({ok:true});
+}
+
+async function handleDistributionCheck(env:Env,user:CurrentUser):Promise<Response>{
+ if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
+ const [classes,students,openTickets]=await Promise.all([env.DB.prepare("SELECT id,status FROM classes ORDER BY id").all<{id:number;status:string}>(),env.DB.prepare("SELECT id,class_id,student_number,preference FROM class_students WHERE removed_at IS NULL").all<{id:string;class_id:number;student_number:string;preference:string}>(),env.DB.prepare("SELECT id,class_id,category FROM class_tickets WHERE status IN ('open','review','information_needed')").all<{id:string;class_id:number;category:string}>()]);
+ const issues:Array<{severity:"blocker"|"warning";code:string;message:string;classId?:number}>=[];
+ for(const klass of classes.results)if(["draft","reopened"].includes(klass.status))issues.push({severity:"blocker",code:"CLASS_NOT_SUBMITTED",message:`A Turma ${klass.id} ainda não foi submetida.`,classId:klass.id});
+ for(const student of students.results){if(!/^\d{9}$/.test(student.student_number))issues.push({severity:"blocker",code:"INVALID_NUMBER",message:`Número mecanográfico inválido na Turma ${student.class_id}.`,classId:student.class_id});if(student.preference==="move"){const count=await env.DB.prepare("SELECT COUNT(*) total FROM student_destinations WHERE student_id=?").bind(student.id).first<{total:number}>();if(!count?.total)issues.push({severity:"blocker",code:"MISSING_DESTINATION",message:`Há um aluno que pretende mudar sem destinos na Turma ${student.class_id}.`,classId:student.class_id});}}
+ for(const ticket of openTickets.results)issues.push({severity:"blocker",code:"OPEN_TICKET",message:`A Turma ${ticket.class_id} tem um pedido pendente (${ticket.category}).`,classId:ticket.class_id});
+ const counts=await env.DB.prepare("SELECT class_id,COUNT(*) total FROM class_students WHERE removed_at IS NULL GROUP BY class_id ORDER BY class_id").all<{class_id:number;total:number}>();const values=counts.results.map(r=>r.total);if(values.length===20&&Math.max(...values)-Math.min(...values)>3)issues.push({severity:"warning",code:"IMBALANCE",message:"A diferença atual entre a maior e a menor turma excede três alunos."});
+ return json({ready:issues.every(i=>i.severity!=="blocker"),checkedAt:Date.now(),summary:{classes:20,students:students.results.length,blockers:issues.filter(i=>i.severity==="blocker").length,warnings:issues.filter(i=>i.severity==="warning").length},issues});
+}
+
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
@@ -624,6 +644,8 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (pathname === "/api/classes" || pathname.startsWith("/api/classes/")) {
     const user = await currentUser(request, env); return user ? handleClasses(request, env, user, pathname) : json({ error:"Sessão inválida." },401);
   }
+  if(pathname==="/api/admin/class-tickets"&&["GET","PATCH"].includes(request.method)){const user=await currentUser(request,env);return user?handleGlobalTickets(request,env,user):json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/distribution-check"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleDistributionCheck(env,user):json({error:"Sessão inválida."},401);}
   if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
     const admin = await requireAdmin(request, env);
     return admin ? handleAdminUsers(request, env, admin) : json({ error: "Acesso reservado a administradores." }, 403);
