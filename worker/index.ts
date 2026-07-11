@@ -320,13 +320,25 @@ async function ensureOperationalSchema(env: Env): Promise<void> {
     CREATE TABLE IF NOT EXISTS admin_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, target_user_id TEXT REFERENCES users(id) ON DELETE SET NULL, action TEXT NOT NULL, details TEXT, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS commission_positions (code TEXT PRIMARY KEY, label TEXT NOT NULL, authority_level TEXT NOT NULL CHECK (authority_level IN ('supreme', 'core', 'moderator')), rank INTEGER NOT NULL UNIQUE);
     CREATE TABLE IF NOT EXISTS commission_departments (code TEXT PRIMARY KEY, label TEXT NOT NULL, rank INTEGER NOT NULL UNIQUE);
+    CREATE TABLE IF NOT EXISTS classes (id INTEGER PRIMARY KEY CHECK(id BETWEEN 1 AND 20), academic_year TEXT NOT NULL DEFAULT '2026/2027', status TEXT NOT NULL DEFAULT 'draft', submitted_at INTEGER, submitted_by TEXT REFERENCES users(id), updated_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS class_students (id TEXT PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), full_name TEXT NOT NULL, student_number TEXT NOT NULL UNIQUE, preference TEXT NOT NULL CHECK(preference IN ('stay','move')), preference_locked_at INTEGER NOT NULL, created_by TEXT NOT NULL REFERENCES users(id), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, removed_at INTEGER);
+    CREATE TABLE IF NOT EXISTS student_destinations (student_id TEXT NOT NULL REFERENCES class_students(id) ON DELETE CASCADE, destination_class INTEGER NOT NULL REFERENCES classes(id), rank INTEGER NOT NULL, updated_by TEXT NOT NULL REFERENCES users(id), updated_at INTEGER NOT NULL, PRIMARY KEY(student_id, destination_class), UNIQUE(student_id, rank));
+    CREATE TABLE IF NOT EXISTS class_tickets (id TEXT PRIMARY KEY, class_id INTEGER NOT NULL REFERENCES classes(id), student_id TEXT REFERENCES class_students(id), category TEXT NOT NULL, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', response TEXT, created_by TEXT NOT NULL REFERENCES users(id), resolved_by TEXT REFERENCES users(id), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS class_audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, class_id INTEGER NOT NULL, student_id TEXT, actor_user_id TEXT NOT NULL REFERENCES users(id), action TEXT NOT NULL, details TEXT, created_at INTEGER NOT NULL);
     INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('maintenance_mode', '${env.MAINTENANCE_MODE === "true" ? "true" : "false"}', ${Date.now()});
     INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('maintenance_message', 'A área de gestão encontra-se temporariamente indisponível enquanto preparamos novas funcionalidades.', ${Date.now()});
     INSERT OR IGNORE INTO commission_positions (code, label, authority_level, rank) VALUES ('principal_admin', 'Administrador Principal', 'supreme', 1), ('president', 'Presidente', 'core', 2), ('vice_president', 'Vice-Presidente', 'core', 3), ('treasurer', 'Tesoureiro/a', 'core', 4), ('member', 'Vogal', 'moderator', 5);
     INSERT OR IGNORE INTO commission_departments (code, label, rank) VALUES ('management', 'Núcleo de Gestão', 1), ('studies', 'Estudos e Sebentas', 2), ('curricular_units', 'Unidades Curriculares', 3), ('recreation_image', 'Recreativo e Imagem', 4);
   `);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('classes_open_at', '2026-07-11T08:00:00.000Z', ?)").bind(now),
+    env.DB.prepare("INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('classes_close_at', '2026-07-12T22:00:00.000Z', ?)").bind(now),
+    ...Array.from({ length: 20 }, (_, index) => env.DB.prepare("INSERT OR IGNORE INTO classes (id, updated_at) VALUES (?, ?)").bind(index + 1, now)),
+  ]);
   await env.DB.prepare("UPDATE users SET commission_position = COALESCE(commission_position, 'principal_admin'), role = 'admin' WHERE email = ?")
     .bind(PERMANENT_ADMIN_EMAIL).run();
+  await env.DB.prepare("UPDATE users SET class_representative = 1, represented_class = 17 WHERE email = ?").bind(PERMANENT_ADMIN_EMAIL).run();
 }
 
 async function createSessionResponse(env: Env, request: Request, user: { id: string; email: string; full_name: string; role: string }, rememberMe: boolean): Promise<Response> {
@@ -379,16 +391,17 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; fullName: string; role: string; fontScale: string } | null> {
+type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null };
+async function currentUser(request: Request, env: Env): Promise<CurrentUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.commission_department, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; commission_department: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
   if (!row) return null;
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale };
+  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department };
 }
 
 async function handleAccessibilityPreference(request: Request, env: Env): Promise<Response> {
@@ -454,18 +467,23 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
 }
 
 async function handleAdminSettings(request: Request, env: Env, admin: { id: string }): Promise<Response> {
-  if (request.method === "GET") return json(await maintenanceConfig(env));
+  if (request.method === "GET") return json({ ...await maintenanceConfig(env), ...await classSettings(env) });
   const body = await parseJson(request);
   const enabled = body?.maintenanceMode === true;
   const message = typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim().slice(0, 500) : "";
   if (!message) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+  const openAt = typeof body?.openAt === "string" ? body.openAt : "";
+  const closeAt = typeof body?.closeAt === "string" ? body.closeAt : "";
+  if (!Number.isFinite(Date.parse(openAt)) || !Number.isFinite(Date.parse(closeAt)) || Date.parse(openAt) >= Date.parse(closeAt)) return json({ error: "Defina um início e fim válidos para o prazo." }, 400);
   const now = Date.now();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_mode', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(String(enabled), now, admin.id),
     env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_message', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(message, now, admin.id),
+    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('classes_open_at', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(openAt, now, admin.id),
+    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('classes_close_at', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(closeAt, now, admin.id),
     env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, action, details, created_at) VALUES (?, 'settings_updated', ?, ?)").bind(admin.id, JSON.stringify({ maintenanceMode: enabled }), now),
   ]);
-  return json({ ok: true, maintenanceMode: enabled, maintenanceMessage: message });
+  return json({ ok: true, maintenanceMode: enabled, maintenanceMessage: message, openAt, closeAt });
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
@@ -488,6 +506,79 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
   return json({ ok: true }, 200, { "set-cookie": `${SESSION_COOKIE}=${token}; Path=/${persistence}; HttpOnly; Secure; SameSite=Strict` });
 }
 
+function studentNumberFromEmail(email: string): string { return email.split("@")[0].replace(/^up/i, ""); }
+function canManageAll(user: CurrentUser): boolean { return user.role === "admin" || user.commissionDepartment === "management"; }
+function canEditClass(user: CurrentUser, classId: number): boolean { return canManageAll(user) || (user.classRepresentative && user.representedClass === classId); }
+
+async function classSettings(env: Env) {
+  const result = await env.DB.prepare("SELECT key, value FROM app_settings WHERE key IN ('classes_open_at','classes_close_at')").all<{ key: string; value: string }>();
+  const values = Object.fromEntries(result.results.map((row) => [row.key, row.value]));
+  return { openAt: values.classes_open_at, closeAt: values.classes_close_at };
+}
+
+async function handleClasses(request: Request, env: Env, user: CurrentUser, pathname: string): Promise<Response> {
+  const settings = await classSettings(env);
+  if (pathname === "/api/classes" && request.method === "GET") {
+    const result = await env.DB.prepare(`SELECT c.id,c.status,c.submitted_at,u.full_name representative,
+      COUNT(s.id) students,COALESCE(SUM(s.preference='stay'),0) stays,COALESCE(SUM(s.preference='move'),0) moves
+      FROM classes c LEFT JOIN users u ON u.class_representative=1 AND u.represented_class=c.id AND u.status='active'
+      LEFT JOIN class_students s ON s.class_id=c.id AND s.removed_at IS NULL GROUP BY c.id ORDER BY c.id`).all();
+    return json({ classes: result.results, settings });
+  }
+  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(students|submit|tickets))?$/);
+  if (!match) return json({ error: "Turma não encontrada." }, 404);
+  const classId = Number(match[1]); const action = match[2] || "detail";
+  if (classId < 1 || classId > 20) return json({ error: "Turma inválida." }, 400);
+  const klass = await env.DB.prepare("SELECT * FROM classes WHERE id=?").bind(classId).first<{ id:number; status:string; submitted_at:number|null }>();
+  if (!klass) return json({ error: "Turma não encontrada." }, 404);
+  if (request.method === "GET" && action === "detail") {
+    const students = await env.DB.prepare("SELECT id,full_name,student_number,preference,preference_locked_at FROM class_students WHERE class_id=? AND removed_at IS NULL ORDER BY full_name").bind(classId).all<{id:string;full_name:string;student_number:string;preference:string;preference_locked_at:number}>();
+    const ownNumber = studentNumberFromEmail(user.email);
+    const output = await Promise.all(students.results.map(async (student) => {
+      const isSelf = student.student_number === ownNumber;
+      const destinations = isSelf || canManageAll(user) ? (await env.DB.prepare("SELECT destination_class FROM student_destinations WHERE student_id=? ORDER BY rank").bind(student.id).all<{destination_class:number}>()).results.map((row)=>row.destination_class) : [];
+      return { id:student.id,nome:student.full_name,numero:student.student_number,preferencia:student.preference==='stay'?'Ficar':'Mudar',locked:true,isSelf,destinations };
+    }));
+    return json({ class: { id:classId,status:klass.status,submittedAt:klass.submitted_at }, students:output, settings, permissions:{ edit:canEditClass(user,classId), manage:canManageAll(user), representative:user.classRepresentative&&user.representedClass===classId } });
+  }
+  if (request.method === "POST" && action === "students") {
+    if (!canEditClass(user,classId)) return json({ error:"Sem permissão para alterar esta turma." },403);
+    if (klass.status !== "draft" && !canManageAll(user)) return json({ error:"A turma já foi submetida. Abra um pedido de correção." },409);
+    const body=await parseJson(request); const fullName=normalizeFullName(body?.fullName); const number=String(body?.studentNumber||"").trim(); const preference=body?.preference==="move"?"move":"stay";
+    if (validateFullName(fullName)||!/^\d{9}$/.test(number)) return json({error:"Indique o nome completo e um número mecanográfico com 9 algarismos."},400);
+    const now=Date.now(), id=crypto.randomUUID();
+    try { await env.DB.batch([
+      env.DB.prepare("INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(id,classId,fullName,number,preference,now,user.id,now,now),
+      env.DB.prepare("INSERT INTO class_audit_log (class_id,student_id,actor_user_id,action,details,created_at) VALUES (?,?,?,'student_created',?,?)").bind(classId,id,user.id,JSON.stringify({preference}),now),
+    ]); } catch { return json({error:"Este número mecanográfico já está registado."},409); }
+    return json({ok:true,id},201);
+  }
+  if (request.method === "POST" && action === "submit") {
+    if (!canEditClass(user,classId)) return json({error:"Sem permissão para submeter esta turma."},403);
+    if (!canManageAll(user) && klass.status!=="draft" && klass.status!=="reopened") return json({error:"Esta turma já foi submetida."},409);
+    const count=await env.DB.prepare("SELECT COUNT(*) total FROM class_students WHERE class_id=? AND removed_at IS NULL").bind(classId).first<{total:number}>();
+    if (!count?.total) return json({error:"Adicione pelo menos um aluno antes de submeter."},400);
+    await env.DB.batch([env.DB.prepare("UPDATE classes SET status='submitted',submitted_at=?,submitted_by=?,updated_at=? WHERE id=?").bind(Date.now(),user.id,Date.now(),classId),env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,created_at) VALUES (?,?,'class_submitted',?)").bind(classId,user.id,Date.now())]);
+    return json({ok:true});
+  }
+  if (action === "tickets" && request.method === "GET") {
+    const tickets=await env.DB.prepare("SELECT t.*,u.full_name created_by_name FROM class_tickets t JOIN users u ON u.id=t.created_by WHERE t.class_id=? ORDER BY t.created_at DESC").bind(classId).all(); return json({tickets:tickets.results});
+  }
+  if (action === "tickets" && request.method === "POST") {
+    const body=await parseJson(request), description=String(body?.description||"").trim().slice(0,1000), category=String(body?.category||"other"); if(description.length<10)return json({error:"Descreva o pedido com pelo menos 10 caracteres."},400);
+    await env.DB.prepare("INSERT INTO class_tickets (id,class_id,student_id,category,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),classId,typeof body?.studentId==="string"?body.studentId:null,category,description,user.id,Date.now(),Date.now()).run(); return json({ok:true},201);
+  }
+  return json({error:"Operação não suportada."},405);
+}
+
+async function handleOwnDestinations(request:Request,env:Env,user:CurrentUser):Promise<Response>{
+  const body=await parseJson(request); const destinations=Array.isArray(body?.destinations)?body.destinations.map(Number):[]; if(new Set(destinations).size!==destinations.length||destinations.some((id)=>!Number.isInteger(id)||id<1||id>20))return json({error:"Lista de destinos inválida."},400);
+  const number=studentNumberFromEmail(user.email); const student=await env.DB.prepare("SELECT s.id,s.class_id,s.preference,c.status FROM class_students s JOIN classes c ON c.id=s.class_id WHERE s.student_number=? AND s.removed_at IS NULL").bind(number).first<{id:string;class_id:number;preference:string;status:string}>();
+  if(!student)return json({error:"O seu registo ainda não consta de uma turma."},404); if(student.status==="draft"||student.status==="reopened")return json({error:"O representante ainda não submeteu a turma."},409); if(destinations.includes(student.class_id))return json({error:"A turma atual não pode ser um destino."},400);
+  const settings=await classSettings(env), now=Date.now(); if(now<Date.parse(settings.openAt)||now>Date.parse(settings.closeAt))return json({error:"O prazo de preferências não está aberto."},409);
+  await env.DB.batch([env.DB.prepare("DELETE FROM student_destinations WHERE student_id=?").bind(student.id),env.DB.prepare("UPDATE class_students SET preference=?,updated_at=? WHERE id=?").bind(destinations.length?'move':'stay',now,student.id),...destinations.map((id,rank)=>env.DB.prepare("INSERT INTO student_destinations (student_id,destination_class,rank,updated_by,updated_at) VALUES (?,?,?,?,?)").bind(student.id,id,rank+1,user.id,now)),env.DB.prepare("INSERT INTO class_audit_log (class_id,student_id,actor_user_id,action,details,created_at) VALUES (?,?,?,'student_preference_updated',?,?)").bind(student.class_id,student.id,user.id,JSON.stringify({destinations}),now)]); return json({ok:true});
+}
+
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
@@ -508,7 +599,13 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method === "PATCH" && pathname === "/api/auth/accessibility") return handleAccessibilityPreference(request, env);
   if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
-    return user ? json({ user: { email: user.email, fullName: user.fullName, role: user.role, fontScale: user.fontScale } }) : json({ user: null }, 401);
+    return user ? json({ user }) : json({ user: null }, 401);
+  }
+  if (pathname === "/api/student/destinations" && request.method === "PUT") {
+    const user = await currentUser(request, env); return user ? handleOwnDestinations(request, env, user) : json({ error:"Sessão inválida." },401);
+  }
+  if (pathname === "/api/classes" || pathname.startsWith("/api/classes/")) {
+    const user = await currentUser(request, env); return user ? handleClasses(request, env, user, pathname) : json({ error:"Sessão inválida." },401);
   }
   if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
     const admin = await requireAdmin(request, env);

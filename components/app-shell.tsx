@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
+import { ChevronRight, LayoutDashboard, LogOut, Menu, Settings, Users, X } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { FontScale, useAuth } from "@/components/auth-context";
 
@@ -33,8 +33,9 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
         <nav className="nav-list" aria-label="Gestão de turmas">
           <span className="nav-label">Gestão de turmas</span>
           <Link className={active === "overview" ? "is-active" : ""} href="/" aria-current={active === "overview" ? "page" : undefined}>
-            <LayoutDashboard aria-hidden="true" size={19} />Visão geral
+            <LayoutDashboard aria-hidden="true" size={19} />Resumo
           </Link>
+          {user?.representedClass&&<Link href={`/turmas/${user.representedClass}`}><Users aria-hidden="true" size={19}/>A minha turma <span className="nav-count">{user.representedClass}</span></Link>}
           <Link className={active === "turmas" ? "is-active" : ""} href="/#turmas" aria-current={active === "turmas" ? "page" : undefined}>
             <Users aria-hidden="true" size={19} />Turmas<span className="nav-count">20</span>
           </Link>
@@ -42,7 +43,6 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
         </nav>
 
         <div className="sidebar__footer">
-          <div className="security-note"><ShieldCheck aria-hidden="true" size={18} /><div><strong>Sessão protegida</strong><span>Email institucional confirmado</span></div></div>
           <div className="text-size-setting"><span>Tamanho do texto</span><div role="group" aria-label="Tamanho do texto">{([['small','A−'],['normal','A'],['large','A+']] as [FontScale,string][]).map(([value,label])=><button key={value} type="button" className={user?.fontScale===value?'is-active':''} onClick={()=>void setFontScale(value)} aria-pressed={user?.fontScale===value}>{label}</button>)}</div></div>
           <div className="profile"><span className="avatar" aria-hidden="true">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{roleLabel}</small></span><button className="profile__logout" type="button" onClick={() => void logout()} title="Terminar sessão" aria-label="Terminar sessão"><LogOut aria-hidden="true" size={17} /></button></div>
         </div>
