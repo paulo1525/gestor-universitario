@@ -386,6 +386,8 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .admin-settings__actions .button { min-width:128px; }
 .settings-notice { display:flex; align-items:center; min-height:38px; margin:0 20px; padding:9px 12px; border:1px solid #cce8d8; border-radius:8px; }
 .admin-users { overflow:hidden; } .admin-users .panel__header { padding:18px; } .admin-users select,.admin-users input { min-height:36px; padding:0 9px; border:1px solid #d8d8d2; border-radius:8px; background:#fff; font-size:9px; }
+.admin-card-heading { min-width:0; display:flex; align-items:center; gap:14px; }
+.admin-card-heading h2 { margin:0; }
 .admin-users .search-field { width:250px; height:40px; flex:0 1 250px; padding:0 12px; border-color:#d8d8d2; border-radius:10px; background:#fff; }
 .admin-users .search-field input { width:100%; min-height:0; padding:0; border:0; border-radius:0; outline:0; background:transparent; font-size:10px; }
 .admin-users .search-field:focus-within { border-color:#947000; box-shadow:0 0 0 3px rgba(246,201,69,.2); }
@@ -866,6 +868,16 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .class-roster .roster-table td { height: 52px; padding: 7px 16px; }
 .class-roster > .batch-footer,
 .submission-panel > .batch-footer { min-height: 56px; padding: 10px 20px; }
+.workspace .class-roster .roster-table tbody tr:last-child td { border-bottom: 0; }
+.workspace .class-roster > .batch-footer { border-top: 1px solid var(--line); }
+.workspace .class-roster > .batch-footer .button--compact {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 10px;
+  gap: 7px;
+}
+.workspace .class-roster > .batch-footer .button--compact svg { width: 15px; height: 15px; }
 @media(max-width:760px) {
   .class-roster .roster-table table { min-width: 680px; }
 }
