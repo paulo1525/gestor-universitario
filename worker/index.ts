@@ -78,7 +78,8 @@ function withSecurity(response: Response): Response {
 }
 
 function normalizeEmail(value: unknown): string {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return email.replace(/@edu\.med\.up\.pt$/i, "@up.pt");
 }
 
 function normalizeFullName(value: unknown): string {
@@ -229,7 +230,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   if (!await verifyTurnstile(env, request, body?.turnstileToken)) return json({ error: "Não foi possível validar a proteção antiabuso. Atualize a página e tente novamente." }, 400);
 
   const now = Date.now();
-  const existing = await env.DB.prepare("SELECT id, status, email_verified_at FROM users WHERE email = ?").bind(email).first<{ id: string; status: string; email_verified_at: number }>();
+  const existing = await env.DB.prepare("SELECT id, status, email_verified_at FROM users WHERE lower(replace(email,'@edu.med.up.pt','@up.pt')) = ?").bind(email).first<{ id: string; status: string; email_verified_at: number }>();
   const pending = await env.DB.prepare("SELECT last_sent_at FROM pending_registrations WHERE email = ?").bind(email).first<{ last_sent_at: number }>();
   if (pending && now - pending.last_sent_at < 60_000) return json({ error: "Aguarde um minuto antes de pedir outro código." }, 429);
   if (existing && existing.email_verified_at > 0) {
@@ -351,10 +352,10 @@ async function handlePasswordResetRequest(request:Request,env:Env):Promise<Respo
  if(!EMAIL_PATTERN.test(email))return json(neutral);
  if(!await rateLimit(env,"password-reset",email))return json({error:"Demasiados pedidos. Aguarde antes de tentar novamente."},429);
  if(!await verifyTurnstile(env,request,body?.turnstileToken))return json({error:"Não foi possível validar a proteção antiabuso."},400);
- const user=await env.DB.prepare("SELECT id FROM users WHERE email=? AND status='active' AND email_verified_at>0").bind(email).first<{id:string}>();
+ const user=await env.DB.prepare("SELECT id,email FROM users WHERE lower(replace(email,'@edu.med.up.pt','@up.pt'))=? AND status='active' AND email_verified_at>0").bind(email).first<{id:string;email:string}>();
  if(!user)return json(neutral);
  const code=makeCode(),now=Date.now();await env.DB.prepare("INSERT INTO password_resets (email,user_id,code_hash,expires_at,attempts,created_at) VALUES (?,?,?,?,0,?) ON CONFLICT(email) DO UPDATE SET user_id=excluded.user_id,code_hash=excluded.code_hash,expires_at=excluded.expires_at,attempts=0,created_at=excluded.created_at").bind(email,user.id,await codeHash(env,email,code),now+CODE_SECONDS*1000,now).run();
- try{await sendPasswordResetEmail(env,email,code)}catch(error){console.error("password_reset_email_failed",error);await env.DB.prepare("DELETE FROM password_resets WHERE email=?").bind(email).run();}
+ try{await sendPasswordResetEmail(env,user.email,code)}catch(error){console.error("password_reset_email_failed",error);await env.DB.prepare("DELETE FROM password_resets WHERE email=?").bind(email).run();}
  return json(neutral);
 }
 
@@ -425,7 +426,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!EMAIL_PATTERN.test(email) || !password || password.length > 128) return json(genericError, 401);
   if (!await rateLimit(env, "login", email)) return json({ error: "Demasiadas tentativas. Aguarde antes de tentar novamente." }, 429);
   if (!await verifyTurnstile(env, request, body?.turnstileToken)) return json({ error: "Não foi possível validar a proteção antiabuso." }, 400);
-  const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<UserRow>();
+  const user = await env.DB.prepare("SELECT * FROM users WHERE lower(replace(email,'@edu.med.up.pt','@up.pt')) = ?").bind(email).first<UserRow>();
   const now = Date.now();
   const accessBlocked = user && user.status !== "active" && !(user.status === "suspended" && user.status_until && user.status_until <= now);
   if (!user || user.email_verified_at <= 0 || accessBlocked || (user.locked_until && user.locked_until > now)) {
