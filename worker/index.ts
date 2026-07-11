@@ -50,6 +50,7 @@ const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const BROWSER_SESSION_SECONDS = 60 * 60 * 12;
 const CODE_SECONDS = 60 * 10;
 const EMAIL_PATTERN = /^up\d{9}@(up\.pt|edu\.med\.up\.pt)$/i;
+const PERMANENT_ADMIN_EMAIL = "up202507850@up.pt";
 const encoder = new TextEncoder();
 
 function json(data: unknown, status = 200, extraHeaders?: HeadersInit): Response {
@@ -320,8 +321,8 @@ async function ensureOperationalSchema(env: Env): Promise<void> {
     INSERT OR IGNORE INTO commission_positions (code, label, authority_level, rank) VALUES ('principal_admin', 'Administrador Principal', 'supreme', 1), ('president', 'Presidente', 'core', 2), ('vice_president', 'Vice-Presidente', 'core', 3), ('treasurer', 'Tesoureiro/a', 'core', 4), ('member', 'Vogal', 'moderator', 5);
     INSERT OR IGNORE INTO commission_departments (code, label, rank) VALUES ('management', 'Núcleo de Gestão', 1), ('studies', 'Estudos e Sebentas', 2), ('curricular_units', 'Unidades Curriculares', 3), ('recreation_image', 'Recreativo e Imagem', 4);
   `);
-  await env.DB.prepare("UPDATE users SET commission_position = 'principal_admin', commission_department = 'studies', role = 'admin' WHERE email = ? AND commission_position IS NULL")
-    .bind(env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()).run();
+  await env.DB.prepare("UPDATE users SET commission_position = COALESCE(commission_position, 'principal_admin'), role = 'admin' WHERE email = ?")
+    .bind(PERMANENT_ADMIN_EMAIL).run();
 }
 
 async function createSessionResponse(env: Env, request: Request, user: { id: string; email: string; full_name: string; role: string }, rememberMe: boolean): Promise<Response> {
@@ -374,16 +375,26 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; fullName: string; role: string } | null> {
+async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; fullName: string; role: string; fontScale: string } | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
   if (!row) return null;
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role };
+  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale };
+}
+
+async function handleAccessibilityPreference(request: Request, env: Env): Promise<Response> {
+  const user = await currentUser(request, env);
+  if (!user) return json({ error: "Sessão inválida." }, 401);
+  const body = await parseJson(request);
+  const fontScale = body?.fontScale;
+  if (!["small", "normal", "large"].includes(String(fontScale))) return json({ error: "Tamanho de texto inválido." }, 400);
+  await env.DB.prepare("UPDATE users SET font_scale = ?, updated_at = ? WHERE id = ?").bind(fontScale, Date.now(), user.id).run();
+  return json({ ok: true, fontScale });
 }
 
 async function requireAdmin(request: Request, env: Env) {
@@ -400,7 +411,7 @@ async function maintenanceConfig(env: Env): Promise<{ maintenanceMode: boolean; 
 async function handleAdminUsers(request: Request, env: Env, admin: { id: string }): Promise<Response> {
   if (request.method === "GET") {
     const [users, positions, departments] = await Promise.all([
-      env.DB.prepare("SELECT id, email, full_name, role, status, status_reason, status_until, commission_position, commission_department, email_verified_at, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC").all(),
+      env.DB.prepare("SELECT id, email, full_name, role, admin_override, class_representative, represented_class, status, status_reason, status_until, commission_position, commission_department, email_verified_at, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC").all(),
       env.DB.prepare("SELECT code, label, authority_level, rank FROM commission_positions ORDER BY rank").all(),
       env.DB.prepare("SELECT code, label, rank FROM commission_departments ORDER BY rank").all(),
     ]);
@@ -409,21 +420,30 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
   const body = await parseJson(request);
   const id = typeof body?.id === "string" ? body.id : "";
   const fullName = normalizeFullName(body?.fullName);
-  const role = body?.role;
+  const adminOverride = body?.adminOverride === true;
+  const classRepresentative = body?.classRepresentative === true;
+  const representedClass = classRepresentative && Number.isInteger(body?.representedClass) ? Number(body.representedClass) : null;
   const status = body?.status;
   const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 300) : "";
   const statusUntil = typeof body?.statusUntil === "number" && Number.isFinite(body.statusUntil) ? body.statusUntil : null;
   const commissionPosition = body?.commissionPosition === null ? null : String(body?.commissionPosition || "");
   const commissionDepartment = body?.commissionDepartment === null ? null : String(body?.commissionDepartment || "");
-  if (!id || validateFullName(fullName) || !["student", "representative", "admin"].includes(String(role)) || !["active", "pending", "suspended", "banned"].includes(String(status))) return json({ error: "Dados do utilizador inválidos." }, 400);
+  if (!id || validateFullName(fullName) || !["active", "pending", "suspended", "banned"].includes(String(status))) return json({ error: "Dados do utilizador inválidos." }, 400);
   if (commissionPosition && !["principal_admin", "president", "vice_president", "treasurer", "member"].includes(commissionPosition)) return json({ error: "Cargo da Comissão inválido." }, 400);
   if (commissionDepartment && !["management", "studies", "curricular_units", "recreation_image"].includes(commissionDepartment)) return json({ error: "Departamento da Comissão inválido." }, 400);
-  if (id === admin.id && (role !== "admin" || status !== "active")) return json({ error: "Não pode retirar o seu próprio acesso administrativo." }, 400);
+  if (classRepresentative && (!representedClass || representedClass < 1 || representedClass > 20)) return json({ error: "Selecione uma turma válida entre 1 e 20." }, 400);
   const target = await env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(id).first<{ id: string; email: string }>();
   if (!target) return json({ error: "Utilizador não encontrado." }, 404);
+  if (adminOverride && !commissionPosition) return json({ error: "Só pode atribuir acesso administrativo a membros da CC com cargo definido." }, 400);
+  const isPermanentAdmin = target.email.toLowerCase() === PERMANENT_ADMIN_EMAIL;
+  const effectiveAdminOverride = isPermanentAdmin ? false : adminOverride;
+  const role = isPermanentAdmin || commissionDepartment === "management" || (effectiveAdminOverride && commissionPosition)
+    ? "admin"
+    : commissionPosition || classRepresentative ? "representative" : "student";
+  if (id === admin.id && (role !== "admin" || status !== "active")) return json({ error: "Não pode retirar o seu próprio acesso administrativo." }, 400);
   await env.DB.batch([
-    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, status = ?, status_reason = ?, status_until = ?, commission_position = ?, commission_department = ?, updated_at = ? WHERE id = ?").bind(fullName, role, status, reason || null, status === "suspended" ? statusUntil : null, commissionPosition || null, commissionDepartment || null, Date.now(), id),
-    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, status, reason: reason || null, statusUntil, commissionPosition: commissionPosition || null, commissionDepartment: commissionDepartment || null }), Date.now()),
+    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, admin_override = ?, class_representative = ?, represented_class = ?, status = ?, status_reason = ?, status_until = ?, commission_position = ?, commission_department = ?, updated_at = ? WHERE id = ?").bind(fullName, role, effectiveAdminOverride ? 1 : 0, classRepresentative ? 1 : 0, representedClass, status, reason || null, status === "suspended" ? statusUntil : null, commissionPosition || null, commissionDepartment || null, Date.now(), id),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, adminOverride: effectiveAdminOverride, classRepresentative, representedClass, status, reason: reason || null, statusUntil, commissionPosition: commissionPosition || null, commissionDepartment: commissionDepartment || null }), Date.now()),
   ]);
   if (status !== "active") await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id).run();
   return json({ ok: true });
@@ -481,9 +501,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method === "POST" && pathname === "/api/auth/login") return handleLogin(request, env);
   if (request.method === "POST" && pathname === "/api/auth/logout") return handleLogout(request, env);
   if (request.method === "POST" && pathname === "/api/auth/session-preference") return handleSessionPreference(request, env);
+  if (request.method === "PATCH" && pathname === "/api/auth/accessibility") return handleAccessibilityPreference(request, env);
   if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
-    return user ? json({ user: { email: user.email, fullName: user.fullName, role: user.role } }) : json({ user: null }, 401);
+    return user ? json({ user: { email: user.email, fullName: user.fullName, role: user.role, fontScale: user.fontScale } }) : json({ user: null }, 401);
   }
   if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
     const admin = await requireAdmin(request, env);

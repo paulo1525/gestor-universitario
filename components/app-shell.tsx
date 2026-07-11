@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
 import { ReactNode, useState } from "react";
-import { useAuth } from "@/components/auth-context";
+import { FontScale, useAuth } from "@/components/auth-context";
 
 type AppShellProps = {
   children: ReactNode;
@@ -14,7 +14,7 @@ type AppShellProps = {
 
 export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppShellProps) {
   const [menuAberto, setMenuAberto] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, setFontScale } = useAuth();
   const roleLabel = user?.role === "admin" ? "Administrador" : user?.role === "representative" ? "Representante" : "Estudante";
 
   return (
@@ -43,6 +43,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
 
         <div className="sidebar__footer">
           <div className="security-note"><ShieldCheck aria-hidden="true" size={18} /><div><strong>Sessão protegida</strong><span>Email institucional confirmado</span></div></div>
+          <div className="text-size-setting"><span>Tamanho do texto</span><div role="group" aria-label="Tamanho do texto">{([['small','A−'],['normal','A'],['large','A+']] as [FontScale,string][]).map(([value,label])=><button key={value} type="button" className={user?.fontScale===value?'is-active':''} onClick={()=>void setFontScale(value)} aria-pressed={user?.fontScale===value}>{label}</button>)}</div></div>
           <div className="profile"><span className="avatar" aria-hidden="true">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{roleLabel}</small></span><button className="profile__logout" type="button" onClick={() => void logout()} title="Terminar sessão" aria-label="Terminar sessão"><LogOut aria-hidden="true" size={17} /></button></div>
         </div>
       </aside>
@@ -53,7 +54,6 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
         <header className="topbar">
           <button className="icon-button mobile-menu" type="button" onClick={() => setMenuAberto(true)} aria-label="Abrir menu"><Menu aria-hidden="true" size={22} /></button>
           <div className="breadcrumbs" aria-label="Localização atual"><Link href="/">Gestão de turmas</Link><ChevronRight aria-hidden="true" size={15} /><strong>{breadcrumb}</strong></div>
-          <div className="topbar__actions"><span className="session-badge"><ShieldCheck aria-hidden="true" size={16} />Ligação segura</span></div>
         </header>
         <main id="conteudo-principal" className="main-content">{children}</main>
       </div>
