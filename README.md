@@ -73,8 +73,8 @@ O push para `main` é o único evento autorizado a desencadear a produção. Nas
 definições de Builds do Cloudflare usar:
 
 - Production branch: `main`
-- Build command: `corepack pnpm install --frozen-lockfile && corepack pnpm run build`
-- Deploy command: `corepack pnpm run deploy`
+- Build command: `pnpm build`
+- Deploy command: `pnpm exec wrangler deploy`
 - Root directory: `/`
 
 Não adicionar uma GitHub Action de deploy quando a integração nativa do
