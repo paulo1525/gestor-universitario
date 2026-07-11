@@ -854,3 +854,16 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   .submission-panel > .batch-footer .button { width: 100%; }
   .submission-warning { margin: 12px; }
 }
+
+/* Densidade do roster igual à tabela administrativa. */
+.verification-list-panel .roster-table,
+.class-roster .roster-table { width: 100%; padding: 0; }
+.class-roster .roster-table table { width: 100%; min-width: 0; }
+.class-roster > .panel__header { min-height: 72px; }
+.class-roster .roster-table th { height: 38px; padding: 8px 16px; }
+.class-roster .roster-table td { height: 52px; padding: 7px 16px; }
+.class-roster > .batch-footer,
+.submission-panel > .batch-footer { min-height: 56px; padding: 10px 20px; }
+@media(max-width:760px) {
+  .class-roster .roster-table table { min-width: 680px; }
+}
