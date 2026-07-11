@@ -20,7 +20,7 @@ A aplicação recolhe e valida os dados necessários para uma futura distribuiç
 - A ordem é significativa: a 1.ª turma é a mais desejada.
 - A interface permite acrescentar, remover, subir e descer opções.
 - Não é obrigatório preencher todas as alternativas.
-- A turma atual não pode aparecer como destino.
+- A turma atual, para quem quiser mudar, deverá ser a última opção. Por exemplo: queria mudar para a 3ª, 7ª ou 9ª turmas; se não entrar em nenhuma delas, fico na minha atual.
 - Guardar novamente substitui a lista anterior numa única operação.
 - As preferências não garantem uma mudança.
 
