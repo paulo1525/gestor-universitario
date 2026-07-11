@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { TurmaDetail } from "@/components/turma-detail";
+import { AuthGuard } from "@/components/auth-guard";
 import { getAlunosDaTurma, getTurma, turmas } from "@/data/turmas";
 
 export function generateStaticParams() {
@@ -10,5 +11,5 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const turma = getTurma(Number(id));
   if (!turma) notFound();
-  return <TurmaDetail turma={turma} alunosIniciais={getAlunosDaTurma(turma)} />;
+  return <AuthGuard><TurmaDetail turma={turma} alunosIniciais={getAlunosDaTurma(turma)} /></AuthGuard>;
 }
