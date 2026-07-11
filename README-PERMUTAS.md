@@ -47,20 +47,22 @@ O cálculo deve analisar a solução global, em vez de processar estudantes um a
 
 Cada execução deverá criar uma fotografia versionada dos dados, regras e resultados. Com os mesmos dados, regras e critério de desempate, o resultado deve ser reproduzível.
 
-## Regras ainda por decidir pelo Núcleo de Gestão
-
-Antes de ativar o motor, é necessário configurar e aprovar:
+## Núcleo de Gestão
 
 - capacidade mínima e máxima de cada turma;
+- Resposta do núcleo: não há máximo nem mínimo - só não pode haver diferença superior a 3 estudantes entre as turmas de menores e maiores dimensões.
 - desequilíbrio permitido entre turmas;
 - critério para comparar uma 1.ª escolha com várias escolhas inferiores;
-- política de desempate;
+- política de desempate: vai ser por aleatorização do sistema, mas sempre SEMPRE registando isto tudo em logs.
 - tratamento de exceções administrativas;
 - momento em que uma proposta aprovada é publicada aos estudantes.
+- Este momento é apenas no fim de todas as turmas tarem validadas manualmente pelo núcleo.
 
 Estas regras não são inferidas pelo código, porque são decisões académicas. Até serem definidas, o verificador prepara os dados, mas não altera colocações.
 
 ## Verificador de distribuição
+
+Quando o sistema for rodado pela primeira vez pelos admins, pode dar para voltar atrás e reverter todas as alterações. Casos por aleatorização ou assim que mereçam atenção devem ficar registados devidamente em logs visíveis para os admins. Pessoas com "Notas" ou aleatorizadas devem tar a cores diferentes. Quem mudou para o que queria deve ficar a verde e quem permaneceu na msema turma por vontade própria deve ficar a cinzento estilo bloqueado.
 
 São bloqueadores atuais:
 
