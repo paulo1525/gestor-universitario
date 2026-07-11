@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, Users, X } from "lucide-react";
+import { ChevronRight, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
 import { ReactNode, useState } from "react";
 import { useAuth } from "@/components/auth-context";
 
 type AppShellProps = {
   children: ReactNode;
-  active: "overview" | "turmas";
+  active: "overview" | "turmas" | "admin";
   breadcrumb?: string;
 };
 
@@ -38,6 +38,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: AppS
           <Link className={active === "turmas" ? "is-active" : ""} href="/#turmas" aria-current={active === "turmas" ? "page" : undefined}>
             <Users aria-hidden="true" size={19} />Turmas<span className="nav-count">20</span>
           </Link>
+          {user?.role === "admin" && <Link className={active === "admin" ? "is-active" : ""} href="/admin" aria-current={active === "admin" ? "page" : undefined}><Settings aria-hidden="true" size={19} />Controlo administrativo</Link>}
         </nav>
 
         <div className="sidebar__footer">

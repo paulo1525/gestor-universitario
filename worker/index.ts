@@ -25,6 +25,9 @@ type UserRow = {
   email_verified_at: number;
   failed_login_count: number;
   locked_until: number | null;
+  status: "active" | "pending" | "suspended" | "banned";
+  status_reason: string | null;
+  status_until: number | null;
 };
 
 type PendingRow = {
@@ -305,7 +308,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!await verifyTurnstile(env, request, body?.turnstileToken)) return json({ error: "Não foi possível validar a proteção antiabuso." }, 400);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<UserRow>();
   const now = Date.now();
-  if (!user || (user.locked_until && user.locked_until > now)) {
+  const accessBlocked = user && user.status !== "active" && !(user.status === "suspended" && user.status_until && user.status_until <= now);
+  if (!user || accessBlocked || (user.locked_until && user.locked_until > now)) {
     await audit(env, request, "login", false, email, user?.id);
     return json(genericError, 401);
   }
@@ -317,7 +321,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     await audit(env, request, "login", false, email, user.id);
     return json(genericError, 401);
   }
-  await env.DB.prepare("UPDATE users SET failed_login_count = 0, locked_until = NULL, updated_at = ? WHERE id = ?").bind(now, user.id).run();
+  await env.DB.prepare("UPDATE users SET failed_login_count = 0, locked_until = NULL, status = CASE WHEN status = 'suspended' AND status_until <= ? THEN 'active' ELSE status END, status_reason = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_reason END, status_until = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_until END, last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, now, now, now, user.id).run();
   await audit(env, request, "login", true, email, user.id);
   return createSessionResponse(env, request, user, body?.rememberMe === true);
 }
@@ -334,11 +338,63 @@ function cookieValue(request: Request, name: string): string | null {
 async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; fullName: string; role: string } | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
   if (!row) return null;
+  if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
+  if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
   return { id: row.id, email: row.email, fullName: row.full_name, role: row.role };
+}
+
+async function requireAdmin(request: Request, env: Env) {
+  const user = await currentUser(request, env);
+  return user?.role === "admin" ? user : null;
+}
+
+async function maintenanceConfig(env: Env): Promise<{ maintenanceMode: boolean; maintenanceMessage: string }> {
+  const result = await env.DB.prepare("SELECT key, value FROM app_settings WHERE key IN ('maintenance_mode', 'maintenance_message')").all<{ key: string; value: string }>();
+  const settings = Object.fromEntries(result.results.map((row) => [row.key, row.value]));
+  return { maintenanceMode: (settings.maintenance_mode ?? env.MAINTENANCE_MODE) === "true", maintenanceMessage: settings.maintenance_message ?? "A plataforma encontra-se temporariamente em manutenção." };
+}
+
+async function handleAdminUsers(request: Request, env: Env, admin: { id: string }): Promise<Response> {
+  if (request.method === "GET") {
+    const users = await env.DB.prepare("SELECT id, email, full_name, role, status, status_reason, status_until, email_verified_at, last_login_at, created_at, updated_at FROM users ORDER BY created_at DESC").all();
+    return json({ users: users.results });
+  }
+  const body = await parseJson(request);
+  const id = typeof body?.id === "string" ? body.id : "";
+  const fullName = normalizeFullName(body?.fullName);
+  const role = body?.role;
+  const status = body?.status;
+  const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 300) : "";
+  const statusUntil = typeof body?.statusUntil === "number" && Number.isFinite(body.statusUntil) ? body.statusUntil : null;
+  if (!id || validateFullName(fullName) || !["student", "representative", "admin"].includes(String(role)) || !["active", "pending", "suspended", "banned"].includes(String(status))) return json({ error: "Dados do utilizador inválidos." }, 400);
+  if (id === admin.id && (role !== "admin" || status !== "active")) return json({ error: "Não pode retirar o seu próprio acesso administrativo." }, 400);
+  const target = await env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(id).first<{ id: string; email: string }>();
+  if (!target) return json({ error: "Utilizador não encontrado." }, 404);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, status = ?, status_reason = ?, status_until = ?, updated_at = ? WHERE id = ?").bind(fullName, role, status, reason || null, status === "suspended" ? statusUntil : null, Date.now(), id),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, status, reason: reason || null, statusUntil }), Date.now()),
+  ]);
+  if (status !== "active") await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id).run();
+  return json({ ok: true });
+}
+
+async function handleAdminSettings(request: Request, env: Env, admin: { id: string }): Promise<Response> {
+  if (request.method === "GET") return json(await maintenanceConfig(env));
+  const body = await parseJson(request);
+  const enabled = body?.maintenanceMode === true;
+  const message = typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim().slice(0, 500) : "";
+  if (!message) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_mode', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(String(enabled), now, admin.id),
+    env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_message', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(message, now, admin.id),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, action, details, created_at) VALUES (?, 'settings_updated', ?, ?)").bind(admin.id, JSON.stringify({ maintenanceMode: enabled }), now),
+  ]);
+  return json({ ok: true, maintenanceMode: enabled, maintenanceMessage: message });
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
@@ -364,7 +420,7 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
-  if (request.method === "GET" && pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, maintenanceMode: env.MAINTENANCE_MODE === "true" });
+  if (request.method === "GET" && pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env) });
   if (request.method === "POST" && pathname === "/api/auth/register") return handleRegister(request, env);
   if (request.method === "POST" && pathname === "/api/auth/verify") return handleVerify(request, env);
   if (request.method === "POST" && pathname === "/api/auth/login") return handleLogin(request, env);
@@ -373,6 +429,14 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
     return user ? json({ user: { email: user.email, fullName: user.fullName, role: user.role } }) : json({ user: null }, 401);
+  }
+  if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
+    const admin = await requireAdmin(request, env);
+    return admin ? handleAdminUsers(request, env, admin) : json({ error: "Acesso reservado a administradores." }, 403);
+  }
+  if (pathname === "/api/admin/settings" && ["GET", "PUT"].includes(request.method)) {
+    const admin = await requireAdmin(request, env);
+    return admin ? handleAdminSettings(request, env, admin) : json({ error: "Acesso reservado a administradores." }, 403);
   }
   return json({ error: "Endpoint não encontrado." }, 404);
 }
