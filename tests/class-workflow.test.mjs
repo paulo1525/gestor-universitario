@@ -34,7 +34,8 @@ test("submissão e aprovação são idempotentes",()=>{
 test("permissões e prazo são validados no servidor",()=>{
   assert.match(worker,/canEditClass\(user,classId\)/);
   assert.match(worker,/Date\.now\(\) < Date\.parse\(settings\.closeAt\)/);
-  assert.match(worker,/now<Date\.parse\(settings\.closeAt\)/);
+  assert.match(worker,/now<Date\.parse\(settings\.preferencesOpenAt\)/);
+  assert.match(worker,/now>Date\.parse\(settings\.preferencesCloseAt\)/);
 });
 
 test("o exemplo de número mecanográfico é neutro",()=>{
