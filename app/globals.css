@@ -650,6 +650,9 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .audit-row__action small { margin-top: 3px; }
 .audit-row time { white-space: nowrap; }
 .audit-row__button { min-width: 82px; min-height: 34px !important; padding-inline: 10px !important; font-size: 10px !important; }
+.audit-search { width: 280px; height: 40px; flex: 0 1 280px; background: #fff; }
+.audit-search input { width: 100%; min-height: 0; }
+.audit-search:focus-within { border-color: #947000; box-shadow: 0 0 0 3px rgba(246, 201, 69, .2); }
 .audit-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(17, 17, 17, .48); }
 .audit-modal { width: min(680px, 100%); max-height: min(680px, calc(100vh - 40px)); overflow: auto; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 24px 70px rgba(0, 0, 0, .24); }
 .audit-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
@@ -661,7 +664,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .audit-modal dd { margin: 4px 0 0; font-size: 11px; font-weight: 700; }
 .audit-modal h3 { margin: 18px 0 7px; font-size: 12px; }
 .audit-modal pre { max-height: 320px; overflow: auto; margin: 0; padding: 13px; border: 1px solid #e5e4de; border-radius: 9px; color: #41413d; background: #fafaf8; font: 10px/1.55 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-@media(max-width:760px) { .audit-row { grid-template-columns: 1fr auto; gap: 6px 12px; padding: 13px 16px; } .audit-row__action { grid-column: 1; } .audit-row__context, .audit-row time { grid-column: 1; margin-left: 42px; } .audit-row time { grid-row: 2; } .audit-row__button { grid-column: 2; grid-row: 1 / span 2; } .audit-modal dl { grid-template-columns: 1fr; } }
+@media(max-width:760px) { .audit-search { width: 100%; flex-basis: auto; } .audit-row { grid-template-columns: 1fr auto; gap: 6px 12px; padding: 13px 16px; } .audit-row__action { grid-column: 1; } .audit-row__context, .audit-row time { grid-column: 1; margin-left: 42px; } .audit-row time { grid-row: 2; } .audit-row__button { grid-column: 2; grid-row: 1 / span 2; } .audit-modal dl { grid-template-columns: 1fr; } }
 
 /* Formulário de gestão de turmas: alinhado com os restantes cards e formulários. */
 .workspace .class-editor {
