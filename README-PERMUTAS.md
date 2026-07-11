@@ -13,6 +13,7 @@ A aplicação recolhe e valida os dados necessários para uma futura distribuiç
 5. Se nenhuma alternativa for viável, o estudante permanece na turma atual. Um cálculo nunca pode deixar um estudante sem turma.
 6. O Núcleo resolve pedidos pendentes, executa o verificador e, futuramente, calcula uma proposta.
 7. Uma proposta deve ser revista e aprovada antes de ser aplicada.
+8. O formulário deverá ter uma opção de 'Notas', em que, se o estudante escrever algo (deve ter um aviso para só escrever em casos especiais, tipo sofre bullying ou não se encaixa na turma), esse estudante fica sinalizado. O sistema pode atribuir-lhe automaticamente uma turma, mas o núcleo da CC terá de validar manualmente esse estudante.
 
 ## Preferências
 
