@@ -2,7 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-export type AuthUser = { email: string; role: "student" | "representative" | "admin" };
+export type AuthUser = { email: string; fullName: string; role: "student" | "representative" | "admin" };
 type AuthState = { user: AuthUser | null; loading: boolean; refresh: () => Promise<void>; logout: () => Promise<void> };
 
 const AuthContext = createContext<AuthState | null>(null);

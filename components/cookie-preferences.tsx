@@ -26,8 +26,8 @@ export function CookiePreferences() {
 
   return (
     <>
-      <button className="cookie-settings-button" type="button" onClick={() => setOpen(true)} aria-label="Abrir preferências de cookies"><Cookie size={17} /></button>
-      {open && <div className="cookie-panel" role="dialog" aria-modal="false" aria-labelledby="cookie-title">
+      <button className="cookie-settings-button" type="button" onClick={() => setOpen((current) => !current)} aria-label={open ? "Fechar preferências de cookies" : "Abrir preferências de cookies"} aria-expanded={open} aria-controls="cookie-preferences-panel"><Cookie size={17} /></button>
+      {open && <div id="cookie-preferences-panel" className="cookie-panel" role="dialog" aria-modal="false" aria-labelledby="cookie-title">
         <div className="cookie-panel__header"><div><Cookie size={20} /><h2 id="cookie-title">Preferências de cookies</h2></div><button type="button" onClick={close} aria-label="Fechar"><X size={18} /></button></div>
         <p>Usamos cookies essenciais para autenticar e proteger a sua conta. Estão sempre ativos.</p>
         <div className="cookie-option"><div><strong>Cookies essenciais</strong><span>Permitem iniciar sessão e manter a conta segura.</span></div><span className="cookie-required">Sempre ativos</span></div>

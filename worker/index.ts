@@ -17,6 +17,7 @@ export interface Env {
 type UserRow = {
   id: string;
   email: string;
+  full_name: string;
   password_hash: string;
   password_salt: string;
   password_iterations: number;
@@ -28,6 +29,7 @@ type UserRow = {
 
 type PendingRow = {
   email: string;
+  full_name: string;
   password_hash: string;
   password_salt: string;
   password_iterations: number;
@@ -73,6 +75,17 @@ function withSecurity(response: Response): Response {
 
 function normalizeEmail(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeFullName(value: unknown): string {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+}
+
+function validateFullName(value: unknown): string | null {
+  const fullName = normalizeFullName(value);
+  if (fullName.length < 3 || fullName.length > 120) return "O nome completo deve ter entre 3 e 120 caracteres.";
+  if (!/^[\p{L}\p{M}][\p{L}\p{M}'’. -]*[\p{L}\p{M}.]$/u.test(fullName) || !/\s/u.test(fullName)) return "Introduza o nome completo, incluindo nome e apelido.";
+  return null;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -201,8 +214,11 @@ async function sendVerificationEmail(env: Env, email: string, code: string): Pro
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   const body = await parseJson(request);
   const email = normalizeEmail(body?.email);
+  const fullName = normalizeFullName(body?.fullName);
   const password = body?.password;
   if (!EMAIL_PATTERN.test(email)) return json({ error: "Use um email institucional no formato upXXXXXXXXX@up.pt ou upXXXXXXXXX@edu.med.up.pt." }, 400);
+  const fullNameError = validateFullName(body?.fullName);
+  if (fullNameError) return json({ error: fullNameError }, 400);
   const passwordError = validatePassword(password, email);
   if (passwordError) return json({ error: passwordError }, 400);
   if (!await rateLimit(env, "register", email)) return json({ error: "Demasiadas tentativas. Aguarde antes de tentar novamente." }, 429);
@@ -220,8 +236,8 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   const salt = bytesToBase64(randomBytes(16));
   const hash = await derivePassword(password as string, salt, env.AUTH_PEPPER, PASSWORD_ITERATIONS);
   const code = makeCode();
-  await env.DB.prepare("INSERT INTO pending_registrations (email, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at")
-    .bind(email, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now)
+  await env.DB.prepare("INSERT INTO pending_registrations (email, full_name, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at")
+    .bind(email, fullName, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now)
     .run();
   try {
     await sendVerificationEmail(env, email, code);
@@ -256,17 +272,17 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   const role = email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? "admin" : "student";
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO users (id, email, password_hash, password_salt, password_iterations, role, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(userId, email, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, now),
+      env.DB.prepare("INSERT INTO users (id, email, full_name, password_hash, password_salt, password_iterations, role, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(userId, email, pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, now),
       env.DB.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(email),
     ]);
   } catch {
     return json({ error: "Não foi possível concluir o registo. A conta poderá já existir." }, 409);
   }
   await audit(env, request, "registration_complete", true, email, userId);
-  return createSessionResponse(env, request, { id: userId, email, role }, body?.rememberMe === true);
+  return createSessionResponse(env, request, { id: userId, email, full_name: pending.full_name, role }, body?.rememberMe === true);
 }
 
-async function createSessionResponse(env: Env, request: Request, user: { id: string; email: string; role: string }, rememberMe: boolean): Promise<Response> {
+async function createSessionResponse(env: Env, request: Request, user: { id: string; email: string; full_name: string; role: string }, rememberMe: boolean): Promise<Response> {
   const token = bytesToBase64(randomBytes(32)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const now = Date.now();
   const lifetime = rememberMe ? SESSION_SECONDS : BROWSER_SESSION_SECONDS;
@@ -276,7 +292,7 @@ async function createSessionResponse(env: Env, request: Request, user: { id: str
     .run();
   const persistence = rememberMe ? `; Max-Age=${SESSION_SECONDS}` : "";
   const cookie = `${SESSION_COOKIE}=${token}; Path=/${persistence}; HttpOnly; Secure; SameSite=Strict`;
-  return json({ ok: true, user: { email: user.email, role: user.role } }, 200, { "set-cookie": cookie });
+  return json({ ok: true, user: { email: user.email, fullName: user.full_name, role: user.role } }, 200, { "set-cookie": cookie });
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
@@ -315,14 +331,14 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; role: string } | null> {
+async function currentUser(request: Request, env: Env): Promise<{ id: string; email: string; fullName: string; role: string } | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.role, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; role: string; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; session_id: string; last_seen_at: number }>();
   if (!row) return null;
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  return { id: row.id, email: row.email, role: row.role };
+  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role };
 }
 
 async function handleLogout(request: Request, env: Env): Promise<Response> {
@@ -356,7 +372,7 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method === "POST" && pathname === "/api/auth/session-preference") return handleSessionPreference(request, env);
   if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
-    return user ? json({ user: { email: user.email, role: user.role } }) : json({ user: null }, 401);
+    return user ? json({ user: { email: user.email, fullName: user.fullName, role: user.role } }) : json({ user: null }, 401);
   }
   return json({ error: "Endpoint não encontrado." }, 404);
 }

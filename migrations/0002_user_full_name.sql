@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN full_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE pending_registrations ADD COLUMN full_name TEXT NOT NULL DEFAULT '';
