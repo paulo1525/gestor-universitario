@@ -461,9 +461,16 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
 
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
-  await ensureOperationalSchema(env);
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
-  if (request.method === "GET" && pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env) });
+  if (request.method === "GET" && pathname === "/api/config") {
+    try {
+      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env) });
+    } catch (error) {
+      console.error("config_fallback", error instanceof Error ? error.message : "unknown");
+      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, maintenanceMode: env.MAINTENANCE_MODE === "true", maintenanceMessage: "A plataforma encontra-se temporariamente em manutenção." });
+    }
+  }
+  await ensureOperationalSchema(env);
   if (request.method === "POST" && pathname === "/api/auth/register") return handleRegister(request, env);
   if (request.method === "POST" && pathname === "/api/auth/verify") return handleVerify(request, env);
   if (request.method === "POST" && pathname === "/api/auth/login") return handleLogin(request, env);
