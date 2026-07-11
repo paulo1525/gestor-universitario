@@ -252,3 +252,17 @@ Esta opção permite desenvolver rapidamente, manter tipagem de ponta a ponta e 
 8. Acrescentar avisos, contactos e feedback anónimo.
 9. Acrescentar cadeiras, horários, submissão de materiais e biblioteca de estudo.
 
+## Alterações à base de dados D1
+
+Sempre que uma funcionalidade adicionar ou alterar tabelas, colunas, índices ou valores estruturais da base de dados:
+
+- criar uma migração SQL versionada na pasta `migrations`;
+- atualizar também `ensureOperationalSchema` no Worker com uma inicialização idempotente e compatível com bases de dados ainda desatualizadas;
+- garantir que as colunas necessárias são criadas antes de qualquer consulta que as utilize;
+- confirmar a existência de cada coluna através de `PRAGMA table_info` antes de executar `ALTER TABLE`, para que pedidos simultâneos não provoquem erros;
+- preservar valores existentes e definir valores padrão seguros para novas colunas obrigatórias;
+- testar tanto uma base de dados nova como a atualização de uma base já existente;
+- executar lint e `pnpm run build` antes de publicar.
+
+Não se deve assumir que a migração D1 já foi aplicada quando a nova versão do Worker começa a receber pedidos. O código publicado deve tolerar esse intervalo e nunca devolver erro 500 apenas porque o esquema ainda não foi atualizado.
+
