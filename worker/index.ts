@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { calculateDistribution } from "@/lib/distribution-engine.mjs";
+
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
@@ -164,6 +166,7 @@ function validOrigin(request: Request, env: Env): boolean {
 }
 
 async function verifyTurnstile(env: Env, request: Request, token: unknown): Promise<boolean> {
+  if (env.TURNSTILE_SECRET_KEY === "1x0000000000000000000000000000000AA") return token === "local-test";
   if (typeof token !== "string" || !token || token.length > 2048) return false;
   const fingerprint = requestFingerprint(request);
   const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -632,7 +635,7 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
       LEFT JOIN class_students s ON s.class_id=c.id AND s.removed_at IS NULL GROUP BY c.id ORDER BY c.id`).all();
     return json({ classes: result.results, settings, serverNow: Date.now() });
   }
-  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(draft|submit|tickets))?$/);
+  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(draft|submit|reopen|tickets))?$/);
   if (!match) return json({ error: "Turma não encontrada." }, 404);
   const classId = Number(match[1]), action = match[2] || "detail";
   if (classId < 1 || classId > 20) return json({ error: "Turma inválida." }, 400);
@@ -644,12 +647,12 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
     if (!canManageAll(user) && !canEditClass(user, classId) && Date.now() < Date.parse(settings.closeAt)) return json({ error: "A formação inicial das turmas encontra-se em curso." }, 403);
     const savedDraft = isDraft ? await env.DB.prepare("SELECT payload FROM class_drafts WHERE class_id=? AND revision=?").bind(classId, klass.draft_revision).first<{payload:string}>() : null;
     const ownNumber = studentNumberFromEmail(user.email);
-    let output: Array<{id:string;nome:string;numero:string;preferencia:string;locked:boolean;isSelf:boolean;destinations:number[]}>;
+    let output: Array<{id:string;nome:string;numero:string;preferencia:string;locked:boolean;isSelf:boolean;destinations:number[];notes?:string}>;
     if (savedDraft) {
       output = (JSON.parse(savedDraft.payload) as DraftStudent[]).map((student) => ({ id:student.id,nome:student.fullName,numero:student.studentNumber,preferencia:student.preference === "stay" ? "Ficar" : "Mudar",locked:false,isSelf:student.studentNumber===ownNumber,destinations:[] }));
     } else {
-      const students = await env.DB.prepare(`SELECT s.id,s.full_name,s.student_number,s.preference,COALESCE(GROUP_CONCAT(d.destination_class || ':' || d.rank, ','),'') destinations FROM class_students s LEFT JOIN student_destinations d ON d.student_id=s.id WHERE s.class_id=? AND s.removed_at IS NULL GROUP BY s.id ORDER BY s.full_name`).bind(classId).all<{id:string;full_name:string;student_number:string;preference:string;destinations:string}>();
-      output = students.results.map((student) => ({ id:student.id,nome:student.full_name,numero:student.student_number,preferencia:student.preference === "stay" ? "Ficar" : "Mudar",locked:!isDraft,isSelf:student.student_number===ownNumber,destinations:String(student.destinations).split(",").filter(Boolean).sort((a,b)=>Number(a.split(":")[1])-Number(b.split(":")[1])).map((value)=>Number(value.split(":")[0])) }));
+      const students = await env.DB.prepare(`SELECT s.id,s.full_name,s.student_number,s.preference,s.notes,COALESCE(GROUP_CONCAT(d.destination_class || ':' || d.rank, ','),'') destinations FROM class_students s LEFT JOIN student_destinations d ON d.student_id=s.id WHERE s.class_id=? AND s.removed_at IS NULL GROUP BY s.id ORDER BY s.full_name`).bind(classId).all<{id:string;full_name:string;student_number:string;preference:string;notes:string|null;destinations:string}>();
+      output = students.results.map((student) => ({ id:student.id,nome:student.full_name,numero:student.student_number,preferencia:student.preference === "stay" ? "Ficar" : "Mudar",locked:!isDraft,isSelf:student.student_number===ownNumber,destinations:String(student.destinations).split(",").filter(Boolean).sort((a,b)=>Number(a.split(":")[1])-Number(b.split(":")[1])).map((value)=>Number(value.split(":")[0])),notes:student.student_number===ownNumber||canManageAll(user)?student.notes||"":undefined }));
     }
     return json({ class:{id:classId,status:klass.status,submittedAt:klass.submitted_at,workflowStep:klass.workflow_step,draftRevision:klass.draft_revision},students:output,settings,serverNow:Date.now(),permissions:{edit:canEditClass(user,classId)&&isDraft,manage:canManageAll(user),representative:user.classRepresentative&&user.representedClass===classId} });
   }
@@ -677,6 +680,14 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
     const now=Date.now(),values=normalized.students.map(()=>"(?,?,?,?,?,?,?,?,?,NULL)").join(","),bindings=normalized.students.flatMap((student)=>[student.id,classId,student.fullName,student.studentNumber,student.preference,now,user.id,now,now]);
     await env.DB.batch([env.DB.prepare("UPDATE class_students SET removed_at=?,updated_at=? WHERE class_id=? AND removed_at IS NULL").bind(now,now,classId),env.DB.prepare(`INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at,removed_at) VALUES ${values} ON CONFLICT(student_number) DO UPDATE SET class_id=excluded.class_id,full_name=excluded.full_name,preference=excluded.preference,preference_locked_at=excluded.preference_locked_at,updated_at=excluded.updated_at,removed_at=NULL`).bind(...bindings),env.DB.prepare("UPDATE classes SET status='submitted',workflow_step=3,submitted_at=?,submitted_by=?,updated_at=? WHERE id=? AND status IN ('draft','reopened')").bind(now,user.id,now,classId),env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) VALUES (?,?,'class_submitted',?,?)").bind(classId,user.id,JSON.stringify({students:normalized.students.length,revision:klass.draft_revision}),now)]);
     return json({ok:true});
+  }
+
+  if (request.method === "POST" && action === "reopen") {
+    if (!canManageAll(user)) return json({error:"Apenas um administrador pode reverter a submissão."},403);
+    if (isDraft) return json({ok:true,alreadyReopened:true});
+    const now=Date.now(),actorId=user.actorId||user.id;
+    await env.DB.batch([env.DB.prepare("UPDATE classes SET status='reopened',workflow_step=2,submitted_at=NULL,submitted_by=NULL,updated_at=? WHERE id=?").bind(now,classId),env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) VALUES (?,?,'class_submission_reverted',?,?)").bind(classId,actorId,JSON.stringify({previousStatus:klass.status}),now)]);
+    return json({ok:true,status:"reopened"});
   }
 
   if (action === "tickets" && request.method === "GET") {
@@ -754,11 +765,11 @@ async function handleClasses(request: Request, env: Env, user: CurrentUser, path
 }
 
 async function handleOwnDestinations(request:Request,env:Env,user:CurrentUser):Promise<Response>{
-  const body=await parseJson(request); const destinations=Array.isArray(body?.destinations)?body.destinations.map(Number):[]; if(destinations.length>19||new Set(destinations).size!==destinations.length||destinations.some((id)=>!Number.isInteger(id)||id<1||id>20))return json({error:"Pode indicar até 19 turmas alternativas, sem repetições."},400);
+  const body=await parseJson(request); const destinations=Array.isArray(body?.destinations)?body.destinations.map(Number):[],notes=typeof body?.notes==="string"?body.notes.trim().slice(0,1000):""; if(destinations.length>19||new Set(destinations).size!==destinations.length||destinations.some((id)=>!Number.isInteger(id)||id<1||id>20))return json({error:"Pode indicar até 19 turmas alternativas, sem repetições."},400);
   const number=studentNumberFromEmail(user.email); const student=await env.DB.prepare("SELECT s.id,s.class_id,s.preference,c.status FROM class_students s JOIN classes c ON c.id=s.class_id WHERE s.student_number=? AND s.removed_at IS NULL").bind(number).first<{id:string;class_id:number;preference:string;status:string}>();
   if(!student)return json({error:"O seu registo ainda não consta de uma turma."},404); if(student.status==="draft"||student.status==="reopened")return json({error:"O representante ainda não submeteu a turma."},409); if(destinations.includes(student.class_id))return json({error:"A turma atual não pode ser um destino."},400);
   const settings=await classSettings(env), now=Date.now(); if(now<Date.parse(settings.closeAt))return json({error:"As preferências ficam disponíveis depois de terminar a formação inicial das turmas."},409);
-  const writes=[env.DB.prepare("DELETE FROM student_destinations WHERE student_id=?").bind(student.id),env.DB.prepare("UPDATE class_students SET preference=?,student_decision=?,decision_at=?,distribution_result='pending',updated_at=? WHERE id=?").bind(destinations.length?'move':'stay',destinations.length?'move':'stay',now,now,student.id)];
+  const writes=[env.DB.prepare("DELETE FROM student_destinations WHERE student_id=?").bind(student.id),env.DB.prepare("UPDATE class_students SET preference=?,student_decision=?,decision_at=?,distribution_result='pending',notes=?,manual_review=?,updated_at=? WHERE id=?").bind(destinations.length?'move':'stay',destinations.length?'move':'stay',now,notes,notes?1:0,now,student.id)];
   if(destinations.length){const values=destinations.map(()=>"(?,?,?,?,?)").join(","),bindings=destinations.flatMap((id,rank)=>[student.id,id,rank+1,user.id,now]);writes.push(env.DB.prepare(`INSERT INTO student_destinations (student_id,destination_class,rank,updated_by,updated_at) VALUES ${values}`).bind(...bindings));}
   writes.push(env.DB.prepare("INSERT INTO class_audit_log (class_id,student_id,actor_user_id,action,details,created_at) VALUES (?,?,?,'student_preference_updated',?,?)").bind(student.class_id,student.id,user.id,JSON.stringify({destinations}),now));await env.DB.batch(writes);return json({ok:true});
 }
@@ -775,6 +786,7 @@ async function handleGlobalTickets(request:Request,env:Env,user:CurrentUser):Pro
 async function handleGlobalTicketsV2(request:Request,env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  if(request.method==="GET"){const result=await env.DB.prepare(`SELECT t.*,s.full_name student_name,s.student_number,u.full_name created_by_name FROM class_tickets t LEFT JOIN class_students s ON s.id=t.student_id JOIN users u ON u.id=t.created_by ORDER BY CASE t.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,t.created_at DESC`).all();return json({tickets:result.results});}
+ if(request.method==="DELETE"){const body=await parseJson(request),id=String(body?.id||"");if(!id)return json({error:"Pedido inválido."},400);const ticket=await env.DB.prepare("SELECT id,class_id,status FROM class_tickets WHERE id=?").bind(id).first<{id:string;class_id:number;status:string}>();if(!ticket)return json({ok:true,alreadyDeleted:true});const actorId=user.actorId||user.id,now=Date.now();await env.DB.batch([env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'class_ticket_deleted',?,?)").bind(actorId,JSON.stringify(ticket),now),env.DB.prepare("DELETE FROM class_tickets WHERE id=?").bind(id)]);return json({ok:true});}
  const body=await parseJson(request),id=String(body?.id||""),status=String(body?.status||""),response=String(body?.response||"").trim().slice(0,1000),actorId=user.actorId||user.id;
  if(!id||!["pending","approved","rejected"].includes(status))return json({error:"Estado do pedido inválido."},400);
  if(["approved","rejected"].includes(status)&&response.length<5)return json({error:"Registe uma resposta antes de decidir o pedido."},400);
@@ -850,6 +862,24 @@ async function handleDistributionCheckV2(env:Env,user:CurrentUser):Promise<Respo
  return json({ready:issues.every((issue)=>issue.severity!=="blocker"),checkedAt:Date.now(),summary:{classes:classes.results.length,students:students.results.length,blockers:issues.filter((issue)=>issue.severity==="blocker").length,warnings:issues.filter((issue)=>issue.severity==="warning").length},issues});
 }
 
+async function handleDistributionProposals(request:Request,env:Env,user:CurrentUser,action:string):Promise<Response>{
+ if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
+ const actorId=user.actorId||user.id;
+ if(request.method==="GET"){const rows=await env.DB.prepare("SELECT id,seed,status,result_snapshot,created_at,approved_at,applied_at,rolled_back_at FROM distribution_proposals ORDER BY created_at DESC LIMIT 10").all();return json({proposals:rows.results});}
+ if(action==="calculate"){
+  const check=await handleDistributionCheckV2(env,user),checkBody=await check.clone().json() as {ready:boolean};if(!checkBody.ready)return json({error:"Resolva os bloqueadores do verificador antes de calcular."},409);
+  const raw=(await env.DB.prepare(`SELECT s.id,s.class_id,s.preference,s.notes,COALESCE(json_group_array(d.destination_class) FILTER (WHERE d.destination_class IS NOT NULL),'[]') destinations FROM class_students s LEFT JOIN student_destinations d ON d.student_id=s.id WHERE s.removed_at IS NULL GROUP BY s.id`).all<{id:string;class_id:number;preference:"stay"|"move";notes:string|null;destinations:string}>()).results;
+  const students=raw.map(row=>({id:row.id,classId:row.class_id,preference:row.preference,notes:row.notes,destinations:JSON.parse(row.destinations) as number[]}));
+  const seed=crypto.randomUUID(),results=calculateDistribution(students,{seed,maxDifference:3}),id=crypto.randomUUID(),now=Date.now();
+  await env.DB.batch([env.DB.prepare("INSERT INTO distribution_proposals (id,seed,status,input_snapshot,result_snapshot,created_by,created_at) VALUES (?,?,'draft',?,?,?,?)").bind(id,seed,JSON.stringify(students),JSON.stringify(results),actorId,now),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'distribution_calculated',?,?)").bind(actorId,JSON.stringify({proposalId:id,seed}),now)]);return json({proposal:{id,seed,status:"draft",results}},201);
+ }
+ const body=await parseJson(request),id=String(body?.id||""),proposal=await env.DB.prepare("SELECT * FROM distribution_proposals WHERE id=?").bind(id).first<{status:string;input_snapshot:string;result_snapshot:string}>();if(!proposal)return json({error:"Proposta não encontrada."},404);const now=Date.now();
+ if(action==="approve"){if(!["draft","approved"].includes(proposal.status))return json({error:"A proposta já não pode ser aprovada."},409);await env.DB.prepare("UPDATE distribution_proposals SET status='approved',approved_by=COALESCE(approved_by,?),approved_at=COALESCE(approved_at,?) WHERE id=?").bind(actorId,now,id).run();return json({ok:true,status:"approved"});}
+ if(action==="apply"){if(proposal.status==="applied")return json({ok:true,status:"applied",alreadyApplied:true});if(proposal.status!=="approved")return json({error:"A proposta tem de ser aprovada antes de ser aplicada."},409);const results=JSON.parse(proposal.result_snapshot) as Array<{studentId:string;destinationClass:number;status:string;manualReview:boolean}>;await env.DB.batch([...results.map(result=>env.DB.prepare("UPDATE class_students SET class_id=?,distribution_result=?,manual_review=?,updated_at=? WHERE id=?").bind(result.destinationClass,result.status,result.manualReview?1:0,now,result.studentId)),env.DB.prepare("UPDATE distribution_proposals SET status='applied',applied_at=? WHERE id=?").bind(now,id),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'distribution_applied',?,?)").bind(actorId,JSON.stringify({proposalId:id}),now)]);return json({ok:true,status:"applied"});}
+ if(action==="rollback"){if(proposal.status==="rolled_back")return json({ok:true,status:"rolled_back",alreadyRolledBack:true});if(proposal.status!=="applied")return json({error:"Só uma proposta aplicada pode ser revertida."},409);const input=JSON.parse(proposal.input_snapshot) as Array<{id:string;classId:number}>;await env.DB.batch([...input.map(student=>env.DB.prepare("UPDATE class_students SET class_id=?,distribution_result='pending',updated_at=? WHERE id=?").bind(student.classId,now,student.id)),env.DB.prepare("UPDATE distribution_proposals SET status='rolled_back',rolled_back_at=? WHERE id=?").bind(now,id),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'distribution_rolled_back',?,?)").bind(actorId,JSON.stringify({proposalId:id}),now)]);return json({ok:true,status:"rolled_back"});}
+ return json({error:"Operação não suportada."},405);
+}
+
 async function handleAdminAudit(env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  const [adminActions,classActions]=await Promise.all([
@@ -891,9 +921,11 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (pathname === "/api/classes" || pathname.startsWith("/api/classes/")) {
     const user = await currentUser(request, env); return user ? handleClasses(request, env, user, pathname) : json({ error:"Sessão inválida." },401);
   }
-  if(pathname==="/api/admin/class-tickets"&&["GET","PATCH"].includes(request.method)){const user=await currentUser(request,env);return user?handleGlobalTicketsV2(request,env,user):json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/class-tickets"&&["GET","PATCH","DELETE"].includes(request.method)){const user=await currentUser(request,env);return user?handleGlobalTicketsV2(request,env,user):json({error:"Sessão inválida."},401);}
   if(pathname==="/api/admin/distribution-check"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleDistributionCheckV2(env,user):json({error:"Sessão inválida."},401);}
   if(pathname==="/api/admin/audit"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleAdminAudit(env,user):json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/distribution-proposals"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleDistributionProposals(request,env,user,"list"):json({error:"Sessão inválida."},401);}
+  const proposalAction=pathname.match(/^\/api\/admin\/distribution-proposals\/(calculate|approve|apply|rollback)$/);if(proposalAction&&request.method==="POST"){const user=await currentUser(request,env);return user?handleDistributionProposals(request,env,user,proposalAction[1]):json({error:"Sessão inválida."},401);}
   if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
     const admin = await requireAdmin(request, env);
     return admin ? handleAdminUsers(request, env, admin) : json({ error: "Acesso reservado a administradores." }, 403);

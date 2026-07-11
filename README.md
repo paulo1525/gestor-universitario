@@ -29,6 +29,20 @@ corepack pnpm dev
 
 A aplicação abre em <http://127.0.0.1:3000>. O servidor não é exposto à rede.
 
+### Ambiente local com dados fictícios
+
+Para preparar uma base D1 exclusivamente local com cinco turmas, cinco
+representantes e 50 estudantes fictícios:
+
+```powershell
+corepack pnpm run test:local:setup
+corepack pnpm dev
+```
+
+O comando aplica as migrações e recria apenas os dados da base local. No fim,
+apresenta as contas de teste e a palavra-passe comum no terminal. Também cria
+`.dev.vars`, que está ignorado pelo Git e contém apenas valores de teste locais.
+
 Antes de enviar alterações:
 
 ```powershell
