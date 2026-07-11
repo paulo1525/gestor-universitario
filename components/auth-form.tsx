@@ -1,114 +1,12 @@
 "use client";
-
-import Script from "next/script";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/components/auth-context";
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (element: HTMLElement, options: { sitekey: string; action: string; callback: (token: string) => void; "expired-callback": () => void; "error-callback": () => void }) => string;
-      reset: (widgetId?: string) => void;
-    };
-  }
-}
-
-type Mode = "login" | "register" | "verify";
-
-export function AuthForm() {
-  const [mode, setMode] = useState<Mode>("login");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [siteKey, setSiteKey] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
-  const turnstileContainer = useRef<HTMLDivElement>(null);
-  const widgetId = useRef<string>("");
-  const { user, refresh } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next")?.startsWith("/") ? searchParams.get("next")! : "/";
-
-  useEffect(() => {
-    if (user) router.replace(next);
-  }, [next, router, user]);
-
-  useEffect(() => {
-    fetch("/api/config", { cache: "no-store" }).then(async (response) => await response.json() as { turnstileSiteKey?: string }).then((result) => setSiteKey(result.turnstileSiteKey || "")).catch(() => setError("Não foi possível carregar a proteção de segurança."));
-    queueMicrotask(() => setRememberMe(localStorage.getItem("gu_persistent_login") !== "false"));
-  }, []);
-
-  function renderTurnstile() {
-    if (!siteKey || !window.turnstile || !turnstileContainer.current || widgetId.current) return;
-    widgetId.current = window.turnstile.render(turnstileContainer.current, {
-      sitekey: siteKey,
-      action: mode === "register" ? "register" : "login",
-      callback: setTurnstileToken,
-      "expired-callback": () => setTurnstileToken(""),
-      "error-callback": () => setTurnstileToken(""),
-    });
-  }
-
-  useEffect(() => {
-    if (mode === "verify") return;
-    widgetId.current = "";
-    if (turnstileContainer.current) turnstileContainer.current.innerHTML = "";
-    renderTurnstile();
-    // renderTurnstile is intentionally driven by mode/siteKey changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, siteKey]);
-
-  function changeMode(nextMode: Mode) {
-    setMode(nextMode); setError(""); setMessage(""); setCode(""); setTurnstileToken("");
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError(""); setMessage("");
-    const endpoint = mode === "login" ? "/api/auth/login" : mode === "register" ? "/api/auth/register" : "/api/auth/verify";
-    const payload = mode === "verify" ? { email, code, rememberMe } : mode === "register" ? { fullName, email, password, turnstileToken, rememberMe } : { email, password, turnstileToken, rememberMe };
-    try {
-      const response = await fetch(endpoint, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-      const result = await response.json() as { error?: string; next?: string; code?: string };
-      if (!response.ok) {
-        if (result.code === "ACCOUNT_EXISTS") setMode("login");
-        throw new Error(result.error || "Não foi possível concluir o pedido.");
-      }
-      if (mode === "register") { setMode("verify"); setMessage("Enviámos um código de seis algarismos para o seu email institucional."); }
-      else { await refresh(); router.replace(next); }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível concluir o pedido.");
-      if (mode !== "verify") { setTurnstileToken(""); window.turnstile?.reset(widgetId.current); }
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <>
-      <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onLoad={renderTurnstile} />
-      <div className="auth-tabs" role="tablist" aria-label="Tipo de acesso">
-        <button type="button" className={mode === "login" ? "is-active" : ""} onClick={() => changeMode("login")}>Iniciar sessão</button>
-        <button type="button" className={mode !== "login" ? "is-active" : ""} onClick={() => changeMode("register")}>Criar conta</button>
-      </div>
-      <form className="auth-form" onSubmit={submit}>
-        <div className="auth-form__intro"><h2>{mode === "login" ? "Bem-vindo" : mode === "register" ? "Criar conta" : "Confirmar email"}</h2><p>{mode === "verify" ? `Introduza o código enviado para ${email}.` : "Utilize exclusivamente o seu email institucional da Universidade do Porto."}</p></div>
-        {mode === "register" && <label className="auth-field"><span>Nome completo</span><div><UserRound size={18} aria-hidden="true" /><input type="text" autoComplete="name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Nome e apelido" minLength={3} maxLength={120} required /></div></label>}
-        <label className="auth-field"><span>Email institucional</span><div><Mail size={18} aria-hidden="true" /><input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="up123456789@up.pt" pattern="up[0-9]{9}@(up\.pt|edu\.med\.up\.pt)" required readOnly={mode === "verify"} /></div></label>
-        {mode !== "verify" && <label className="auth-field"><span>Password</span><div><LockKeyhole size={18} aria-hidden="true" /><input type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} required /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Ocultar password" : "Mostrar password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>{mode === "register" && <small>Mínimo de 12 caracteres, com maiúsculas, minúsculas, número e símbolo.</small>}</label>}
-        {mode === "verify" && <label className="auth-field auth-field--code"><span>Código de confirmação</span><div><ShieldCheck size={18} aria-hidden="true" /><input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} pattern="[0-9]{6}" placeholder="000000" required /></div></label>}
-        {mode === "login" && <label className="remember-login"><input type="checkbox" checked={rememberMe} onChange={(event) => { setRememberMe(event.target.checked); localStorage.setItem("gu_persistent_login", String(event.target.checked)); }} /><span><strong>Manter sessão iniciada</strong><small>Recomendado num dispositivo pessoal: mantém o acesso durante 7 dias.</small></span></label>}
-        {mode !== "verify" && <div className="turnstile-wrap" ref={turnstileContainer} />}
-        {message && <p className="auth-message" role="status">{message}</p>}
-        {error && <p className="auth-error" role="alert">{error}</p>}
-        <button className="button button--primary button--full auth-submit" type="submit" disabled={busy || (mode !== "verify" && !turnstileToken)}>{busy ? <LoaderCircle className="spin" size={18} /> : <ShieldCheck size={18} />}{busy ? "A processar…" : mode === "login" ? "Iniciar sessão" : mode === "register" ? "Enviar código" : "Confirmar e entrar"}</button>
-        {mode === "verify" && <button className="auth-back" type="button" onClick={() => changeMode("register")}>Alterar email ou pedir novo código</button>}
-      </form>
-    </>
-  );
-}
+import Script from "next/script";import {FormEvent,useEffect,useRef,useState} from "react";import {Eye,EyeOff,LoaderCircle,LockKeyhole,Mail,ShieldCheck,UserRound} from "lucide-react";import {useRouter,useSearchParams} from "next/navigation";import {useAuth} from "@/components/auth-context";
+declare global{interface Window{turnstile?:{render:(element:HTMLElement,options:{sitekey:string;action:string;callback:(token:string)=>void;"expired-callback":()=>void;"error-callback":()=>void})=>string;reset:(id?:string)=>void}}}
+type Mode="login"|"register"|"verify"|"reset-request"|"reset-confirm";
+export function AuthForm(){const [mode,setMode]=useState<Mode>("login"),[fullName,setFullName]=useState(""),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[code,setCode]=useState(""),[show,setShow]=useState(false),[message,setMessage]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[siteKey,setSiteKey]=useState(""),[token,setToken]=useState(""),[remember,setRemember]=useState(true);const container=useRef<HTMLDivElement>(null),widget=useRef(""),{user,refresh}=useAuth(),router=useRouter(),params=useSearchParams(),next=params.get("next")?.startsWith("/")?params.get("next")!:"/";
+ useEffect(()=>{if(user)router.replace(next)},[user,next,router]);useEffect(()=>{fetch("/api/config",{cache:"no-store"}).then(async response=>await response.json() as {turnstileSiteKey?:string}).then(result=>setSiteKey(result.turnstileSiteKey||"")).catch(()=>setError("Não foi possível carregar a proteção de segurança."));queueMicrotask(()=>setRemember(localStorage.getItem("gu_persistent_login")!=="false"))},[]);
+ function render(){if(!siteKey||!window.turnstile||!container.current||widget.current||["verify","reset-confirm"].includes(mode))return;widget.current=window.turnstile.render(container.current,{sitekey:siteKey,action:mode==="register"?"register":mode==="reset-request"?"password-reset":"login",callback:setToken,"expired-callback":()=>setToken(""),"error-callback":()=>setToken("")})}
+ useEffect(()=>{widget.current="";if(container.current)container.current.innerHTML="";render();/* eslint-disable-next-line react-hooks/exhaustive-deps */},[mode,siteKey]);
+ function change(nextMode:Mode){setMode(nextMode);setError("");setMessage("");setCode("");setToken("")}
+ async function submit(event:FormEvent){event.preventDefault();setBusy(true);setError("");const endpoint=mode==="login"?"/api/auth/login":mode==="register"?"/api/auth/register":mode==="verify"?"/api/auth/verify":mode==="reset-request"?"/api/auth/password-reset/request":"/api/auth/password-reset/confirm",payload=mode==="verify"?{email,code,rememberMe:remember}:mode==="reset-request"?{email,turnstileToken:token}:mode==="reset-confirm"?{email,code,password}:mode==="register"?{fullName,email,password,turnstileToken:token,rememberMe:remember}:{email,password,turnstileToken:token,rememberMe:remember};try{const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)}),result=await response.json() as {error?:string;code?:string};if(!response.ok){if(result.code==="ACCOUNT_EXISTS")setMode("login");throw new Error(result.error||"Não foi possível concluir o pedido.")}if(mode==="register"){setMode("verify");setMessage("Enviámos um código de seis algarismos para o email institucional.")}else if(mode==="reset-request"){setMode("reset-confirm");setMessage("Se a conta estiver ativa, enviámos um código para o email institucional.")}else if(mode==="reset-confirm"){setMode("login");setPassword("");setCode("");setMessage("Palavra-passe alterada. Já pode iniciar sessão.")}else{await refresh();router.replace(next)}}catch(caught){setError(caught instanceof Error?caught.message:"Não foi possível concluir o pedido.");setToken("");window.turnstile?.reset(widget.current)}finally{setBusy(false)}}
+ const needsPassword=!['verify','reset-request'].includes(mode),needsCode=['verify','reset-confirm'].includes(mode),needsCaptcha=!needsCode;
+ return <><Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onLoad={render}/><div className="auth-tabs"><button type="button" className={mode==="login"?"is-active":""} onClick={()=>change("login")}>Iniciar sessão</button><button type="button" className={mode==="register"||mode==="verify"?"is-active":""} onClick={()=>change("register")}>Criar conta</button></div><form className="auth-form" onSubmit={submit}><div className="auth-form__intro"><h2>{mode==="login"?"Bem-vindo":mode==="register"?"Criar conta":mode==="verify"?"Confirmar email":"Repor palavra-passe"}</h2><p>{needsCode?`Introduza o código enviado para ${email}.`:"Utilize exclusivamente o seu email institucional da Universidade do Porto."}</p></div>{mode==="register"&&<label className="auth-field"><span>Nome completo</span><div><UserRound/><input value={fullName} onChange={e=>setFullName(e.target.value)} minLength={3} required/></div></label>}<label className="auth-field"><span>Email institucional</span><div><Mail/><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="up123456789@up.pt" pattern="up[0-9]{9}@(up\.pt|edu\.med\.up\.pt)" readOnly={needsCode} required/></div></label>{needsPassword&&<label className="auth-field"><span>{mode==="reset-confirm"?"Nova palavra-passe":"Password"}</span><div><LockKeyhole/><input type={show?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} minLength={12} maxLength={128} required/><button type="button" onClick={()=>setShow(value=>!value)}>{show?<EyeOff/>:<Eye/>}</button></div>{mode!=="login"&&<small>Mínimo de 12 caracteres, com maiúsculas, minúsculas, número e símbolo.</small>}</label>}{needsCode&&<label className="auth-field auth-field--code"><span>Código de confirmação</span><div><ShieldCheck/><input inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} pattern="[0-9]{6}" placeholder="000000" required/></div></label>}{mode==="login"&&<><label className="remember-login"><input type="checkbox" checked={remember} onChange={e=>{setRemember(e.target.checked);localStorage.setItem("gu_persistent_login",String(e.target.checked))}}/><span><strong>Manter sessão iniciada</strong></span></label><button className="auth-back" type="button" onClick={()=>change("reset-request")}>Esqueci-me da palavra-passe</button></>}{needsCaptcha&&<div className="turnstile-wrap" ref={container}/>} {message&&<p className="auth-message">{message}</p>}{error&&<p className="auth-error">{error}</p>}<button className="button button--primary button--full auth-submit" disabled={busy||(needsCaptcha&&!token)}>{busy?<LoaderCircle className="spin"/>:<ShieldCheck/>}{busy?"A processar…":mode==="login"?"Iniciar sessão":mode==="register"?"Enviar código":mode==="verify"?"Confirmar e entrar":mode==="reset-request"?"Enviar código de reposição":"Alterar palavra-passe"}</button>{mode.startsWith("reset")&&<button className="auth-back" type="button" onClick={()=>change("login")}>Voltar ao início de sessão</button>}</form></>}

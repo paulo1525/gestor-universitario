@@ -1,21 +1,35 @@
 "use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight,ClipboardCheck,LogOut,Menu,Settings,Ticket,Users,X } from "lucide-react";
-import { ReactNode,useState } from "react";
-import { FontScale,useAuth } from "@/components/auth-context";
+import { ChevronRight, ClipboardCheck, History, LogOut, Menu, Settings, Ticket, Users, X } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { FontScale, useAuth } from "@/components/auth-context";
 
-type AppShellProps={children:ReactNode;active:"overview"|"turmas"|"admin"|"tickets"|"check";breadcrumb?:string;currentClassId?:number};
-export function AppShell({children,active,breadcrumb="Visão geral",currentClassId}:AppShellProps){
- const [menuOpen,setMenuOpen]=useState(false);const {user,logout,setFontScale}=useAuth();
- const roleLabel=user?.role==="admin"?"Administrador":user?.role==="representative"?"Representante":"Estudante";
- const visibleClassId=currentClassId??Number(breadcrumb.match(/^Turma (\d+)$/)?.[1]||0);
- const ownClassActive=Boolean(user?.representedClass&&visibleClassId===user.representedClass);
- const classesActive=(active==="overview"||active==="turmas")&&!ownClassActive;
- const stopPreview=async()=>{await fetch("/api/admin/preview-user",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify({userId:null})});window.location.href="/admin"};
- return <div className="app-shell"><a className="skip-link" href="#conteudo-principal">Saltar para o conteúdo</a>
-  <aside className={`sidebar ${menuOpen?"sidebar--open":""}`} aria-label="Navegação principal"><div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt="Comissão de Curso FMUP 2025–2031" width={58} height={58} priority/></span><div><span className="brand__name">Gestor Universitário</span><span className="brand__context">Comissão de Curso</span></div><button className="icon-button sidebar__close" onClick={()=>setMenuOpen(false)} aria-label="Fechar menu"><X size={20}/></button></div>
-  <nav className="nav-list" aria-label="Navegação principal"><div className="nav-section"><span className="nav-label">Gestão de turmas</span><Link className={classesActive?"is-active":""} href="/" aria-current={classesActive?"page":undefined}><Users size={19}/>Turmas<span className="nav-count">20</span></Link>{user?.representedClass&&<Link className={ownClassActive?"is-active":""} href={`/turmas/${user.representedClass}`} aria-current={ownClassActive?"page":undefined}><Users size={19}/>A minha turma<span className="nav-count">{user.representedClass}</span></Link>}</div>{user?.role==="admin"&&<div className="nav-section"><span className="nav-label">Gestão administrativa</span><Link className={active==="admin"?"is-active":""} href="/admin"><Settings size={19}/>Controlo administrativo</Link><Link className={active==="tickets"?"is-active":""} href="/admin/pedidos"><Ticket size={19}/>Pedidos</Link><Link className={active==="check"?"is-active":""} href="/admin/verificacao"><ClipboardCheck size={19}/>Verificar distribuição</Link></div>}</nav>
-  <div className="sidebar__footer"><div className="text-size-setting"><span>Tamanho do texto</span><div role="group" aria-label="Tamanho do texto">{([['small','A−'],['normal','A'],['large','A+']] as [FontScale,string][]).map(([value,label])=><button key={value} className={user?.fontScale===value?'is-active':''} onClick={()=>void setFontScale(value)} aria-pressed={user?.fontScale===value}>{label}</button>)}</div></div><div className="profile"><span className="avatar">{user?.email.slice(0,2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{roleLabel}</small></span><button className="profile__logout" onClick={()=>void logout()} title="Terminar sessão" aria-label="Terminar sessão"><LogOut size={17}/></button></div></div></aside>
-  {menuOpen&&<button className="sidebar-backdrop" onClick={()=>setMenuOpen(false)} aria-label="Fechar menu"/>}<div className="workspace"><header className="topbar"><button className="icon-button mobile-menu" onClick={()=>setMenuOpen(true)} aria-label="Abrir menu"><Menu size={22}/></button><div className="breadcrumbs"><Link href="/">Gestão de turmas</Link><ChevronRight size={15}/><strong>{breadcrumb}</strong></div></header><main id="conteudo-principal" className="main-content">{children}</main></div>{user?.preview&&<button className="preview-user-toggle" onClick={()=>void stopPreview()}><span>A ver como</span><strong>{user.fullName}</strong><small>Voltar ao meu perfil</small></button>}</div>;
+type Props = { children: ReactNode; active: "overview" | "turmas" | "admin" | "tickets" | "check" | "audit"; breadcrumb?: string; currentClassId?: number };
+
+export function AppShell({ children, active, breadcrumb = "Visão geral", currentClassId }: Props) {
+  const [open, setOpen] = useState(false);
+  const { user, logout, setFontScale } = useAuth();
+  const visibleClassId = currentClassId ?? Number(breadcrumb.match(/^Turma (\d+)$/)?.[1] || 0);
+  const ownActive = Boolean(user?.representedClass && visibleClassId === user.representedClass);
+  const classesActive = (active === "overview" || active === "turmas") && !ownActive;
+  const stopPreview = async () => {
+    await fetch("/api/admin/preview-user", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: null }) });
+    window.location.href = "/admin";
+  };
+  return <div className="app-shell">
+    <a className="skip-link" href="#conteudo-principal">Saltar para o conteúdo</a>
+    <aside className={`sidebar ${open ? "sidebar--open" : ""}`}>
+      <div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt="Comissão de Curso FMUP" width={58} height={58} priority /></span><div><span className="brand__name">Gestor Universitário</span><span className="brand__context">Comissão de Curso</span></div><button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label="Fechar menu"><X /></button></div>
+      <nav className="nav-list" aria-label="Navegação principal">
+        <div className="nav-section"><span className="nav-label">Gestão de turmas</span><Link className={classesActive ? "is-active" : ""} href="/"><Users />Turmas<span className="nav-count">20</span></Link>{user?.representedClass && <Link className={ownActive ? "is-active" : ""} href={`/turmas/${user.representedClass}`}><Users />A minha turma<span className="nav-count">{user.representedClass}</span></Link>}</div>
+        {user?.role === "admin" && <div className="nav-section"><span className="nav-label">Gestão administrativa</span><Link className={active === "admin" ? "is-active" : ""} href="/admin"><Settings />Controlo administrativo</Link><Link className={active === "tickets" ? "is-active" : ""} href="/admin/pedidos"><Ticket />Pedidos</Link><Link className={active === "check" ? "is-active" : ""} href="/admin/verificacao"><ClipboardCheck />Verificador de distribuição</Link><Link className={active === "audit" ? "is-active" : ""} href="/admin/historico"><History />Histórico de ações</Link></div>}
+      </nav>
+      <div className="sidebar__footer"><div className="text-size-setting"><span>Tamanho do texto</span><div>{([['small', 'A−'], ['normal', 'A'], ['large', 'A+']] as [FontScale, string][]).map(([value, label]) => <button key={value} className={user?.fontScale === value ? 'is-active' : ''} onClick={() => void setFontScale(value)}>{label}</button>)}</div></div><div className="profile"><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{user?.role === "admin" ? "Administrador" : user?.classRepresentative ? "Representante" : "Estudante"}</small></span><button className="profile__logout" onClick={() => void logout()} aria-label="Terminar sessão"><LogOut /></button></div></div>
+    </aside>
+    {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} aria-label="Fechar menu" />}
+    <div className="workspace"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></button><div className="breadcrumbs"><Link href="/">Gestão de turmas</Link><ChevronRight /><strong>{breadcrumb}</strong></div></header><main id="conteudo-principal" className="main-content">{children}</main></div>
+    {user?.preview && <button className="preview-user-toggle" onClick={() => void stopPreview()}><span>A visualizar com as permissões de</span><strong>{user.fullName}</strong><small>Voltar ao meu perfil</small></button>}
+  </div>;
 }
