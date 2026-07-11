@@ -8,7 +8,7 @@ type Student={id:string;nome:string;numero:string;preferencia:"Ficar"|"Mudar";is
 type Detail={class:{id:number;status:string;submittedAt:number|null;workflowStep:number;draftRevision:number};students:Student[];settings:{openAt:string;closeAt:string};serverNow:number;permissions:{edit:boolean;manage:boolean;representative:boolean}};
 type Row={id:string;fullName:string;studentNumber:string;preference:"stay"|"move"};
 const blank=():Row=>({id:crypto.randomUUID(),fullName:"",studentNumber:"",preference:"stay"});
-const steps=["Preenchimento","Verificação e edição","Revisão e submissão"];
+const steps=["Preenchimento","Verificação","Revisão e submissão"];
 const requestTypes={reopen:"Reabrir a turma para edição",add_student:"Adicionar um estudante",remove_student:"Remover um estudante",replace_student:"Substituir um estudante",correct_student:"Corrigir dados de um estudante",other:"Outro pedido"};
 export function TurmaDetail({turma}:{turma:Turma;alunosIniciais:unknown[]}){
  const [data,setData]=useState<Detail|null>(null),[rows,setRows]=useState<Row[]>([blank()]),[step,setStep]=useState(1),[query,setQuery]=useState(""),[saveState,setSaveState]=useState("idle"),[notice,setNotice]=useState(""),[confirming,setConfirming]=useState(false),[submitting,setSubmitting]=useState(false),[requestType,setRequestType]=useState("reopen"),[description,setDescription]=useState(""),[ticketStudentId,setTicketStudentId]=useState(""),[ticketName,setTicketName]=useState(""),[ticketNumber,setTicketNumber]=useState(""),[ticketPreference,setTicketPreference]=useState<"stay"|"move">("stay"),[destinations,setDestinations]=useState<number[]>([]);
