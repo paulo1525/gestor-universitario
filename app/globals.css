@@ -594,3 +594,46 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .submission-warning{margin:0 24px 16px;padding:13px 15px;border:1px solid #ead9a0;border-radius:10px;color:#6c5510;background:#fffaf0;font-size:.82rem;line-height:1.5}
 .submission-warning strong{color:#554000}
 @media(max-width:760px){.verification-list-panel .table-scroll{padding:0 12px 8px;overflow-x:auto}.verification-list-panel th,.verification-list-panel td{white-space:nowrap}.submission-warning{margin:0 12px 14px}}
+
+/* Sistema visual comum das páginas autenticadas. */
+.workspace .panel,
+.workspace .stat-card,
+.workspace .detail-stats article,
+.workspace .ticket-admin-card,
+.workspace .verification-hero,
+.workspace .destination-editor,
+.workspace .ticket-panel,
+.workspace .rules-panel,
+.workspace .role-guidance {
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(23, 23, 18, .045);
+}
+.workspace .panel__header { min-height: 72px; padding: 16px 20px; }
+.workspace .button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 11px;
+  gap: 8px;
+  box-shadow: none;
+}
+.workspace .button--primary { box-shadow: 0 4px 12px rgba(182, 136, 0, .14); }
+.workspace .class-editor { border-radius: 12px; box-shadow: 0 4px 18px rgba(23, 23, 18, .045); }
+.workspace .class-editor > .panel__header { min-height: 72px; padding: 16px 20px; }
+.workspace .class-editor > .panel__header .button { min-height: 38px; padding-inline: 12px; font-size: 10px; }
+.workspace .class-editor > .batch-footer { padding: 12px 20px; }
+.workspace .class-editor > .batch-footer .button { min-height: 40px; }
+.workspace .student-block input,
+.workspace .student-block select,
+.workspace .batch-row input,
+.workspace .batch-row select,
+.workspace .student-entry-form input,
+.workspace .student-entry-form select { min-height: 40px; border-radius: 9px; }
+.workspace .delete-row,
+.workspace .student-block header button { width: 32px; height: 32px; border-radius: 8px; }
+.workspace .status { min-height: 23px; padding: 3px 8px; }
+@media(max-width:560px) {
+  .workspace .panel__header,
+  .workspace .class-editor > .panel__header { padding: 14px 16px; }
+  .workspace .class-editor > .batch-footer { padding: 12px 16px; }
+}
