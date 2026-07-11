@@ -375,6 +375,10 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .admin-table-wrap td:nth-child(4) { display:grid; gap:5px; min-width:190px; } .admin-name { font-weight:800; }
 .admin-notice { margin:0; padding:10px 18px; color:var(--green); background:var(--green-soft); font-size:9px; font-weight:700; }
 .admin-empty { padding:24px; color:var(--muted); text-align:center; font-size:10px; }
+.admin-save-user { min-width:82px; min-height:34px; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 10px; border:1px solid #d7d7d1; border-radius:8px; color:#343431; background:#fff; font-size:9px; font-weight:800; cursor:pointer; }
+.admin-save-user:hover:not(:disabled) { border-color:#b79422; background:var(--gold-soft); }
+.admin-save-user:disabled { opacity:.7; cursor:wait; }
+.admin-save-user.is-saved { color:var(--green); border-color:#b9ddc8; background:var(--green-soft); }
 .maintenance-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 70% 15%, #3a3010 0, #111 42%); }
 .maintenance-card { width: min(520px, 100%); padding: clamp(28px, 6vw, 52px); border-radius: 18px; background: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.35); }
 .maintenance-card > img { display: block; margin-bottom: 24px; }
