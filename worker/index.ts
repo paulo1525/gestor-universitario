@@ -301,6 +301,10 @@ async function ensureOperationalSchema(env: Env): Promise<void> {
     ["last_login_at", "ALTER TABLE users ADD COLUMN last_login_at INTEGER"],
     ["commission_position", "ALTER TABLE users ADD COLUMN commission_position TEXT CHECK (commission_position IN ('principal_admin', 'president', 'vice_president', 'treasurer', 'member'))"],
     ["commission_department", "ALTER TABLE users ADD COLUMN commission_department TEXT CHECK (commission_department IN ('management', 'studies', 'curricular_units', 'recreation_image'))"],
+    ["admin_override", "ALTER TABLE users ADD COLUMN admin_override INTEGER NOT NULL DEFAULT 0 CHECK (admin_override IN (0, 1))"],
+    ["class_representative", "ALTER TABLE users ADD COLUMN class_representative INTEGER NOT NULL DEFAULT 0 CHECK (class_representative IN (0, 1))"],
+    ["represented_class", "ALTER TABLE users ADD COLUMN represented_class INTEGER CHECK (represented_class BETWEEN 1 AND 20)"],
+    ["font_scale", "ALTER TABLE users ADD COLUMN font_scale TEXT NOT NULL DEFAULT 'normal' CHECK (font_scale IN ('small', 'normal', 'large'))"],
   ] as const;
   for (const [name, statement] of additions) {
     if (names.has(name)) continue;
