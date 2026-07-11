@@ -228,10 +228,10 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   if (!await verifyTurnstile(env, request, body?.turnstileToken)) return json({ error: "Não foi possível validar a proteção antiabuso. Atualize a página e tente novamente." }, 400);
 
   const now = Date.now();
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+  const existing = await env.DB.prepare("SELECT id, status, email_verified_at FROM users WHERE email = ?").bind(email).first<{ id: string; status: string; email_verified_at: number }>();
   const pending = await env.DB.prepare("SELECT last_sent_at FROM pending_registrations WHERE email = ?").bind(email).first<{ last_sent_at: number }>();
   if (pending && now - pending.last_sent_at < 60_000) return json({ error: "Aguarde um minuto antes de pedir outro código." }, 429);
-  if (existing) {
+  if (existing && existing.email_verified_at > 0) {
     await audit(env, request, "registration_existing", false, email);
     return json({ error: "Já existe uma conta associada a este email. Inicie sessão.", code: "ACCOUNT_EXISTS" }, 409);
   }
@@ -239,9 +239,12 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   const salt = bytesToBase64(randomBytes(16));
   const hash = await derivePassword(password as string, salt, env.AUTH_PEPPER, PASSWORD_ITERATIONS);
   const code = makeCode();
-  await env.DB.prepare("INSERT INTO pending_registrations (email, full_name, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at")
-    .bind(email, fullName, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now)
-    .run();
+  const userId = existing?.id ?? crypto.randomUUID();
+  const role = email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? "admin" : "student";
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO users (id, email, full_name, password_hash, password_salt, password_iterations, role, status, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, role=excluded.role, status='pending', updated_at=excluded.updated_at WHERE users.email_verified_at = 0").bind(userId, email, fullName, hash, salt, PASSWORD_ITERATIONS, role, now, now, now),
+    env.DB.prepare("INSERT INTO pending_registrations (email, full_name, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at").bind(email, fullName, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now),
+  ]);
   try {
     await sendVerificationEmail(env, email, code);
   } catch (error) {
@@ -271,11 +274,13 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
     await audit(env, request, "registration_verify", false, email);
     return json({ error: "Código inválido ou expirado." }, 400);
   }
-  const userId = crypto.randomUUID();
+  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND email_verified_at = 0").bind(email).first<{ id: string }>();
+  if (!user) return json({ error: "Não foi possível concluir o registo. A conta poderá já estar validada." }, 409);
+  const userId = user.id;
   const role = email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? "admin" : "student";
   try {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO users (id, email, full_name, password_hash, password_salt, password_iterations, role, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(userId, email, pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, now),
+      env.DB.prepare("UPDATE users SET full_name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, role = ?, status = 'active', email_verified_at = ?, password_changed_at = ?, updated_at = ? WHERE id = ? AND email_verified_at = 0").bind(pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, userId),
       env.DB.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(email),
     ]);
   } catch {
@@ -343,7 +348,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ?").bind(email).first<UserRow>();
   const now = Date.now();
   const accessBlocked = user && user.status !== "active" && !(user.status === "suspended" && user.status_until && user.status_until <= now);
-  if (!user || accessBlocked || (user.locked_until && user.locked_until > now)) {
+  if (!user || user.email_verified_at <= 0 || accessBlocked || (user.locked_until && user.locked_until > now)) {
     await audit(env, request, "login", false, email, user?.id);
     return json(genericError, 401);
   }
