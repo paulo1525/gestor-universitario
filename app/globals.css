@@ -585,3 +585,12 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .class-progress li.is-complete button{border-color:#d8eadf;background:#fff}
 .class-progress button span{position:relative;z-index:1}
 @media(max-width:760px){.class-progress{gap:4px}.class-progress button{justify-content:center;padding:7px 4px;border-color:transparent;background:transparent}.class-progress button:hover,.class-progress li.is-active button,.class-progress li.is-complete button{border-color:transparent;background:transparent}}
+.class-progress button:disabled{cursor:default;opacity:1}
+.verification-list-panel .table-scroll{padding:0 24px 8px}
+.verification-list-panel table{width:100%;border-collapse:collapse}
+.verification-list-panel th{padding:12px 10px;border-bottom:1px solid #e7e5df;color:#78766f;font-size:.7rem;text-align:left;text-transform:uppercase;letter-spacing:.03em}
+.verification-list-panel td{padding:15px 10px;border-bottom:1px solid #eeeDE9;color:#292824;font-size:.86rem}
+.verification-list-panel .batch-footer{border-top:0}
+.submission-warning{margin:0 24px 16px;padding:13px 15px;border:1px solid #ead9a0;border-radius:10px;color:#6c5510;background:#fffaf0;font-size:.82rem;line-height:1.5}
+.submission-warning strong{color:#554000}
+@media(max-width:760px){.verification-list-panel .table-scroll{padding:0 12px 8px;overflow-x:auto}.verification-list-panel th,.verification-list-panel td{white-space:nowrap}.submission-warning{margin:0 12px 14px}}
