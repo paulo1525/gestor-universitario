@@ -25,6 +25,7 @@ runWrangler(["d1", "migrations", "apply", database, "--local"]);
 
 const users = [
   ["local-admin", "up202500001@up.pt", "Administrador Local", "admin", 1, null],
+  ["local-student-user", "up202500100@up.pt", "Ana Almeida", "student", 0, null],
   ...Array.from({ length: 5 }, (_, index) => [
     `local-rep-${index + 1}`,
     `up20250001${index + 1}@up.pt`,
@@ -59,6 +60,9 @@ for (const [id, email, name, role, adminOverride, representedClass] of users) {
   statements.push(`INSERT INTO users (id,email,full_name,password_hash,password_salt,password_iterations,role,email_verified_at,password_changed_at,status,created_at,updated_at,admin_override,class_representative,represented_class,font_scale,commission_position,commission_department) VALUES (${sql(id)},${sql(email)},${sql(name)},${sql(passwordHash)},${sql(salt)},${iterations},${sql(role)},${now},${now},'active',${now},${now},${adminOverride},${representedClass ? 1 : 0},${representedClass ?? "NULL"},'normal',${role === "admin" ? "'principal_admin'" : "NULL"},${role === "admin" ? "'management'" : "NULL"})`);
 }
 statements.push("UPDATE classes SET status='submitted',submitted_at=" + now + ",submitted_by='local-admin',workflow_step=3,updated_at=" + now);
+statements.push("DELETE FROM classes WHERE id>5");
+statements.push(`INSERT INTO app_settings (key,value,updated_at,updated_by) VALUES ('classes_open_at','2026-01-01T00:00:00.000Z',${now},'local-admin') ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by`);
+statements.push(`INSERT INTO app_settings (key,value,updated_at,updated_by) VALUES ('classes_close_at','2026-02-01T00:00:00.000Z',${now},'local-admin') ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by`);
 
 const firstNames = ["Ana", "Bruno", "Carolina", "Diogo", "Eva", "Filipe", "Gabriela", "Hugo", "Inês", "João"];
 const lastNames = ["Almeida", "Barros", "Costa", "Dias", "Esteves", "Ferreira", "Gomes", "Henriques", "Lopes", "Martins"];
@@ -97,4 +101,5 @@ writeFileSync(join(root, ".dev.vars"), [
 console.log("\nAmbiente local pronto em http://127.0.0.1:3000");
 console.log(`Administrador: up202500001@up.pt / ${password}`);
 console.log(`Representantes: up202500011@up.pt a up202500015@up.pt / ${password}`);
+console.log(`Estudante: up202500100@up.pt / ${password}`);
 console.log("Dados: 5 turmas, 10 estudantes fictícios por turma.");
