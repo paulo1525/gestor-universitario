@@ -1,12 +1,96 @@
 # Gestor Universitário
 
+Aplicação da Comissão de Curso de Medicina 2025–2031, alojada em Cloudflare
+Workers e publicada exclusivamente através da integração GitHub → Cloudflare.
+
+## Fonte canónica e produção
+
+- Código oficial: <https://github.com/paulo1525/gestor-universitario>
+- Produção: <https://gestoruniversitario.cc>
+- Cópia local recomendada: `C:\Projetos\gestor-universitario`
+- Ramo de produção: `main`
+- Não colocar este repositório no OneDrive.
+- Nunca executar um deploy da Cloudflare a partir do computador local.
+
+Fluxo obrigatório:
+
+```text
+local → testes locais → GitHub main → Cloudflare Workers Build → produção
+```
+
+## Desenvolvimento local
+
+Requisitos: Node.js 20 ou superior e pnpm 11.0.7.
+
+```powershell
+corepack pnpm install --frozen-lockfile
+corepack pnpm dev
+```
+
+A aplicação abre em <http://127.0.0.1:3000>. O servidor não é exposto à rede.
+
+Antes de enviar alterações:
+
+```powershell
+corepack pnpm lint
+corepack pnpm run build
+```
+
+O preview Cloudflare é local e nunca publica:
+
+```powershell
+corepack pnpm run preview
+```
+
+No Windows, o OpenNext pode necessitar de WSL ou Developer Mode para criar
+ligações simbólicas. O build normal do Next.js não tem essa dependência.
+
+## Scripts
+
+- `dev`: inicia o Next.js em `127.0.0.1`.
+- `build`: compila e valida a aplicação localmente.
+- `lint`: executa ESLint.
+- `preview`: compila com OpenNext e inicia preview local.
+- `deploy`: compila com OpenNext e executa Wrangler; reservado exclusivamente
+  ao ambiente automático da Cloudflare.
+
+## Variáveis e bindings
+
+O ficheiro `.dev.vars.example` documenta os segredos exigidos localmente. Copiar
+para `.dev.vars` apenas quando for necessário testar autenticação completa:
+
+- `AUTH_PEPPER`
+- `RESEND_API_KEY`
+- `TURNSTILE_SECRET_KEY`
+
+Nunca versionar `.dev.vars`, `.env.local`, tokens ou valores reais. Em produção,
+estes segredos são configurados no Worker. Os bindings D1 e rate limiter estão
+declarados em `wrangler.jsonc`.
+
+## Publicação
+
+O push para `main` é o único evento autorizado a desencadear a produção. Nas
+definições de Builds do Cloudflare usar:
+
+- Production branch: `main`
+- Build command: `corepack pnpm install --frozen-lockfile && corepack pnpm run build`
+- Deploy command: `corepack pnpm run deploy`
+- Root directory: `/`
+
+Não adicionar uma GitHub Action de deploy quando a integração nativa do
+Cloudflare estiver ativa.
+
+---
+
 Plataforma digital da Comissão de Curso de Medicina 2025–2031.
 
 <p align="center">
   <img src="public/logo-comissao-curso-fmup-2025-2031.png" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
 </p>
 
-> **Estado atual:** protótipo visual da gestão das turmas, ainda com dados fictícios e sem autenticação ou base de dados.
+> **Estado atual:** autenticação institucional, sessões seguras e base D1 ativas;
+> dashboard em modo de manutenção para utilizadores comuns. Os dados das turmas
+> continuam fictícios até existir importação e validação institucional.
 
 ## Executar o protótipo
 

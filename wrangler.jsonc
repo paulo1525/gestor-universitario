@@ -1,8 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gestor-universitario",
-  "main": "worker/index.ts",
+  "main": ".open-next/worker.js",
   "compatibility_date": "2026-07-10",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
@@ -12,11 +13,8 @@
     }
   ],
   "assets": {
-    "directory": "./out",
-    "binding": "ASSETS",
-    "run_worker_first": true,
-    "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
   },
   "d1_databases": [
     {

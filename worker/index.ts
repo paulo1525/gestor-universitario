@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-interface Env {
+export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   AUTH_RATE_LIMITER: RateLimit;
@@ -346,14 +346,15 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
 }
 
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
+  const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
-  if (request.method === "GET" && url.pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, maintenanceMode: env.MAINTENANCE_MODE === "true" });
-  if (request.method === "POST" && url.pathname === "/api/auth/register") return handleRegister(request, env);
-  if (request.method === "POST" && url.pathname === "/api/auth/verify") return handleVerify(request, env);
-  if (request.method === "POST" && url.pathname === "/api/auth/login") return handleLogin(request, env);
-  if (request.method === "POST" && url.pathname === "/api/auth/logout") return handleLogout(request, env);
-  if (request.method === "POST" && url.pathname === "/api/auth/session-preference") return handleSessionPreference(request, env);
-  if (request.method === "GET" && url.pathname === "/api/auth/me") {
+  if (request.method === "GET" && pathname === "/api/config") return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, maintenanceMode: env.MAINTENANCE_MODE === "true" });
+  if (request.method === "POST" && pathname === "/api/auth/register") return handleRegister(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/verify") return handleVerify(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/login") return handleLogin(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/logout") return handleLogout(request, env);
+  if (request.method === "POST" && pathname === "/api/auth/session-preference") return handleSessionPreference(request, env);
+  if (request.method === "GET" && pathname === "/api/auth/me") {
     const user = await currentUser(request, env);
     return user ? json({ user: { email: user.email, role: user.role } }) : json({ user: null }, 401);
   }

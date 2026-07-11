@@ -1,0 +1,18 @@
+# Regras operacionais do Gestor Universitário
+
+- Nunca executar `wrangler deploy` localmente.
+- Nunca executar `npx wrangler deploy` localmente.
+- Nunca executar `pnpm run deploy` localmente.
+- Nunca publicar diretamente na Cloudflare a partir deste computador.
+- É permitido executar `pnpm dev` para desenvolvimento local.
+- É permitido executar `pnpm run build` para validação local.
+- É permitido executar `pnpm run preview` ou `wrangler dev` apenas para pré-visualização local.
+- Um comando de preview nunca pode publicar nem modificar a aplicação de produção.
+- Nunca fazer push automaticamente após cada pequena alteração; agrupar alterações relacionadas.
+- Testar localmente antes de criar um commit e executar `pnpm run build` antes de publicar.
+- Só fazer commit e push quando o utilizador pedir explicitamente para publicar ou enviar.
+- O único fluxo permitido é: local → teste local → GitHub → Cloudflare.
+- Antes de começar a trabalhar, executar `git fetch origin --prune` e confirmar que o ramo local está atualizado.
+- Ao trabalhar em dois computadores, nunca editar simultaneamente versões desatualizadas do projeto.
+- Nunca guardar tokens, palavras-passe ou segredos no repositório.
+- Nunca adicionar `.env.local`, `.dev.vars` ou qualquer ficheiro de segredos ao Git.

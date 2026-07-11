@@ -1,0 +1,5 @@
+# Copiar para .dev.vars e preencher apenas no computador local.
+# Nunca versionar .dev.vars nem valores reais.
+AUTH_PEPPER=valor-local-longo-e-aleatorio
+RESEND_API_KEY=re_exemplo_sem_valor_real
+TURNSTILE_SECRET_KEY=segredo-turnstile-de-exemplo
