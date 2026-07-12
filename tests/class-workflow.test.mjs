@@ -29,6 +29,9 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/Array\.from\(\{length:5\}/);
   assert.match(testMode,/\/api\/admin\/distribution-check/);
   assert.match(testMode,/\/api\/admin\/placements/);
+  assert.match(testMode,/\/api\/admin\/export-validation/);
+  assert.match(testMode,/colocacoes-ambiente-teste\.xls/);
+  assert.match(testMode,/action==="calculate"\?"draft"/);
   assert.match(testMode,/classes:"1–2"/);
   assert.match(testMode,/classes:"3–5"/);
 });
@@ -116,6 +119,12 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
   assert.match(worker,/preferenceSource:decision\?row\.preference_source:"automatic"/);
   assert.match(placements,/Tem amigos noutra turma/);
   assert.match(placements,/Sofre bullying \/ está mal integrado/);
+  assert.match(placements,/statusLabels/);
+  assert.match(placements,/Rascunho/);
+  assert.match(placements,/setTimeout\(\(\)=>setNotice\(""\),1500\)/);
+  assert.match(placements,/admin-preference-ranking/);
+  assert.match(placements,/ArrowUp/);
+  assert.doesNotMatch(placements,/Justificação obrigatória/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
