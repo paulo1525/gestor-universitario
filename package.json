@@ -10,6 +10,7 @@
     "test:local:setup": "node scripts/setup-local-test.mjs",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && wrangler deploy",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
