@@ -74,7 +74,7 @@ export function TicketAdmin() {
     if (response.ok) void load();
   }
 
-  return <AuthGuard><AppShell active="tickets" breadcrumb="Tickets">
+  return <AuthGuard requireAdmin><AppShell active="tickets" breadcrumb="Tickets">
     <section className="admin-heading"><div><span className="eyebrow">Gestão administrativa</span><h1>Tickets</h1><p>Pedidos de alteração com decisão, execução e histórico auditados.</p></div></section>
     <section className="ticket-stats" aria-label="Resumo dos tickets">
       <article><Clock3 /><div><strong>{counts.pending}</strong><span>Pendentes</span></div></article>

@@ -13,12 +13,27 @@ const iterations = 310_000;
 const passwordHash = pbkdf2Sync(`${password}\0${pepper}`, Buffer.from(salt, "base64"), iterations, 32, "sha256").toString("base64");
 const now = Date.now();
 
+const chaosStudents = Array.from({ length: 20 }, (_, index) => {
+  const classId = Math.floor(index / 4) + 1;
+  const slot = (index % 4) + 1;
+  return {
+    id: `local-chaos-${classId}-${slot}`,
+    userId: `local-chaos-user-${classId}-${slot}`,
+    classId,
+    slot,
+    fullName: `Pessoa Caos ${classId}.${slot}`,
+    studentNumber: String(202503001 + index),
+  };
+});
+
 function sql(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
 function runWrangler(args) {
-  execFileSync("corepack", ["pnpm", "exec", "wrangler", ...args], { cwd: root, stdio: "inherit", shell: true });
+  const pnpm = process.env.PNPM_BIN || "corepack";
+  const command = pnpm === "corepack" ? [pnpm, "pnpm", "exec", "wrangler", ...args] : [pnpm, "exec", "wrangler", ...args];
+  execFileSync(command[0], command.slice(1), { cwd: root, stdio: "inherit", shell: true });
 }
 
 runWrangler(["d1", "migrations", "apply", database, "--local"]);
@@ -26,6 +41,7 @@ runWrangler(["d1", "migrations", "apply", database, "--local"]);
 const users = [
   ["local-admin", "up202500001@up.pt", "Administrador Local", "admin", 1, null],
   ["local-student-user", "up202500100@up.pt", "Ana Almeida", "student", 0, null],
+  ...chaosStudents.map((student) => [student.userId, `up${student.studentNumber}@up.pt`, student.fullName, "student", 0, null]),
   ...Array.from({ length: 5 }, (_, index) => [
     `local-rep-${index + 1}`,
     `up20250001${index + 1}@up.pt`,
@@ -79,7 +95,34 @@ for (let classId = 1; classId <= 5; classId += 1) {
     }
   }
 }
-statements.push(`INSERT INTO class_tickets (id,class_id,category,description,status,response,created_by,created_at,updated_at,request_type,request_payload,execution_result) VALUES ('local-ticket-pending',1,'correct_student','Corrigir o nome de um estudante fictício.','pending',NULL,'local-rep-1',${now},${now},'other','{}',NULL)`);
+
+const chaosDestinations = {
+  1: [2, 3, 4, 5],
+  2: [3, 4, 5, 1],
+  3: [4, 5, 1, 2],
+  4: [5, 1, 2, 3],
+  5: [1, 2, 3, 4],
+};
+for (const student of chaosStudents) {
+  const destinations = chaosDestinations[student.classId];
+  const considerations = ["with_person"];
+  if (student.slot === 1) considerations.push("integration_bullying");
+  if (student.slot === 2) considerations.push("other_exception");
+  const sensitive = considerations.includes("integration_bullying") || considerations.includes("other_exception");
+  const notes = sensitive ? `Situação fictícia para testar revisão manual da Pessoa Caos ${student.classId}.${student.slot}.` : "";
+  const supportClass = student.slot === 3 ? destinations[1] : null;
+  statements.push(`INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at,student_decision,decision_at,notes,considerations,support_class,friend_group_code,manual_review,distribution_result) VALUES (${sql(student.id)},${student.classId},${sql(student.fullName)},${sql(student.studentNumber)},'move',${now},${sql(`local-rep-${student.classId}`)},${now},${now},'move',${now},${sql(notes)},${sql(JSON.stringify(considerations))},${supportClass ?? "NULL"},${sql(`CAOS-${student.slot}`)},${sensitive ? 1 : 0},'pending')`);
+  destinations.forEach((destination, rank) => {
+    statements.push(`INSERT INTO student_destinations (student_id,destination_class,rank,updated_by,updated_at) VALUES (${sql(student.id)},${destination},${rank + 1},${sql(`local-chaos-user-${student.classId}-${student.slot}`)},${now})`);
+  });
+}
+for (const [index, student] of chaosStudents.entries()) {
+  const friends = [chaosStudents[(index + 4) % chaosStudents.length], chaosStudents[(index + 8) % chaosStudents.length]];
+  friends.forEach((friend, rank) => {
+    statements.push(`INSERT INTO student_friend_preferences (student_id,friend_student_id,destination_class,rank,updated_at) VALUES (${sql(student.id)},${sql(friend.id)},${friend.classId},${rank + 1},${now})`);
+  });
+}
+statements.push(`INSERT INTO class_tickets (id,class_id,category,description,status,response,created_by,resolved_by,created_at,updated_at,request_type,request_payload,decided_at,executed_at,execution_result) VALUES ('local-ticket-resolved-correction',1,'correct_student','Corrigir o nome de um estudante fictício.','executed','Pedido fictício resolvido no seed local.','local-rep-1','local-admin',${now},${now},'other','{}',${now},${now},'Pedido fictício resolvido no seed local.')`);
 statements.push(`INSERT INTO class_tickets (id,class_id,category,description,status,response,created_by,resolved_by,created_at,updated_at,request_type,request_payload,decided_at,executed_at,execution_result) VALUES ('local-ticket-resolved',2,'reopen','Pedido fictício já resolvido.','executed','Pedido validado no ambiente local.','local-rep-2','local-admin',${now-60000},${now},'reopen','{}',${now},${now},'Turma reaberta e novamente submetida para demonstração.')`);
 statements.push("PRAGMA foreign_keys = ON");
 
@@ -102,4 +145,5 @@ console.log("\nAmbiente local pronto em http://127.0.0.1:3000");
 console.log(`Administrador: up202500001@up.pt / ${password}`);
 console.log(`Representantes: up202500011@up.pt a up202500015@up.pt / ${password}`);
 console.log(`Estudante: up202500100@up.pt / ${password}`);
-console.log("Dados: 5 turmas, 10 estudantes fictícios por turma.");
+console.log("Dados: 5 turmas, 14 estudantes fictícios por turma, incluindo 20 Pessoas Caos.");
+console.log("Pessoas Caos: up202503001@up.pt a up202503020@up.pt / " + password);

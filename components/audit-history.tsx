@@ -39,7 +39,7 @@ export function AuditHistory() {
   const effectivePage = Math.min(page, pageCount);
   const pagedActions = visible.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE);
 
-  return <AuthGuard><AppShell active="audit" breadcrumb="Histórico de ações">
+  return <AuthGuard requireAdmin><AppShell active="audit" breadcrumb="Histórico de ações">
     <section className="page-heading"><div><span className="eyebrow">Auditoria</span><h1>Histórico de ações</h1><p>Submissões, decisões e alterações administrativas ficam registadas.</p></div></section>
     <section className="panel audit-panel">
       <div className="panel__header"><div><h2>Ações recentes</h2><p>Até 200 registos, ordenados do mais recente para o mais antigo.</p></div><label className="search-field audit-search"><Search size={16} /><input placeholder="Pesquisar ação ou utilizador" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label></div>

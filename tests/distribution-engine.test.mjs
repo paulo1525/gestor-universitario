@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {calculateDistribution} from "../lib/distribution-engine.mjs";
 
+test("a ordem das pessoas indicadas desempata dentro da mesma primeira opcao",()=>{const stay=(id,classId)=>({...student(id,classId),studentDecision:"stay"});const move=(id,classId,destinations)=>({...student(id,classId,destinations),studentDecision:"move"});const rows=[stay("base-1-1",1),stay("base-1-2",1),stay("alberto",2),stay("stay-1",2),stay("stay-2",2),stay("stay-3",2),move("weak",2,[3]),stay("base-3-1",3),stay("base-3-2",3),{...move("a",1,[2]),friendPreferences:[{friendStudentId:"alberto",friendClassId:2,destinations:[],rank:1}]},move("b",1,[2])];const result=calculateDistribution(rows,{seed:"prioridade",classIds:[1,2,3]});assert.equal(result.find(row=>row.studentId==="a").destinationClass,2);assert.equal(result.find(row=>row.studentId==="b").destinationClass,1)});
+
 const student=(id,classId,destinations=[],preference=destinations.length?"move":"stay",notes="")=>({id,classId,destinations,preference,notes});
 function balanced(extra=[]){const rows=[];for(let c=1;c<=20;c++)for(let i=0;i<2;i++)rows.push(student(`base-${c}-${i}`,c));return [...rows,...extra]}
 
 test("nenhuma mudança possível mantém a origem",()=>{const rows=balanced([student("lotado-1",2),student("lotado-2",2),student("lotado-3",2),student("x",1,[2])]);const result=calculateDistribution(rows,{seed:"a"}).find(r=>r.studentId==="x");assert.equal(result.destinationClass,1)});
+test("sem conta ou decisão submetida permanece na turma de origem",()=>{const rows=balanced([{...student("x",1,[2]),studentDecision:null}]);const result=calculateDistribution(rows,{seed:"sem-decisao"}).find(r=>r.studentId==="x");assert.equal(result.destinationClass,1);assert.equal(result.status,"stayed_by_choice")});
 test("vaga simples atribui uma preferência",()=>{const rows=balanced();rows.splice(rows.findIndex(r=>r.classId===2),1);rows.push(student("x",1,[2]));const result=calculateDistribution(rows,{seed:"b"}).find(r=>r.studentId==="x");assert.equal(result.destinationClass,2)});
 test("permuta direta e ciclo de três turmas",()=>{const rows=balanced([student("a",1,[2]),student("b",2,[3]),student("c",3,[1])]);const result=calculateDistribution(rows,{seed:"c"});assert.deepEqual(result.filter(r=>["a","b","c"].includes(r.studentId)).map(r=>r.destinationClass).sort(),[1,2,3])});
 test("notas obrigam a revisão manual e o cálculo é determinístico",()=>{const rows=balanced([student("x",1,[2],"move","Situação excecional")]);assert.deepEqual(calculateDistribution(rows,{seed:"fixo"}),calculateDistribution(rows,{seed:"fixo"}));assert.equal(calculateDistribution(rows,{seed:"fixo"}).find(r=>r.studentId==="x").manualReview,true)});
