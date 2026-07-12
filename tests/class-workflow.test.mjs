@@ -8,9 +8,9 @@ const verifier=readFileSync(new URL("../components/distribution-check.tsx",impor
 const dashboard=readFileSync(new URL("../components/turmas-dashboard.tsx",import.meta.url),"utf8");
 const authGuard=readFileSync(new URL("../components/auth-guard.tsx",import.meta.url),"utf8");
 const notFound=readFileSync(new URL("../app/not-found.tsx",import.meta.url),"utf8");
-const migration=readFileSync(new URL("../migrations/0006_class_workflow_performance.sql",import.meta.url),"utf8");
 const resetMigration=readFileSync(new URL("../migrations/0007_password_reset.sql",import.meta.url),"utf8");
 const phasedMigration=readFileSync(new URL("../migrations/0015_cc_rosters_and_group_windows.sql",import.meta.url),"utf8");
+const testEnvironment=readFileSync(new URL("../components/test-environment.tsx",import.meta.url),"utf8");
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
@@ -21,8 +21,16 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/preferencia:readOnlyStudent \? "A aguardar decisão"/);
   assert.match(dashboard,/Turmas base/);
   assert.match(dashboard,/!preferenceOnly && <th>Decisões dos estudantes<\/th>/);
-  assert.match(detail,/Consulta da turma base/);
-  assert.match(detail,/submitted && !readOnlyStudent/);
+  assert.match(detail,/hideDecisions/);
+});
+
+test("ambiente de testes usa dados fictícios isolados e cinco turmas",()=>{
+  assert.match(testEnvironment,/localStorage\.getItem\("gu-test-environment"\)/);
+  assert.match(testEnvironment,/Todos os nomes, turmas e resultados desta página são fictícios/);
+  assert.match(testEnvironment,/Turmas 1–2 abertas/);
+  assert.match(testEnvironment,/Turmas 1–5 abertas/);
+  assert.match(testEnvironment,/O período de acesso da tua turma ainda não começou/);
+  assert.equal((testEnvironment.match(/representative:/g)||[]).length,5);
 });
 
 test("acesso inválido mostra aviso e volta ao início",()=>{
@@ -55,11 +63,13 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(verifier,/Exportar Excel/);
 });
 
-test("rascunho usa debounce, versão e cancelamento",()=>{
-  assert.match(detail,/setTimeout\(\(\) => void save\(rows, step\), 900\)/);
-  assert.match(detail,/AbortController/);
-  assert.match(worker,/revision<=klass\.draft_revision/);
-  assert.match(migration,/PRIMARY KEY \(class_id, revision\)/);
+test("composição é guardada diretamente e exige todos os campos",()=>{
+  assert.match(detail,/\/api\/classes\/\$\{turma\.id\}\/save/);
+  assert.match(detail,/!row\.fullName\.trim\(\)\|\|!\/\^\[0-9\]\{9\}\$\//);
+  assert.match(detail,/Guardar e continuar/);
+  assert.doesNotMatch(detail,/Revisão final|Submeter turma|class-progress/);
+  assert.match(worker,/action==="save"/);
+  assert.match(worker,/class_roster_saved/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{
@@ -88,7 +98,7 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(worker,/Ainda existem \$\{pending\.total\} revisões manuais pendentes/);
   assert.match(worker,/Os dados mudaram depois do cálculo/);
   assert.match(worker,/distribution_published/);
-  assert.match(detail,/submitted && !readOnlyStudent/);
+  assert.match(detail,/A decisão é tomada mais tarde por cada estudante/);
 });
 
 test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
