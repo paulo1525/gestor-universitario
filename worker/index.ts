@@ -643,7 +643,7 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
       : result.results;
     return json({ classes, settings, serverNow: Date.now() });
   }
-  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(draft|submit|reopen|tickets))?$/);
+  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(save|draft|submit|reopen|tickets))?$/);
   if (!match) return json({ error: "Turma não encontrada." }, 404);
   const classId = Number(match[1]), action = match[2] || "detail";
   if (classId < 1 || classId > 20) return json({ error: "Turma inválida." }, 400);
@@ -664,7 +664,18 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
       output = students.results.map((student) => ({ id:student.id,nome:student.full_name,numero:student.student_number,preferencia:readOnlyStudent ? "A aguardar decisão" : student.student_decision === "move" ? "Mudar" : student.student_decision === "stay" ? "Ficar" : "A aguardar decisão",locked:!isDraft,isSelf:student.student_number===ownNumber,destinations:readOnlyStudent ? [] : String(student.destinations).split(",").filter(Boolean).sort((a,b)=>Number(a.split(":")[1])-Number(b.split(":")[1])).map((value)=>Number(value.split(":")[0])),notes:!readOnlyStudent&&(student.student_number===ownNumber||canManageAll(user))?student.notes||"":undefined }));
     }
     const activeClasses=(await env.DB.prepare("SELECT id FROM classes ORDER BY id").all<{id:number}>()).results.map(row=>row.id);
-    return json({ class:{id:classId,status:klass.status,submittedAt:klass.submitted_at,workflowStep:klass.workflow_step,draftRevision:klass.draft_revision},students:output,activeClasses,settings,serverNow:Date.now(),permissions:{edit:canEditClass(user,classId)&&isDraft,manage:canManageAll(user),representative:false} });
+    return json({ class:{id:classId,status:klass.status,submittedAt:klass.submitted_at,workflowStep:klass.workflow_step,draftRevision:klass.draft_revision},students:output,activeClasses,settings,serverNow:Date.now(),permissions:{edit:canManageAll(user),manage:canManageAll(user),representative:false} });
+  }
+
+  if(request.method==="PUT"&&action==="save"){
+    if(!canManageAll(user))return json({error:"A composição das turmas é gerida exclusivamente pela Comissão de Curso."},403);
+    const body=await parseJson(request),normalized=normalizeDraftStudents(body?.students);
+    if(normalized.error||!normalized.students?.length)return json({error:normalized.error||"Adicione pelo menos um estudante e preencha todos os campos."},400);
+    const conflict=await conflictingStudent(env,classId,normalized.students.map(student=>student.studentNumber));
+    if(conflict)return json({error:`O estudante ${conflict.student_number} já está associado à Turma ${conflict.class_id}.`},409);
+    const now=Date.now(),actorId=user.actorId||user.id,values=normalized.students.map(()=>"(?,?,?,?,?,?,?,?,?,NULL)").join(","),bindings=normalized.students.flatMap(student=>[student.id,classId,student.fullName,student.studentNumber,student.preference,now,actorId,now,now]);
+    await env.DB.batch([env.DB.prepare("UPDATE class_students SET removed_at=?,updated_at=? WHERE class_id=? AND removed_at IS NULL AND student_number NOT IN ("+normalized.students.map(()=>"?").join(",")+")").bind(now,now,classId,...normalized.students.map(student=>student.studentNumber)),env.DB.prepare(`INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at,removed_at) VALUES ${values} ON CONFLICT(student_number) DO UPDATE SET class_id=excluded.class_id,full_name=excluded.full_name,updated_at=excluded.updated_at,removed_at=NULL`).bind(...bindings),env.DB.prepare("UPDATE classes SET status='submitted',workflow_step=1,submitted_at=?,submitted_by=?,updated_at=? WHERE id=?").bind(now,actorId,now,classId),env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) VALUES (?,?,'class_roster_saved',?,?)").bind(classId,actorId,JSON.stringify({students:normalized.students.length}),now)]);
+    return json({ok:true});
   }
 
   if (request.method === "PUT" && action === "draft") {
