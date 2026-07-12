@@ -1,1 +1,2 @@
-import {TicketAdmin} from "@/components/ticket-admin";export default function Page(){return <TicketAdmin/>}
+import {notFound} from "next/navigation";
+export default function Page(){notFound()}

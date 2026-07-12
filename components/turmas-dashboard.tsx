@@ -17,6 +17,7 @@ export function TurmasDashboard() {
   const [classes, setClasses] = useState<Turma[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [placementsPublished,setPlacementsPublished]=useState(false);
   const preferenceOnly = user?.role === "student" && !user.classRepresentative && !user.preview;
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function TurmasDashboard() {
         const response = await fetch("/api/classes", { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json() as { classes?: ApiClass[] };
+        setPlacementsPublished(Boolean(data.classes?.length&&data.classes.every(item=>item.status==="published")));
         setClasses((data.classes || []).map((item) => ({
           id: item.id,
           nome: `Turma ${item.id}`,
@@ -46,7 +48,7 @@ export function TurmasDashboard() {
 
   const classOverview = <section className="panel overview-panel">
     <div className="panel__header">
-      <div><h2>{preferenceOnly ? "Turmas base" : "Estado das turmas"}</h2><p>{preferenceOnly ? "Consulta a composição das turmas sem ver as decisões individuais sobre mudança." : "Os alunos podem consultar as decisões já submetidas."}</p></div>
+      <div><span className="eyebrow">{placementsPublished?"Colocações publicadas":"Composição atual"}</span><h2>{placementsPublished?"Turmas definitivas":preferenceOnly ? "Turmas base" : "Estado das turmas"}</h2><p>{placementsPublished?"Consulta a composição definitiva publicada pela Comissão de Curso.":preferenceOnly ? "Consulta a composição das turmas sem ver as decisões individuais sobre mudança." : "Os alunos podem consultar as decisões já submetidas."}</p></div>
       <label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar turma ou representante" /></label>
     </div>
     <div className="table-scroll"><table><thead><tr><th>Turma</th><th>Representante</th><th>Alunos</th>{!preferenceOnly && <th>Decisões dos estudantes</th>}<th>Estado</th><th /></tr></thead><tbody>{visible.map((item) => <tr className="class-row" tabIndex={0} key={item.id} onClick={() => router.push(`/turmas/${item.id}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") router.push(`/turmas/${item.id}`); }}><td><strong>{item.nome}</strong></td><td>{item.representante}</td><td>{item.alunos}</td>{!preferenceOnly && <td><div className="preference-counts preference-counts--inline"><span><i className="dot dot--green" />{item.ficam} ficam</span><span><i className="dot dot--gold" />{item.mudam} mudam</span></div></td>}<td><span className="status status--neutral">{item.estado}</span></td><td><ChevronRight size={18} /></td></tr>)}</tbody></table>{loading && <div className="empty-state">A carregar as turmas…</div>}{!loading && !visible.length && <div className="empty-state">Nenhuma turma corresponde à pesquisa.</div>}</div>
