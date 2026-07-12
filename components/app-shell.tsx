@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, ClipboardCheck, FlaskConical, Grid3X3, History, LogOut, Menu, Settings, Ticket, Users, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ClipboardCheck, FlaskConical, Grid3X3, History, LogOut, Menu, Settings, Ticket, Users, X } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { FontScale, useAuth } from "@/components/auth-context";
 import {setTestPersona,TEST_PERSONAS,testPersona} from "@/lib/test-mode";
@@ -11,6 +11,7 @@ type Props = { children: ReactNode; active: "overview" | "turmas" | "admin" | "t
 
 export function AppShell({ children, active, breadcrumb = "Visão geral", currentClassId }: Props) {
   const [open, setOpen] = useState(false);
+  const [testMenu,setTestMenu]=useState(false);
   const [classCount, setClassCount] = useState(20);
   const { user, logout, setFontScale } = useAuth();
   const visibleClassId = currentClassId ?? Number(breadcrumb.match(/^Turma (\d+)$/)?.[1] || 0);
@@ -33,9 +34,8 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
       <div className="sidebar__footer"><div className="text-size-setting"><span>Tamanho do texto</span><div>{([['small', 'A−'], ['normal', 'A'], ['large', 'A+']] as [FontScale, string][]).map(([value, label]) => <button key={value} className={user?.fontScale === value ? 'is-active' : ''} onClick={() => void setFontScale(value)}>{label}</button>)}</div></div><div className="profile"><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{user?.role === "admin" ? "Administrador" : user?.classRepresentative ? "Representante" : "Estudante"}</small></span>{!user?.preview&&!user?.testMode&&<button className="profile__logout" onClick={() => void logout()} aria-label="Terminar sessão"><LogOut /></button>}</div></div>
     </aside>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} aria-label="Fechar menu" />}
-    <div className="workspace"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></button><div className="breadcrumbs">{preferenceOnly ? <strong>As minhas preferências</strong> : <><Link href="/">Gestão de turmas</Link><ChevronRight /><strong>{breadcrumb}</strong></>}</div></header><main id="conteudo-principal" className={`main-content${preferenceOnly ? " main-content--preference" : ""}`}>{children}</main></div>
+    <div className="workspace"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu /></button><div className="breadcrumbs">{preferenceOnly ? <strong>As minhas preferências</strong> : <><Link href="/">Gestão de turmas</Link><ChevronRight /><strong>{breadcrumb}</strong></>}</div>{user?.testMode&&<div className="test-mode-control"><button type="button" className="test-mode-control__trigger" aria-expanded={testMenu} onClick={()=>setTestMenu(value=>!value)}><span className="test-mode-control__icon"><FlaskConical/></span><span><small>Ambiente de testes</small><strong>{TEST_PERSONAS.find(item=>item.id===testPersona())?.name}</strong></span><ChevronDown className={testMenu?"is-open":""}/></button>{testMenu&&<div className="test-mode-control__menu" role="menu"><header><strong>Visualizar como</strong><small>Os dados continuam a ser fictícios</small></header>{TEST_PERSONAS.map(persona=><button type="button" role="menuitem" key={persona.id} className={testPersona()===persona.id?"is-active":""} onClick={()=>setTestPersona(persona.id)}><span><strong>{persona.name}</strong><small>{persona.classId?`Aluno · Turma ${persona.classId}`:"Gestão administrativa"}</small></span>{testPersona()===persona.id&&<Check/>}</button>)}</div>}</div>}</header><main id="conteudo-principal" className={`main-content${preferenceOnly ? " main-content--preference" : ""}`}>{children}</main></div>
     {user?.preview&&<button className="preview-user-toggle" onClick={()=>void stopPreview()}><EyeLabel/><span><small>A visualizar como</small><strong>{user.fullName}</strong></span><b>Voltar ao meu perfil</b></button>}
-    {user?.testMode&&<div className="test-mode-float"><span className="test-mode-float__mark"><FlaskConical/></span><span><small>Ambiente de testes ativo</small><strong>Visualizar como</strong></span><select aria-label="Utilizador fictício" value={testPersona()} onChange={event=>setTestPersona(event.target.value as never)}>{TEST_PERSONAS.map(persona=><option key={persona.id} value={persona.id}>{persona.name}{persona.classId?` · Turma ${persona.classId}`:""}</option>)}</select></div>}
   </div>;
 }
 
