@@ -6,21 +6,41 @@ export const TEST_PERSONAS=[
  {id:"move-b" as const,name:"Carla Sousa",role:"student" as const,classId:4,email:"up202600003@up.pt"},
 ];
 type TestStudent={id:string;full_name:string;student_number:string;class_id:number;student_decision:string|null};
-type TestState={windows:Array<{group:number;classes:string;openAt:string;closeAt:string}>;decisions:Record<string,number[]>;proposalStatus:string|null;roster?:TestStudent[]};
-const defaults:TestState={windows:[{group:1,classes:"1–2",openAt:"2026-07-15T08:00:00.000Z",closeAt:"2026-07-17T19:00:00.000Z"},{group:2,classes:"3–5",openAt:"2026-07-16T08:00:00.000Z",closeAt:"2026-07-18T19:00:00.000Z"}],decisions:{stay:[],"move-a":[1,3],"move-b":[5,3]},proposalStatus:null};
+type TestState={version:number;windows:Array<{group:number;classes:string;openAt:string;closeAt:string}>;decisions:Record<string,number[]>;proposalStatus:string|null;roster?:TestStudent[]};
+const defaults:TestState={version:2,windows:[{group:1,classes:"1–2",openAt:"2026-07-15T08:00:00.000Z",closeAt:"2026-07-17T19:00:00.000Z"},{group:2,classes:"3–5",openAt:"2026-07-16T08:00:00.000Z",closeAt:"2026-07-18T19:00:00.000Z"}],decisions:{stay:[],"move-a":[1,3],"move-b":[5,3],"t1-move":[2,4],"t2-move":[3,1],"t3-move":[4,5],"t4-move":[2,5],"t5-move":[1,3]},proposalStatus:null};
 const roster=[
  {id:"stay",full_name:"Ana Martins",student_number:"202600001",class_id:1,student_decision:"stay"},
+ {id:"t1-stay-2",full_name:"Beatriz Lopes",student_number:"202600004",class_id:1,student_decision:"stay"},
+ {id:"t1-move",full_name:"Gonçalo Neves",student_number:"202600005",class_id:1,student_decision:"move"},
+ {id:"t1-pending",full_name:"Joana Ferreira",student_number:"202600006",class_id:1,student_decision:null},
+ {id:"t1-stay-3",full_name:"Luís Correia",student_number:"202600007",class_id:1,student_decision:"stay"},
  {id:"move-a",full_name:"Bruno Costa",student_number:"202600002",class_id:2,student_decision:"move"},
- {id:"t3",full_name:"Diana Ribeiro",student_number:"202600004",class_id:3,student_decision:null},
+ {id:"t2-stay-1",full_name:"Mariana Alves",student_number:"202600008",class_id:2,student_decision:"stay"},
+ {id:"t2-move",full_name:"Nuno Carvalho",student_number:"202600009",class_id:2,student_decision:"move"},
+ {id:"t2-pending",full_name:"Rita Faria",student_number:"202600010",class_id:2,student_decision:null},
+ {id:"t2-stay-2",full_name:"Tiago Ramos",student_number:"202600011",class_id:2,student_decision:"stay"},
+ {id:"t3-stay-1",full_name:"Diana Ribeiro",student_number:"202600012",class_id:3,student_decision:"stay"},
+ {id:"t3-move",full_name:"Eduardo Lima",student_number:"202600013",class_id:3,student_decision:"move"},
+ {id:"t3-stay-2",full_name:"Filipa Melo",student_number:"202600014",class_id:3,student_decision:"stay"},
+ {id:"t3-pending",full_name:"Henrique Sousa",student_number:"202600015",class_id:3,student_decision:null},
+ {id:"t3-stay-3",full_name:"Inês Rocha",student_number:"202600016",class_id:3,student_decision:"stay"},
  {id:"move-b",full_name:"Carla Sousa",student_number:"202600003",class_id:4,student_decision:"move"},
- {id:"t5",full_name:"Eduardo Lima",student_number:"202600005",class_id:5,student_decision:null},
+ {id:"t4-stay-1",full_name:"Leonor Pinto",student_number:"202600017",class_id:4,student_decision:"stay"},
+ {id:"t4-move",full_name:"Miguel Cardoso",student_number:"202600018",class_id:4,student_decision:"move"},
+ {id:"t4-pending",full_name:"Patrícia Gomes",student_number:"202600019",class_id:4,student_decision:null},
+ {id:"t4-stay-2",full_name:"Rodrigo Cunha",student_number:"202600020",class_id:4,student_decision:"stay"},
+ {id:"t5-stay-1",full_name:"Sofia Matos",student_number:"202600021",class_id:5,student_decision:"stay"},
+ {id:"t5-move",full_name:"Tomás Vieira",student_number:"202600022",class_id:5,student_decision:"move"},
+ {id:"t5-stay-2",full_name:"Vera Monteiro",student_number:"202600023",class_id:5,student_decision:"stay"},
+ {id:"t5-pending",full_name:"Afonso Leal",student_number:"202600024",class_id:5,student_decision:null},
+ {id:"t5-stay-3",full_name:"Catarina Reis",student_number:"202600025",class_id:5,student_decision:"stay"},
 ];
 let installed=false,realFetch:typeof fetch|null=null;
 export function testModeEnabled(){return typeof window!=="undefined"&&localStorage.getItem("gu-test-mode")==="1"}
 export function testPersona(){return (typeof window!=="undefined"?localStorage.getItem("gu-test-persona"):null) as TestPersona||"admin"}
 export function setTestMode(active:boolean){if(active){localStorage.setItem("gu-test-mode","1");localStorage.setItem("gu-test-persona","admin");if(!localStorage.getItem("gu-test-state"))localStorage.setItem("gu-test-state",JSON.stringify(defaults))}else{localStorage.removeItem("gu-test-mode");localStorage.removeItem("gu-test-persona")}window.dispatchEvent(new Event("gu-test-mode"))}
 export function setTestPersona(persona:TestPersona){localStorage.setItem("gu-test-persona",persona);window.location.assign("/")}
-function state():TestState{try{return {...defaults,...JSON.parse(localStorage.getItem("gu-test-state")||"")}}catch{return structuredClone(defaults)}}
+function state():TestState{try{const saved=JSON.parse(localStorage.getItem("gu-test-state")||"");return saved.version===defaults.version?{...defaults,...saved}:structuredClone(defaults)}catch{return structuredClone(defaults)}}
 function saveState(next:TestState){localStorage.setItem("gu-test-state",JSON.stringify(next))}
 function reply(value:unknown,status=200){return new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json"}})}
 function studentShape(row:typeof roster[number]){return {id:row.id,nome:row.full_name,numero:row.student_number,preferencia:row.student_decision==="move"?"Mudar":row.student_decision==="stay"?"Ficar":"A aguardar decisão",isSelf:row.id===testPersona(),destinations:state().decisions[row.id]||[]}}
