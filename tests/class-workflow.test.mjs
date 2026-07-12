@@ -10,9 +10,13 @@ const authGuard=readFileSync(new URL("../components/auth-guard.tsx",import.meta.
 const notFound=readFileSync(new URL("../app/not-found.tsx",import.meta.url),"utf8");
 const migration=readFileSync(new URL("../migrations/0006_class_workflow_performance.sql",import.meta.url),"utf8");
 const resetMigration=readFileSync(new URL("../migrations/0007_password_reset.sql",import.meta.url),"utf8");
+const phasedMigration=readFileSync(new URL("../migrations/0015_cc_rosters_and_group_windows.sql",import.meta.url),"utf8");
+const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
+const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
+const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
 
 test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
-  assert.match(worker,/const readOnlyStudent = user\.role === "student" && !user\.classRepresentative && !user\.preview/);
+  assert.match(worker,/const readOnlyStudent = !canManageAll\(user\) && !user\.preview/);
   assert.match(worker,/const canReadBaseClasses = request\.method === "GET"/);
   assert.match(worker,/preferencia:readOnlyStudent \? "A aguardar decisão"/);
   assert.match(dashboard,/Turmas base/);
@@ -67,8 +71,9 @@ test("submissão e aprovação são idempotentes",()=>{
 test("permissões e prazo são validados no servidor",()=>{
   assert.match(worker,/canEditClass\(user,classId\)/);
   assert.match(worker,/Date\.now\(\) < Date\.parse\(settings\.closeAt\)/);
-  assert.match(worker,/now<Date\.parse\(settings\.preferencesOpenAt\)/);
-  assert.match(worker,/now>=Date\.parse\(settings\.preferencesCloseAt\)/);
+  assert.match(worker,/now<Date\.parse\(window\.openAt\)/);
+  assert.match(worker,/now>=Date\.parse\(window\.closeAt\)/);
+  assert.match(worker,/gerida exclusivamente pelo Núcleo da CC/);
 });
 
 test("sem decisão do estudante a distribuição mantém a turma antiga",()=>{
@@ -90,8 +95,18 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
   assert.match(worker,/handlePlacementWorkbench/);
   assert.match(worker,/student_preferences_admin_updated/);
   assert.match(worker,/distribution_manual_override/);
-  assert.match(worker,/EXCECAO_POR_AVALIAR/);
+  assert.match(worker,/INFORMACAO_POR_VALIDAR/);
   assert.match(worker,/preferenceSource:decision\?row\.preference_source:"automatic"/);
+  assert.match(placements,/Tem amigos noutra turma/);
+  assert.match(placements,/Sofre bullying \/ está mal integrado/);
+});
+
+test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
+  assert.match(worker,/function canEditClass\(user: CurrentUser, _classId: number\).*canManageAll\(user\)/);
+  assert.match(phasedMigration,/preferences_group_4_close_at/);
+  assert.match(admin,/Janelas de preferências por bloco/);
+  assert.match(preferences,/Informação adicional para análise pela CC/);
+  assert.doesNotMatch(preferences,/bullying|amigos|Pessoa específica/i);
 });
 
 test("o exemplo de número mecanográfico é neutro",()=>{
