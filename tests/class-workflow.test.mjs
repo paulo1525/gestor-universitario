@@ -67,8 +67,8 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/xlsxZip/);
   assert.match(worker,/Situações a considerar/);
   assert.match(worker,/Colegas indicados \(por ordem\)/);
-  assert.match(verifier,/\/api\/admin\/export-validation/);
-  assert.match(verifier,/Exportar Excel/);
+  assert.match(placements,/\/api\/admin\/export-validation/);
+  assert.match(placements,/Exportar Excel/);
 });
 
 test("composição é guardada diretamente e exige todos os campos",()=>{
@@ -110,6 +110,32 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(worker,/\["applied","published"\]\.includes\(proposal\.status\)/);
   assert.match(worker,/UPDATE classes SET status='submitted'.*status='published'/);
   assert.match(detail,/A decisão é tomada mais tarde por cada estudante/);
+});
+
+test("aprovação confirma e publica automaticamente",()=>{
+  assert.match(placements,/Aprovar e publicar as turmas\?/);
+  assert.match(placements,/\["approve","apply","publish"\]/);
+  assert.match(placements,/Sim, aprovar e publicar/);
+});
+
+test("editor lista preferências por ordem e integra o destino final",()=>{
+  assert.match(placements,/destinations\.map\(item=>item\.destination_class\)/);
+  assert.match(placements,/Preferências submetidas pelo estudante/);
+  assert.match(placements,/sem preferência/);
+  assert.doesNotMatch(placements,/Guardar destino manual/);
+  assert.match(worker,/O destino manual tem de ser uma turma ativa/);
+});
+
+test("publicação aparece na página inicial",()=>{
+  assert.match(dashboard,/Turmas do 2\.º ano/);
+  assert.match(dashboard,/published-badge/);
+  assert.match(dashboard,/Publicadas/);
+  assert.match(testMode,/s\.proposalStatus==="published"\?"published"/);
+});
+
+test("verificador omite referências sem ponto",()=>{
+  assert.doesNotMatch(verifier,/Referências sem ponto/);
+  assert.match(worker,/issue\.code!=="REFERENCIA_SEM_PONTO"/);
 });
 
 test("referências de colegas chegam ao motor com validade calculada",()=>{
