@@ -14,6 +14,7 @@ const testMode=readFileSync(new URL("../lib/test-mode.ts",import.meta.url),"utf8
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
+const shell=readFileSync(new URL("../components/app-shell.tsx",import.meta.url),"utf8");
 
 test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/const readOnlyStudent = !canManageAll\(user\) && !user\.preview/);
@@ -31,6 +32,10 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/\/api\/admin\/placements/);
   assert.match(testMode,/\/api\/admin\/export-validation/);
   assert.match(testMode,/colocacoes-ambiente-teste\.xls/);
+  assert.match(testMode,/Excel\.Sheet/);
+  assert.match(testMode,/AutoFilter/);
+  assert.match(testMode,/FreezePanes/);
+  assert.match(testMode,/#F6C945/);
   assert.match(testMode,/action==="calculate"\?"draft"/);
   assert.match(testMode,/classes:"1–2"/);
   assert.match(testMode,/classes:"3–5"/);
@@ -107,8 +112,22 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(detail,/A decisão é tomada mais tarde por cada estudante/);
 });
 
+test("referências de colegas chegam ao motor com validade calculada",()=>{
+  assert.match(worker,/const friendsById=new Map/);
+  assert.match(worker,/friend_class_id===row\.destination_class&&row\.friend_decision!=="move"/);
+  assert.match(worker,/friendPreferences:friendsById\.get\(row\.id\)\|\|\[\]/);
+});
+
 test("tickets ficam ocultos e desativados temporariamente",()=>{
   assert.match(worker,/funcionalidade de tickets está temporariamente desativada/);
+  assert.doesNotMatch(shell,/href="\/admin\/pedidos"/);
+});
+
+test("menu administrativo segue o fluxo de trabalho",()=>{
+  assert.match(shell,/1\. Preparar dados/);
+  assert.match(shell,/2\. Calcular e publicar/);
+  assert.match(shell,/Utilizadores e calendário/);
+  assert.match(shell,/Ações administrativas/);
 });
 
 test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
@@ -128,7 +147,7 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
-  assert.match(worker,/function canEditClass\(user: CurrentUser, _classId: number\).*canManageAll\(user\)/);
+  assert.match(worker,/function canEditClass\(user: CurrentUser, classId: number\).*canManageAll\(user\)/);
   assert.match(phasedMigration,/preferences_group_4_close_at/);
   assert.match(admin,/Janelas de preferências por bloco/);
   assert.match(preferences,/Informação adicional para análise pela CC/);

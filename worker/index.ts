@@ -295,6 +295,7 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   return createSessionResponse(env, request, { id: userId, email, full_name: pending.full_name, role }, body?.rememberMe === true);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- referência histórica de migração
 async function ensureOperationalSchemaLegacy(env: Env): Promise<void> {
   const columns = await env.DB.prepare("PRAGMA table_info(users)").all<{ name: string }>();
   const names = new Set(columns.results.map((column) => column.name));
@@ -600,7 +601,7 @@ async function handleSessionPreference(request: Request, env: Env): Promise<Resp
 
 function studentNumberFromEmail(email: string): string { return email.split("@")[0].replace(/^up/i, ""); }
 function canManageAll(user: CurrentUser): boolean { return user.role === "admin" || user.commissionDepartment === "management"; }
-function canEditClass(user: CurrentUser, _classId: number): boolean { return canManageAll(user); }
+function canEditClass(user: CurrentUser, classId: number): boolean { void classId; return canManageAll(user); }
 
 async function classSettings(env: Env) {
   const result = await env.DB.prepare("SELECT key,value FROM app_settings WHERE key LIKE 'preferences_group_%' OR key IN ('classes_open_at','classes_close_at','preferences_open_at','preferences_close_at')").all<{ key: string; value: string }>();
@@ -802,6 +803,7 @@ async function handleStudentSearch(env:Env,user:CurrentUser,url:URL):Promise<Res
  const number=studentNumberFromEmail(user.email),student=await env.DB.prepare("SELECT id FROM class_students WHERE student_number=? AND removed_at IS NULL").bind(number).first<{id:string}>();if(!student)return json({error:"O seu registo ainda não consta de uma turma."},404);const query=(url.searchParams.get("q")||"").trim();if(query.length<2)return json({students:[]});const rows=await env.DB.prepare("SELECT id,full_name,student_number,class_id,preference FROM class_students WHERE removed_at IS NULL AND id<>? AND instr(lower(full_name),lower(?))>0 ORDER BY full_name LIMIT 8").bind(student.id,query).all<{id:string;full_name:string;student_number:string;class_id:number;preference:"stay"|"move"}>();return json({students:rows.results.map(row=>({id:row.id,fullName:row.full_name,studentNumber:row.student_number,classId:row.class_id,preference:row.preference}))});
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tickets temporariamente desativados
 async function handleGlobalTickets(request:Request,env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  if(request.method==="GET"){const result=await env.DB.prepare(`SELECT t.*,s.full_name student_name,s.student_number,u.full_name created_by_name FROM class_tickets t LEFT JOIN class_students s ON s.id=t.student_id JOIN users u ON u.id=t.created_by ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'review' THEN 1 ELSE 2 END,t.created_at DESC`).all();return json({tickets:result.results});}
@@ -811,6 +813,7 @@ async function handleGlobalTickets(request:Request,env:Env,user:CurrentUser):Pro
  const now=Date.now();await env.DB.batch([env.DB.prepare("UPDATE class_tickets SET status=?,response=?,resolved_by=CASE WHEN ? IN ('accepted','rejected','completed') THEN ? ELSE resolved_by END,updated_at=? WHERE id=?").bind(status,response||null,status,user.actorId||user.id,now,id),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'class_ticket_updated',?,?)").bind(user.actorId||user.id,JSON.stringify({id,status}),now)]);return json({ok:true});
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- tickets temporariamente desativados
 async function handleGlobalTicketsV2(request:Request,env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  if(request.method==="GET"){const result=await env.DB.prepare(`SELECT t.*,s.full_name student_name,s.student_number,u.full_name created_by_name FROM class_tickets t LEFT JOIN class_students s ON s.id=t.student_id JOIN users u ON u.id=t.created_by ORDER BY CASE t.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,t.created_at DESC`).all();return json({tickets:result.results});}
@@ -868,6 +871,7 @@ async function handleGlobalTicketsV2(request:Request,env:Env,user:CurrentUser):P
  await env.DB.batch([env.DB.prepare("UPDATE class_tickets SET status=?,response=?,resolved_by=?,decided_at=?,updated_at=? WHERE id=? AND status<>'executed'").bind(status,response||null,actorId,status==="rejected"?now:null,now,id),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'class_ticket_updated',?,?)").bind(actorId,JSON.stringify({id,status}),now)]);return json({ok:true,status});
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- versão legada preservada durante a transição para V2
 async function handleDistributionCheck(env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  const [classes,students,openTickets]=await Promise.all([env.DB.prepare("SELECT id,status FROM classes ORDER BY id").all<{id:number;status:string}>(),env.DB.prepare("SELECT id,class_id,student_number,preference,student_decision FROM class_students WHERE removed_at IS NULL").all<{id:string;class_id:number;student_number:string;preference:string;student_decision:string|null}>(),env.DB.prepare("SELECT id,class_id,category FROM class_tickets WHERE status IN ('open','review','information_needed')").all<{id:string;class_id:number;category:string}>()]);
@@ -901,7 +905,8 @@ async function distributionInputs(env:Env){
   env.DB.prepare("SELECT p.student_id,p.friend_student_id,p.destination_class,p.rank,f.class_id friend_class_id,f.student_decision friend_decision FROM student_friend_preferences p JOIN class_students f ON f.id=p.friend_student_id AND f.removed_at IS NULL ORDER BY p.student_id,p.rank").all<{student_id:string;friend_student_id:string;destination_class:number;rank:number;friend_class_id:number;friend_decision:string|null}>()
  ]);
  const destinationsById=new Map<string,number[]>();for(const row of destinationRows.results)destinationsById.set(row.student_id,[...(destinationsById.get(row.student_id)||[]),row.destination_class]);
- const students:DistributionInput[]=studentRows.results.map(row=>{const decision=row.student_decision==="move"?"move":row.student_decision==="stay"?"stay":null,destinations=decision==="move"?(destinationsById.get(row.id)||[]):[];let considerations:string[]=[];try{const parsed=JSON.parse(row.considerations||"[]");if(Array.isArray(parsed))considerations=parsed.filter((value):value is string=>typeof value==="string")}catch{}const integrationPoints=considerations.includes("integration_bullying")?2:0,exceptionPoints=Math.max(0,Number(row.exception_points||0)-integrationPoints);return {id:row.id,studentNumber:row.student_number,classId:row.class_id,preference:decision==="move"?"move":"stay",studentDecision:decision,representativePreference:row.preference,preferenceSource:decision?row.preference_source:"automatic",notes:row.notes,considerations,integrationPoints,exceptionPoints,supportClass:row.support_class,basePoints:Number(row.exception_points||0),destinations,friendPreferences:[]};});
+ const friendsById=new Map<string,DistributionInput["friendPreferences"]>();for(const row of friendRows.results)friendsById.set(row.student_id,[...(friendsById.get(row.student_id)||[]),{friendStudentId:row.friend_student_id,destinationClass:row.destination_class,valid:row.friend_class_id===row.destination_class&&row.friend_decision!=="move",rank:row.rank}]);
+ const students:DistributionInput[]=studentRows.results.map(row=>{const decision=row.student_decision==="move"?"move":row.student_decision==="stay"?"stay":null,destinations=decision==="move"?(destinationsById.get(row.id)||[]):[];let considerations:string[]=[];try{const parsed=JSON.parse(row.considerations||"[]");if(Array.isArray(parsed))considerations=parsed.filter((value):value is string=>typeof value==="string")}catch{}const integrationPoints=considerations.includes("integration_bullying")?2:0,exceptionPoints=Math.max(0,Number(row.exception_points||0)-integrationPoints);return {id:row.id,studentNumber:row.student_number,classId:row.class_id,preference:decision==="move"?"move":"stay",studentDecision:decision,representativePreference:row.preference,preferenceSource:decision?row.preference_source:"automatic",notes:row.notes,considerations,integrationPoints,exceptionPoints,supportClass:row.support_class,basePoints:Number(row.exception_points||0),destinations,friendPreferences:friendsById.get(row.id)||[]};});
  const snapshot=JSON.stringify({engineVersion:DISTRIBUTION_ENGINE_VERSION,classIds:classRows.results.map(row=>row.id),students});
  const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(snapshot));const hash=[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,"0")).join("");
  return {students,classIds:classRows.results.map(row=>row.id),snapshot,hash};
@@ -938,6 +943,7 @@ async function handleAdminAudit(env:Env,user:CurrentUser):Promise<Response>{
 }
 
 function xmlCell(value:unknown,style="Cell"){const escaped=String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");return `<Cell ss:StyleID="${style}"><Data ss:Type="String">${escaped}</Data></Cell>`}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- exportação XLS legada substituída pelo XLSX atual
 async function handleAdminExport(env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
  const rows=await env.DB.prepare(`SELECT s.id,s.full_name,s.student_number,s.class_id,s.preference,s.student_decision,s.decision_at,s.notes,s.considerations,s.support_class,s.manual_review,s.distribution_result,COALESCE(group_concat(DISTINCT d.destination_class),'') destinations,COALESCE(group_concat(DISTINCT f.full_name||' ('||f.student_number||', Turma '||fp.destination_class||')'),'') friends FROM class_students s LEFT JOIN student_destinations d ON d.student_id=s.id LEFT JOIN student_friend_preferences fp ON fp.student_id=s.id LEFT JOIN class_students f ON f.id=fp.friend_student_id WHERE s.removed_at IS NULL GROUP BY s.id ORDER BY s.class_id,s.full_name`).all<Record<string,unknown>>();
