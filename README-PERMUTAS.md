@@ -2,7 +2,7 @@
 
 ## Estado atual
 
-A aplicação recolhe e valida os dados necessários para uma futura distribuição automática. O motor que altera as colocações não é executado enquanto o Núcleo de Gestão não definir as regras académicas de capacidade, equilíbrio, prioridades e desempate. O **Verificador de distribuição** pode ser usado entretanto para detetar dados em falta ou inconsistentes.
+A aplicação recolhe e valida os dados e permite ao Núcleo calcular uma proposta versionada. O cálculo nunca altera imediatamente as turmas: casos sensíveis têm revisão obrigatória, a proposta é aprovada, aplicada internamente e só depois publicada. Os dados de entrada são protegidos por hash; qualquer alteração posterior obriga a um novo cálculo.
 
 ## Fluxo
 
@@ -11,9 +11,10 @@ A aplicação recolhe e valida os dados necessários para uma futura distribuiç
 3. O estudante pode ordenar qualquer quantidade entre 1 e 19 turmas alternativas, sem repetições.
 4. A turma atual não é repetida na lista: é sempre o resultado de segurança e constitui o 20.º resultado possível.
 5. Se nenhuma alternativa for viável, o estudante permanece na turma atual. Um cálculo nunca pode deixar um estudante sem turma.
-6. O Núcleo resolve pedidos pendentes, executa o verificador e, futuramente, calcula uma proposta.
-7. Uma proposta deve ser revista e aprovada antes de ser aplicada.
-8. O formulário deverá ter uma opção de 'Notas', em que, se o estudante escrever algo (deve ter um aviso para só escrever em casos especiais, tipo sofre bullying ou não se encaixa na turma), esse estudante fica sinalizado. O sistema pode atribuir-lhe automaticamente uma turma, mas o núcleo da CC terá de validar manualmente esse estudante.
+6. O Núcleo resolve pedidos pendentes, executa o verificador e calcula uma proposta.
+7. Uma proposta deve ser revista e aprovada antes de ser aplicada; propostas antigas ficam invalidadas quando se calcula outra.
+8. Uma nota ou situação sensível sinaliza o estudante e bloqueia a aprovação até o Núcleo validar expressamente o caso.
+9. Depois de aplicada, a proposta pode ser revertida ou publicada. A publicação é a fase que torna a distribuição final.
 
 ## Preferências
 

@@ -3,7 +3,9 @@
 - Nunca executar `wrangler deploy` localmente.
 - Nunca executar `npx wrangler deploy` localmente.
 - Nunca executar `pnpm run deploy` localmente.
-- Nunca publicar diretamente na Cloudflare a partir deste computador.
+- Nunca publicar diretamente a aplicação ou o Worker na Cloudflare a partir deste computador.
+- É permitido e obrigatório usar `wrangler d1 migrations apply gestor-universitario-prod --remote` quando uma alteração publicada exigir migrations da base de dados D1.
+- Antes de aplicar migrations remotas, concluir os testes locais, executar `pnpm run build`, fazer commit e push para o GitHub.
 - É permitido executar `pnpm dev` para desenvolvimento local.
 - É permitido executar `pnpm run build` para validação local.
 - É permitido executar `pnpm run preview` ou `wrangler dev` apenas para pré-visualização local.

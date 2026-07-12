@@ -76,6 +76,16 @@ test("sem decisão do estudante a distribuição mantém a turma antiga",()=>{
   assert.match(worker,/studentDecision/);
 });
 
+test("propostas protegem ordem, versão, revisão e publicação",()=>{
+  assert.match(worker,/student_destinations ORDER BY student_id,rank/);
+  assert.match(worker,/crypto\.subtle\.digest\("SHA-256"/);
+  assert.match(worker,/distribution_result_reviews/);
+  assert.match(worker,/Ainda existem \$\{pending\.total\} revisões manuais pendentes/);
+  assert.match(worker,/Os dados mudaram depois do cálculo/);
+  assert.match(worker,/distribution_published/);
+  assert.match(detail,/submitted && !readOnlyStudent/);
+});
+
 test("o exemplo de número mecanográfico é neutro",()=>{
   assert.match(detail,/placeholder="202500000"/);
   assert.doesNotMatch(detail,/placeholder="202507850"/);
