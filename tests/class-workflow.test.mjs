@@ -18,6 +18,7 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(dashboard,/Turmas base/);
   assert.match(dashboard,/!preferenceOnly && <th>Decisões dos estudantes<\/th>/);
   assert.match(detail,/Consulta da turma base/);
+  assert.match(detail,/submitted && !readOnlyStudent/);
 });
 
 test("acesso inválido mostra aviso e volta ao início",()=>{
