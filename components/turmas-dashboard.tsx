@@ -9,7 +9,7 @@ import { StudentPreferencePanel } from "@/components/student-preference-panel";
 import type { EstadoTurma, Turma } from "@/data/turmas";
 
 type ApiClass = { id: number; status: string; submitted_at: number | null; representative: string | null; students: number; stays?: number; moves?: number };
-const labels: Record<string, EstadoTurma> = { draft: "Em preenchimento", submitted: "Submetida", review: "Em revisão", reopened: "Reaberta", validated: "Validada", published: "Publicada" };
+const labels: Record<string, EstadoTurma> = { draft: "Em preenchimento", reopened: "Em preenchimento", submitted: "Submetida", review: "Submetida", validated: "Submetida", published: "Submetida" };
 
 export function TurmasDashboard() {
   const router = useRouter();
@@ -42,7 +42,7 @@ export function TurmasDashboard() {
 
   const visible = useMemo(() => classes.filter((item) => `${item.nome} ${item.representante}`.toLowerCase().includes(search.toLowerCase().trim())), [classes, search]);
   const total = classes.reduce((count, item) => count + item.alunos, 0);
-  const submitted = classes.filter((item) => item.estado !== "Em preenchimento" && item.estado !== "Reaberta").length;
+  const submitted = classes.filter((item) => item.estado === "Submetida").length;
 
   const classOverview = <section className="panel overview-panel">
     <div className="panel__header">
