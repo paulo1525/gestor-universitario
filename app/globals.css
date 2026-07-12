@@ -212,6 +212,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .rules-panel__facts dd { display: flex; align-items: center; gap: 5px; margin: 4px 0 0; font-size: 10px; font-weight: 800; }
 .rules-panel__exception dd { color: #8a5a00; }
 .overview-panel { min-width: 0; }
+.published-heading{display:flex;align-items:center;gap:10px}.published-heading h2{margin:0}.published-badge{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;color:#17633d;background:#d9f2e2;font-size:9px;font-weight:850}.published-badge svg{width:14px;height:14px}
 .overview-panel tbody tr { cursor: pointer; }
 .overview-panel td { height: 58px; }
 .table-link--route { color: var(--ink); text-decoration: none; }
