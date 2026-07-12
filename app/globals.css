@@ -1054,3 +1054,6 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .workspace .distribution-export{display:grid;grid-template-columns:minmax(0,1fr) auto;max-width:1180px;gap:28px;padding:18px 20px}.distribution-export>div:last-child{display:flex;align-items:center;gap:8px}.distribution-export .button{min-height:40px;padding:0 13px}
 @media(max-width:900px){.preference-window-grid{grid-template-columns:1fr}.placement-runbar,.workspace .distribution-export{grid-template-columns:1fr}.placement-runbar>div:last-child,.distribution-export>div:last-child{justify-content:flex-start}}
 @media(max-width:560px){.preference-window-grid{padding:12px}.preference-window-grid .deadline-fields{grid-template-columns:1fr}.placement-runbar{padding:16px}.placement-runbar>div:last-child,.distribution-export>div:last-child{align-items:stretch;flex-direction:column}.placement-runbar .button,.distribution-export .button{width:100%;justify-content:center}.student-preferences__body{padding:18px 14px}.preference-window{align-items:flex-start}}
+.verifier-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:900px){.verifier-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.verifier-kpis{grid-template-columns:1fr}}
