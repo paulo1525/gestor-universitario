@@ -18,3 +18,4 @@
 - Ao trabalhar em dois computadores, nunca editar simultaneamente versões desatualizadas do projeto.
 - Nunca guardar tokens, palavras-passe ou segredos no repositório.
 - Nunca adicionar `.env.local`, `.dev.vars` ou qualquer ficheiro de segredos ao Git.
+- Nunca usar o navegador integrado do Codex neste projeto; para testes visuais ou interação web, usar exclusivamente o plugin do Chrome.
