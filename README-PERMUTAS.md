@@ -24,6 +24,12 @@ A aplicação recolhe e valida os dados e permite ao Núcleo calcular uma propos
 - A turma atual, para quem quiser mudar, deverá ser a última opção. Por exemplo: queria mudar para a 3ª, 7ª ou 9ª turmas; se não entrar em nenhuma delas, fico na minha atual.
 - Guardar novamente substitui a lista anterior numa única operação.
 - As preferências não garantem uma mudança.
+- Quem não submete o formulário permanece automaticamente na turma de origem.
+- O Núcleo pode registar preferências em nome de um estudante antes do cálculo, sempre com justificação e auditoria.
+- Cada destino pode ter no máximo uma pessoa de referência. A referência vale um ponto apenas se essa pessoa permanecer nessa turma.
+- Dificuldades graves de integração ou bullying valem dois pontos de desempate.
+- Outra situação excecional tem de ser avaliada pelo Núcleo, que atribui entre zero e cinco pontos e regista a justificação.
+- Os pontos desempatem estudantes dentro da mesma posição de preferência; nunca reordenam os destinos escolhidos.
 
 ## Garantias que já estão implementadas
 
@@ -71,6 +77,9 @@ São bloqueadores atuais:
 - número mecanográfico inválido;
 - estudante que quer mudar sem preferências;
 - pedido de alteração pendente.
+- situação excecional ainda não avaliada pelo Núcleo.
+
+Referências que deixaram de permanecer na turma indicada aparecem como aviso e não atribuem pontos. A revisão e edição das colocações decorrem na secção administrativa própria **Colocações**, com grelha, filtros, overrides justificados e controlo das fases de cálculo, aprovação, aplicação e publicação.
 
 O verificador apresenta avisos sobre distribuição atual, mas um aviso não autoriza automaticamente movimentos.
 

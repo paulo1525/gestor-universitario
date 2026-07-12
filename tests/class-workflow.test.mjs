@@ -48,7 +48,7 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/Situações a considerar/);
   assert.match(worker,/Colegas indicados \(por ordem\)/);
   assert.match(verifier,/\/api\/admin\/export-validation/);
-  assert.match(verifier,/Exportar Excel completo/);
+  assert.match(verifier,/Exportar Excel/);
 });
 
 test("rascunho usa debounce, versão e cancelamento",()=>{
@@ -84,6 +84,14 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(worker,/Os dados mudaram depois do cálculo/);
   assert.match(worker,/distribution_published/);
   assert.match(detail,/submitted && !readOnlyStudent/);
+});
+
+test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
+  assert.match(worker,/handlePlacementWorkbench/);
+  assert.match(worker,/student_preferences_admin_updated/);
+  assert.match(worker,/distribution_manual_override/);
+  assert.match(worker,/EXCECAO_POR_AVALIAR/);
+  assert.match(worker,/preferenceSource:decision\?row\.preference_source:"automatic"/);
 });
 
 test("o exemplo de número mecanográfico é neutro",()=>{

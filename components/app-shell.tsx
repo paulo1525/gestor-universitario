@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, ClipboardCheck, History, LogOut, Menu, Settings, Ticket, Users, X } from "lucide-react";
+import { ChevronRight, ClipboardCheck, Grid3X3, History, LogOut, Menu, Settings, Ticket, Users, X } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { FontScale, useAuth } from "@/components/auth-context";
 
-type Props = { children: ReactNode; active: "overview" | "turmas" | "admin" | "tickets" | "check" | "audit"; breadcrumb?: string; currentClassId?: number };
+type Props = { children: ReactNode; active: "overview" | "turmas" | "admin" | "tickets" | "check" | "placements" | "audit"; breadcrumb?: string; currentClassId?: number };
 
 export function AppShell({ children, active, breadcrumb = "Visão geral", currentClassId }: Props) {
   const [open, setOpen] = useState(false);
@@ -27,7 +27,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
       <div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt="Comissão de Curso FMUP" width={58} height={58} priority /></span><div><span className="brand__name">Gestor Universitário</span><span className="brand__context">Comissão de Curso</span></div><button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label="Fechar menu"><X /></button></div>
       <nav className="nav-list" aria-label="Navegação principal">
         <div className="nav-section"><span className="nav-label">Gestão de turmas</span>{preferenceOnly ? <Link className={classesActive ? "is-active" : ""} href="/"><ClipboardCheck />Preferências</Link> : <Link className={classesActive ? "is-active" : ""} href="/"><Users />Turmas<span className="nav-count">{classCount}</span></Link>}{user?.representedClass && <Link className={ownActive ? "is-active" : ""} href={`/turmas/${user.representedClass}`}><Users />A minha turma<span className="nav-count">{user.representedClass}</span></Link>}</div>
-        {user?.role === "admin" && <div className="nav-section"><span className="nav-label">Gestão administrativa</span><Link className={active === "admin" ? "is-active" : ""} href="/admin"><Settings />Controlo administrativo</Link><Link className={active === "tickets" ? "is-active" : ""} href="/admin/pedidos"><Ticket />Tickets</Link><Link className={active === "check" ? "is-active" : ""} href="/admin/verificacao"><ClipboardCheck />Verificador de distribuição</Link><Link className={active === "audit" ? "is-active" : ""} href="/admin/historico"><History />Histórico de ações</Link></div>}
+        {user?.role === "admin" && <div className="nav-section"><span className="nav-label">Gestão administrativa</span><Link className={active === "admin" ? "is-active" : ""} href="/admin"><Settings />Controlo administrativo</Link><Link className={active === "tickets" ? "is-active" : ""} href="/admin/pedidos"><Ticket />Tickets</Link><Link className={active === "check" ? "is-active" : ""} href="/admin/verificacao"><ClipboardCheck />Verificador</Link><Link className={active === "placements" ? "is-active" : ""} href="/admin/colocacoes"><Grid3X3 />Colocações</Link><Link className={active === "audit" ? "is-active" : ""} href="/admin/historico"><History />Histórico de ações</Link></div>}
       </nav>
       <div className="sidebar__footer"><div className="text-size-setting"><span>Tamanho do texto</span><div>{([['small', 'A−'], ['normal', 'A'], ['large', 'A+']] as [FontScale, string][]).map(([value, label]) => <button key={value} className={user?.fontScale === value ? 'is-active' : ''} onClick={() => void setFontScale(value)}>{label}</button>)}</div></div><div className="profile"><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{user?.role === "admin" ? "Administrador" : user?.classRepresentative ? "Representante" : "Estudante"}</small></span><button className="profile__logout" onClick={() => void logout()} aria-label="Terminar sessão"><LogOut /></button></div></div>
     </aside>
