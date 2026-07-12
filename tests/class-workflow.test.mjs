@@ -70,6 +70,7 @@ test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.doesNotMatch(detail,/Revisão final|Submeter turma|class-progress/);
   assert.match(worker,/action==="save"/);
   assert.match(worker,/class_roster_saved/);
+  assert.match(worker,/UPDATE classes SET status='submitted'/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{
@@ -98,7 +99,13 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(worker,/Ainda existem \$\{pending\.total\} revisões manuais pendentes/);
   assert.match(worker,/Os dados mudaram depois do cálculo/);
   assert.match(worker,/distribution_published/);
+  assert.match(worker,/\["applied","published"\]\.includes\(proposal\.status\)/);
+  assert.match(worker,/UPDATE classes SET status='submitted'.*status='published'/);
   assert.match(detail,/A decisão é tomada mais tarde por cada estudante/);
+});
+
+test("tickets ficam ocultos e desativados temporariamente",()=>{
+  assert.match(worker,/funcionalidade de tickets está temporariamente desativada/);
 });
 
 test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
