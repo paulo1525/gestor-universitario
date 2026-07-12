@@ -10,7 +10,7 @@ const authGuard=readFileSync(new URL("../components/auth-guard.tsx",import.meta.
 const notFound=readFileSync(new URL("../app/not-found.tsx",import.meta.url),"utf8");
 const resetMigration=readFileSync(new URL("../migrations/0007_password_reset.sql",import.meta.url),"utf8");
 const phasedMigration=readFileSync(new URL("../migrations/0015_cc_rosters_and_group_windows.sql",import.meta.url),"utf8");
-const testEnvironment=readFileSync(new URL("../components/test-environment.tsx",import.meta.url),"utf8");
+const testMode=readFileSync(new URL("../lib/test-mode.ts",import.meta.url),"utf8");
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
@@ -24,13 +24,13 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(detail,/hideDecisions/);
 });
 
-test("ambiente de testes usa dados fictícios isolados e cinco turmas",()=>{
-  assert.match(testEnvironment,/localStorage\.getItem\("gu-test-environment"\)/);
-  assert.match(testEnvironment,/Todos os nomes, turmas e resultados desta página são fictícios/);
-  assert.match(testEnvironment,/Turmas 1–2 abertas/);
-  assert.match(testEnvironment,/Turmas 1–5 abertas/);
-  assert.match(testEnvironment,/O período de acesso da tua turma ainda não começou/);
-  assert.equal((testEnvironment.match(/representative:/g)||[]).length,5);
+test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>{
+  assert.match(testMode,/gu-test-mode/);
+  assert.match(testMode,/Array\.from\(\{length:5\}/);
+  assert.match(testMode,/\/api\/admin\/distribution-check/);
+  assert.match(testMode,/\/api\/admin\/placements/);
+  assert.match(testMode,/classes:"1–2"/);
+  assert.match(testMode,/classes:"3–5"/);
 });
 
 test("acesso inválido mostra aviso e volta ao início",()=>{
