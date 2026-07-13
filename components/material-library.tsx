@@ -8,20 +8,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
-  Bold,
   Check,
   Download,
   FileText,
   FolderOpen,
   Image as ImageIcon,
-  Italic,
-  Link2,
-  List,
-  ListOrdered,
   LoaderCircle,
   Send,
   ShieldCheck,
@@ -34,7 +28,8 @@ import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
 import { FileUploadField, MultiFileUploadField, SelectedUpload } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
-import { richTextDisplayHtml, richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
+import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import styles from "@/components/material-library.module.css";
 
 type Status = "pending" | "approved" | "rejected" | "archived";
@@ -189,7 +184,6 @@ function readFileDataUrl(file: File) {
 }
 export function MaterialLibrary() {
   const { user } = useAuth();
-  const descriptionEditorRef = useRef<HTMLDivElement>(null);
   const [materials, setMaterials] = useState<Material[]>([]),
     [units, setUnits] = useState<Unit[]>([]),
     [canModerate, setCanModerate] = useState(false),
@@ -261,11 +255,6 @@ export function MaterialLibrary() {
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    if (editor && descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = description;
-  // The HTML is restored only when the editor mounts; input updates must not reset the caret.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor]);
   const visible = useMemo(
     () =>
       materials.filter((item) => filter === "all" || item.category === filter),
@@ -346,27 +335,7 @@ export function MaterialLibrary() {
     setFile(null);
     setFileData("");
     setExamFiles([]);
-    if (descriptionEditorRef.current) descriptionEditorRef.current.innerHTML = "";
     setEditor(false);
-  };
-  const syncDescription = () => setDescription(descriptionEditorRef.current?.innerHTML ?? "");
-  const formatDescription = (command: "bold" | "italic" | "insertUnorderedList" | "insertOrderedList") => {
-    descriptionEditorRef.current?.focus();
-    document.execCommand(command);
-    syncDescription();
-  };
-  const addDescriptionLink = () => {
-    const value = window.prompt("Indica o endere\u00e7o completo da liga\u00e7\u00e3o (https://\u2026)");
-    if (!value) return;
-    try {
-      const url = new URL(value);
-      if (!["http:", "https:", "mailto:"].includes(url.protocol)) throw new Error();
-      descriptionEditorRef.current?.focus();
-      document.execCommand("createLink", false, value);
-      syncDescription();
-    } catch {
-      setNotice({ kind: "warning", message: "Indica uma liga\u00e7\u00e3o v\u00e1lida iniciada por https://." });
-    }
   };
   const descriptionLength = richTextPlainText(description).length;
   const submit = async (event: FormEvent) => {
@@ -554,40 +523,15 @@ export function MaterialLibrary() {
                       <span>
                         Descrição <small>(opcional)</small>
                       </span>
-                      <textarea className={styles.hiddenDescriptionInput}
+                      <RichTextEditor
                         value={description}
-                        onChange={(event) => setDescription(event.target.value)}
+                        onChange={setDescription}
+                        ariaLabel="Descrição do material"
                         maxLength={1200}
+                        minHeight="compact"
                         placeholder="Contextualiza o ficheiro, ano letivo ou conteúdo…"
+                        onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por https://." })}
                       />
-                      <div className={styles.richEditor}>
-                        <div className={styles.editorToolbar} role="toolbar" aria-label="Rich text formatting">
-                          <button type="button" onClick={() => formatDescription("bold")} aria-label="Negrito" title="Negrito"><Bold /></button>
-                          <button type="button" onClick={() => formatDescription("italic")} aria-label={"It\u00e1lico"} title={"It\u00e1lico"}><Italic /></button>
-                          <span aria-hidden="true" />
-                          <button type="button" onClick={() => formatDescription("insertUnorderedList")} aria-label="Lista com marcas" title="Lista com marcas"><List /></button>
-                          <button type="button" onClick={() => formatDescription("insertOrderedList")} aria-label="Lista numerada" title="Lista numerada"><ListOrdered /></button>
-                          <button type="button" onClick={addDescriptionLink} aria-label="Adicionar link" title="Adicionar link"><Link2 /></button>
-                        </div>
-                        <div
-                          ref={descriptionEditorRef}
-                          className={styles.editable}
-                          contentEditable
-                          role="textbox"
-                          aria-label="Material description"
-                          aria-multiline="true"
-                          aria-describedby="material-description-count"
-                          data-placeholder={"Contextualiza o ficheiro, ano letivo ou conte\u00fado\u2026"}
-                          onInput={syncDescription}
-                          onPaste={(event) => {
-                            event.preventDefault();
-                            document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
-                            syncDescription();
-                          }}
-                          suppressContentEditableWarning
-                        />
-                      </div>
-                      <small id="material-description-count" className={descriptionLength > 1200 ? styles.limitExceeded : ""}>{descriptionLength}/1200 caracteres</small>
                     </div>
                   </div>
                   <div className={styles.legacyUpload} aria-hidden="true">
@@ -771,7 +715,7 @@ export function MaterialLibrary() {
                         </div>
                         <div>
                           <h3>{item.title}</h3>
-                          {item.description && <div className={styles.materialDescription} dangerouslySetInnerHTML={{ __html: richTextDisplayHtml(item.description) }} />}
+                          {item.description && <RichTextContent value={item.description} className={styles.materialDescription} />}
                         </div>
                         {item.unit && (
                           <span className={styles.unitCode}>
