@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, CheckCircle2, ChevronRight, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { Building2, CheckCircle2, ChevronRight, Download, Search, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-context";
 import { StudentPreferencePanel } from "@/components/student-preference-panel";
 import type { EstadoTurma, Turma } from "@/data/turmas";
 
 type ApiClass = { id: number; status: string; submitted_at: number | null; representative: string | null; students: number; stays?: number; moves?: number };
-const labels: Record<string, EstadoTurma> = { draft: "Em preenchimento", reopened: "Em preenchimento", submitted: "Submetida", review: "Submetida", validated: "Submetida", published: "Submetida" };
+const labels: Record<string, EstadoTurma> = { draft: "Em preenchimento", reopened: "Em preenchimento", submitted: "Submetida", review: "Submetida", validated: "Submetida", published: "Publicada" };
 
 export function TurmasDashboard() {
   const router = useRouter();
@@ -44,17 +45,18 @@ export function TurmasDashboard() {
 
   const visible = useMemo(() => classes.filter((item) => `${item.nome} ${item.representante}`.toLowerCase().includes(search.toLowerCase().trim())), [classes, search]);
   const total = classes.reduce((count, item) => count + item.alunos, 0);
-  const submitted = classes.filter((item) => item.estado === "Submetida").length;
+  const submitted = classes.filter((item) => item.estado === "Submetida" || item.estado === "Publicada").length;
+  const showDecisions = !preferenceOnly && !placementsPublished;
 
   const classOverview = <section className="panel overview-panel">
     <div className="panel__header">
       <div><span className="eyebrow">{placementsPublished?"Turmas do 2.º ano":"Composição atual"}</span><div className="published-heading"><h2>{placementsPublished?"Turmas definitivas":preferenceOnly ? "Turmas base" : "Estado das turmas"}</h2>{placementsPublished&&<span className="published-badge"><CheckCircle2/>Publicadas</span>}</div><p>{placementsPublished?"Consulta a composição definitiva publicada pela Comissão de Curso.":preferenceOnly ? "Consulta a composição das turmas sem ver as decisões individuais sobre mudança." : "Os alunos podem consultar as decisões já submetidas."}</p></div>
-      <label className="search-field"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar turma ou representante" /></label>
+      <div className="overview-panel__tools"><label className="search-field"><Search size={18} /><span className="sr-only">Pesquisar turmas</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar turma ou representante" /></label>{placementsPublished&&<Link className="button button--secondary overview-panel__pdf" href="/api/classes/public-pdf" prefetch={false} download><Download/>Descarregar turmas em PDF</Link>}</div>
     </div>
-    <div className="table-scroll"><table><thead><tr><th>Turma</th><th>Representante</th><th>Alunos</th>{!preferenceOnly && <th>Decisões dos estudantes</th>}<th>Estado</th><th /></tr></thead><tbody>{visible.map((item) => <tr className="class-row" tabIndex={0} key={item.id} onClick={() => router.push(`/turmas/${item.id}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") router.push(`/turmas/${item.id}`); }}><td><strong>{item.nome}</strong></td><td>{item.representante}</td><td>{item.alunos}</td>{!preferenceOnly && <td><div className="preference-counts preference-counts--inline"><span><i className="dot dot--green" />{item.ficam} ficam</span><span><i className="dot dot--gold" />{item.mudam} mudam</span></div></td>}<td><span className="status status--neutral">{item.estado}</span></td><td><ChevronRight size={18} /></td></tr>)}</tbody></table>{loading && <div className="empty-state">A carregar as turmas…</div>}{!loading && !visible.length && <div className="empty-state">Nenhuma turma corresponde à pesquisa.</div>}</div>
+    <div className="table-scroll"><table><thead><tr><th>Turma</th><th>Representante</th><th>Alunos</th>{showDecisions && <th>Decisões dos estudantes</th>}<th>Estado</th><th /></tr></thead><tbody>{visible.map((item) => <tr className="class-row" tabIndex={0} key={item.id} onClick={() => router.push(`/turmas/${item.id}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " "){event.preventDefault();router.push(`/turmas/${item.id}`)} }}><td><strong>{item.nome}</strong></td><td>{item.representante}</td><td>{item.alunos}</td>{showDecisions && <td><div className="preference-counts preference-counts--inline"><span><i className="dot dot--green" />{item.ficam} ficam</span><span><i className="dot dot--gold" />{item.mudam} mudam</span></div></td>}<td><span className={`status ${placementsPublished?"status--success":"status--neutral"}`}>{item.estado}</span></td><td><ChevronRight size={18} /></td></tr>)}</tbody></table>{loading && <div className="empty-state">A carregar as turmas…</div>}{!loading && !visible.length && <div className="empty-state">Nenhuma turma corresponde à pesquisa.</div>}</div>
   </section>;
 
-  if (preferenceOnly) return <AppShell active="overview"><StudentPreferencePanel />{classOverview}</AppShell>;
+  if (preferenceOnly) return <AppShell active="overview">{!loading && !placementsPublished && <StudentPreferencePanel />}{classOverview}</AppShell>;
 
   return <AppShell active="overview"><section className="page-heading page-heading--simple"><div><span className="eyebrow">Ano letivo 2026/2027</span><h1>Turmas do 2.º ano</h1></div></section><section className="stats-grid"><article className="stat-card"><span className="stat-card__icon stat-card__icon--ink"><Users /></span><div><span>Alunos registados</span><strong>{total}</strong><small>nas {classes.length} turmas</small></div></article><article className="stat-card"><span className="stat-card__icon stat-card__icon--blue"><Building2 /></span><div><span>Turmas criadas</span><strong>{classes.length}</strong><small>todas disponíveis</small></div></article><article className="stat-card"><span className="stat-card__icon stat-card__icon--green"><CheckCircle2 /></span><div><span>Submetidas</span><strong>{submitted}/{classes.length}</strong><small>listas entregues</small></div></article></section>{classOverview}</AppShell>;
 }
