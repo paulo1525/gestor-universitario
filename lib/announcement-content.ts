@@ -11,6 +11,18 @@ function escapeHtmlText(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+function decodeHtmlText(value: string): string {
+  const entities: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    "#39": "'",
+    nbsp: " ",
+  };
+  return value.replace(/&(amp|lt|gt|quot|#39|nbsp);/gi, (entity, name: string) => entities[name.toLowerCase()] ?? entity);
+}
+
 export function sanitizeAnnouncementHtml(value: string): string {
   const tokens = value.match(/<[^>]*>|[^<]+|</g) ?? [];
 
@@ -32,16 +44,14 @@ export function sanitizeAnnouncementHtml(value: string): string {
 }
 
 export function announcementPlainText(value: string): string {
-  return value
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(div|p|li)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&amp;/gi, "&")
+  const sanitized = sanitizeAnnouncementHtml(value);
+  const tokens = sanitized.match(/<[^>]*>|[^<]+|</g) ?? [];
+  return tokens
+    .map((token) => {
+      if (!token.startsWith("<") || token === "<") return decodeHtmlText(token);
+      return /^<\s*\/?\s*(?:div|p|br|li)\b/i.test(token) ? " " : "";
+    })
+    .join("")
     .replace(/\s+/g, " ")
     .trim();
 }

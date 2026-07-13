@@ -70,6 +70,8 @@ test("comunicados lideram a navegação, têm editor isolado e um urgente global
   assert.match(announcementContent, /escapeHtmlText/);
   assert.match(announcementContent, /allowedTags\.has\(tag\)/);
   assert.match(announcementContent, /\[\^<\]\+\|</);
+  assert.match(announcementContent, /const sanitized = sanitizeAnnouncementHtml\(value\)/);
+  assert.doesNotMatch(announcementContent, /replace\(\/<\[\^>\]\+>\/g/);
   assert.match(worker, /sanitizeAnnouncementHtml/);
 });
 
