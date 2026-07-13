@@ -2,6 +2,9 @@
 
 import { calculateDistribution } from "@/lib/distribution-engine.mjs";
 import { buildPublicClassesPdf } from "@/lib/public-classes-pdf.mjs";
+import { APP_MODULE_KEYS, APP_MODULES, moduleEffectiveEnabled } from "@/lib/app-modules";
+import { announcementDisplayHtml, announcementPlainText, sanitizeAnnouncementHtml } from "@/lib/announcement-content";
+import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
 
 export interface Env {
   DB: D1Database;
@@ -460,21 +463,21 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null; preview?:boolean; actorId?:string };
+type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null; commissionPosition: string | null; commissionPositionLabel: string | null; preview?:boolean; actorId?:string };
 async function currentUser(request: Request, env: Env): Promise<CurrentUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.commission_department, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; commission_department: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.commission_department, users.commission_position, commission_positions.label AS commission_position_label, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN commission_positions ON commission_positions.code = users.commission_position WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; commission_department: string | null; commission_position: string | null; commission_position_label: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
   if (!row) return null;
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department };
+  const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department, commissionPosition: row.commission_position, commissionPositionLabel: row.commission_position_label };
   const previewId=cookieValue(request,"gu_preview_user");
   if(row.email.toLowerCase()===PERMANENT_ADMIN_EMAIL&&previewId){
-    const target=await env.DB.prepare("SELECT id,email,full_name,role,font_scale,class_representative,represented_class,commission_department FROM users WHERE id=? AND status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;commission_department:string|null}>();
-    if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,commissionDepartment:target.commission_department,preview:true,actorId:row.id};
+    const target=await env.DB.prepare("SELECT users.id,users.email,users.full_name,users.role,users.font_scale,users.class_representative,users.represented_class,users.commission_department,users.commission_position,commission_positions.label AS commission_position_label FROM users LEFT JOIN commission_positions ON commission_positions.code=users.commission_position WHERE users.id=? AND users.status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;commission_department:string|null;commission_position:string|null;commission_position_label:string|null}>();
+    if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,commissionDepartment:target.commission_department,commissionPosition:target.commission_position,commissionPositionLabel:target.commission_position_label,preview:true,actorId:row.id};
   }
   return base;
 }
@@ -502,6 +505,61 @@ async function handleAccessibilityPreference(request: Request, env: Env): Promis
 async function requireAdmin(request: Request, env: Env) {
   const user = await currentUser(request, env);
   return user?.role === "admin" ? user : null;
+}
+
+async function moduleStates(env: Env): Promise<Record<string, boolean>> {
+  const result = await env.DB.prepare("SELECT module_key,enabled FROM app_module_settings").all<{ module_key: string; enabled: number }>();
+  const stored = Object.fromEntries(result.results.map((row) => [row.module_key, row.enabled === 1]));
+  return Object.fromEntries(APP_MODULES.map((module) => [module.key, stored[module.key] ?? module.defaultEnabled]));
+}
+
+async function isModuleEnabled(env: Env, key: string): Promise<boolean> {
+  return moduleEffectiveEnabled(key, await moduleStates(env));
+}
+
+function moduleSnapshot(states: Record<string, boolean>) {
+  return APP_MODULES.filter((module) => module.parentKey === null).map((module) => ({
+    key: module.key,
+    label: module.label,
+    description: module.description,
+    enabled: states[module.key] !== false,
+    effectiveEnabled: moduleEffectiveEnabled(module.key, states),
+    submodules: APP_MODULES.filter((candidate) => candidate.parentKey === module.key).map((submodule) => ({
+      key: submodule.key,
+      label: submodule.label,
+      description: submodule.description,
+      enabled: states[submodule.key] !== false,
+      effectiveEnabled: moduleEffectiveEnabled(submodule.key, states),
+      inheritedDisabled: states[module.key] === false,
+    })),
+  }));
+}
+
+async function handleAdminModules(request: Request, env: Env, user: CurrentUser): Promise<Response> {
+  if (normalizeEmail(user.email) !== PERMANENT_ADMIN_EMAIL) return json({ error: "A gestão de módulos está reservada ao administrador principal." }, 403);
+  if (request.method === "GET") return json({ modules: moduleSnapshot(await moduleStates(env)) });
+  const body = await parseJson(request);
+  const moduleKey = String(body?.moduleKey || "");
+  const submoduleKey = String(body?.submoduleKey || "");
+  const targetKey = submoduleKey || moduleKey;
+  const enabled = body?.enabled;
+  const target = APP_MODULES.find((module) => module.key === targetKey);
+  if (!APP_MODULE_KEYS.has(targetKey) || !target || typeof enabled !== "boolean") return json({ error: "Módulo ou estado inválido." }, 400);
+  if (submoduleKey && target.parentKey !== moduleKey) return json({ error: "O submódulo não pertence ao módulo indicado." }, 400);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO app_module_settings (module_key,enabled,updated_by,updated_at) VALUES (?,?,?,?) ON CONFLICT(module_key) DO UPDATE SET enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=excluded.updated_at").bind(targetKey, enabled ? 1 : 0, user.actorId || user.id, now),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'app_module_updated',?,?)").bind(user.actorId || user.id, JSON.stringify({ moduleKey: targetKey, enabled }), now),
+  ]);
+  return json({ ok: true, modules: moduleSnapshot(await moduleStates(env)) });
+}
+
+function moduleDisabled(): Response {
+  return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404);
+}
+
+function isManagementCore(user: CurrentUser): boolean {
+  return normalizeEmail(user.email) === PERMANENT_ADMIN_EMAIL || user.commissionDepartment === "management";
 }
 
 async function maintenanceConfig(env: Env): Promise<{ maintenanceMode: boolean; maintenanceMessage: string }> {
@@ -1141,6 +1199,121 @@ async function handleValidationExport(env:Env,user:CurrentUser):Promise<Response
  return new Response(xlsxZip(files),{headers:{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename="auditoria-pautas-colocacao-${new Date().toISOString().slice(0,10)}.xlsx`}});
 }
 
+async function handleAnnouncements(request: Request, env: Env, user: CurrentUser): Promise<Response> {
+  if (!await isModuleEnabled(env, "announcements.feed")) return moduleDisabled();
+  const publishingEnabled = await isModuleEnabled(env, "announcements.publishing");
+  const canPublish = Boolean(publishingEnabled && user.commissionPosition);
+  if (request.method === "GET") {
+    const announcements = await env.DB.prepare("SELECT id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,archived_at FROM announcements WHERE status='published' AND (expires_at IS NULL OR expires_at>?) ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,published_at DESC LIMIT 100").bind(Date.now()).all<Record<string, unknown>>();
+    return json({ announcements: announcements.results.map((announcement) => ({ ...announcement, body: announcementDisplayHtml(String(announcement.body || "")) })), canPublish, publishingEnabled });
+  }
+  if (!canPublish) return json({ error: "A publicação está reservada a membros da Comissão de Curso com cargo definido." }, 403);
+  const body = await parseJson(request);
+  if (request.method === "POST") {
+    const title = String(body?.title || "").trim().replace(/\s+/g, " ").slice(0, 140);
+    const content = sanitizeAnnouncementHtml(String(body?.body || "").trim());
+    const plainContent = announcementPlainText(content);
+    const priority = String(body?.priority || "normal");
+    const curricularUnitId = String(body?.unitId || body?.curricularUnitId || "").trim();
+    const expiresAt = body?.expiresAt === null || body?.expiresAt === "" || body?.expiresAt === undefined ? null : Date.parse(String(body.expiresAt));
+    if (title.length < 5 || plainContent.length < 10 || plainContent.length > 5000) return json({ error: "Indique um título e uma mensagem completos, até 5000 caracteres." }, 400);
+    if (!["normal", "important", "urgent"].includes(priority)) return json({ error: "Prioridade inválida." }, 400);
+    if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) return json({ error: "A validade deve terminar no futuro." }, 400);
+    if (curricularUnitId && !await env.DB.prepare("SELECT id FROM curricular_units WHERE id=? AND active=1").bind(curricularUnitId).first()) return json({ error: "Unidade curricular inválida." }, 400);
+    const id = crypto.randomUUID(), now = Date.now(), actorId = user.actorId || user.id;
+    const statements = [
+      env.DB.prepare("INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at) VALUES (?,?,?,?,'published',?,?,?,?,?,?,?,?)").bind(id, title, content, priority, user.id, user.fullName, user.commissionPosition, user.commissionPositionLabel || user.commissionPosition, now, expiresAt, now, now),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_published',?,?)").bind(actorId, JSON.stringify({ id, title, priority, expiresAt }), now),
+    ];
+    if (curricularUnitId) statements.push(env.DB.prepare("INSERT INTO announcement_curricular_units (announcement_id,curricular_unit_id) VALUES (?,?)").bind(id, curricularUnitId));
+    await env.DB.batch(statements);
+    return json({ ok: true, id }, 201);
+  }
+  if (request.method === "PATCH") {
+    const id = String(body?.id || ""), status = String(body?.status || "");
+    if (!id || status !== "archived") return json({ error: "Ação inválida." }, 400);
+    const existing = await env.DB.prepare("SELECT id,author_user_id,status FROM announcements WHERE id=?").bind(id).first<{ id: string; author_user_id: string; status: string }>();
+    if (!existing) return json({ error: "Aviso não encontrado." }, 404);
+    if (existing.author_user_id !== user.id && !isManagementCore(user)) return json({ error: "Só o autor ou o Núcleo pode arquivar este aviso." }, 403);
+    if (existing.status === "archived") return json({ ok: true, alreadyArchived: true });
+    const now = Date.now(), actorId = user.actorId || user.id;
+    await env.DB.batch([
+      env.DB.prepare("UPDATE announcements SET status='archived',archived_at=?,archived_by=?,updated_at=? WHERE id=? AND status='published'").bind(now, actorId, now, id),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_archived',?,?)").bind(actorId, JSON.stringify({ id }), now),
+    ]);
+    return json({ ok: true });
+  }
+  return json({ error: "Operação não suportada." }, 405);
+}
+
+type CurricularUnitInput = { code: string; name: string; ects: number; year: number; semester: number; representativeUserId: string };
+function curricularUnitInput(body: Record<string, unknown> | null): CurricularUnitInput {
+  return {
+    code: String(body?.code || "").trim().toUpperCase().replace(/\s+/g, "").slice(0, 20),
+    name: String(body?.name || "").trim().replace(/\s+/g, " ").slice(0, 160),
+    ects: Number(body?.ects),
+    year: Number(body?.year),
+    semester: Number(body?.semester),
+    representativeUserId: String(body?.representativeUserId || ""),
+  };
+}
+
+function validCurricularUnit(input: CurricularUnitInput): boolean {
+  return /^[A-Z0-9._-]{2,20}$/.test(input.code) && input.name.length >= 3 && Number.isFinite(input.ects) && input.ects > 0 && input.ects <= 60 && Number.isInteger(input.year) && input.year >= 1 && input.year <= 6 && [1, 2].includes(input.semester) && Boolean(input.representativeUserId);
+}
+
+async function handleCurricularUnits(request: Request, env: Env, user: CurrentUser): Promise<Response> {
+  if (!isManagementCore(user)) return json({ error: "Acesso reservado ao Núcleo de Gestão." }, 403);
+  if (!await isModuleEnabled(env, request.method === "GET" ? "curricular_units.catalog" : "curricular_units.management")) return moduleDisabled();
+  if (request.method === "GET") {
+    const [units, representatives] = await Promise.all([
+      env.DB.prepare("SELECT cu.id,cu.code,cu.name,cu.ects,cu.study_year,cu.semester,cu.representative_user_id,u.full_name AS representative_name,p.label AS representative_position,cu.created_at,cu.updated_at FROM curricular_units cu JOIN users u ON u.id=cu.representative_user_id LEFT JOIN commission_positions p ON p.code=u.commission_position WHERE cu.active=1 ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE").all<{ id:string;code:string;name:string;ects:number;study_year:number;semester:number;representative_user_id:string;representative_name:string;representative_position:string|null;created_at:number;updated_at:number }>(),
+      env.DB.prepare("SELECT u.id,u.full_name AS name,u.email,p.label AS position_label,d.label AS department_label FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' ORDER BY p.rank,u.full_name COLLATE NOCASE").all(),
+    ]);
+    return json({
+      units: units.results.map((unit) => ({ id: unit.id, code: unit.code, name: unit.name, ects: unit.ects, year: unit.study_year, semester: unit.semester, representativeUserId: unit.representative_user_id, representativeName: unit.representative_name, representativePosition: unit.representative_position, createdAt: unit.created_at, updatedAt: unit.updated_at })),
+      representatives: representatives.results.map((representative) => {
+        const row = representative as { id:string;name:string;email:string;position_label:string|null;department_label:string|null };
+        return { id: row.id, fullName: row.name, email: row.email, commissionPosition: row.position_label, department: row.department_label };
+      }),
+    });
+  }
+  const body = await parseJson(request), now = Date.now(), actorId = user.actorId || user.id;
+  if (request.method === "DELETE") {
+    const id = String(body?.id || "");
+    if (!id) return json({ error: "Unidade curricular inválida." }, 400);
+    const result = await env.DB.prepare("UPDATE curricular_units SET active=0,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(actorId, now, id).run();
+    if (!result.meta.changes) return json({ error: "Unidade curricular não encontrada." }, 404);
+    await env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_archived',?,?)").bind(actorId, JSON.stringify({ id }), now).run();
+    return json({ ok: true });
+  }
+  const input = curricularUnitInput(body);
+  if (!validCurricularUnit(input)) return json({ error: "Preencha código, nome, ECTS, ano, semestre e representante válidos." }, 400);
+  const representative = await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND commission_position IS NOT NULL").bind(input.representativeUserId).first();
+  if (!representative) return json({ error: "Selecione um membro ativo da Comissão de Curso." }, 400);
+  if (request.method === "POST") {
+    const id = crypto.randomUUID();
+    try {
+      await env.DB.batch([
+        env.DB.prepare("INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?,?)").bind(id, input.code, input.name, input.ects, input.year, input.semester, input.representativeUserId, actorId, actorId, now, now),
+        env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_created',?,?)").bind(actorId, JSON.stringify({ id, ...input }), now),
+      ]);
+    } catch { return json({ error: "Já existe uma unidade curricular com esse código." }, 409); }
+    return json({ ok: true, id }, 201);
+  }
+  if (request.method === "PUT") {
+    const id = String(body?.id || "");
+    if (!id) return json({ error: "Unidade curricular inválida." }, 400);
+    try {
+      const result = await env.DB.prepare("UPDATE curricular_units SET code=?,name=?,ects=?,study_year=?,semester=?,representative_user_id=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(input.code, input.name, input.ects, input.year, input.semester, input.representativeUserId, actorId, now, id).run();
+      if (!result.meta.changes) return json({ error: "Unidade curricular não encontrada." }, 404);
+      await env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_updated',?,?)").bind(actorId, JSON.stringify({ id, ...input }), now).run();
+    } catch { return json({ error: "Já existe uma unidade curricular com esse código." }, 409); }
+    return json({ ok: true });
+  }
+  return json({ error: "Operação não suportada." }, 405);
+}
+
 async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
@@ -1166,21 +1339,41 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
     const user = await currentUser(request, env);
     return user ? json({ user }) : json({ user: null }, 401);
   }
-  if (pathname === "/api/student/destinations" && ["GET","PUT"].includes(request.method)) {
-    const user = await currentUser(request, env); return user ? handleOwnDestinations(request, env, user) : json({ error:"Sessão inválida." },401);
+  if (request.method === "GET" && pathname === "/api/modules") {
+    const user = await currentUser(request, env);
+    return user ? json({ modules: moduleSnapshot(await moduleStates(env)) }) : json({ error: "Sessão inválida." }, 401);
   }
-  if(pathname==="/api/classes/public-pdf"&&request.method==="GET"){const user=await currentUser(request,env);return user?handlePublicClassesPdf(env):json({error:"Sessão inválida."},401);}
+  if (pathname === "/api/admin/modules" && ["GET", "PUT"].includes(request.method)) {
+    const user = await currentUser(request, env);
+    return user ? handleAdminModules(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (pathname === "/api/announcements" && ["GET", "POST", "PATCH"].includes(request.method)) {
+    const user = await currentUser(request, env);
+    return user ? handleAnnouncements(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (pathname === "/api/admin/curricular-units" && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
+    const user = await currentUser(request, env);
+    return user ? handleCurricularUnits(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (isAcademicHubPath(pathname)) {
+    const user = await currentUser(request, env);
+    return handleAcademicHubRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
+  }
+  if (pathname === "/api/student/destinations" && ["GET","PUT"].includes(request.method)) {
+    const user = await currentUser(request, env); return user ? await isModuleEnabled(env,"classes.preferences") ? handleOwnDestinations(request, env, user) : moduleDisabled() : json({ error:"Sessão inválida." },401);
+  }
+  if(pathname==="/api/classes/public-pdf"&&request.method==="GET"){const user=await currentUser(request,env);return user?await isModuleEnabled(env,"classes.rosters")?handlePublicClassesPdf(env):moduleDisabled():json({error:"Sessão inválida."},401);}
   if (pathname === "/api/classes" || pathname.startsWith("/api/classes/")) {
-    const user = await currentUser(request, env); return user ? handleClasses(request, env, user, pathname) : json({ error:"Sessão inválida." },401);
+    const user = await currentUser(request, env); return user ? await isModuleEnabled(env,"classes.rosters") ? handleClasses(request, env, user, pathname) : moduleDisabled() : json({ error:"Sessão inválida." },401);
   }
   if(pathname==="/api/admin/class-tickets")return json({error:"A funcionalidade de tickets está temporariamente desativada."},404);
-  if(pathname==="/api/admin/distribution-check"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleDistributionCheckV2(env,user):json({error:"Sessão inválida."},401);}
-  if(pathname==="/api/admin/placements"&&["GET","PUT","PATCH"].includes(request.method)){const user=await currentUser(request,env);return user?handlePlacementWorkbench(request,env,user):json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/distribution-check"&&request.method==="GET"){const user=await currentUser(request,env);return user?await isModuleEnabled(env,"classes.placements")?handleDistributionCheckV2(env,user):moduleDisabled():json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/placements"&&["GET","PUT","PATCH"].includes(request.method)){const user=await currentUser(request,env);return user?await isModuleEnabled(env,"classes.placements")?handlePlacementWorkbench(request,env,user):moduleDisabled():json({error:"Sessão inválida."},401);}
   if(pathname==="/api/admin/audit"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleAdminAudit(env,user):json({error:"Sessão inválida."},401);}
   if(pathname==="/api/admin/export-decisions"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleValidationExport(env,user):json({error:"Sessão inválida."},401);}
   if(pathname==="/api/admin/export-validation"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleValidationExport(env,user):json({error:"Sessão inválida."},401);}
-  if(pathname==="/api/admin/distribution-proposals"&&request.method==="GET"){const user=await currentUser(request,env);return user?handleDistributionProposals(request,env,user,"list"):json({error:"Sessão inválida."},401);}
-  const proposalAction=pathname.match(/^\/api\/admin\/distribution-proposals\/(calculate|review|override|approve|apply|publish|rollback)$/);if(proposalAction&&request.method==="POST"){const user=await currentUser(request,env);return user?handleDistributionProposals(request,env,user,proposalAction[1]):json({error:"Sessão inválida."},401);}
+  if(pathname==="/api/admin/distribution-proposals"&&request.method==="GET"){const user=await currentUser(request,env);return user?await isModuleEnabled(env,"classes.placements")?handleDistributionProposals(request,env,user,"list"):moduleDisabled():json({error:"Sessão inválida."},401);}
+  const proposalAction=pathname.match(/^\/api\/admin\/distribution-proposals\/(calculate|review|override|approve|apply|publish|rollback)$/);if(proposalAction&&request.method==="POST"){const user=await currentUser(request,env);return user?await isModuleEnabled(env,"classes.placements")?handleDistributionProposals(request,env,user,proposalAction[1]):moduleDisabled():json({error:"Sessão inválida."},401);}
   if (pathname === "/api/admin/users" && ["GET", "PATCH"].includes(request.method)) {
     const admin = await requireAdmin(request, env);
     return admin ? handleAdminUsers(request, env, admin) : json({ error: "Acesso reservado a administradores." }, 403);
