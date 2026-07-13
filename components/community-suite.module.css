@@ -139,3 +139,27 @@ a.card:hover { border-color:#d0b444; box-shadow:0 10px 25px rgba(67,53,9,.07); t
 @media(max-width:1050px){.grid,.materialGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.statsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.hero{align-items:stretch;flex-direction:column}.heroActions{justify-content:flex-start}.toolbar{align-items:stretch;flex-direction:column}.grid,.materialGrid,.pollGrid,.dashboardGrid,.columns{grid-template-columns:1fr}.formGrid{grid-template-columns:1fr}.fieldFull{grid-column:auto}.detailHero{grid-template-columns:1fr}.detailStats{grid-template-columns:repeat(3,minmax(0,1fr))}.materialThumb{height:180px}}
 @media(max-width:500px){.heroCopy{flex-direction:column}.grid,.materialGrid,.pollGrid{padding:11px}.panelHeader{align-items:flex-start;flex-direction:column}.statsGrid{grid-template-columns:1fr}.detailStats,.metrics{grid-template-columns:1fr 1fr}.formActions{align-items:stretch;flex-direction:column-reverse}.formActions button{width:100%}.preview{grid-template-columns:60px minmax(0,1fr) auto}.preview img,.filePreview{width:60px;height:52px}}
+
+/* Keep every community module on the same visual system as the Turmas dashboard. */
+.hero { align-items:flex-end; padding:4px 2px; }
+.heroIcon { display:none; }
+.heroCopy { gap:0; }
+.hero h1,.detailHero h1 { margin:5px 0 7px; font-size:clamp(27px,3vw,38px); letter-spacing:-.035em; }
+.hero p,.detailHero p,.panelHeader p { font-size:12px; line-height:1.6; }
+.panel { border-radius:var(--radius); box-shadow:var(--shadow); }
+.panelHeader { min-height:78px; padding:17px 20px; }
+.panelHeader h2 { font-size:17px; }
+.grid,.materialGrid,.pollGrid { gap:14px; padding:18px; }
+.card,.poll,.material { border-radius:var(--radius); }
+.card h3,.poll h3,.materialBody h3 { font-size:15px; }
+.card p,.poll p,.materialBody p { font-size:12px; line-height:1.6; }
+.statsGrid { gap:14px; }
+.statCard { min-height:110px; padding:19px; border-radius:var(--radius); box-shadow:0 2px 8px rgba(20,20,16,.025); }
+.statCard strong { font-size:22px; }
+.statCard small { font-size:10px; }
+.field,.checkField strong { font-size:11px; }
+.field input,.field textarea,.field select { font-size:12px; }
+.field small,.checkField small { font-size:10px; }
+.result strong,.listItem strong { font-size:12px; }
+.result small,.listItem small { font-size:10px; }
+@media(max-width:500px){.heroCopy{flex-direction:row}}

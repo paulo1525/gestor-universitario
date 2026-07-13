@@ -1,8 +1,8 @@
 .panel {
-  border: 1px solid #dfe5ec;
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: #fff;
-  box-shadow: 0 12px 35px rgba(21, 34, 50, 0.06);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
@@ -10,7 +10,8 @@
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  padding: 24px;
+  min-height: 78px;
+  padding: 17px 20px;
   border-bottom: 1px solid #e8edf2;
 }
 
@@ -52,7 +53,7 @@
 }
 
 .heading h2 {
-  font-size: 1.25rem;
+  font-size: 17px;
 }
 
 .heading p,
@@ -70,7 +71,7 @@
   border-radius: 999px;
   color: #526171;
   background: #f1f4f7;
-  font-size: 0.8rem;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -119,16 +120,17 @@
 }
 
 .moduleCopy h3 {
-  font-size: 1rem;
+  font-size: 15px;
 }
 
 .submoduleCopy h4 {
-  font-size: 0.9rem;
+  font-size: 12px;
 }
 
 .moduleCopy p,
 .submoduleCopy p {
-  font-size: 0.83rem;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .titleLine {

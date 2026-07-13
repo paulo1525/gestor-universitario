@@ -43,6 +43,9 @@ test("rotas existentes são bloqueadas no backend quando o respetivo submódulo 
   assert.match(routes, /isModuleEnabled\(env,"classes\.placements"\)/);
   assert.match(routes, /moduleDisabled\(\)/);
   assert.match(shell, /moduleAccess\["classes\.placements"\]/);
+  assert.match(shell, /hasCommunication&&<div className="nav-section"/);
+  assert.match(shell, /hasAcademicLife&&<div className="nav-section"/);
+  assert.match(shell, /hasCommunity&&<div className="nav-section"/);
 });
 
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {
