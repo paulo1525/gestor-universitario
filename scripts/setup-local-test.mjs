@@ -60,6 +60,7 @@ const statements = [
   "DELETE FROM poll_options",
   "DELETE FROM poll_questions",
   "DELETE FROM polls",
+  "DELETE FROM material_submission_attachments",
   "DELETE FROM material_submissions",
   "DELETE FROM course_requests",
   "DELETE FROM academic_documents",
@@ -102,6 +103,9 @@ statements.push(`INSERT INTO poll_options (id,question_id,label,sort_order) VALU
 statements.push(`INSERT INTO poll_options (id,question_id,label,sort_order) VALUES ('local-poll-afternoon','local-poll-question','Tarde',1)`);
 statements.push(`INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,moderation_note,moderated_by,moderated_at,created_at,updated_at) VALUES ('local-material-published','Resumo fictício de Anatomia II','Material vazio usado apenas para validar a biblioteca.','summary','local-unit-anat2','2025/2026',1,'local-student-user','resumo-teste.txt','text/plain','data:text/plain;base64,VGVzdGU=','published','Conteúdo fictício aprovado.','local-primary-admin',${now},${now},${now})`);
 statements.push(`INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES ('local-material-pending','Fotografia de exame fictícia','Submissão pendente para validar a moderação.','exam_photo','local-unit-anat2','2025/2026',1,'local-student-user','exame-teste.txt','text/plain','data:text/plain;base64,VGVzdGU=','pending',${now},${now})`);
+statements.push(`INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES ('local-exam-photos','Fotos privadas de frequencia','Lote privado com varias fotografias para a CC.','exam_photo','local-unit-anat2','2025/2026',1,'local-student-user','frequencia-pagina-1.png','image/png','data:image/png;base64,iVBORw0KGgo=','pending',${now},${now})`);
+statements.push(`INSERT INTO material_submission_attachments (id,submission_id,attachment_name,attachment_mime,attachment_data_url,sort_order,created_at) VALUES ('local-exam-photo-2','local-exam-photos','frequencia-pagina-2.png','image/png','data:image/png;base64,iVBORw0KGgo=',1,${now})`);
+statements.push(`INSERT INTO material_submission_attachments (id,submission_id,attachment_name,attachment_mime,attachment_data_url,sort_order,created_at) VALUES ('local-exam-photo-3','local-exam-photos','frequencia-pagina-3.png','image/png','data:image/png;base64,iVBORw0KGgo=',2,${now})`);
 statements.push("UPDATE classes SET status='submitted',submitted_at=" + now + ",submitted_by='local-admin',workflow_step=3,updated_at=" + now);
 statements.push("DELETE FROM classes WHERE id>5");
 statements.push(`INSERT INTO app_settings (key,value,updated_at,updated_by) VALUES ('classes_open_at','2026-01-01T00:00:00.000Z',${now},'local-admin') ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by`);

@@ -59,6 +59,10 @@ test("a gestão de inquéritos permite edição segura sem corromper votos", () 
   assert.match(polls, /Editar inquérito/);
   assert.match(polls, /optionsLocked/);
   assert.match(polls, /Inquérito atualizado/);
+  assert.match(backend, /request\.method === "DELETE"/);
+  assert.match(backend, /poll_deleted/);
+  assert.match(polls, /Apagar definitivamente/);
+  assert.match(polls, /deleteTarget/);
 });
 
 test("diretório e áreas de UC usam users e agregam informação académica", () => {

@@ -1,5 +1,5 @@
 .page{display:grid;gap:18px;max-width:1480px;margin:0 auto;padding:2px}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:end;gap:28px;padding:4px 2px}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:24px;padding:4px 2px}
 .hero:after{display:none}
 .heroContent{position:relative;z-index:1;display:flex;align-items:flex-start;gap:17px;min-width:0}
 .heroIcon{display:none}
@@ -10,6 +10,10 @@
 .heroStats{position:relative;z-index:1;display:flex;gap:9px}
 .heroStats span{min-width:92px;display:grid;gap:2px;padding:11px 13px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:#747169;font-size:10px;box-shadow:0 2px 8px rgba(20,20,16,.025)}
 .heroStats strong{color:#292821;font-size:18px}
+.heroActions{display:flex;align-items:center;gap:10px}
+.createButton{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 13px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface);box-shadow:0 2px 8px rgba(20,20,16,.035);font:inherit;font-size:11px;font-weight:850;cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.createButton:hover{transform:translateY(-1px);border-color:#cfad31;background:var(--gold-soft)}
+.createButton svg{width:15px;height:15px;color:#806000}
 .primaryButton,.secondaryButton,.voteButton,.editButton,.textButton,.closeButton{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;cursor:pointer;font:inherit;font-weight:850;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
 .primaryButton{position:relative;z-index:1;min-height:42px;padding:0 16px;border-radius:11px;color:#201b08;background:#f2ce36;box-shadow:0 8px 20px rgba(156,116,0,.14);font-size:11px}
 .primaryButton:hover,.voteButton:hover{transform:translateY(-1px);box-shadow:0 11px 24px rgba(156,116,0,.2)}
@@ -78,6 +82,10 @@
 .pollCard p{max-width:940px;margin:6px 0 0;color:#706e67;font-size:12px;line-height:1.6}
 .editButton{min-height:35px;padding:0 11px;flex:0 0 auto;border:1px solid #dcd9ce;border-radius:9px;color:#67510a;background:#fff;font-size:11px}
 .editButton:hover{border-color:#c4a432;background:#fffdf3}
+.pollActions{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.deleteButton{min-height:35px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #ead4d1;border-radius:9px;color:#9d3a32;background:#fffafa;font:inherit;font-size:10px;font-weight:800;cursor:pointer}
+.deleteButton:hover{border-color:#d59c96;background:#fff0ee}
+.deleteButton svg{width:14px;height:14px}
 .optionList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .voteOption{position:relative;isolation:isolate;overflow:hidden;display:grid;grid-template-columns:21px minmax(0,1fr) auto;align-items:center;gap:9px;min-height:48px;padding:10px 12px;border:1px solid #dedcd4;border-radius:11px;background:#fbfbf9;cursor:pointer;transition:border-color .15s,transform .15s,background .15s}
 .voteOption:hover:not(:has(input:disabled)){transform:translateY(-1px);border-color:#c9a82d;background:#fffdf2}
@@ -99,6 +107,38 @@
 .empty{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;padding:35px;color:#8a877e;text-align:center;background:#fafaf7}
 .empty>svg{width:27px;color:#98740b}.empty strong{color:#44433d;font-size:12px}.empty p{margin:0;font-size:12px;line-height:1.6}
 .spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.confirmBackdrop{position:fixed;z-index:320;inset:0;display:grid;place-items:center;padding:20px;background:var(--color-overlay);backdrop-filter:blur(5px)}
+.confirmDialog{width:min(560px,calc(100vw - 32px));display:grid;grid-template-columns:42px minmax(0,1fr);gap:14px;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 28px 90px rgba(0,0,0,.26)}
+.confirmIcon{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;color:#a83d34;background:#fff0ee}
+.confirmIcon svg{width:20px}
+.confirmDialog h2{margin:2px 0 7px;font-size:18px}
+.confirmDialog p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+.confirmDialog footer{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;padding-top:6px}
+.dangerButton{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;border:1px solid #b8443a;border-radius:10px;color:#fff;background:#b8443a;font:inherit;font-size:11px;font-weight:850;cursor:pointer}
+.dangerButton:hover{background:#9f342c}.dangerButton:disabled{opacity:.6;cursor:wait}.dangerButton svg{width:15px}
 @media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) auto}.heroStats{display:none}.editorBody{grid-template-columns:minmax(0,1.3fr) minmax(280px,.75fr)}}
-@media(max-width:820px){.hero{grid-template-columns:1fr;gap:18px;padding:23px}.hero .primaryButton{width:max-content}.editorBody{grid-template-columns:1fr}.editorMain{border-right:0;border-bottom:1px solid #e8e6df}.toolbar{align-items:stretch;flex-direction:column}.search{width:100%;min-width:0}.optionList{grid-template-columns:1fr}}
-@media(max-width:560px){.heroContent{flex-direction:column}.hero h1{font-size:23px}.editorHeader,.editorMain,.editorAside{padding:18px}.optionEditor{grid-template-columns:1fr}.pollCard{padding:16px}.pollHeader,.pollFooter{align-items:stretch;flex-direction:column}.editButton,.voteButton{width:100%}.pollMeta{display:grid;gap:8px}.editorActions{align-items:stretch;flex-direction:column-reverse}.editorActions button{width:100%}}
+@media(max-width:820px){.hero{grid-template-columns:1fr;gap:18px;padding:4px 2px}.heroActions{align-items:flex-start;flex-direction:column}.hero .primaryButton,.createButton{width:max-content}.editorBody{grid-template-columns:1fr}.editorMain{border-right:0;border-bottom:1px solid #e8e6df}.toolbar{align-items:stretch;flex-direction:column}.search{width:100%;min-width:0}.optionList{grid-template-columns:1fr}}
+@media(max-width:560px){.heroContent{flex-direction:column}.hero h1{font-size:23px}.editorHeader,.editorMain,.editorAside{padding:18px}.optionEditor{grid-template-columns:1fr}.pollCard{padding:16px}.pollHeader,.pollFooter{align-items:stretch;flex-direction:column}.pollActions{width:100%}.editButton,.deleteButton,.voteButton{flex:1;justify-content:center}.pollMeta{display:grid;gap:8px}.editorActions{align-items:stretch;flex-direction:column-reverse}.editorActions button{width:100%}.confirmDialog{grid-template-columns:1fr}.confirmDialog footer{grid-column:auto;align-items:stretch;flex-direction:column-reverse}.confirmDialog footer button{width:100%}}
+
+/* Componentes de votação no mesmo sistema visual e prontos para temas. */
+.primaryButton,.voteButton { color:#201b08; background:var(--gold); }
+.editor,.workspace,.pollCard { border-color:var(--line); background:var(--surface); }
+.editorHeader { border-color:var(--line); background:#fffdf5; }
+.editorMain,.editorAside,.toolbar { border-color:var(--line); }
+.editorAside,.toolbar,.empty { background:#fafaf7; }
+.field input,.field textarea,.field select,.optionInput,.privacyCard,.toggleCard,.secondaryButton,.textButton,.closeButton,.search,.editButton,.voteOption {
+  border-color:var(--line);
+  background:var(--surface);
+}
+.field input,.field textarea,.field select { color:var(--ink); }
+.field input:focus,.field textarea:focus,.field select:focus,.search:focus-within {
+  border-color:#c3a01e;
+  box-shadow:0 0 0 3px rgba(246,201,69,.2);
+}
+.optionInput>span,.tabs .activeTab,.status_draft { color:#654f00; background:var(--gold-soft); }
+.tabs .activeTab span { color:#231c00; background:var(--gold); }
+.voteOption.selected { border-color:#d0aa22; background:#fffaf0; }
+.resultBar { background:linear-gradient(90deg,rgba(246,201,69,.28),rgba(246,201,69,.08)); }
+.selected .choiceMark { border-color:#a77f00; background:#a77f00; }
+.status_active { background:var(--green-soft); }
+.empty>svg { color:#98740b; }

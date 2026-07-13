@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { sanitizeRichTextHtml } from "@/lib/announcement-content";
+
 export type HubUser = {
   id: string;
   email: string;
@@ -271,10 +273,10 @@ async function unitDetail(env: HubEnv, id: string, user: HubUser | null, enabled
     env.DB.prepare(`SELECT * FROM academic_events WHERE curricular_unit_id=? AND ${visibility} AND status='scheduled' ORDER BY starts_at LIMIT 100`).bind(id).all(),
     env.DB.prepare(`SELECT * FROM academic_documents WHERE curricular_unit_id=? AND ${visibility} AND status='published' ORDER BY published_at DESC LIMIT 100`).bind(id).all(),
     env.DB.prepare("SELECT a.* FROM announcements a JOIN announcement_curricular_units acu ON acu.announcement_id=a.id WHERE acu.curricular_unit_id=? AND a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) ORDER BY a.published_at DESC LIMIT 50").bind(id, Date.now()).all(),
-    env.DB.prepare("SELECT id,title,description,material_type,academic_year,attachment_name,attachment_mime,attachment_data_url,created_at FROM material_submissions WHERE curricular_unit_id=? AND status='published' ORDER BY created_at DESC LIMIT 100").bind(id).all(),
+    env.DB.prepare("SELECT id,title,description,material_type,academic_year,attachment_name,attachment_mime,attachment_data_url,created_at FROM material_submissions WHERE curricular_unit_id=? AND status='published' AND material_type!='exam_photo' ORDER BY created_at DESC LIMIT 100").bind(id).all(),
   ]);
   const row = rowObject(unit);
-  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representative: { id: row.representative_id, fullName: row.representative_name, email: row.representative_email, position: row.representative_position, department: row.representative_department } }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false)), announcements: announcementsResult.results, materials: materialsResult.results.map(materialDto) });
+  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representative: { id: row.representative_id, fullName: row.representative_name, email: row.representative_email, position: row.representative_position, department: row.representative_department } }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false)), announcements: announcementsResult.results, materials: materialsResult.results.map((item) => materialDto(item)) });
 }
 
 function pollDto(row: Record<string, unknown>, questions: Array<Record<string, unknown>>, options: Array<Record<string, unknown>>, canResults: boolean, voted: boolean) {
@@ -328,6 +330,16 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
     }
     try { await env.DB.batch(statements); } catch { return json({ error: "Já respondeu a este inquérito." }, 409); }
     return json({ ok: true, anonymous: true }, 201);
+  }
+  if (request.method === "DELETE") {
+    const id = text(body.id, 80);
+    if (!id) return json({ error: "Inquérito inválido." }, 400);
+    const current = await env.DB.prepare("SELECT id,title FROM polls WHERE id=?").bind(id).first<{ id: string; title: string }>();
+    if (!current) return json({ error: "Inquérito não encontrado." }, 404);
+    const result = await env.DB.prepare("DELETE FROM polls WHERE id=?").bind(id).run();
+    if (!result.meta.changes) return json({ error: "Inquérito não encontrado." }, 404);
+    await audit(env, user, "poll_deleted", { id, title: current.title });
+    return json({ ok: true });
   }
   if (request.method === "POST") {
     const title = text(body.title, 180), description = longText(body.description, 3000), resultsVisibility = text(body.resultsVisibility, 30) || "after_vote";
@@ -389,10 +401,11 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
   return json({ error: "Operação não suportada." }, 405);
 }
 
-function materialDto(item: unknown) {
+function materialDto(item: unknown, extraAttachments: Array<Record<string, unknown>> = []) {
   const row = rowObject(item);
   const categories: Record<string, string> = { exam_photo: "exam", summary: "summary", notes: "notes", other: "other" };
-  return { id: row.id, title: row.title, description: row.description, type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, createdAt: row.created_at, updatedAt: row.updated_at };
+  const attachments = [{ id: `${String(row.id)}-legacy`, name: row.attachment_name, mime: row.attachment_mime, dataUrl: row.attachment_data_url }, ...extraAttachments.map((attachment) => ({ id: attachment.id, name: attachment.attachment_name, mime: attachment.attachment_mime, dataUrl: attachment.attachment_data_url }))];
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function validDataUrl(value: string): { mime: string; bytes: number } | null {
@@ -411,22 +424,46 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     const unitId = text(url.searchParams.get("unitId"), 80);
     const canModerate = isCommission(user) && await enabled("materials.moderation");
     const showModeration = moderation || canModerate;
-    const [result, units] = await Promise.all([env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${showModeration ? "1=1" : "m.status='published'"} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(unitId, unitId).all(), unitChoices(env)]);
-    return json({ materials: result.results.map((item) => { const dto = materialDto(item) as Record<string, unknown>, row = rowObject(item); if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; return dto; }), units, canModerate });
+    const materialVisibility = showModeration ? "1=1" : "m.status='published' AND m.material_type!='exam_photo'";
+    const [result, units, attachmentResult] = await Promise.all([
+      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(unitId, unitId).all(),
+      unitChoices(env),
+      env.DB.prepare(`SELECT a.* FROM material_submission_attachments a JOIN material_submissions m ON m.id=a.submission_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY a.submission_id,a.sort_order,a.created_at`).bind(unitId, unitId).all(),
+    ]);
+    const attachmentsBySubmission = new Map<string, Array<Record<string, unknown>>>();
+    for (const item of attachmentResult.results) {
+      const attachment = rowObject(item), submissionId = String(attachment.submission_id);
+      attachmentsBySubmission.set(submissionId, [...(attachmentsBySubmission.get(submissionId) ?? []), attachment]);
+    }
+    return json({ materials: result.results.map((item) => { const row = rowObject(item), dto = materialDto(item, attachmentsBySubmission.get(String(row.id)) ?? []) as Record<string, unknown>; if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; return dto; }), units, canModerate });
   }
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
   if (request.method === "POST") {
     const file = body.file && typeof body.file === "object" && !Array.isArray(body.file) ? body.file as Record<string, unknown> : {};
     const category = text(body.category, 30), categoryTypes: Record<string, string> = { exam: "exam_photo", summary: "summary", notes: "notes", other: "other" };
-    const title = text(body.title, 180), description = longText(body.description, 3000), type = text(body.type ?? body.materialType, 30) || categoryTypes[category] || "", unitId = text(body.unitId, 80), academicYear = text(body.academicYear, 20), anonymous = body.anonymous === true, attachmentName = text(body.attachmentName ?? file.name, 180), attachmentData = typeof (body.attachmentDataUrl ?? file.dataUrl) === "string" ? String(body.attachmentDataUrl ?? file.dataUrl) : "", parsed = validDataUrl(attachmentData);
+    const title = text(body.title, 180), description = sanitizeRichTextHtml(longText(body.description, 3000)), type = text(body.type ?? body.materialType, 30) || categoryTypes[category] || "", unitId = text(body.unitId, 80), academicYear = text(body.academicYear, 20), anonymous = body.anonymous === true, attachmentName = text(body.attachmentName ?? file.name, 180), attachmentData = typeof (body.attachmentDataUrl ?? file.dataUrl) === "string" ? String(body.attachmentDataUrl ?? file.dataUrl) : "", parsed = validDataUrl(attachmentData);
+    const rawAttachments = Array.isArray(body.attachments) ? body.attachments.slice(0, 9) : [];
+    const photoInputs = (rawAttachments.length ? rawAttachments : [{ name: attachmentName, dataUrl: attachmentData }]).map((item) => item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : {});
+    const photos = photoInputs.map((item, index) => {
+      const name = text(item.name, 180) || `foto-${index + 1}.jpg`;
+      const dataUrl = typeof item.dataUrl === "string" ? item.dataUrl : "";
+      return { name, dataUrl, parsed: validDataUrl(dataUrl) };
+    });
+    const invalidExamPhotos = type === "exam_photo" && (photos.length < 1 || photos.length > 8 || !parsed || !parsed.mime.startsWith("image/") || parsed.bytes > 5 * 1024 * 1024 || photos.some((item) => !item.parsed || !item.parsed.mime.startsWith("image/") || item.parsed.bytes > 5 * 1024 * 1024) || photos.reduce((total, item) => total + (item.parsed?.bytes ?? 0), 0) > 24 * 1024 * 1024);
+    if (invalidExamPhotos) return json({ error: "Fotos de exame invalidas. Usa ate 8 imagens, 5 MB por imagem e 24 MB no total." }, 400);
     if (title.length < 3 || !["exam_photo", "summary", "notes", "other"].includes(type) || !attachmentName || !parsed || parsed.bytes > 8 * 1024 * 1024 || !await existingUnit(env, unitId)) return json({ error: "Dados ou anexo inválidos. O ficheiro deve ter até 8 MB." }, 400);
     const id = crypto.randomUUID(), now = Date.now();
-    await env.DB.prepare("INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)").bind(id, title, description, type, unitId || null, academicYear || null, anonymous ? 1 : 0, user.id, attachmentName, parsed.mime, attachmentData, now, now).run();
+    const primaryAttachment = type === "exam_photo" ? photos[0] : { name: attachmentName, dataUrl: attachmentData, parsed };
+    const statements = [env.DB.prepare("INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)").bind(id, title, description, type, unitId || null, academicYear || null, anonymous ? 1 : 0, user.id, primaryAttachment.name, primaryAttachment.parsed?.mime || parsed.mime, primaryAttachment.dataUrl, now, now)];
+    if (type === "exam_photo") photos.slice(1).forEach((item, index) => statements.push(env.DB.prepare("INSERT INTO material_submission_attachments (id,submission_id,attachment_name,attachment_mime,attachment_data_url,sort_order,created_at) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, item.name, item.parsed?.mime, item.dataUrl, index + 1, now)));
+    await env.DB.batch(statements);
     return json({ ok: true, id, anonymous, status: "pending" }, 201);
   }
   if (request.method === "PATCH") {
     const id = text(body.id, 80), rawStatus = text(body.status, 20), status = rawStatus === "approved" ? "published" : rawStatus, note = longText(body.moderationNote, 2000);
+    const submission = id ? await env.DB.prepare("SELECT material_type FROM material_submissions WHERE id=?").bind(id).first<{ material_type: string }>() : null;
+    if (submission?.material_type === "exam_photo" && status === "published") return json({ error: "As fotos de exame sao privadas e nao podem ser publicadas diretamente." }, 400);
     if (!id || !["pending", "published", "rejected", "archived"].includes(status)) return json({ error: "Moderação inválida." }, 400);
     const now = Date.now(), result = await env.DB.prepare("UPDATE material_submissions SET status=?,moderation_note=?,moderated_by=?,moderated_at=?,updated_at=? WHERE id=?").bind(status, note || null, actor(user), now, now, id).run();
     if (!result.meta.changes) return json({ error: "Submissão não encontrada." }, 404);
@@ -445,9 +482,9 @@ async function dashboard(env: HubEnv, user: HubUser | null, enabled: ModuleCheck
     env.DB.prepare("SELECT COUNT(*) AS n FROM academic_events WHERE status='scheduled' AND starts_at BETWEEN ? AND ?").bind(Date.now(), Date.now() + 30 * 86400000).first<{ n:number }>(),
     env.DB.prepare("SELECT COUNT(*) AS n FROM academic_documents WHERE status='published'").first<{ n:number }>(),
     env.DB.prepare("SELECT COUNT(*) AS n FROM polls WHERE status='published'").first<{ n:number }>(),
-    env.DB.prepare(cc ? "SELECT COUNT(*) AS n FROM material_submissions WHERE status='pending'" : "SELECT COUNT(*) AS n FROM material_submissions WHERE status='published'").first<{ n:number }>(),
+    env.DB.prepare(cc ? "SELECT COUNT(*) AS n FROM material_submissions WHERE status='pending'" : "SELECT COUNT(*) AS n FROM material_submissions WHERE status='published' AND material_type!='exam_photo'").first<{ n:number }>(),
     cc ? env.DB.prepare("SELECT COUNT(*) AS n FROM course_requests WHERE status NOT IN ('resolved','closed')").first<{ n:number }>() : env.DB.prepare("SELECT COUNT(*) AS n FROM course_requests WHERE submitted_by=? AND status NOT IN ('resolved','closed')").bind(user.id).first<{ n:number }>(),
-    env.DB.prepare("SELECT * FROM (SELECT id,title,'announcement' AS type,'/avisos' AS href,published_at AS created_at FROM announcements WHERE status='published' UNION ALL SELECT id,title,'event' AS type,'/calendario' AS href,created_at FROM academic_events UNION ALL SELECT id,title,'document' AS type,'/documentos' AS href,created_at FROM academic_documents WHERE status!='archived' UNION ALL SELECT id,title,'material' AS type,'/materiais' AS href,created_at FROM material_submissions WHERE status IN ('pending','published')) ORDER BY created_at DESC LIMIT 12").all(),
+    env.DB.prepare(`SELECT * FROM (SELECT id,title,'announcement' AS type,'/avisos' AS href,published_at AS created_at FROM announcements WHERE status='published' UNION ALL SELECT id,title,'event' AS type,'/calendario' AS href,created_at FROM academic_events UNION ALL SELECT id,title,'document' AS type,'/documentos' AS href,created_at FROM academic_documents WHERE status!='archived' UNION ALL SELECT id,title,'material' AS type,'/materiais' AS href,created_at FROM material_submissions WHERE ${cc ? "status IN ('pending','published')" : "status='published' AND material_type!='exam_photo'"}) ORDER BY created_at DESC LIMIT 12`).all(),
     env.DB.prepare("SELECT cu.id,cu.code,cu.name,(SELECT COUNT(*) FROM course_requests r WHERE r.curricular_unit_id=cu.id AND r.status NOT IN ('resolved','closed')) AS issues,(SELECT COUNT(*) FROM academic_events e WHERE e.curricular_unit_id=cu.id AND e.status='scheduled' AND e.starts_at>=?) AS events FROM curricular_units cu WHERE cu.active=1 ORDER BY issues DESC,events DESC,cu.name LIMIT 30").bind(Date.now()).all(),
   ]);
   const metrics = { activeAnnouncements: announcements?.n || 0, openRequests: requestsCount?.n || 0, pendingMaterials: materialsCount?.n || 0, activePolls: pollsCount?.n || 0, urgentAnnouncements: announcements?.n || 0, upcomingEvents: upcoming?.n || 0, publishedDocuments: docs?.n || 0, openPolls: pollsCount?.n || 0 };
@@ -466,7 +503,7 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
     env.DB.prepare(`SELECT id,event_type AS eyebrow,title,description,'event' AS type,starts_at AS date FROM academic_events WHERE ${visibility} AND status='scheduled' AND (title LIKE ? OR description LIKE ?) LIMIT 20`).bind(pattern, pattern).all(),
     env.DB.prepare(`SELECT id,document_type AS eyebrow,title,description,'document' AS type,published_at AS date FROM academic_documents WHERE ${visibility} AND status='published' AND (title LIKE ? OR description LIKE ? OR content LIKE ?) LIMIT 20`).bind(pattern, pattern, pattern).all(),
     env.DB.prepare("SELECT id,priority AS eyebrow,title,substr(body,1,220) AS description,'announcement' AS type,published_at AS date FROM announcements WHERE status='published' AND (title LIKE ? OR body LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
-    env.DB.prepare("SELECT id,material_type AS eyebrow,title,description,'material' AS type,created_at AS date FROM material_submissions WHERE status='published' AND (title LIKE ? OR description LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
+    env.DB.prepare("SELECT id,material_type AS eyebrow,title,description,'material' AS type,created_at AS date FROM material_submissions WHERE status='published' AND material_type!='exam_photo' AND (title LIKE ? OR description LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare("SELECT u.id,p.label AS eyebrow,u.full_name AS title,COALESCE(d.label,p.label) AS description,'member' AS type,u.updated_at AS date FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' AND (u.full_name LIKE ? OR p.label LIKE ? OR d.label LIKE ?) LIMIT 20").bind(pattern, pattern, pattern).all(),
   ]);
   const hrefs: Record<string, (id: unknown) => string> = { announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao" };

@@ -26,10 +26,13 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
+import { FileUploadField, MultiFileUploadField, SelectedUpload } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
+import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
+import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import styles from "@/components/material-library.module.css";
 
-type Status = "pending" | "approved" | "rejected";
+type Status = "pending" | "approved" | "rejected" | "archived";
 type Category = "exam" | "summary" | "notes" | "other";
 type ApiMaterial = {
   id: string | number;
@@ -59,7 +62,9 @@ type ApiMaterial = {
   unitName?: string;
   unit?: { id: string | number; code?: string; name?: string };
   curricularUnit?: { id: string | number; code?: string; name?: string };
+  attachments?: Array<{ id?: string; name?: string; mime?: string; dataUrl?: string; fileName?: string; fileType?: string; fileUrl?: string }>;
 };
+type MaterialAttachment = { id: string; name: string; mime: string; dataUrl: string };
 type Material = {
   id: string;
   title: string;
@@ -71,6 +76,7 @@ type Material = {
   fileName: string;
   fileType: string;
   fileUrl: string;
+  attachments: MaterialAttachment[];
   createdAt: string;
   unit: { id: string; code: string; name: string } | null;
 };
@@ -82,6 +88,7 @@ const categoryLabels: Record<Category, string> = {
   notes: "Sebenta ou apontamentos",
   other: "Outro material",
 };
+categoryLabels.exam = "Fotos de exame/frequ\u00eancia";
 const categoryToType: Record<
   Category,
   "exam_photo" | "summary" | "notes" | "other"
@@ -90,9 +97,13 @@ const statusLabels: Record<Status, string> = {
   pending: "Em moderação",
   approved: "Publicado",
   rejected: "Recusado",
+  archived: "Analisado pela CC",
 };
 const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_SIZE = 5 * 1024 * 1024;
+const allowedPhotos = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PHOTOS = 8;
+const MAX_PHOTO_TOTAL_SIZE = 24 * 1024 * 1024;
 function normalize(item: ApiMaterial): Material {
   const nested = item.unit ?? item.curricularUnit;
   const unit =
@@ -103,13 +114,26 @@ function normalize(item: ApiMaterial): Material {
   const apiType = item.type;
   const category: Category =
     item.category ?? (apiType === "exam_photo" ? "exam" : (apiType ?? "other"));
+  const legacyAttachment: MaterialAttachment = {
+    id: `${item.id}-legacy`,
+    name: item.attachmentName ?? item.fileName ?? item.file_name ?? "ficheiro",
+    mime: item.attachmentMime ?? item.fileType ?? item.file_type ?? "application/octet-stream",
+    dataUrl: item.attachmentDataUrl ?? item.fileUrl ?? item.file_url ?? item.fileData ?? item.file_data ?? "",
+  };
+  const attachments = item.attachments?.map((attachment, index) => ({
+    id: attachment.id ?? `${item.id}-${index}`,
+    name: attachment.name ?? attachment.fileName ?? `fotografia-${index + 1}`,
+    mime: attachment.mime ?? attachment.fileType ?? "application/octet-stream",
+    dataUrl: attachment.dataUrl ?? attachment.fileUrl ?? "",
+  })).filter((attachment) => attachment.dataUrl) ?? [];
   return {
     id: String(item.id),
     title: item.title,
     description: item.description ?? "",
     category,
-    status:
-      item.status === "published" ? "approved" : (item.status ?? "pending"),
+    status: category === "exam" && (item.status === "published" || item.status === "approved")
+      ? "archived"
+      : item.status === "published" ? "approved" : (item.status ?? "pending"),
     anonymous: item.anonymous ?? false,
     authorName: item.anonymous
       ? "Partilha anónima"
@@ -128,6 +152,7 @@ function normalize(item: ApiMaterial): Material {
       item.fileData ??
       item.file_data ??
       "",
+    attachments: attachments.length ? attachments : legacyAttachment.dataUrl ? [legacyAttachment] : [],
     createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
     unit: unit
       ? {
@@ -149,6 +174,14 @@ function size(value: number) {
     ? `${Math.round(value / 1024)} KB`
     : `${(value / 1024 / 1024).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} MB`;
 }
+function readFileDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error());
+    reader.readAsDataURL(file);
+  });
+}
 export function MaterialLibrary() {
   const { user } = useAuth();
   const [materials, setMaterials] = useState<Material[]>([]),
@@ -166,7 +199,8 @@ export function MaterialLibrary() {
     [unitId, setUnitId] = useState(""),
     [anonymous, setAnonymous] = useState(true),
     [file, setFile] = useState<File | null>(null),
-    [fileData, setFileData] = useState("");
+    [fileData, setFileData] = useState(""),
+    [examFiles, setExamFiles] = useState<Array<SelectedUpload & { dataUrl: string }>>([]);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -246,12 +280,7 @@ export function MaterialLibrary() {
       return;
     }
     try {
-      const value = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error());
-        reader.readAsDataURL(selected);
-      });
+      const value = await readFileDataUrl(selected);
       setFile(selected);
       setFileData(value);
     } catch {
@@ -259,6 +288,42 @@ export function MaterialLibrary() {
         kind: "error",
         message: "Não foi possível ler o ficheiro selecionado.",
       });
+    }
+  };
+  const pickExamPhotos = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(event.target.files ?? []);
+    if (!selected.length) return;
+    if (examFiles.length + selected.length > MAX_PHOTOS) {
+      setNotice({ kind: "warning", message: `Podes enviar no m\u00e1ximo ${MAX_PHOTOS} fotografias por submiss\u00e3o.` });
+      event.target.value = "";
+      return;
+    }
+    if (selected.some((item) => !allowedPhotos.includes(item.type))) {
+      setNotice({ kind: "warning", message: "As fotos de exame devem estar em formato JPG, PNG ou WebP." });
+      event.target.value = "";
+      return;
+    }
+    if (selected.some((item) => item.size > MAX_SIZE)) {
+      setNotice({ kind: "warning", message: "Cada fotografia pode ter no m\u00e1ximo 5 MB." });
+      event.target.value = "";
+      return;
+    }
+    const total = [...examFiles.map((item) => item.file), ...selected].reduce((sum, item) => sum + item.size, 0);
+    if (total > MAX_PHOTO_TOTAL_SIZE) {
+      setNotice({ kind: "warning", message: "O conjunto de fotografias pode ter no m\u00e1ximo 24 MB." });
+      event.target.value = "";
+      return;
+    }
+    try {
+      const encoded = await Promise.all(selected.map(async (item) => {
+        const dataUrl = await readFileDataUrl(item);
+        return { file: item, dataUrl, previewUrl: dataUrl };
+      }));
+      setExamFiles((current) => [...current, ...encoded]);
+    } catch {
+      setNotice({ kind: "error", message: "N\u00e3o foi poss\u00edvel ler uma das fotografias selecionadas." });
+    } finally {
+      event.target.value = "";
     }
   };
   const reset = () => {
@@ -269,16 +334,24 @@ export function MaterialLibrary() {
     setAnonymous(true);
     setFile(null);
     setFileData("");
+    setExamFiles([]);
     setEditor(false);
   };
+  const descriptionLength = richTextPlainText(description).length;
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!title.trim() || !file || !fileData) {
+    const examSubmission = category === "exam";
+    const primaryExamFile = examFiles[0];
+    if (!title.trim() || (examSubmission ? !primaryExamFile : !file || !fileData)) {
       setNotice({
         kind: "warning",
         message:
           "Indica um título e seleciona o ficheiro que queres partilhar.",
       });
+      return;
+    }
+    if (descriptionLength > 1200) {
+      setNotice({ kind: "warning", message: "A descri\u00e7\u00e3o n\u00e3o pode ultrapassar 1200 caracteres." });
       return;
     }
     setSaving(true);
@@ -288,12 +361,13 @@ export function MaterialLibrary() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          description: description.trim(),
+          description: sanitizeRichTextHtml(description),
           type: categoryToType[category],
           unitId: unitId || null,
           anonymous,
-          attachmentName: file.name,
-          attachmentDataUrl: fileData,
+          attachmentName: examSubmission ? primaryExamFile.file.name : file?.name,
+          attachmentDataUrl: examSubmission ? primaryExamFile.dataUrl : fileData,
+          attachments: examSubmission ? examFiles.map((item) => ({ name: item.file.name, dataUrl: item.dataUrl })) : undefined,
         }),
       });
       const data = (await response.json()) as { error?: string };
@@ -317,7 +391,7 @@ export function MaterialLibrary() {
       setSaving(false);
     }
   };
-  const moderate = async (id: string, status: "approved" | "rejected") => {
+  const moderate = async (id: string, status: "approved" | "rejected" | "archived") => {
     setModerating(id);
     try {
       const response = await fetch("/api/material-submissions", {
@@ -336,7 +410,7 @@ export function MaterialLibrary() {
         message:
           status === "approved"
             ? "Material aprovado e publicado."
-            : "Material recusado.",
+            : status === "archived" ? "Fotografias analisadas e arquivadas pela CC." : "Material recusado.",
       });
       await load();
     } catch (reason) {
@@ -445,18 +519,22 @@ export function MaterialLibrary() {
                         ))}
                       </select>
                     </label>
-                    <label className={`${styles.field} ${styles.fieldFull}`}>
+                    <div className={`${styles.field} ${styles.fieldFull}`}>
                       <span>
                         Descrição <small>(opcional)</small>
                       </span>
-                      <textarea
+                      <RichTextEditor
                         value={description}
-                        onChange={(event) => setDescription(event.target.value)}
+                        onChange={setDescription}
+                        ariaLabel="Descrição do material"
                         maxLength={1200}
+                        minHeight="compact"
                         placeholder="Contextualiza o ficheiro, ano letivo ou conteúdo…"
+                        onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por https://." })}
                       />
-                    </label>
+                    </div>
                   </div>
+                  <div className={styles.legacyUpload} aria-hidden="true">
                   {file ? (
                     <div className={styles.preview}>
                       {file.type.startsWith("image/") ? (
@@ -493,13 +571,38 @@ export function MaterialLibrary() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp,application/pdf"
                         onChange={(event) => void pick(event)}
-                        required
+                        disabled
                       />
                       <Upload />
                       <strong>Selecionar fotografia ou PDF</strong>
                       <small>JPG, PNG, WebP ou PDF · máximo de 5 MB</small>
                     </label>
                   )}
+                  </div>
+                  {category === "exam" ? <>
+                    <div className={styles.privateNotice} role="note">
+                      <ShieldCheck />
+                      <span><strong>{"Envio privado para a Comiss\u00e3o de Curso"}</strong><small>Estas fotografias nunca aparecem na biblioteca. Servem apenas para a CC preparar e publicar posteriormente um PDF final.</small></span>
+                    </div>
+                    <MultiFileUploadField
+                      accept="image/jpeg,image/png,image/webp"
+                      emptyLabel={"Selecionar fotografias do exame ou frequ\u00eancia"}
+                      files={examFiles}
+                      help={`JPG, PNG ou WebP. At\u00e9 ${MAX_PHOTOS} fotos, 5 MB por foto e 24 MB no total.`}
+                      label="Fotografias privadas"
+                      maxFiles={MAX_PHOTOS}
+                      onChange={(event) => void pickExamPhotos(event)}
+                      onRemove={(index) => setExamFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    />
+                  </> : <FileUploadField
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      emptyLabel="Fotografia ou documento PDF"
+                      file={file}
+                      help="JPG, PNG, WebP ou PDF. Tamanho maximo: 5 MB."
+                      onChange={(event) => void pick(event)}
+                      onRemove={() => { setFile(null); setFileData(""); }}
+                      previewUrl={fileData}
+                    />}
                   <label className={styles.checkField}>
                     <input
                       type="checkbox"
@@ -526,7 +629,7 @@ export function MaterialLibrary() {
                     <button
                       className="button button--primary"
                       type="submit"
-                      disabled={saving}
+                    disabled={saving || descriptionLength > 1200}
                     >
                       {saving ? (
                         <LoaderCircle className={styles.spin} />
@@ -569,7 +672,7 @@ export function MaterialLibrary() {
                     onChange={(event) => setFilter(event.target.value)}
                   >
                     <option value="all">Todos os materiais</option>
-                    {Object.entries(categoryLabels).map(([value, label]) => (
+                    {Object.entries(categoryLabels).filter(([value]) => canModerate || value !== "exam").map(([value, label]) => (
                       <option value={value} key={value}>
                         {label}
                       </option>
@@ -605,14 +708,14 @@ export function MaterialLibrary() {
                             {categoryLabels[item.category]}
                           </span>
                           <span
-                            className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : styles.statusPending}`}
+                            className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : item.status === "archived" ? styles.statusArchived : styles.statusPending}`}
                           >
                             {statusLabels[item.status]}
                           </span>
                         </div>
                         <div>
                           <h3>{item.title}</h3>
-                          {item.description && <p>{item.description}</p>}
+                          {item.description && <RichTextContent value={item.description} className={styles.materialDescription} />}
                         </div>
                         {item.unit && (
                           <span className={styles.unitCode}>
@@ -629,12 +732,18 @@ export function MaterialLibrary() {
                             <span>{item.fileName}</span>
                           </span>
                         </div>
+                        {canModerate && item.category === "exam" && item.attachments.length > 0 && (
+                          <div className={styles.photoDownloads}>
+                            <strong>{item.attachments.length} {item.attachments.length === 1 ? "fotografia privada" : "fotografias privadas"}</strong>
+                            <div>{item.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download />Foto {index + 1}<small>{attachment.name}</small></a>)}</div>
+                          </div>
+                        )}
                         {canModerate && item.status === "pending" ? (
                           <div className={styles.moderation}>
                             <button
                               className="button button--primary button--compact"
                               type="button"
-                              onClick={() => void moderate(item.id, "approved")}
+                              onClick={() => void moderate(item.id, item.category === "exam" ? "archived" : "approved")}
                               disabled={moderating === item.id}
                             >
                               {moderating === item.id ? (
@@ -642,7 +751,7 @@ export function MaterialLibrary() {
                               ) : (
                                 <Check />
                               )}
-                              Aprovar
+                              {item.category === "exam" ? "Concluir an\u00e1lise" : "Aprovar"}
                             </button>
                             <button
                               className="button button--danger button--compact"

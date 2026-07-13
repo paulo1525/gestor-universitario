@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import { AuthProvider } from "@/components/auth-context";
 import { CookiePreferences } from "@/components/cookie-preferences";
+import { ModuleProvider } from "@/components/module-context";
 import "./globals.css";
+import "./theme-forum.css";
 
 const inter = Inter({
   variable: "--font-body",
@@ -28,8 +30,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-PT" data-scroll-behavior="smooth">
-      <body className={`${inter.variable} ${manrope.variable}`}><AuthProvider>{children}<CookiePreferences /></AuthProvider></body>
+    <html lang="pt-PT" data-scroll-behavior="smooth" data-theme="cc" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("gestor-theme");document.documentElement.dataset.theme=theme==="forum"?"forum":"cc"}catch(error){document.documentElement.dataset.theme="cc"}` }} /></head>
+      <body className={`${inter.variable} ${manrope.variable}`}><AuthProvider><ModuleProvider>{children}<CookiePreferences /></ModuleProvider></AuthProvider></body>
     </html>
   );
 }

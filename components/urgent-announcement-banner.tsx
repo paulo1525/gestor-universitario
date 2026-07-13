@@ -7,7 +7,6 @@ import { announcementPlainText } from "@/lib/announcement-content";
 
 type ApiAnnouncement = { id: string | number; title: string; body?: string; content?: string; priority?: string; published_at?: string | number; publishedAt?: string | number };
 type UrgentAnnouncement = { id: string; title: string; body: string };
-type ModuleNode = { key: string; enabled?: boolean; effectiveEnabled?: boolean; submodules?: ModuleNode[] };
 
 export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
   const [announcement, setAnnouncement] = useState<UrgentAnnouncement | null>(null);
@@ -15,18 +14,12 @@ export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    Promise.all([
-      fetch("/api/modules", { cache: "no-store", credentials: "same-origin", signal: controller.signal }),
-      fetch("/api/announcements", { cache: "no-store", credentials: "same-origin", signal: controller.signal }),
-    ])
-      .then(async ([modulesResponse, announcementsResponse]) => ({
-        modules: modulesResponse.ok ? (await modulesResponse.json() as { modules?: ModuleNode[] }).modules ?? [] : [],
-        announcements: announcementsResponse.ok ? (await announcementsResponse.json() as { announcements?: ApiAnnouncement[] }).announcements ?? [] : [],
-      }))
-      .then(({ modules, announcements }) => {
-        const nodes = modules.flatMap((module) => [module, ...(module.submodules ?? [])]);
-        const feed = nodes.find((module) => module.key === "announcements.feed");
-        if (!feed || (feed.effectiveEnabled ?? feed.enabled) === false) return;
+    fetch("/api/announcements", { cache: "no-store", credentials: "same-origin", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        return (await response.json() as { announcements?: ApiAnnouncement[] }).announcements ?? [];
+      })
+      .then((announcements) => {
         const latest = announcements.filter((item) => item.priority === "urgent").sort((a, b) => new Date(b.publishedAt ?? b.published_at ?? 0).getTime() - new Date(a.publishedAt ?? a.published_at ?? 0).getTime())[0];
         if (!latest || window.sessionStorage.getItem(`dismissed-urgent-announcement-v2:${latest.id}`)) return;
         setAnnouncement({ id: String(latest.id), title: latest.title, body: latest.body ?? latest.content ?? "" });

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Boxes, Check, LoaderCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-context";
 import { AppToast } from "@/components/app-toast";
+import { useModules } from "@/components/module-context";
 import styles from "./module-management.module.css";
 
 const MODULE_MANAGER_EMAIL = "up202507850@up.pt";
@@ -39,7 +40,8 @@ function switchLabel(enabled: boolean) {
 
 export function ModuleManagement() {
   const { user } = useAuth();
-  const canManageModules = user?.email.toLowerCase() === MODULE_MANAGER_EMAIL;
+  const { synchronize } = useModules();
+  const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
   const [modules, setModules] = useState<ManagedModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -64,6 +66,7 @@ export function ModuleManagement() {
       })
       .then((data) => {
         setModules(data.modules);
+        synchronize(data.modules);
         setLoadError("");
       })
       .catch((error: unknown) => {
@@ -75,7 +78,7 @@ export function ModuleManagement() {
       });
 
     return () => controller.abort();
-  }, [canManageModules, requestVersion]);
+  }, [canManageModules, requestVersion, synchronize]);
 
   const activeCount = useMemo(
     () => modules.reduce((total, module) => total + Number(module.enabled) + module.submodules.filter((item) => item.effectiveEnabled).length, 0),
@@ -110,6 +113,7 @@ export function ModuleManagement() {
       const data = await response.json() as ModulesResponse;
       if (!response.ok) throw new Error(data.error || "Não foi possível guardar a alteração.");
       setModules(data.modules);
+      synchronize(data.modules);
       setSavedTarget(id);
       const parent = modules.find((module) => module.key === target.moduleKey);
       const label = target.submoduleKey ? parent?.submodules.find((submodule) => submodule.key === target.submoduleKey)?.label : parent?.label;

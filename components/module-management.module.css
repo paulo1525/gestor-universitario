@@ -1,7 +1,7 @@
 .panel {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow);
   overflow: hidden;
 }
@@ -9,26 +9,26 @@
 .header {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
-  min-height: 78px;
-  padding: 17px 20px;
-  border-bottom: 1px solid #e8edf2;
+  gap: 12px;
+  min-height: 70px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
 }
 
 .icon {
   display: grid;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  border-radius: 12px;
-  color: #0c6f57;
-  background: #e7f6f1;
+  border-radius: 10px;
+  color: #715700;
+  background: var(--gold-soft);
 }
 
 .icon svg {
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
 }
 
 .heading {
@@ -38,8 +38,8 @@
 .eyebrow {
   display: block;
   margin-bottom: 3px;
-  color: #607080;
-  font-size: 0.72rem;
+  color: var(--muted);
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -49,68 +49,72 @@
 .moduleCopy h3,
 .submoduleCopy h4 {
   margin: 0;
-  color: #172536;
+  color: var(--ink);
 }
 
 .heading h2 {
-  font-size: 17px;
+  font-size: 15px;
 }
 
 .heading p,
 .moduleCopy p,
 .submoduleCopy p {
   margin: 5px 0 0;
-  color: #637181;
+  color: var(--muted);
   line-height: 1.5;
+}
+
+.heading p {
+  font-size: 10px;
 }
 
 .summary {
   flex: 0 0 auto;
   margin-left: auto;
-  padding: 7px 11px;
+  padding: 6px 9px;
   border-radius: 999px;
-  color: #526171;
-  background: #f1f4f7;
-  font-size: 10px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 68%, var(--line));
+  font-size: 9px;
   white-space: nowrap;
 }
 
 .summary strong {
-  color: #0c6f57;
+  color: var(--green);
 }
 
 .moduleList {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  background: #f7f9fb;
+  gap: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--surface) 48%, var(--line));
 }
 
 .moduleCard {
-  border: 1px solid #dce3ea;
-  border-radius: 14px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .moduleCard:hover {
-  border-color: #c6d3dc;
+  border-color: color-mix(in srgb, var(--ink) 18%, var(--line));
   box-shadow: 0 5px 18px rgba(27, 43, 61, 0.05);
 }
 
 .moduleCard.disabled {
-  background: #fbfcfd;
+  background: color-mix(in srgb, var(--surface) 75%, var(--line));
 }
 
 .moduleRow,
 .submoduleRow {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
 .moduleRow {
-  padding: 18px 20px;
+  padding: 12px 14px;
 }
 
 .moduleCopy,
@@ -120,59 +124,59 @@
 }
 
 .moduleCopy h3 {
-  font-size: 15px;
+  font-size: 12px;
 }
 
 .submoduleCopy h4 {
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .moduleCopy p,
 .submoduleCopy p {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .titleLine {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .activeBadge,
 .inactiveBadge,
 .inheritedBadge {
-  padding: 3px 7px;
+  padding: 3px 6px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 8px;
   font-weight: 750;
 }
 
 .activeBadge {
-  color: #09664f;
-  background: #e2f4ee;
+  color: var(--green);
+  background: var(--green-soft);
 }
 
 .inactiveBadge {
-  color: #626e7a;
-  background: #edf0f3;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 58%, var(--line));
 }
 
 .inheritedBadge {
-  color: #825713;
-  background: #fff2ce;
+  color: var(--warning);
+  background: var(--warning-soft);
 }
 
 .submoduleList {
-  margin: 0 20px 18px 42px;
-  border-left: 2px solid #dfe6eb;
+  margin: 0 14px 10px 30px;
+  border-left: 2px solid var(--line);
 }
 
 .submoduleRow {
   position: relative;
-  padding: 12px 0 12px 18px;
-  border-bottom: 1px solid #edf0f3;
+  padding: 9px 0 9px 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 .submoduleRow::before {
@@ -181,7 +185,7 @@
   top: 50%;
   left: -2px;
   width: 11px;
-  border-top: 2px solid #dfe6eb;
+  border-top: 2px solid var(--line);
 }
 
 .submoduleRow:last-child {
@@ -190,9 +194,9 @@
 
 .switch {
   display: grid;
-  grid-template-columns: auto minmax(62px, auto) 16px;
+  grid-template-columns: auto minmax(56px, auto) 14px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
   cursor: pointer;
 }
@@ -208,10 +212,10 @@
 .switch > span {
   position: relative;
   grid-column: 1;
-  width: 42px;
-  height: 24px;
+  width: 36px;
+  height: 20px;
   border-radius: 999px;
-  background: #b5bec7;
+  background: color-mix(in srgb, var(--muted) 48%, var(--line));
   box-shadow: inset 0 0 0 1px rgba(17, 31, 45, 0.08);
   transition: background 150ms ease;
 }
@@ -221,24 +225,24 @@
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 4px rgba(18, 31, 44, 0.3);
   transition: transform 150ms ease;
 }
 
 .switch input:checked + span {
-  background: #11775f;
+  background: var(--green);
 }
 
 .switch input:checked + span::after {
-  transform: translateX(18px);
+  transform: translateX(16px);
 }
 
 .switch input:focus-visible + span {
-  outline: 3px solid rgba(26, 118, 192, 0.25);
+  outline: 3px solid color-mix(in srgb, var(--gold) 36%, transparent);
   outline-offset: 2px;
 }
 
@@ -249,16 +253,16 @@
 
 .switch small {
   grid-column: 2;
-  color: #5d6b79;
-  font-size: 0.75rem;
+  color: var(--muted);
+  font-size: 9px;
   text-align: right;
 }
 
 .switchStatusIcon {
   grid-column: 3;
-  width: 15px;
-  height: 15px;
-  color: #0c6f57;
+  width: 13px;
+  height: 13px;
+  color: var(--green);
 }
 
 .state {
@@ -268,7 +272,8 @@
   gap: 10px;
   min-height: 130px;
   padding: 24px;
-  color: #596878;
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .state svg,
@@ -284,7 +289,7 @@
 }
 
 .state div span {
-  font-size: 0.84rem;
+  font-size: 9px;
 }
 
 .state button {
@@ -293,12 +298,12 @@
   gap: 7px;
   margin-left: 8px;
   padding: 8px 11px;
-  border: 1px solid #c9d2da;
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: #26384a;
-  background: #fff;
+  color: var(--ink);
+  background: var(--surface);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -314,7 +319,7 @@
   gap: 8px;
   padding: 11px 13px;
   border-radius: 9px;
-  font-size: 0.84rem;
+  font-size: 10px;
 }
 
 .error {
@@ -333,7 +338,7 @@
 @media (max-width: 680px) {
   .header {
     align-items: center;
-    padding: 18px;
+    padding: 14px;
   }
 
   .summary {
@@ -341,30 +346,35 @@
   }
 
   .moduleList {
-    padding: 12px;
+    padding: 8px;
   }
 
   .moduleRow,
   .submoduleRow {
     align-items: flex-start;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .moduleRow {
-    padding: 16px;
+    padding: 11px 12px;
   }
 
   .submoduleList {
-    margin: 0 16px 14px 25px;
+    margin: 0 12px 9px 23px;
   }
 
   .submoduleRow {
-    padding-left: 14px;
+    padding: 8px 0 8px 12px;
   }
 
   .switch {
     width: 100%;
+    grid-template-columns: auto 1fr 14px;
+  }
+
+  .switch small {
+    text-align: left;
   }
 
   .state {

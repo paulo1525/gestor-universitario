@@ -11,6 +11,9 @@ const announcementsUi = readFileSync(new URL("../components/announcements-board.
 const topbarSearch = readFileSync(new URL("../components/topbar-global-search.tsx", import.meta.url), "utf8");
 const directoryUi = readFileSync(new URL("../components/commission-directory.tsx", import.meta.url), "utf8");
 const urgentBanner = readFileSync(new URL("../components/urgent-announcement-banner.tsx", import.meta.url), "utf8");
+const moduleContext = readFileSync(new URL("../components/module-context.tsx", import.meta.url), "utf8");
+const moduleGuard = readFileSync(new URL("../components/module-guard.tsx", import.meta.url), "utf8");
+const curricularAdminPage = readFileSync(new URL("../app/admin/unidades-curriculares/page.tsx", import.meta.url), "utf8");
 const announcementContent = readFileSync(new URL("../lib/announcement-content.ts", import.meta.url), "utf8");
 const curricularUi = readFileSync(new URL("../components/curricular-units-management.tsx", import.meta.url), "utf8");
 
@@ -46,6 +49,17 @@ test("rotas existentes são bloqueadas no backend quando o respetivo submódulo 
   assert.match(shell, /hasCommunication&&<div className="nav-section"/);
   assert.match(shell, /hasAcademicLife&&<div className="nav-section"/);
   assert.match(shell, /hasCommunity&&<div className="nav-section"/);
+  assert.match(shell, /moduleAccess\["curricular_units\.management"\]/);
+  assert.match(curricularAdminPage, /moduleKey="curricular_units\.management"/);
+});
+
+test("o estado dos módulos é partilhado e não bloqueia novamente cada navegação", () => {
+  assert.match(moduleContext, /ModuleProvider/);
+  assert.match(moduleContext, /fetch\("\/api\/modules"/);
+  assert.doesNotMatch(shell, /fetch\("\/api\/modules"/);
+  assert.doesNotMatch(moduleGuard, /fetch\("\/api\/modules"/);
+  assert.doesNotMatch(shell, /"classes\.rosters":true/);
+  assert.match(moduleUi, /synchronize\(data\.modules\)/);
 });
 
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {
@@ -62,7 +76,8 @@ test("comunicados lideram a navegação, têm editor isolado e um urgente global
   assert.match(shell, /active !== "announcements"/);
   assert.match(urgentBanner, /dismissed-urgent-announcement/);
   assert.match(urgentBanner, /sessionStorage/);
-  assert.match(urgentBanner, /Promise\.all/);
+  assert.doesNotMatch(urgentBanner, /api\/modules/);
+  assert.match(urgentBanner, /api\/announcements/);
   assert.match(urgentBanner, /priority === "urgent"/);
   assert.match(announcementsUi, /contentEditable/);
   assert.match(announcementsUi, /!editorOpen && <section/);

@@ -5,3 +5,27 @@
 /* Match the established Turmas dashboard instead of using a decorative hero. */
 .hero{align-items:end;padding:4px 2px}.heroCopy{gap:0}.heroIcon{display:none}.hero h1{margin:5px 0 7px;font-size:clamp(27px,3vw,38px)}.hero p{font-size:12px;line-height:1.6}.metrics{gap:14px}.metrics>div{min-height:110px;align-content:center;padding:19px;border-radius:var(--radius);box-shadow:0 2px 8px rgba(20,20,16,.025)}.metrics strong{font-size:22px}.metrics span{font-size:10px}.directory{border-radius:var(--radius);box-shadow:var(--shadow)}.directoryHeader{min-height:78px;padding:17px 20px}.directoryHeader h2{font-size:17px}.directoryHeader p{font-size:12px;line-height:1.6}.grid{gap:14px;padding:18px}.card{padding:18px;border-radius:var(--radius);background:#fff}.card h3{font-size:15px}.cardIdentity p,.email,.classRole{font-size:11px}.position,.units>div:first-child strong{font-size:10px}.unitList span,.units>p{font-size:10px;line-height:1.45}.unitList b{font-size:10px}.state strong{font-size:12px}.state p{font-size:10px}
 @media(max-width:620px){.heroCopy{flex-direction:row}.hero h1{font-size:27px}.metrics>div{min-height:92px}}
+
+/* Tratamento neutro e compacto, com dourado reservado a seleção e contexto. */
+.metrics>div,.directory,.card { border-color:var(--line); background:var(--surface); }
+.directoryHeader { border-color:var(--line); background:var(--surface); }
+.sectionIcon { color:#6f5600; background:var(--gold-soft); }
+.count { color:#624d00; background:var(--gold-soft); }
+.controls { border-color:var(--line); background:#fafaf7; }
+.search { min-height:40px; border-color:var(--line); border-radius:10px; background:var(--surface); }
+.search:focus-within { border-color:#b38b10; box-shadow:0 0 0 3px rgba(246,201,69,.2); }
+.search input { height:38px; font-size:11px; }
+.departmentTabs button { min-height:32px; padding:0 11px; border-color:var(--line); color:#5e5d57; background:var(--surface); font-size:10px; }
+.departmentTabs .activeTab { color:#231c00; border-color:#d4ad20; background:var(--gold); }
+.card { box-shadow:0 8px 24px rgba(36,34,25,.045); }
+.avatar,.position { color:#664f00; background:var(--gold-soft); }
+.email { border-color:var(--line); background:#fafaf8; }
+.units>div:first-child span,.unitList span { background:#f3f3ef; }
+
+@media(max-width:620px){
+  .hero { padding:4px 2px; }
+  .heroCopy { min-width:0; }
+  .metrics { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .metrics>div { padding:14px; }
+  .directoryHeader,.controls { padding-inline:14px; }
+}

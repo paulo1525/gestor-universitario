@@ -1,0 +1,23 @@
+.editor { overflow:hidden; border:1px solid var(--line); border-radius:10px; background:var(--surface); transition:border-color .15s ease,box-shadow .15s ease; }
+.editor:focus-within { border-color:#b8941b; box-shadow:0 0 0 3px rgba(246,201,69,.2); }
+.toolbar { min-height:38px; display:flex; align-items:center; gap:3px; padding:4px 7px; border-bottom:1px solid var(--line); background:#fafaf7; }
+.toolbar > span { width:1px; height:20px; margin:0 4px; background:#ddd9cb; }
+.toolbar button { width:30px; height:30px; display:grid; place-items:center; padding:0; border:0; border-radius:7px; color:#55534c; background:transparent; cursor:pointer; }
+.toolbar button:hover:not(:disabled),.toolbar button:focus-visible { color:#493900; background:var(--gold-soft); }
+.toolbar button:focus-visible { outline:2px solid #b88e08; outline-offset:1px; }
+.toolbar button:disabled { cursor:not-allowed; opacity:.45; }
+.toolbar svg { width:14px; height:14px; }
+.editable { min-height:142px; padding:13px 14px; outline:0; color:var(--ink); background:var(--surface); font-size:11px; font-weight:500; line-height:1.65; overflow-wrap:anywhere; }
+.compact .editable { min-height:96px; }
+.editable:empty::before { content:attr(data-placeholder); color:#96948c; pointer-events:none; }
+.editable p { margin:0 0 8px; }.editable p:last-child { margin-bottom:0; }
+.editable ul,.editable ol { margin:7px 0; padding-left:21px; }
+.editable a { color:#245ec7; font-weight:700; }
+.counter { padding:5px 10px; border-top:1px solid #efeee9; color:var(--muted); background:#fcfcfa; font-size:8px; text-align:right; }
+.counterOver { color:#9d2e2e; font-weight:800; }
+.disabled { background:#f5f5f2; opacity:.82; }.disabled .editable { background:#f5f5f2; }
+.content { color:inherit; font-size:inherit; line-height:inherit; overflow-wrap:anywhere; }
+.content p { margin:0 0 8px; white-space:pre-wrap; }.content p:last-child { margin-bottom:0; }
+.content ul,.content ol { margin:7px 0; padding-left:21px; }
+.content a { color:#245ec7; font-weight:700; }
+@media(max-width:520px){.toolbar{overflow-x:auto}.editable{min-height:120px}}

@@ -61,3 +61,9 @@ export function announcementDisplayHtml(value: string): string {
   if (/<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a)\b/i.test(sanitized)) return sanitized;
   return `<p>${escapeHtml(announcementPlainText(value))}</p>`;
 }
+
+// Generic aliases for safe rich text outside announcements.
+// The original exports remain stable for existing consumers.
+export const sanitizeRichTextHtml = sanitizeAnnouncementHtml;
+export const richTextPlainText = announcementPlainText;
+export const richTextDisplayHtml = announcementDisplayHtml;
