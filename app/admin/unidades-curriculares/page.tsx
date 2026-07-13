@@ -3,5 +3,5 @@ import { CurricularUnitsManagement } from "@/components/curricular-units-managem
 import { ModuleGuard } from "@/components/module-guard";
 
 export default function CurricularUnitsPage() {
-  return <AuthGuard requireAdmin><ModuleGuard moduleKey="curricular_units.catalog"><CurricularUnitsManagement /></ModuleGuard></AuthGuard>;
+  return <AuthGuard requireAdmin><ModuleGuard moduleKey="curricular_units.management"><CurricularUnitsManagement /></ModuleGuard></AuthGuard>;
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Bold, CalendarClock, ChevronLeft, ChevronRight, Italic, Link2, List, ListOrdered, LoaderCircle, Megaphone, Plus, RotateCcw, Search, Send, Underline, UserRound } from "lucide-react";
+import { AlignLeft, Archive, Bold, CalendarClock, ChevronLeft, ChevronRight, Flag, Italic, Link2, List, ListOrdered, LoaderCircle, Megaphone, Plus, RotateCcw, Search, Send, Underline, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { FormLabel } from "@/components/form-label";
 import { ModuleGuard } from "@/components/module-guard";
 import { announcementDisplayHtml, announcementPlainText } from "@/lib/announcement-content";
 import styles from "@/components/announcements-board.module.css";
@@ -245,9 +246,9 @@ export function AnnouncementsBoard() {
     {canPublish && editorOpen && <form id="announcement-editor" className={`panel ${styles.editor}`} onSubmit={publish}>
       <header><span className={styles.editorIcon}><Megaphone /></span><div><span className="eyebrow">Publicação oficial</span><h2>Novo comunicado</h2><p>O teu nome e cargo na Comissão de Curso serão associados automaticamente.</p></div></header>
       <div className={styles.formGrid}>
-        <label className={styles.titleField}><span>Título</span><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder="Ex.: Alteração do horário da aula prática" /></label>
-        <label><span>Prioridade</span><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">Informativo</option><option value="important">Importante</option><option value="urgent">Urgente</option></select></label>
-        <div className={styles.bodyField}><span>Conteúdo</span><div className={styles.richEditor}>
+        <label className={styles.titleField}><FormLabel icon={Megaphone}>Título</FormLabel><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder="Ex.: Alteração do horário da aula prática" /></label>
+        <label><FormLabel icon={Flag}>Prioridade</FormLabel><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">Informativo</option><option value="important">Importante</option><option value="urgent">Urgente</option></select></label>
+        <div className={styles.bodyField}><FormLabel icon={AlignLeft}>Conteúdo</FormLabel><div className={styles.richEditor}>
           <div className={styles.toolbar} role="toolbar" aria-label="Formatação do comunicado">
             <button type="button" onClick={() => format("bold")} aria-label="Negrito" title="Negrito"><Bold /></button>
             <button type="button" onClick={() => format("italic")} aria-label="Itálico" title="Itálico"><Italic /></button>
@@ -259,7 +260,7 @@ export function AnnouncementsBoard() {
           </div>
           <div ref={editorRef} className={styles.editable} contentEditable role="textbox" aria-label="Conteúdo" aria-multiline="true" data-placeholder="Escreve a mensagem completa…" onInput={event => setBody(event.currentTarget.innerHTML)} suppressContentEditableWarning />
         </div></div>
-        <label><span>Visível até <small>(opcional)</small></span><input type="datetime-local" value={expiresAt} min={minimumExpiry} onChange={event => setExpiresAt(event.target.value)} /></label>
+        <label><FormLabel icon={CalendarClock} optional>Visível até</FormLabel><input type="datetime-local" value={expiresAt} min={minimumExpiry} onChange={event => setExpiresAt(event.target.value)} /></label>
       </div>
       <footer><span>{bodyLength}/5000 caracteres</span><button className="button button--primary" type="submit" disabled={submitting || bodyLength > 5000}>{submitting ? <LoaderCircle className={styles.spinner} /> : <Send />}{submitting ? "A publicar…" : "Publicar comunicado"}</button></footer>
     </form>}
@@ -267,9 +268,9 @@ export function AnnouncementsBoard() {
     {!editorOpen && <section className={`panel ${styles.feed}`} aria-busy={loading}>
       <header className="panel__header"><div><h2>Comunicados recentes</h2><p>Ordenados do mais recente para o mais antigo.</p></div><span className={styles.count}>{hasFilters ? `${filteredAnnouncements.length} de ${announcements.length}` : filteredAnnouncements.length} {filteredAnnouncements.length === 1 ? "comunicado" : "comunicados"}</span></header>
       <div className={styles.filters} aria-label="Filtros dos comunicados">
-        <label className={styles.searchField}><span>Pesquisar</span><div><Search /><input type="search" value={searchQuery} onChange={event => { setSearchQuery(event.target.value); setPage(1); }} placeholder="Título, conteúdo, autor ou cargo" /></div></label>
-        <label><span>Prioridade</span><select value={priorityFilter} onChange={event => { setPriorityFilter(event.target.value as Priority | "all"); setPage(1); }}><option value="all">Todas</option><option value="urgent">Urgente</option><option value="important">Importante</option><option value="normal">Informativo</option></select></label>
-        <label><span>Autor</span><select value={authorFilter} onChange={event => { setAuthorFilter(event.target.value); setPage(1); }}><option value="all">Todos os autores</option>{authors.map(author => <option value={author} key={author}>{author}</option>)}</select></label>
+        <label className={styles.searchField}><FormLabel icon={Search}>Pesquisar</FormLabel><div><Search /><input type="search" value={searchQuery} onChange={event => { setSearchQuery(event.target.value); setPage(1); }} placeholder="Título, conteúdo, autor ou cargo" /></div></label>
+        <label><FormLabel icon={Flag}>Prioridade</FormLabel><select value={priorityFilter} onChange={event => { setPriorityFilter(event.target.value as Priority | "all"); setPage(1); }}><option value="all">Todas</option><option value="urgent">Urgente</option><option value="important">Importante</option><option value="normal">Informativo</option></select></label>
+        <label><FormLabel icon={UserRound}>Autor</FormLabel><select value={authorFilter} onChange={event => { setAuthorFilter(event.target.value); setPage(1); }}><option value="all">Todos os autores</option>{authors.map(author => <option value={author} key={author}>{author}</option>)}</select></label>
         <button className={styles.resetFilters} type="button" onClick={resetFilters} disabled={!hasFilters}><RotateCcw />Limpar filtros</button>
       </div>
       {loading ? <div className={styles.loading}><LoaderCircle className={styles.spinner} /><strong>A carregar comunicados…</strong></div> : announcements.length === 0 ? <div className={styles.empty}><Megaphone /><strong>Ainda não existem comunicados.</strong><span>Os avisos oficiais da Comissão de Curso aparecerão aqui.</span></div> : filteredAnnouncements.length === 0 ? <div className={styles.empty}><Search /><strong>Sem comunicados com estes filtros.</strong><span>Altera a pesquisa ou limpa os filtros para voltar a ver todos.</span><button className="button" type="button" onClick={resetFilters}><RotateCcw />Limpar filtros</button></div> : <>

@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, LoaderCircle, Pencil, Plus, Save, ShieldCheck, X } from "lucide-react";
+import { Award, BookOpen, CalendarRange, GraduationCap, Hash, LoaderCircle, Pencil, Plus, Save, ShieldCheck, UserRound, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
+import { FormLabel } from "@/components/form-label";
 import { useAuth } from "@/components/auth-context";
 import styles from "@/components/curricular-units-management.module.css";
 
@@ -188,7 +189,7 @@ export function CurricularUnitsManagement() {
     return <main className="auth-loading"><ShieldCheck size={28} /><strong>Acesso reservado ao Núcleo de Gestão.</strong></main>;
   }
 
-  return <AppShell active="curricular_units" breadcrumb="Unidades curriculares">
+  return <AppShell active="curricular_units_management" breadcrumb="Gerir unidades">
     <header className={styles.heading}>
       <div><span className="eyebrow">Núcleo de Gestão</span><h1>Unidades curriculares</h1><p>Regista as unidades curriculares, os respetivos créditos e o representante da Comissão de Curso.</p></div>
       <button className="button button--primary" type="button" onClick={() => { setShowCreate(true); setNotice(null); }} disabled={showCreate}><Plus />Adicionar unidade curricular</button>
@@ -230,12 +231,12 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
   const field = <Key extends keyof UnitForm>(key: Key, value: UnitForm[Key]) => setForm({ ...form, [key]: value });
   return <form className={styles.form} onSubmit={onSubmit} noValidate>
     <div className={styles.formGrid}>
-      <label className={styles.codeField}><span>Código</span><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder="Ex.: ANAT2" aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
-      <label className={styles.nameField}><span>Nome da unidade curricular</span><input value={form.name} onChange={event => field("name", event.target.value)} maxLength={160} placeholder="Ex.: Anatomia II" aria-invalid={Boolean(errors.name)} />{errors.name && <small>{errors.name}</small>}</label>
-      <label><span>Créditos ECTS</span><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
-      <label><span>Ano</span><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{year}.º ano</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
-      <label><span>Semestre</span><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>1.º semestre</option><option value={2}>2.º semestre</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
-      <label className={styles.representativeField}><span>Representante da Comissão de Curso</span><select value={form.representativeUserId} onChange={event => field("representativeUserId", event.target.value)} aria-invalid={Boolean(errors.representativeUserId)}><option value="">Selecionar representante…</option>{representatives.map(representative => <option value={representative.id} key={representative.id}>{representative.fullName} · {representative.email}</option>)}</select>{errors.representativeUserId && <small>{errors.representativeUserId}</small>}{!representatives.length && <small className={styles.hint}>Não existem membros da CC elegíveis. Atribui primeiro um cargo no controlo administrativo.</small>}</label>
+      <label className={styles.codeField}><FormLabel icon={Hash}>Código</FormLabel><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder="Ex.: ANAT2" aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
+      <label className={styles.nameField}><FormLabel icon={BookOpen}>Nome da unidade curricular</FormLabel><input value={form.name} onChange={event => field("name", event.target.value)} maxLength={160} placeholder="Ex.: Anatomia II" aria-invalid={Boolean(errors.name)} />{errors.name && <small>{errors.name}</small>}</label>
+      <label><FormLabel icon={Award}>Créditos ECTS</FormLabel><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
+      <label><FormLabel icon={GraduationCap}>Ano</FormLabel><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{year}.º ano</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
+      <label><FormLabel icon={CalendarRange}>Semestre</FormLabel><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>1.º semestre</option><option value={2}>2.º semestre</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
+      <label className={styles.representativeField}><FormLabel icon={UserRound}>Representante da Comissão de Curso</FormLabel><select value={form.representativeUserId} onChange={event => field("representativeUserId", event.target.value)} aria-invalid={Boolean(errors.representativeUserId)}><option value="">Selecionar representante…</option>{representatives.map(representative => <option value={representative.id} key={representative.id}>{representative.fullName} · {representative.email}</option>)}</select>{errors.representativeUserId && <small>{errors.representativeUserId}</small>}{!representatives.length && <small className={styles.hint}>Não existem membros da CC elegíveis. Atribui primeiro um cargo no controlo administrativo.</small>}</label>
     </div>
     <div className={styles.formActions}><button className="button button--secondary button--compact" type="button" onClick={onCancel} disabled={saving}>Cancelar</button><button className="button button--primary button--compact" type="submit" disabled={saving}>{saving ? <><LoaderCircle className={styles.spin} />A guardar…</> : <><Save />{submitLabel}</>}</button></div>
   </form>;

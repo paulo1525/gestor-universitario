@@ -109,3 +109,74 @@
   .sectionHead { align-items:stretch; flex-direction:column; }
   .sectionHead label { min-width:0; }
 }
+
+/* Base visual comum para páginas funcionais ainda assentes neste módulo legado. */
+.hero { align-items:flex-end; gap:0; margin-bottom:20px; padding:4px 2px; }
+.heroIcon { display:none; }
+.hero h1 { margin:5px 0 7px; font-size:clamp(27px,3vw,38px); }
+.hero p,.formHeading p,.sectionHead p { color:var(--muted); font-size:12px; line-height:1.6; }
+.panel { margin-bottom:18px; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); }
+.form { padding:20px 22px; }
+.formHeading { margin-bottom:16px; padding-bottom:16px; border-color:var(--line); }
+.formHeading h2,.sectionHead h2 { margin:0 0 4px; font-size:17px; letter-spacing:-.015em; }
+.formGrid { gap:14px; }
+.formGrid label,.manageRequest label { gap:7px; color:#535149; font-size:11px; font-weight:750; }
+.formGrid label > span,.manageRequest label > span { font-size:11px; }
+.formGrid input,.formGrid select,.formGrid textarea,.filterBar select,.sectionHead select,.manageRequest select,.manageRequest textarea {
+  min-height:42px;
+  padding:10px 12px;
+  border-color:var(--line);
+  border-radius:10px;
+  color:var(--ink);
+  background:var(--surface);
+  font-size:12px;
+}
+.formGrid input:focus,.formGrid select:focus,.formGrid textarea:focus,.filterBar select:focus,.sectionHead select:focus,.manageRequest select:focus,.manageRequest textarea:focus {
+  outline:none;
+  border-color:#c3a01e;
+  box-shadow:0 0 0 3px rgba(246,201,69,.2);
+}
+.formGrid small,.privacyOptions label small { color:var(--muted); font-size:10px; line-height:1.45; }
+.formActions { margin-top:16px; padding-top:16px; border-color:var(--line); }
+.formActions :global(.button),.cardActions :global(.button),.manageRequest :global(.button) { min-height:38px; font-size:11px; }
+.fileField { padding:14px; border-color:#c9c4b4; border-radius:12px; background:#faf9f4; }
+.filterBar,.sectionHead { padding:15px 18px; border-color:var(--line); background:#faf9f5; }
+.filterBar { gap:10px; }
+.filterBar > span { color:#49473f; font-size:11px; }
+.timeline { padding:2px 18px; }
+.timelineItem { grid-template-columns:58px minmax(0,1fr) auto; gap:14px; padding:18px 0; border-color:var(--line); }
+.timelineItem > time { padding:9px 4px; color:#6d5200; background:var(--gold-soft); border-radius:10px; }
+.timelineItem > time strong { font-size:20px; }
+.timelineItem > time span { font-size:9px; }
+.timelineItem h2,.fileCard h2 { font-size:15px; }
+.timelineItem p,.fileCard p,.requestCard > p,.answer p { color:#535149; font-size:12px; line-height:1.6; }
+.badge,.softBadge,.statusBadge { min-height:25px; padding:0 9px; font-size:9px; }
+.badge { color:#654f00; background:#fff0af; }
+.softBadge { color:#5e5c55; background:#f0f0ec; }
+.statusBadge { color:#256044; background:var(--green-soft); }
+.meta,.requestCard > small,.requestCard time { color:var(--muted); font-size:10px; }
+.iconDanger { width:38px; height:38px; border-radius:10px; }
+.loading,.empty { min-height:220px; padding:32px; color:var(--muted); font-size:12px; }
+.empty svg { color:#ad8700; }
+.empty strong { font-size:13px; }
+.cardGrid { gap:13px; padding:16px; background:#f8f8f5; }
+.fileCard { padding:18px; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 8px 24px rgba(36,34,25,.045); }
+.fileIcon { width:44px; height:44px; color:#715700; background:var(--gold-soft); border-radius:12px; }
+.fileCard small { color:var(--muted); font-size:10px; }
+.privacyOptions { gap:9px; }
+.privacyOptions legend { color:#535149; font-size:11px; }
+.privacyOptions label { gap:8px; padding:12px; border-color:var(--line); border-radius:12px; background:#fcfcfa; }
+.privacyOptions label.optionSelected { border-color:#c6a320; background:#fff9df; box-shadow:0 0 0 2px rgba(221,181,28,.1); }
+.privacyOptions svg { color:#876900; }
+.requestList { display:grid; gap:10px; padding:14px; background:#f8f8f5; }
+.requestCard { padding:18px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 8px 24px rgba(36,34,25,.045); }
+.requestCard h3 { font-size:15px; }
+.answer { border:1px solid #cfe5da; border-radius:12px; background:#f0f8f4; }
+.answer strong { font-size:11px; }
+.manageRequest { gap:11px; padding:14px; border:1px solid var(--line); border-radius:12px; background:#f8f7f2; }
+
+@media (max-width:760px) {
+  .hero { padding:4px 2px; }
+  .timelineItem { grid-template-columns:52px minmax(0,1fr); }
+  .form,.formGrid,.sectionHead,.filterBar { padding-inline:14px; }
+}

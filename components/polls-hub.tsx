@@ -3,19 +3,24 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlignLeft,
   BarChart3,
+  AlertTriangle,
   CalendarClock,
   Check,
   CheckCircle2,
   CircleDot,
   Clock3,
   Edit3,
+  Eye,
   LoaderCircle,
   LockKeyhole,
+  MessageSquareText,
   Plus,
   Search,
   Send,
   ShieldCheck,
+  Trash2,
   Users,
   Vote,
   X,
@@ -23,6 +28,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { FormLabel } from "@/components/form-label";
 import { ModuleGuard } from "@/components/module-guard";
 import styles from "@/components/polls-hub.module.css";
 
@@ -137,6 +143,8 @@ export function PollsHub() {
   const [form, setForm] = useState<PollForm>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [votingId, setVotingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Poll | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [choices, setChoices] = useState<Record<string, string[]>>({});
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -272,6 +280,24 @@ export function PollsHub() {
     }
   }
 
+  async function deletePoll() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const response = await fetch("/api/polls", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }) });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Não foi possível apagar o inquérito.");
+      if (editingId === deleteTarget.id) closeEditor();
+      setDeleteTarget(null);
+      setNotice({ kind: "success", message: "Inquérito apagado definitivamente." });
+      await load();
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível apagar o inquérito." });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="polls.voting">
@@ -286,11 +312,13 @@ export function PollsHub() {
                   <p>Vota nas decisões da comunidade com privacidade. A participação é validada, mas a resposta nunca fica ligada ao teu perfil.</p>
                 </div>
               </div>
-              <div className={styles.heroStats}>
-                <span><strong>{counts.active}</strong> em curso</span>
-                <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> participações</span>
+              <div className={styles.heroActions}>
+                <div className={styles.heroStats}>
+                  <span><strong>{counts.active}</strong> em curso</span>
+                  <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> participações</span>
+                </div>
+                {canManage && <button className={styles.createButton} type="button" onClick={openCreate}><Plus /> Novo inquérito</button>}
               </div>
-              {canManage && <button className={styles.primaryButton} type="button" onClick={openCreate}><Plus /> Novo inquérito</button>}
             </section>
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
@@ -307,8 +335,8 @@ export function PollsHub() {
                 </header>
                 <form className={styles.editorBody} onSubmit={save}>
                   <div className={styles.editorMain}>
-                    <label className={styles.field}><span>Pergunta</span><input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} maxLength={180} required placeholder="O que gostarias de perguntar?" /></label>
-                    <label className={styles.field}><span>Contexto <small>opcional</small></span><textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={3000} placeholder="Explica brevemente o objetivo desta votação…" /></label>
+                    <label className={styles.field}><FormLabel icon={MessageSquareText}>Pergunta</FormLabel><input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} maxLength={180} required placeholder="O que gostarias de perguntar?" /></label>
+                    <label className={styles.field}><FormLabel icon={AlignLeft} optional>Contexto</FormLabel><textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={3000} placeholder="Explica brevemente o objetivo desta votação…" /></label>
                     <div className={styles.optionsHeading}>
                       <div><strong>Opções de resposta</strong><small>{optionsLocked ? "Protegidas porque o inquérito já recebeu votos." : "Entre 2 e 20 opções diferentes."}</small></div>
                       {!optionsLocked && <button className={styles.textButton} type="button" onClick={() => setForm((current) => ({ ...current, options: [...current.options, ""] }))} disabled={form.options.length >= 20}><Plus /> Adicionar</button>}
@@ -320,9 +348,9 @@ export function PollsHub() {
                     </div>
                   </div>
                   <aside className={styles.editorAside}>
-                    {editor === "edit" && <label className={styles.field}><span>Estado</span><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PollForm["status"] }))}><option value="draft">Rascunho</option><option value="published">Publicado</option><option value="closed">Encerrado</option><option value="archived">Arquivado</option></select></label>}
-                    <label className={styles.field}><span>Termina em <small>opcional</small></span><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
-                    <label className={styles.field}><span>Mostrar resultados</span><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">Depois de votar</option><option value="always">Sempre</option><option value="after_close">Depois de encerrar</option><option value="cc">Só à Comissão de Curso</option></select></label>
+                    {editor === "edit" && <label className={styles.field}><FormLabel icon={CircleDot}>Estado</FormLabel><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PollForm["status"] }))}><option value="draft">Rascunho</option><option value="published">Publicado</option><option value="closed">Encerrado</option><option value="archived">Arquivado</option></select></label>}
+                    <label className={styles.field}><FormLabel icon={CalendarClock} optional>Termina em</FormLabel><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
+                    <label className={styles.field}><FormLabel icon={Eye}>Mostrar resultados</FormLabel><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">Depois de votar</option><option value="always">Sempre</option><option value="after_close">Depois de encerrar</option><option value="cc">Só à Comissão de Curso</option></select></label>
                     <div className={styles.privacyCard}><ShieldCheck /><div><strong>Votação anónima</strong><small>A identidade valida uma única participação, mas nunca é guardada junto da resposta.</small></div></div>
                     <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>Escolha múltipla</strong><small>Permite selecionar várias respostas.</small></span></label>
                     <div className={styles.editorActions}><button className={styles.secondaryButton} type="button" onClick={closeEditor}>Cancelar</button><button className={styles.primaryButton} type="submit" disabled={submitting}>{submitting ? <LoaderCircle className={styles.spin} /> : <Send />}{submitting ? "A guardar…" : editor === "edit" ? "Guardar alterações" : "Publicar"}</button></div>
@@ -350,7 +378,7 @@ export function PollsHub() {
                         <h2>{poll.title}</h2>
                         {poll.description && <p>{poll.description}</p>}
                       </div>
-                      {canManage && <button className={styles.editButton} type="button" onClick={() => openEdit(poll)}><Edit3 /> Editar</button>}
+                      {canManage && <div className={styles.pollActions}><button className={styles.editButton} type="button" onClick={() => openEdit(poll)}><Edit3 /> Editar</button><button className={styles.deleteButton} type="button" onClick={() => setDeleteTarget(poll)}><Trash2 /> Apagar</button></div>}
                     </header>
                     <div className={styles.optionList}>
                       {poll.options.map((option) => {
@@ -373,6 +401,8 @@ export function PollsHub() {
                 })}
               </div>}
             </section>
+
+            {deleteTarget && <div className={styles.confirmBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deleting) setDeleteTarget(null); }}><section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="delete-poll-title"><span className={styles.confirmIcon}><AlertTriangle /></span><div><span className={styles.eyebrow}>Eliminação definitiva</span><h2 id="delete-poll-title">Apagar “{deleteTarget.title}”?</h2><p>O inquérito, as opções, as participações anónimas e os resultados serão eliminados. Esta ação não pode ser anulada.</p></div><footer><button className={styles.secondaryButton} type="button" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancelar</button><button className={styles.dangerButton} type="button" disabled={deleting} onClick={() => void deletePoll()}>{deleting ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deleting ? "A apagar…" : "Apagar definitivamente"}</button></footer></section></div>}
           </main>
         </AppShell>
       </ModuleGuard>

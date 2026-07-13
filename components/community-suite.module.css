@@ -163,3 +163,29 @@ a.card:hover { border-color:#d0b444; box-shadow:0 10px 25px rgba(67,53,9,.07); t
 .result strong,.listItem strong { font-size:12px; }
 .result small,.listItem small { font-size:10px; }
 @media(max-width:500px){.heroCopy{flex-direction:row}}
+
+/* Tokens partilhados deixam este conjunto pronto para variações de tema. */
+.panel,.card,.poll,.material,.statCard,.listItem,.result { border-color:var(--line); background:var(--surface); }
+.toolbar { border-color:var(--line); background:#fafaf7; }
+.search,.select,.field input,.field textarea,.field select,.iconButton { border-color:var(--line); color:var(--ink); background:var(--surface); }
+.search { min-height:40px; }
+.search input { height:38px; }
+.select { min-height:40px; font-size:11px; }
+.search:focus-within,.field input:focus,.field textarea:focus,.field select:focus {
+  border-color:#c3a01e;
+  box-shadow:0 0 0 3px rgba(246,201,69,.2);
+}
+.count,.avatar,.unitCode,.listIcon,.statIcon,.resultType,.filePreview { color:#665000; background:var(--gold-soft); }
+.tag { color:#62500c; background:var(--gold-soft); }
+.tagNeutral { color:#55554e; background:#f0f0ed; }
+.option:has(input:checked) { border-color:#d2af2d; background:#fff9de; }
+.optionBar,.progressTrack span { background:var(--gold); }
+.checkField,.metric,.option,.dropzone { border-color:var(--line); background:#fafaf7; }
+.dropzone:hover,.result:hover { border-color:#b49421; background:#fffdf2; }
+.statusApproved { background:var(--green-soft); }
+.heroActions :global(.button),.formActions :global(.button),.moderation :global(.button) { min-height:38px; font-size:11px; }
+
+@media(max-width:760px){
+  .hero { padding:4px 2px; }
+  .toolbar,.panelHeader,.form { padding-inline:14px; }
+}
