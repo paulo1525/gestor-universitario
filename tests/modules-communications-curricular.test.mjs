@@ -64,7 +64,9 @@ test("comunicados lideram a navegação, têm editor isolado e um urgente global
   assert.match(announcementsUi, /contentEditable/);
   assert.match(announcementsUi, /!editorOpen && <section/);
   assert.doesNotMatch(announcementsUi, /Canal oficial da Comissão de Curso/);
-  assert.match(announcementContent, /script\|style\|iframe\|object\|embed/);
+  assert.match(announcementContent, /escapeHtmlText/);
+  assert.match(announcementContent, /allowedTags\.has\(tag\)/);
+  assert.match(announcementContent, /\[\^<\]\+\|</);
   assert.match(worker, /sanitizeAnnouncementHtml/);
 });
 

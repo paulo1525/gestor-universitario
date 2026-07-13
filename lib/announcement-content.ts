@@ -4,14 +4,18 @@ function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&(?!(?:amp|lt|gt|quot|#39|nbsp);)/gi, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function sanitizeAnnouncementHtml(value: string): string {
-  const safeSource = value
-    .replace(/<!--([\s\S]*?)-->/g, "")
-    .replace(/<(script|style|iframe|object|embed|svg|math)[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
-  const tokens = safeSource.match(/<[^>]*>|[^<]+/g) ?? [];
+  const tokens = value.match(/<[^>]*>|[^<]+|</g) ?? [];
 
   return tokens.map((token) => {
-    if (!token.startsWith("<")) return token;
+    if (!token.startsWith("<") || token === "<") return escapeHtmlText(token);
     const match = token.match(/^<\s*(\/?)\s*([a-z0-9]+)([^>]*)>/i);
     if (!match) return "";
     const closing = Boolean(match[1]);
@@ -33,11 +37,11 @@ export function announcementPlainText(value: string): string {
     .replace(/<\/(div|p|li)>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, "&")
     .replace(/\s+/g, " ")
     .trim();
 }
