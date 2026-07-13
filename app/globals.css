@@ -67,7 +67,7 @@ a { color: inherit; }
 .profile small { margin-top: 2px; color: #858585; font-size: 10px; }
 .avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: #111; background: var(--gold); font-size: 11px; font-weight: 800; }
 
-.workspace { height: 100dvh; min-height: 0; margin-left: 264px; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: auto; }
+.workspace { min-height: 100dvh; margin-left: 264px; overflow-x: clip; }
 .topbar { position: sticky; z-index: 40; top: 0; height: 66px; display: flex; align-items: center; gap: 18px; padding: 0 32px; overflow: visible; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .92); backdrop-filter: blur(12px); }
 .breadcrumbs { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .breadcrumbs strong { color: var(--ink); }
