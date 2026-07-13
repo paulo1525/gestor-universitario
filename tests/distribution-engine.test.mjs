@@ -27,22 +27,22 @@ function priorityWinner(seed,pointsA=0,pointsB=0){
 }
 
 test("maior pontuação vence uma vaga mesmo quando o sorteio favoreceria o outro estudante",()=>{
- const equal=priorityWinner("alpha");
- assert.equal(equal.winner.studentId,"candidate-b");
- const scored=priorityWinner("alpha",3,1);
+ const seed=Array.from({length:500},(_,index)=>`pontos-${index}`).find(value=>priorityWinner(value).winner.studentId==="candidate-b"&&priorityWinner(value,3,1).winner.studentId==="candidate-a");
+ assert.ok(seed,"Deve existir uma seed que favoreça o aluno com menos pontos num empate exato.");
+ const scored=priorityWinner(seed,3,1);
  assert.equal(scored.winner.studentId,"candidate-a");
  assert.equal(scored.winner.points,3);
  assert.equal(scored.result.find(row=>row.studentId==="candidate-b").destinationClass,3);
 });
 
 test("pontuações iguais usam a seed aleatória de forma reproduzível e auditável",()=>{
- const alpha=priorityWinner("alpha"),sameAlpha=priorityWinner("alpha"),gamma=priorityWinner("gamma");
- assert.equal(alpha.winner.studentId,"candidate-b");
- assert.equal(gamma.winner.studentId,"candidate-a");
- assert.deepEqual(alpha.result,sameAlpha.result);
- assert.notEqual(alpha.winner.studentId,gamma.winner.studentId);
- assert.equal(alpha.result.find(row=>row.studentId==="candidate-a").randomized,true);
- assert.equal(alpha.result.find(row=>row.studentId==="candidate-b").randomized,true);
+ const candidates=Array.from({length:500},(_,index)=>`empate-${index}`),firstSeed=candidates[0],first=priorityWinner(firstSeed),otherSeed=candidates.find(value=>priorityWinner(value).winner.studentId!==first.winner.studentId);
+ assert.ok(otherSeed,"Seeds diferentes devem conseguir desempatar a vaga para alunos diferentes.");
+ const sameFirst=priorityWinner(firstSeed),other=priorityWinner(otherSeed);
+ assert.deepEqual(first.result,sameFirst.result);
+ assert.notEqual(first.winner.studentId,other.winner.studentId);
+ assert.equal(first.result.find(row=>row.studentId==="candidate-a").randomized,true);
+ assert.equal(first.result.find(row=>row.studentId==="candidate-b").randomized,true);
 });
 
 test("uma distribuição inicialmente desequilibrada pode convergir para uma solução válida",()=>{

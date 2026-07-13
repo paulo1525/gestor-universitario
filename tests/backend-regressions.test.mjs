@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 
 const worker=readFileSync(new URL("../worker/index.ts",import.meta.url),"utf8");
+const activeDistributionMigration=readFileSync(new URL("../migrations/0019_single_active_distribution.sql",import.meta.url),"utf8");
 
 function section(start,end){
  const from=worker.indexOf(start),to=worker.indexOf(end,from+start.length);
@@ -27,9 +28,10 @@ test("tickets desativados não são criados nem bloqueiam o verificador",()=>{
 
 test("preferências só mudam fora de uma distribuição ativa e invalidam propostas antigas",()=>{
  assert.match(ownDestinations,/student\.status==="published"/);
- assert.match(ownDestinations,/status IN \('applied','published'\)/);
+ assert.match(ownDestinations,/status='published' OR \(status='applied' AND published_at IS NULL\)/);
  assert.match(ownDestinations,/status IN \('draft','approved'\)/);
- assert.match(proposals,/if\(action==="calculate"\).*status IN \('applied','published'\)/s);
+ assert.match(proposals,/if\(action==="calculate"\).*status='published' OR \(status='applied' AND published_at IS NULL\)/s);
+ assert.match(proposals,/status='applied' AND published_at IS NOT NULL/);
 });
 
 test("a funcionalidade nominal de colegas foi removida das APIs",()=>{
@@ -45,7 +47,7 @@ test("editor administrativo limpa preferências e pontos ao manter e valida turm
  assert.match(placements,/activeClasses:classes\.results\.map\(row=>row\.id\)/);
  assert.match(placements,/const activeClasses=new Set/);
  assert.match(placements,/destinations\.some\(value=>!activeClasses\.has\(value\)\)/);
- assert.match(placements,/status IN \('applied','published'\)/);
+ assert.match(placements,/status='published' OR \(status='applied' AND published_at IS NULL\)/);
 });
 
 test("formulário do estudante grava uma decisão explícita e nunca conserva destinos ao ficar",()=>{
@@ -92,4 +94,52 @@ test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálc
 test("informação adicional pode ser revista sem atribuir pontos",()=>{
  assert.match(placements,/reviewed=Boolean\(validationTypes\.length\|\|reviewStatus\)/);
  assert.match(placements,/reviewed\?now:null,reviewed\?actorId:null/);
+});
+
+test("override aceita snapshots atuais e legacy, preserva a origem e remove sorteio manual",()=>{
+ assert.match(proposals,/classes\?:Array<\{id:number\}>;classIds\?:number\[\]/);
+ assert.match(proposals,/parsedInput\.classIds\?\.length\?parsedInput\.classIds:\(parsedInput\.classes\|\|\[\]\)/);
+ assert.match(proposals,/result\.randomized=false/);
+ assert.match(proposals,/previous_class=distribution_manual_overrides\.previous_class/);
+});
+
+test("aprovação e aplicação são idempotentes e validam o snapshot integral",()=>{
+ assert.match(proposals,/alreadyApproved:true/);
+ assert.match(proposals,/WHERE id=\? AND status='draft'/);
+ assert.match(proposals,/results\.length!==current\.students\.length/);
+ assert.match(proposals,/resultIds\.size!==results\.length/);
+ assert.match(proposals,/status IN \('applied','published'\) AND invalidated_at IS NULL/);
+ assert.match(proposals,/WHERE id=\? AND status='approved'/);
+ assert.match(proposals,/alreadyApplied:true/);
+ assert.ok(proposals.indexOf('if(action==="apply"&&proposal.status==="applied")')<proposals.indexOf("const current=await distributionInputs"));
+ assert.match(proposals,/typeof result\.manualReview!=="boolean"/);
+ assert.match(proposals,/EXISTS \(SELECT 1 FROM distribution_proposals WHERE id=\? AND status='approved' AND invalidated_at IS NULL\)/);
+ assert.match(proposals,/WHERE id=\? AND status='approved' AND invalidated_at IS NULL/);
+});
+
+test("revisões manuais só podem ser fechadas no rascunho",()=>{
+ assert.match(proposals,/if\(action==="review"\)\{if\(proposal\.status!=="draft"\)/);
+});
+
+test("uma nova revisão após despublicar só conserva preferências melhores do que a turma atual",()=>{
+ assert.match(distributionCheck,/function destinationsPreferredToCurrent/);
+ assert.match(distributionCheck,/currentIndex>=0\?destinations\.slice\(0,currentIndex\)/);
+ assert.match(distributionCheck,/destinationsPreferredToCurrent\(destinationsById\.get\(student\.id\)\|\|\[\],student\.class_id\)/);
+ assert.match(distributionInputs,/preferredDestinations=row\.student_decision==="move"\?destinationsPreferredToCurrent/);
+ assert.match(distributionInputs,/row\.student_decision==="move"&&preferredDestinations\.length\?"move"/);
+});
+
+test("a D1 impede duas distribuições ativas em concorrência",()=>{
+ assert.match(activeDistributionMigration,/CREATE UNIQUE INDEX idx_distribution_single_active/);
+ assert.match(activeDistributionMigration,/invalidated_at IS NULL/);
+ assert.match(activeDistributionMigration,/status IN \('applied', 'published'\)/);
+});
+
+test("correções de pautas publicadas preservam IDs canónicos e rejeitam snapshots inválidos",()=>{
+ assert.match(classes,/pauta publicada tem um snapshot inválido/);
+ assert.match(classes,/knownStudents\.results\.find\(previous=>previous\.student_number===student\.studentNumber\)\?\.id/);
+ assert.match(classes,/new Set\(publishedResults\.map\(result=>result\.studentId\)\)\.size!==publishedResults\.length/);
+ assert.match(classes,/UPDATE distribution_proposals SET result_snapshot=\? WHERE id=\? AND status='published' AND result_snapshot=\?/);
+ assert.match(classes,/classTransitionIndex=writes\.length/);
+ assert.match(classes,/A pauta foi alterada por outro administrador/);
 });
