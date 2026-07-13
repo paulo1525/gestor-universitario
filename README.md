@@ -238,6 +238,7 @@ Esta opção permite desenvolver rapidamente, manter tipagem de ponta a ponta e 
 - todos os alunos submetidos têm nome completo e número mecanográfico válido e único;
 - todos os alunos marcados como «prefere ficar» permanecem bloqueados na turma atual;
 - só os alunos marcados como «prefere mudar» participam no cálculo de permutações;
+- as vagas são atribuídas primeiro pela posição da preferência, depois pela maior pontuação dentro da mesma posição e, apenas em empate exato, por uma seed reproduzível e auditável;
 - nenhuma turma termina fora dos limites aprovados;
 - um aluno sem permutação válida mantém a turma atual;
 - o resultado pode ser reproduzido e auditado;
