@@ -39,6 +39,7 @@ function runWrangler(args) {
 runWrangler(["d1", "migrations", "apply", database, "--local"]);
 
 const users = [
+  ["local-primary-admin", "up202507850@up.pt", "Administrador Principal Local", "admin", 0, null],
   ["local-admin", "up202500001@up.pt", "Administrador Local", "admin", 1, null],
   ["local-student-user", "up202500100@up.pt", "Ana Almeida", "student", 0, null],
   ...chaosStudents.map((student) => [student.userId, `up${student.studentNumber}@up.pt`, student.fullName, "student", 0, null]),
@@ -54,6 +55,19 @@ const users = [
 
 const statements = [
   "PRAGMA foreign_keys = OFF",
+  "DELETE FROM poll_votes",
+  "DELETE FROM poll_participations",
+  "DELETE FROM poll_options",
+  "DELETE FROM poll_questions",
+  "DELETE FROM polls",
+  "DELETE FROM material_submissions",
+  "DELETE FROM course_requests",
+  "DELETE FROM academic_documents",
+  "DELETE FROM academic_events",
+  "DELETE FROM announcement_curricular_units",
+  "DELETE FROM announcements",
+  "DELETE FROM curricular_units",
+  "UPDATE app_module_settings SET enabled=1,updated_by=NULL,updated_at=" + now,
   "DELETE FROM student_destinations",
   "DELETE FROM distribution_proposals",
   "DELETE FROM class_drafts",
@@ -75,6 +89,19 @@ const statements = [
 for (const [id, email, name, role, adminOverride, representedClass] of users) {
   statements.push(`INSERT INTO users (id,email,full_name,password_hash,password_salt,password_iterations,role,email_verified_at,password_changed_at,status,created_at,updated_at,admin_override,class_representative,represented_class,font_scale,commission_position,commission_department) VALUES (${sql(id)},${sql(email)},${sql(name)},${sql(passwordHash)},${sql(salt)},${iterations},${sql(role)},${now},${now},'active',${now},${now},${adminOverride},${representedClass ? 1 : 0},${representedClass ?? "NULL"},'normal',${role === "admin" ? "'principal_admin'" : "NULL"},${role === "admin" ? "'management'" : "NULL"})`);
 }
+statements.push(`INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at) VALUES ('local-announcement','Bem-vindos ao ambiente local','Este aviso urgente contém apenas informação fictícia para validar o destaque global dos comunicados.','urgent','published','local-primary-admin','Administrador Principal Local','principal_admin','Administrador Principal',${now},NULL,${now},${now})`);
+statements.push(`INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES ('local-unit-anat2','ANAT2','Anatomia II',7.5,2,1,'local-primary-admin',1,'local-primary-admin','local-primary-admin',${now},${now})`);
+statements.push(`INSERT INTO announcement_curricular_units (announcement_id,curricular_unit_id) VALUES ('local-announcement','local-unit-anat2')`);
+statements.push(`INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,visibility,status,created_by,updated_by,created_at,updated_at) VALUES ('local-event-anat2','Frequência de Anatomia II','Evento fictício para validar o calendário e a área da unidade curricular.','assessment','local-unit-anat2',${now + 86400000},${now + 93600000},'Sala de testes','students','scheduled','local-primary-admin','local-primary-admin',${now},${now})`);
+statements.push(`INSERT INTO academic_documents (id,title,description,document_type,curricular_unit_id,content,visibility,status,published_at,created_by,updated_by,created_at,updated_at) VALUES ('local-document-minutes','Ata fictícia da Comissão','Documento de teste sem dados reais.','minutes','local-unit-anat2','Conteúdo exclusivamente fictício para o ambiente local.','students','published',${now},'local-primary-admin','local-primary-admin',${now},${now})`);
+statements.push(`INSERT INTO course_requests (id,subject,body,category,curricular_unit_id,anonymous,submitted_by,status,response,response_visibility,responded_by,responded_at,created_at,updated_at) VALUES ('local-request-anonymous','Sugestão anónima de teste','Mensagem fictícia para validar o fluxo anónimo de pedidos.','suggestion','local-unit-anat2',1,'local-student-user','reviewing',NULL,NULL,NULL,NULL,${now},${now})`);
+statements.push(`INSERT INTO course_requests (id,subject,body,category,curricular_unit_id,anonymous,submitted_by,status,response,response_visibility,responded_by,responded_at,created_at,updated_at) VALUES ('local-request-identified','Pedido identificado de teste','Mensagem fictícia com resposta pública.','academic','local-unit-anat2',0,'local-student-user','resolved','Resposta fictícia da Comissão de Curso.','public','local-primary-admin',${now},${now - 60000},${now})`);
+statements.push(`INSERT INTO polls (id,title,description,status,results_visibility,starts_at,ends_at,created_by,created_at,updated_at) VALUES ('local-poll','Qual o melhor horário para a sessão de esclarecimento?','Inquérito totalmente fictício.','published','after_vote',${now - 60000},${now + 604800000},'local-primary-admin',${now},${now})`);
+statements.push(`INSERT INTO poll_questions (id,poll_id,prompt,selection_type,required,sort_order) VALUES ('local-poll-question','local-poll','Escolhe um horário','single',1,0)`);
+statements.push(`INSERT INTO poll_options (id,question_id,label,sort_order) VALUES ('local-poll-morning','local-poll-question','Manhã',0)`);
+statements.push(`INSERT INTO poll_options (id,question_id,label,sort_order) VALUES ('local-poll-afternoon','local-poll-question','Tarde',1)`);
+statements.push(`INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,moderation_note,moderated_by,moderated_at,created_at,updated_at) VALUES ('local-material-published','Resumo fictício de Anatomia II','Material vazio usado apenas para validar a biblioteca.','summary','local-unit-anat2','2025/2026',1,'local-student-user','resumo-teste.txt','text/plain','data:text/plain;base64,VGVzdGU=','published','Conteúdo fictício aprovado.','local-primary-admin',${now},${now},${now})`);
+statements.push(`INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES ('local-material-pending','Fotografia de exame fictícia','Submissão pendente para validar a moderação.','exam_photo','local-unit-anat2','2025/2026',1,'local-student-user','exame-teste.txt','text/plain','data:text/plain;base64,VGVzdGU=','pending',${now},${now})`);
 statements.push("UPDATE classes SET status='submitted',submitted_at=" + now + ",submitted_by='local-admin',workflow_step=3,updated_at=" + now);
 statements.push("DELETE FROM classes WHERE id>5");
 statements.push(`INSERT INTO app_settings (key,value,updated_at,updated_by) VALUES ('classes_open_at','2026-01-01T00:00:00.000Z',${now},'local-admin') ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by`);
@@ -136,6 +163,7 @@ writeFileSync(join(root, ".dev.vars"), [
 
 console.log("\nAmbiente local pronto em http://127.0.0.1:3000");
 console.log(`Administrador: up202500001@up.pt / ${password}`);
+console.log(`Administrador principal (módulos): up202507850@up.pt / ${password}`);
 console.log(`Representantes: up202500011@up.pt a up202500015@up.pt / ${password}`);
 console.log(`Estudante: up202500100@up.pt / ${password}`);
 console.log("Dados: 5 turmas, 14 estudantes fictícios por turma, incluindo 20 Pessoas Caos.");

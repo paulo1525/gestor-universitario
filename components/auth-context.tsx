@@ -6,7 +6,7 @@ import {installTestApi,TEST_PERSONAS,testModeEnabled,testPersona} from "@/lib/te
 installTestApi();
 
 export type FontScale = "small" | "normal" | "large";
-export type AuthUser = { email: string; fullName: string; role: "student" | "representative" | "admin"; fontScale: FontScale; classRepresentative?:boolean; representedClass?:number|null; commissionDepartment?:string|null;preview?:boolean;testMode?:boolean };
+export type AuthUser = { email: string; fullName: string; role: "student" | "representative" | "admin"; fontScale: FontScale; classRepresentative?:boolean; representedClass?:number|null; commissionDepartment?:string|null; commissionPosition?:string|null; commissionPositionLabel?:string|null;preview?:boolean;testMode?:boolean };
 type AuthState = { user: AuthUser | null; loading: boolean; refresh: () => Promise<void>; logout: () => Promise<void>; setFontScale: (fontScale: FontScale) => Promise<void> };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -15,7 +15,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const applyFontScale = useCallback((fontScale: FontScale) => { document.documentElement.dataset.fontScale = fontScale; }, []);
-  const withTestPersona=useCallback((real:AuthUser|null)=>{if(!real||!testModeEnabled())return real;const persona=TEST_PERSONAS.find(item=>item.id===testPersona())||TEST_PERSONAS[0];return {email:persona.email,fullName:persona.name,role:persona.role,fontScale:real.fontScale,classRepresentative:false,representedClass:null,testMode:true} satisfies AuthUser},[]);
+  const withTestPersona=useCallback((real:AuthUser|null)=>{if(!real||!testModeEnabled())return real;const persona=TEST_PERSONAS.find(item=>item.id===testPersona())||TEST_PERSONAS[0],isAdmin=persona.role==="admin";return {email:persona.email,fullName:persona.name,role:persona.role,fontScale:real.fontScale,classRepresentative:false,representedClass:null,commissionDepartment:isAdmin?"management":null,commissionPosition:isAdmin?"principal_admin":null,commissionPositionLabel:isAdmin?"Administrador Principal":null,testMode:true} satisfies AuthUser},[]);
 
   const refresh = useCallback(async () => {
     try {
