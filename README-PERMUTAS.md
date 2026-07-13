@@ -79,7 +79,7 @@ São bloqueadores atuais:
 - pedido de alteração pendente.
 - situação excecional ainda não avaliada pelo Núcleo.
 
-Referências que deixaram de permanecer na turma indicada aparecem como aviso e não atribuem pontos. A revisão e edição das colocações decorrem na secção administrativa própria **Colocações**, com grelha, filtros, overrides justificados e controlo das fases de cálculo, aprovação, aplicação e publicação.
+A revisão e edição das colocações decorrem na secção administrativa própria **Colocações**, com grelha, filtros, alterações justificadas e controlo das fases de cálculo, aprovação, aplicação e publicação. A pontuação usada no cálculo vem apenas dos critérios validados pela administração.
 
 O verificador apresenta avisos sobre distribuição atual, mas um aviso não autoriza automaticamente movimentos.
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { History, Search, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 
 type Action = { id: string | number; action: string; details: string | null; created_at: number; actor_name: string; class_id: number | null };
@@ -43,7 +44,7 @@ export function AuditHistory() {
     <section className="page-heading"><div><span className="eyebrow">Auditoria</span><h1>Histórico de ações</h1><p>Submissões, decisões e alterações administrativas ficam registadas.</p></div></section>
     <section className="panel audit-panel">
       <div className="panel__header"><div><h2>Ações recentes</h2><p>Até 200 registos, ordenados do mais recente para o mais antigo.</p></div><label className="search-field audit-search"><Search size={16} /><input placeholder="Pesquisar ação ou utilizador" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label></div>
-      {error && <p className="admin-notice">{error}</p>}
+      {error && <AppToast key={error} kind="error" message={error} onDismiss={() => setError("")} />}
       <div className="audit-list">
         {pagedActions.map(action => <article className="audit-row" key={`${action.class_id || "admin"}-${action.id}`}>
           <div className="audit-row__action"><span className="audit-row__icon"><History size={17} /></span><div><strong>{labels[action.action] || action.action}</strong><small>{action.actor_name}</small></div></div>

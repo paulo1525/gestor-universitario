@@ -105,21 +105,14 @@ const chaosDestinations = {
 };
 for (const student of chaosStudents) {
   const destinations = chaosDestinations[student.classId];
-  const considerations = ["with_person"];
+  const considerations = [];
   if (student.slot === 1) considerations.push("integration_bullying");
-  if (student.slot === 2) considerations.push("other_exception");
-  const sensitive = considerations.includes("integration_bullying") || considerations.includes("other_exception");
+  if (student.slot === 2) considerations.push("other");
+  const sensitive = considerations.includes("integration_bullying") || considerations.includes("other");
   const notes = sensitive ? `Situação fictícia para testar revisão manual da Pessoa Caos ${student.classId}.${student.slot}.` : "";
-  const supportClass = student.slot === 3 ? destinations[1] : null;
-  statements.push(`INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at,student_decision,decision_at,notes,considerations,support_class,friend_group_code,manual_review,distribution_result) VALUES (${sql(student.id)},${student.classId},${sql(student.fullName)},${sql(student.studentNumber)},'move',${now},${sql(`local-rep-${student.classId}`)},${now},${now},'move',${now},${sql(notes)},${sql(JSON.stringify(considerations))},${supportClass ?? "NULL"},${sql(`CAOS-${student.slot}`)},${sensitive ? 1 : 0},'pending')`);
+  statements.push(`INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at,student_decision,decision_at,notes,considerations,manual_review,distribution_result) VALUES (${sql(student.id)},${student.classId},${sql(student.fullName)},${sql(student.studentNumber)},'move',${now},${sql(`local-rep-${student.classId}`)},${now},${now},'move',${now},${sql(notes)},${sql(JSON.stringify(considerations))},${sensitive ? 1 : 0},'pending')`);
   destinations.forEach((destination, rank) => {
     statements.push(`INSERT INTO student_destinations (student_id,destination_class,rank,updated_by,updated_at) VALUES (${sql(student.id)},${destination},${rank + 1},${sql(`local-chaos-user-${student.classId}-${student.slot}`)},${now})`);
-  });
-}
-for (const [index, student] of chaosStudents.entries()) {
-  const friends = [chaosStudents[(index + 4) % chaosStudents.length], chaosStudents[(index + 8) % chaosStudents.length]];
-  friends.forEach((friend, rank) => {
-    statements.push(`INSERT INTO student_friend_preferences (student_id,friend_student_id,destination_class,rank,updated_at) VALUES (${sql(student.id)},${sql(friend.id)},${friend.classId},${rank + 1},${now})`);
   });
 }
 statements.push(`INSERT INTO class_tickets (id,class_id,category,description,status,response,created_by,resolved_by,created_at,updated_at,request_type,request_payload,decided_at,executed_at,execution_result) VALUES ('local-ticket-resolved-correction',1,'correct_student','Corrigir o nome de um estudante fictício.','executed','Pedido fictício resolvido no seed local.','local-rep-1','local-admin',${now},${now},'other','{}',${now},${now},'Pedido fictício resolvido no seed local.')`);

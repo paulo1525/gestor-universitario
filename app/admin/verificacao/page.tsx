@@ -1,1 +1,3 @@
-import {DistributionCheck} from "@/components/distribution-check";export default function Page(){return <DistributionCheck/>}
+import {redirect} from "next/navigation";
+
+export default function Page(){redirect("/admin/colocacoes")}

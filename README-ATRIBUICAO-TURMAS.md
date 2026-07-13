@@ -54,17 +54,15 @@ Bullying, discriminação, exclusão, dificuldade grave de integração, outras 
 - `moved`: foi colocado noutra turma;
 - `fallback`: queria mudar, mas permaneceu na origem;
 - `manualReview`: requer análise humana;
-- `supportMatched`: ficou na turma da rede de apoio;
-- `friendMatched`: ficou numa turma associada a um colega indicado;
-- `randomized`: participou num desempate/cadeia resolvida pela semente.
+- `randomized`: o resultado dependeu de um empate exato resolvido pela semente.
 
 ## Fluxo administrativo
 
 1. Os representantes preenchem e submetem as turmas dentro do respetivo prazo.
 2. Depois desse prazo, os estudantes registam decisões e preferências na janela própria.
-3. O verificador bloqueia o cálculo se existirem turmas por submeter, preferências inválidas ou pedidos pendentes.
+3. O verificador bloqueia o cálculo se existirem turmas por submeter, preferências inválidas ou informação adicional por classificar.
 4. Um administrador calcula a proposta e revê equilíbrios e casos manuais.
 5. A proposta é aprovada e aplicada, ou descartada e recalculada.
-6. Se necessário, uma aplicação é revertida para restaurar as turmas de origem guardadas no instantâneo.
+6. Se necessário, a publicação das pautas é retirada do ar sem desfazer as colocações já aplicadas.
 
 O ficheiro Excel administrativo exporta decisões, destinos, colegas, situações selecionadas, notas, revisão manual e resultado da distribuição.

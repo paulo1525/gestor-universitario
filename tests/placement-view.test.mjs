@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {matchesPlacementFilters,placementOutcome} from "../lib/placement-view.mjs";
+import {matchesPlacementFilters,placementOrigin,placementOutcome} from "../lib/placement-view.mjs";
 
 const student=(patch={})=>({full_name:"Ana Martins",student_number:"202600001",class_id:1,student_decision:"stay",notes:null,exception_points:0,exception_reviewed_at:null,additional_info_validation:null,...patch});
 const empty={query:"",origin:"",destination:"",decision:"",result:"",validation:"",points:"",assignment:""};
@@ -24,4 +24,22 @@ test("múltiplos filtros acumulam por turma, decisão, resultado, validação, p
  assert.equal(matchesPlacementFilters(row,filters),true);
  assert.equal(matchesPlacementFilters(row,{...filters,destination:"4"}),false);
  assert.equal(matchesPlacementFilters(row,{...filters,decision:"stay"}),false);
+});
+
+test("mantém a origem e o resultado corretos depois de aplicar a proposta",()=>{
+ const appliedStudent=student({class_id:3,student_decision:"move"});
+ const move={originClass:1,destinationClass:3,rank:1,status:"moved"};
+ const row={student:appliedStudent,move,destinations:[2,3]};
+ assert.equal(placementOrigin(appliedStudent,move),1);
+ assert.deepEqual(placementOutcome(appliedStudent,move),{key:"first",tone:"green",destinationClass:3,label:"Turma 3 · 1.ª preferência"});
+ assert.equal(matchesPlacementFilters(row,{...empty,origin:"1"}),true);
+ assert.equal(matchesPlacementFilters(row,{...empty,origin:"3"}),false);
+ assert.equal(matchesPlacementFilters(row,{...empty,query:"turma 1"}),true);
+});
+
+test("mudança manual fora das preferências não é apresentada como permanência",()=>{
+ const moved=student({student_decision:"move"}),move={originClass:1,destinationClass:4,rank:null,status:"moved",manualOverride:true};
+ const row={student:moved,move,destinations:[2,3]};
+ assert.deepEqual(placementOutcome(moved,move),{key:"manual",tone:"orange",destinationClass:4,label:"Turma 4 · Mudança manual"});
+ assert.equal(matchesPlacementFilters(row,{...empty,result:"manual",assignment:"manual"}),true);
 });
