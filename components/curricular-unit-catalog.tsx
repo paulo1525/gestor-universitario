@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/community-suite.module.css";
 
 type ApiUnit = {
@@ -74,7 +75,7 @@ type Detail = {
     type?: never;
   }>;
 };
-function unit(item: ApiUnit): Unit {
+function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string): Unit {
   const representative = item.representative;
   const name =
     representative?.fullName ??
@@ -84,7 +85,7 @@ function unit(item: ApiUnit): Unit {
   return {
     id: String(item.id),
     code: item.code ?? "UC",
-    name: item.name ?? "Unidade curricular",
+    name: item.name ?? defaultUnit,
     description: item.description ?? "",
     ects: Number(item.ects ?? item.credits ?? 0),
     year: Number(item.year ?? item.studyYear ?? item.study_year ?? 1),
@@ -100,12 +101,12 @@ function unit(item: ApiUnit): Unit {
           position:
             representative?.position ??
             representative?.commissionPositionLabel ??
-            "Representante da CC",
+            defaultRepresentative,
         }
       : null,
   };
 }
-async function readUnits() {
+async function readUnits(defaultUnit: string, defaultRepresentative: string, loadError: string) {
   let response = await fetch("/api/curricular-units", { cache: "no-store" });
   if (response.status === 404 || response.status === 405)
     response = await fetch("/api/admin/curricular-units", {
@@ -114,12 +115,12 @@ async function readUnits() {
   const data = (await response.json()) as { units?: ApiUnit[]; error?: string };
   if (!response.ok)
     throw new Error(
-      data.error || "Não foi possível carregar as unidades curriculares.",
+      data.error || loadError,
     );
-  return (data.units ?? []).map(unit);
+  return (data.units ?? []).map((item) => unit(item, defaultUnit, defaultRepresentative));
 }
-function date(value: string) {
-  return new Intl.DateTimeFormat("pt-PT", {
+function date(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "Europe/Lisbon",
@@ -127,6 +128,7 @@ function date(value: string) {
 }
 
 export function CurricularUnitCatalog() {
+  const { locale, t } = useI18n();
   const [units, setUnits] = useState<Unit[]>([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -136,35 +138,35 @@ export function CurricularUnitCatalog() {
     setLoading(true);
     setError("");
     try {
-      setUnits(await readUnits());
+      setUnits(await readUnits(t("community.common.curricularUnit"), t("community.units.representative"), t("community.units.loadError")));
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Não foi possível carregar as unidades curriculares.",
+          : t("community.units.loadError"),
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
   useEffect(() => {
     void load();
   }, [load]);
   const visible = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("pt-PT");
+    const term = query.trim().toLocaleLowerCase(locale);
     return units.filter(
       (item) =>
         (year === "all" || item.year === Number(year)) &&
         (!term ||
           `${item.code} ${item.name} ${item.representative?.name ?? ""}`
-            .toLocaleLowerCase("pt-PT")
+            .toLocaleLowerCase(locale)
             .includes(term)),
     );
-  }, [units, query, year]);
+  }, [locale, units, query, year]);
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="curricular_units.catalog">
-        <AppShell active="curricular_units" breadcrumb="Unidades curriculares">
+        <AppShell active="curricular_units" breadcrumb={t("community.units.breadcrumb")}>
           <div className={styles.page}>
             <header className={styles.hero}>
               <div className={styles.heroCopy}>
@@ -172,13 +174,9 @@ export function CurricularUnitCatalog() {
                   <BookOpen />
                 </span>
                 <div>
-                  <span className="eyebrow">Plano curricular</span>
-                  <h1>Unidades curriculares</h1>
-                  <p>
-                    Explora o plano de estudos, os representantes da Comissão de
-                    Curso e toda a informação relevante de cada unidade
-                    curricular.
-                  </p>
+                  <span className="eyebrow">{t("community.units.eyebrow")}</span>
+                  <h1>{t("community.units.title")}</h1>
+                  <p>{t("community.units.description")}</p>
                 </div>
               </div>
             </header>
@@ -193,37 +191,37 @@ export function CurricularUnitCatalog() {
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div>
-                  <h2>Catálogo do curso</h2>
-                  <p>Organizado por ano e semestre.</p>
+                  <h2>{t("community.units.catalog")}</h2>
+                  <p>{t("community.units.organized")}</p>
                 </div>
                 {!loading && (
                   <span className={styles.count}>
                     {visible.length}{" "}
-                    {visible.length === 1 ? "unidade" : "unidades"}
+                    {visible.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}
                   </span>
                 )}
               </div>
               <div className={styles.toolbar}>
                 <label className={styles.search}>
                   <Search />
-                  <span className="sr-only">Pesquisar unidade curricular</span>
+                  <span className="sr-only">{t("community.units.search")}</span>
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Pesquisar por nome, código ou representante…"
+                    placeholder={t("community.units.searchPlaceholder")}
                   />
                 </label>
                 <label>
-                  <span className="sr-only">Filtrar por ano</span>
+                  <span className="sr-only">{t("community.units.filterYear")}</span>
                   <select
                     className={styles.select}
                     value={year}
                     onChange={(event) => setYear(event.target.value)}
                   >
-                    <option value="all">Todos os anos</option>
+                    <option value="all">{t("community.units.allYears")}</option>
                     {[1, 2, 3, 4, 5, 6].map((value) => (
                       <option value={value} key={value}>
-                        {value}.º ano
+                        {t("community.units.yearOption", { year: value })}
                       </option>
                     ))}
                   </select>
@@ -232,12 +230,12 @@ export function CurricularUnitCatalog() {
               {loading ? (
                 <div className={styles.state}>
                   <LoaderCircle className={styles.spin} />
-                  <strong>A carregar plano curricular…</strong>
+                  <strong>{t("community.units.loading")}</strong>
                 </div>
               ) : visible.length === 0 ? (
                 <div className={styles.state}>
                   <Search />
-                  <strong>Não encontrámos unidades curriculares.</strong>
+                  <strong>{t("community.units.empty")}</strong>
                 </div>
               ) : (
                 <div className={styles.grid}>
@@ -250,7 +248,7 @@ export function CurricularUnitCatalog() {
                       <div className={styles.cardTop}>
                         <span className={styles.unitCode}>{item.code}</span>
                         <span className={styles.tag}>
-                          {item.year}.º ano · {item.semester}.º semestre
+                          {t("community.units.yearSemester", { year: item.year, semester: item.semester })}
                         </span>
                       </div>
                       <div>
@@ -259,17 +257,17 @@ export function CurricularUnitCatalog() {
                       </div>
                       <div className={styles.metrics}>
                         <div className={styles.metric}>
-                          <span>Créditos</span>
+                          <span>{t("community.units.credits")}</span>
                           <strong>
-                            {item.ects.toLocaleString("pt-PT")} ECTS
+                            {item.ects.toLocaleString(locale)} ECTS
                           </strong>
                         </div>
                         <div className={styles.metric}>
-                          <span>Ano</span>
+                          <span>{t("community.units.year")}</span>
                           <strong>{item.year}.º</strong>
                         </div>
                         <div className={styles.metric}>
-                          <span>Semestre</span>
+                          <span>{t("community.units.semester")}</span>
                           <strong>{item.semester}.º</strong>
                         </div>
                       </div>
@@ -277,11 +275,11 @@ export function CurricularUnitCatalog() {
                         <UserRound />
                         <span>
                           {item.representative?.name ??
-                            "Representante por atribuir"}
+                            t("community.units.unassignedRepresentative")}
                         </span>
                       </div>
                       <span className={styles.linkHint}>
-                        Ver área da unidade curricular <ArrowRight />
+                        {t("community.units.openArea")} <ArrowRight />
                       </span>
                     </Link>
                   ))}
@@ -296,6 +294,7 @@ export function CurricularUnitCatalog() {
 }
 
 export function CurricularUnitDetail({ id }: { id: string }) {
+  const { locale, t } = useI18n();
   const [data, setData] = useState<Detail | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
@@ -348,10 +347,10 @@ export function CurricularUnitDetail({ id }: { id: string }) {
       };
       if (!response.ok || !raw.unit)
         throw new Error(
-          raw.error || "Não foi possível carregar esta unidade curricular.",
+          raw.error || t("community.units.detailLoadError"),
         );
       setData({
-        unit: unit(raw.unit),
+        unit: unit(raw.unit, t("community.common.curricularUnit"), t("community.units.representative")),
         announcements: (raw.announcements ?? []).map((item) => ({
           id: String(item.id),
           title: item.title,
@@ -376,12 +375,12 @@ export function CurricularUnitDetail({ id }: { id: string }) {
           category:
             item.category ??
             (item.type === "exam_photo"
-              ? "Exame"
+              ? t("community.units.material.exam")
               : item.type === "summary"
-                ? "Resumo"
+                ? t("community.units.material.summary")
                 : item.type === "notes"
-                  ? "Sebenta ou apontamentos"
-                  : "Material"),
+                  ? t("community.units.material.notes")
+                  : t("community.units.material.other")),
           url: item.url ?? item.attachmentDataUrl,
         })),
       });
@@ -389,12 +388,12 @@ export function CurricularUnitDetail({ id }: { id: string }) {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Não foi possível carregar esta unidade curricular.",
+          : t("community.units.detailLoadError"),
       );
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -403,7 +402,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
       <ModuleGuard moduleKey="curricular_units.detail">
         <AppShell
           active="curricular_units"
-          breadcrumb={data?.unit.name ?? "Unidade curricular"}
+          breadcrumb={data?.unit.name ?? t("community.common.curricularUnit")}
         >
           <div className={styles.page}>
             {error && (
@@ -418,7 +417,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
               <section className={styles.panel}>
                 <div className={styles.state}>
                   <LoaderCircle className={styles.spin} />
-                  <strong>A preparar a área da unidade curricular…</strong>
+                  <strong>{t("community.units.detailLoading")}</strong>
                 </div>
               </section>
             ) : (
@@ -430,20 +429,20 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       <h1>{data.unit.name}</h1>
                       <p>
                         {data.unit.description ||
-                          "Informação, recursos e acompanhamento da Comissão de Curso para esta unidade curricular."}
+                          t("community.units.detailDescription")}
                       </p>
                     </div>
                     <div className={styles.detailStats}>
                       <div className={styles.metric}>
-                        <span>Créditos</span>
+                        <span>{t("community.units.credits")}</span>
                         <strong>{data.unit.ects} ECTS</strong>
                       </div>
                       <div className={styles.metric}>
-                        <span>Ano</span>
+                        <span>{t("community.units.year")}</span>
                         <strong>{data.unit.year}.º</strong>
                       </div>
                       <div className={styles.metric}>
-                        <span>Semestre</span>
+                        <span>{t("community.units.semester")}</span>
                         <strong>{data.unit.semester}.º</strong>
                       </div>
                     </div>
@@ -451,9 +450,9 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                   <div className={styles.columns}>
                     <div className={styles.page}>
                       <DetailSection
-                        title="Próximos momentos"
-                        description="Avaliações, entregas e eventos desta unidade."
-                        empty="Ainda não existem datas associadas."
+                        title={t("community.units.upcoming")}
+                        description={t("community.units.upcomingDescription")}
+                        empty={t("community.units.upcomingEmpty")}
                       >
                         {data.events.map((item) => (
                           <div className={styles.listItem} key={item.id}>
@@ -463,7 +462,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                             <span>
                               <strong>{item.title}</strong>
                               <small>
-                                {date(item.startsAt)}
+                                {date(item.startsAt, locale)}
                                 {item.kind ? ` · ${item.kind}` : ""}
                               </small>
                             </span>
@@ -471,9 +470,9 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                         ))}
                       </DetailSection>
                       <DetailSection
-                        title="Avisos da unidade"
-                        description="Comunicados relacionados com esta cadeira."
-                        empty="Ainda não existem avisos associados."
+                        title={t("community.units.notices")}
+                        description={t("community.units.noticesDescription")}
+                        empty={t("community.units.noticesEmpty")}
                       >
                         {data.announcements.map((item) => (
                           <div className={styles.listItem} key={item.id}>
@@ -482,9 +481,9 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                             </span>
                             <span>
                               <strong>{item.title}</strong>
-                              <small>{date(item.publishedAt)}</small>
+                              <small>{date(item.publishedAt, locale)}</small>
                             </span>
-                            <Link href="/avisos">Consultar</Link>
+                            <Link href="/avisos">{t("community.units.consult")}</Link>
                           </div>
                         ))}
                       </DetailSection>
@@ -493,8 +492,8 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       <section className={styles.panel}>
                         <div className={styles.panelHeader}>
                           <div>
-                            <h2>Representante da CC</h2>
-                            <p>Acompanhamento desta unidade curricular.</p>
+                            <h2>{t("community.units.representative")}</h2>
+                            <p>{t("community.units.representativeDescription")}</p>
                           </div>
                         </div>
                         <div className={styles.sectionBody}>
@@ -523,15 +522,15 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                           ) : (
                             <div className={styles.state}>
                               <GraduationCap />
-                              <strong>Representante por atribuir.</strong>
+                              <strong>{t("community.units.unassignedRepresentative")}</strong>
                             </div>
                           )}
                         </div>
                       </section>
                       <DetailSection
-                        title="Documentos e materiais"
-                        description="Recursos associados à unidade."
-                        empty="Ainda não existem recursos disponíveis."
+                        title={t("community.units.documents")}
+                        description={t("community.units.documentsDescription")}
+                        empty={t("community.units.documentsEmpty")}
                       >
                         {[...data.documents, ...data.materials].map((item) => (
                           <div className={styles.listItem} key={item.id}>
@@ -550,7 +549,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                                 target="_blank"
                                 rel="noreferrer"
                               >
-                                Abrir
+                                {t("community.units.open")}
                               </a>
                             )}
                           </div>

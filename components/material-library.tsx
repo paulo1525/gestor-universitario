@@ -28,8 +28,11 @@ import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
 import { FileUploadField, MultiFileUploadField, SelectedUpload } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
+import { useI18n } from "@/components/i18n-context";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { personDisplay } from "@/lib/person-display";
+import { PersonName } from "@/components/person-name";
 import styles from "@/components/material-library.module.css";
 
 type Status = "pending" | "approved" | "rejected" | "archived";
@@ -44,6 +47,9 @@ type ApiMaterial = {
   anonymous?: boolean;
   authorName?: string;
   author_name?: string;
+  authorId?: string;
+  authorEmail?: string;
+  authorStudentNumber?: string;
   fileName?: string;
   file_name?: string;
   fileType?: string;
@@ -73,6 +79,9 @@ type Material = {
   status: Status;
   anonymous: boolean;
   authorName: string;
+  authorId: string;
+  authorEmail: string;
+  authorStudentNumber: string;
   fileName: string;
   fileType: string;
   fileUrl: string;
@@ -82,29 +91,28 @@ type Material = {
 };
 type Unit = { id: string; code: string; name: string };
 type Notice = { kind: ToastKind; message: string } | null;
-const categoryLabels: Record<Category, string> = {
-  exam: "Exame ou frequência",
-  summary: "Resumo",
-  notes: "Sebenta ou apontamentos",
-  other: "Outro material",
-};
-categoryLabels.exam = "Fotos de exame/frequ\u00eancia";
+const categoryLabelKeys = {
+  exam: "community.materials.category.exam",
+  summary: "community.materials.category.summary",
+  notes: "community.materials.category.notes",
+  other: "community.materials.category.other",
+} as const;
 const categoryToType: Record<
   Category,
   "exam_photo" | "summary" | "notes" | "other"
 > = { exam: "exam_photo", summary: "summary", notes: "notes", other: "other" };
-const statusLabels: Record<Status, string> = {
-  pending: "Em moderação",
-  approved: "Publicado",
-  rejected: "Recusado",
-  archived: "Analisado pela CC",
-};
+const statusLabelKeys = {
+  pending: "community.materials.status.pending",
+  approved: "community.materials.status.approved",
+  rejected: "community.materials.status.rejected",
+  archived: "community.materials.status.archived",
+} as const;
 const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_SIZE = 5 * 1024 * 1024;
 const allowedPhotos = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PHOTOS = 8;
 const MAX_PHOTO_TOTAL_SIZE = 24 * 1024 * 1024;
-function normalize(item: ApiMaterial): Material {
+function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: string, unitLabel: string): Material {
   const nested = item.unit ?? item.curricularUnit;
   const unit =
     nested ??
@@ -136,8 +144,11 @@ function normalize(item: ApiMaterial): Material {
       : item.status === "published" ? "approved" : (item.status ?? "pending"),
     anonymous: item.anonymous ?? false,
     authorName: item.anonymous
-      ? "Partilha anónima"
-      : (item.authorName ?? item.author_name ?? "Estudante"),
+      ? anonymousLabel
+      : (item.authorName ?? item.author_name ?? studentLabel),
+    authorId: item.authorId ?? "",
+    authorEmail: item.authorEmail ?? "",
+    authorStudentNumber: item.authorStudentNumber ?? "",
     fileName:
       item.attachmentName ?? item.fileName ?? item.file_name ?? "ficheiro",
     fileType:
@@ -158,21 +169,21 @@ function normalize(item: ApiMaterial): Material {
       ? {
           id: String(unit.id),
           code: unit.code ?? "UC",
-          name: unit.name ?? "Unidade curricular",
+          name: unit.name ?? unitLabel,
         }
       : null,
   };
 }
-function date(value: string) {
-  return new Intl.DateTimeFormat("pt-PT", {
+function date(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeZone: "Europe/Lisbon",
   }).format(new Date(value));
 }
-function size(value: number) {
+function size(value: number, locale: string) {
   return value < 1024 * 1024
     ? `${Math.round(value / 1024)} KB`
-    : `${(value / 1024 / 1024).toLocaleString("pt-PT", { maximumFractionDigits: 1 })} MB`;
+    : `${(value / 1024 / 1024).toLocaleString(locale, { maximumFractionDigits: 1 })} MB`;
 }
 function readFileDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -184,6 +195,7 @@ function readFileDataUrl(file: File) {
 }
 export function MaterialLibrary() {
   const { user } = useAuth();
+  const { locale, t } = useI18n();
   const [materials, setMaterials] = useState<Material[]>([]),
     [units, setUnits] = useState<Unit[]>([]),
     [canModerate, setCanModerate] = useState(false),
@@ -220,11 +232,11 @@ export function MaterialLibrary() {
       };
       if (!materialResponse.ok)
         throw new Error(
-          materialData.error || "Não foi possível carregar os materiais.",
+          materialData.error || t("community.materials.loadError"),
         );
       setMaterials(
         (materialData.materials ?? materialData.submissions ?? []).map(
-          normalize,
+          (item) => normalize(item, t("community.materials.anonymousShare"), t("community.materials.student"), t("community.common.curricularUnit")),
         ),
       );
       setCanModerate(
@@ -237,7 +249,7 @@ export function MaterialLibrary() {
         (materialData.units ?? []).map((item) => ({
           id: String(item.id),
           code: item.code ?? "UC",
-          name: item.name ?? "Unidade curricular",
+          name: item.name ?? t("community.common.curricularUnit"),
         })),
       );
     } catch (reason) {
@@ -246,12 +258,12 @@ export function MaterialLibrary() {
         message:
           reason instanceof Error
             ? reason.message
-            : "Não foi possível carregar os materiais.",
+            : t("community.materials.loadError"),
       });
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [t, user]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -266,7 +278,7 @@ export function MaterialLibrary() {
     if (!allowed.includes(selected.type)) {
       setNotice({
         kind: "warning",
-        message: "Seleciona uma imagem JPG, PNG, WebP ou um ficheiro PDF.",
+        message: t("community.materials.fileTypeError"),
       });
       event.target.value = "";
       return;
@@ -274,7 +286,7 @@ export function MaterialLibrary() {
     if (selected.size > MAX_SIZE) {
       setNotice({
         kind: "warning",
-        message: "O ficheiro não pode ultrapassar 5 MB.",
+        message: t("community.materials.fileSizeError"),
       });
       event.target.value = "";
       return;
@@ -286,7 +298,7 @@ export function MaterialLibrary() {
     } catch {
       setNotice({
         kind: "error",
-        message: "Não foi possível ler o ficheiro selecionado.",
+        message: t("community.materials.fileReadError"),
       });
     }
   };
@@ -294,23 +306,23 @@ export function MaterialLibrary() {
     const selected = Array.from(event.target.files ?? []);
     if (!selected.length) return;
     if (examFiles.length + selected.length > MAX_PHOTOS) {
-      setNotice({ kind: "warning", message: `Podes enviar no m\u00e1ximo ${MAX_PHOTOS} fotografias por submiss\u00e3o.` });
+      setNotice({ kind: "warning", message: t("community.materials.photoCountError", { count: MAX_PHOTOS }) });
       event.target.value = "";
       return;
     }
     if (selected.some((item) => !allowedPhotos.includes(item.type))) {
-      setNotice({ kind: "warning", message: "As fotos de exame devem estar em formato JPG, PNG ou WebP." });
+      setNotice({ kind: "warning", message: t("community.materials.photoTypeError") });
       event.target.value = "";
       return;
     }
     if (selected.some((item) => item.size > MAX_SIZE)) {
-      setNotice({ kind: "warning", message: "Cada fotografia pode ter no m\u00e1ximo 5 MB." });
+      setNotice({ kind: "warning", message: t("community.materials.photoSizeError") });
       event.target.value = "";
       return;
     }
     const total = [...examFiles.map((item) => item.file), ...selected].reduce((sum, item) => sum + item.size, 0);
     if (total > MAX_PHOTO_TOTAL_SIZE) {
-      setNotice({ kind: "warning", message: "O conjunto de fotografias pode ter no m\u00e1ximo 24 MB." });
+      setNotice({ kind: "warning", message: t("community.materials.photoTotalError") });
       event.target.value = "";
       return;
     }
@@ -321,7 +333,7 @@ export function MaterialLibrary() {
       }));
       setExamFiles((current) => [...current, ...encoded]);
     } catch {
-      setNotice({ kind: "error", message: "N\u00e3o foi poss\u00edvel ler uma das fotografias selecionadas." });
+      setNotice({ kind: "error", message: t("community.materials.photoReadError") });
     } finally {
       event.target.value = "";
     }
@@ -346,12 +358,12 @@ export function MaterialLibrary() {
       setNotice({
         kind: "warning",
         message:
-          "Indica um título e seleciona o ficheiro que queres partilhar.",
+          t("community.materials.requiredError"),
       });
       return;
     }
     if (descriptionLength > 1200) {
-      setNotice({ kind: "warning", message: "A descri\u00e7\u00e3o n\u00e3o pode ultrapassar 1200 caracteres." });
+      setNotice({ kind: "warning", message: t("community.materials.descriptionError") });
       return;
     }
     setSaving(true);
@@ -372,11 +384,11 @@ export function MaterialLibrary() {
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok)
-        throw new Error(data.error || "Não foi possível enviar o material.");
+        throw new Error(data.error || t("community.materials.sendError"));
       reset();
       setNotice({
         kind: "success",
-        message: "Material enviado para moderação.",
+        message: t("community.materials.sent"),
       });
       await load();
     } catch (reason) {
@@ -385,7 +397,7 @@ export function MaterialLibrary() {
         message:
           reason instanceof Error
             ? reason.message
-            : "Não foi possível enviar o material.",
+            : t("community.materials.sendError"),
       });
     } finally {
       setSaving(false);
@@ -404,13 +416,13 @@ export function MaterialLibrary() {
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok)
-        throw new Error(data.error || "Não foi possível moderar o material.");
+        throw new Error(data.error || t("community.materials.moderateError"));
       setNotice({
         kind: "success",
         message:
           status === "approved"
-            ? "Material aprovado e publicado."
-            : status === "archived" ? "Fotografias analisadas e arquivadas pela CC." : "Material recusado.",
+            ? t("community.materials.approved")
+            : status === "archived" ? t("community.materials.archived") : t("community.materials.rejected"),
       });
       await load();
     } catch (reason) {
@@ -419,7 +431,7 @@ export function MaterialLibrary() {
         message:
           reason instanceof Error
             ? reason.message
-            : "Não foi possível moderar o material.",
+            : t("community.materials.moderateError"),
       });
     } finally {
       setModerating(null);
@@ -428,7 +440,7 @@ export function MaterialLibrary() {
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="materials.library">
-        <AppShell active="materials" breadcrumb="Materiais">
+        <AppShell active="materials" breadcrumb={t("community.materials.breadcrumb")}>
           <div className={styles.page}>
             <header className={styles.hero}>
               <div className={styles.heroCopy}>
@@ -436,13 +448,9 @@ export function MaterialLibrary() {
                   <FolderOpen />
                 </span>
                 <div>
-                  <span className="eyebrow">Partilha entre estudantes</span>
-                  <h1>Materiais académicos</h1>
-                  <p>
-                    Partilha fotografias de exames, resumos, sebentas e outros
-                    recursos úteis. Podes identificar-te ou manter a partilha
-                    anónima.
-                  </p>
+                  <span className="eyebrow">{t("community.materials.eyebrow")}</span>
+                  <h1>{t("community.materials.title")}</h1>
+                  <p>{t("community.materials.description")}</p>
                 </div>
               </div>
               <div className={styles.heroActions}>
@@ -452,7 +460,7 @@ export function MaterialLibrary() {
                   onClick={() => setEditor((value) => !value)}
                 >
                   {editor ? <X /> : <Upload />}
-                  {editor ? "Fechar formulário" : "Partilhar material"}
+                  {editor ? t("community.materials.closeForm") : t("community.materials.share")}
                 </button>
               </div>
             </header>
@@ -467,37 +475,34 @@ export function MaterialLibrary() {
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <h2>Novo material</h2>
-                    <p>
-                      Todos os envios são verificados pela Comissão de Curso
-                      antes de serem publicados.
-                    </p>
+                    <h2>{t("community.materials.new")}</h2>
+                    <p>{t("community.materials.moderationInfo")}</p>
                   </div>
                 </div>
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formGrid}>
                     <label className={styles.field}>
-                      <span>Título</span>
+                      <span>{t("community.materials.field.title")}</span>
                       <input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         maxLength={180}
-                        placeholder="Ex.: Frequência de Anatomia II — 2025"
+                        placeholder={t("community.materials.titlePlaceholder")}
                         required
                       />
                     </label>
                     <label className={styles.field}>
-                      <span>Tipo de material</span>
+                      <span>{t("community.materials.field.type")}</span>
                       <select
                         value={category}
                         onChange={(event) =>
                           setCategory(event.target.value as Category)
                         }
                       >
-                        {Object.entries(categoryLabels).map(
-                          ([value, label]) => (
+                        {Object.entries(categoryLabelKeys).map(
+                          ([value, key]) => (
                             <option value={value} key={value}>
-                              {label}
+                              {t(key)}
                             </option>
                           ),
                         )}
@@ -505,13 +510,13 @@ export function MaterialLibrary() {
                     </label>
                     <label className={styles.field}>
                       <span>
-                        Unidade curricular <small>(opcional)</small>
+                        {t("community.materials.field.unit")} <small>({t("community.common.optional")})</small>
                       </span>
                       <select
                         value={unitId}
                         onChange={(event) => setUnitId(event.target.value)}
                       >
-                        <option value="">Sem unidade específica</option>
+                        <option value="">{t("community.materials.noUnit")}</option>
                         {units.map((item) => (
                           <option value={item.id} key={item.id}>
                             {item.code} · {item.name}
@@ -521,16 +526,16 @@ export function MaterialLibrary() {
                     </label>
                     <div className={`${styles.field} ${styles.fieldFull}`}>
                       <span>
-                        Descrição <small>(opcional)</small>
+                        {t("community.materials.field.description")} <small>({t("community.common.optional")})</small>
                       </span>
                       <RichTextEditor
                         value={description}
                         onChange={setDescription}
-                        ariaLabel="Descrição do material"
+                        ariaLabel={t("community.materials.descriptionAria")}
                         maxLength={1200}
                         minHeight="compact"
-                        placeholder="Contextualiza o ficheiro, ano letivo ou conteúdo…"
-                        onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por https://." })}
+                        placeholder={t("community.materials.descriptionPlaceholder")}
+                        onInvalidLink={() => setNotice({ kind: "warning", message: t("community.materials.invalidLink") })}
                       />
                     </div>
                   </div>
@@ -540,7 +545,7 @@ export function MaterialLibrary() {
                       {file.type.startsWith("image/") ? (
                         <img
                           src={fileData}
-                          alt="Pré-visualização do ficheiro"
+                          alt={t("community.materials.filePreview")}
                         />
                       ) : (
                         <span className={styles.filePreview}>
@@ -550,7 +555,7 @@ export function MaterialLibrary() {
                       <span>
                         <strong>{file.name}</strong>
                         <small>
-                          {file.type} · {size(file.size)}
+                          {file.type} · {size(file.size, locale)}
                         </small>
                       </span>
                       <button
@@ -560,7 +565,7 @@ export function MaterialLibrary() {
                           setFile(null);
                           setFileData("");
                         }}
-                        aria-label="Remover ficheiro"
+                        aria-label={t("community.materials.removeFile")}
                       >
                         <X />
                       </button>
@@ -574,31 +579,31 @@ export function MaterialLibrary() {
                         disabled
                       />
                       <Upload />
-                      <strong>Selecionar fotografia ou PDF</strong>
-                      <small>JPG, PNG, WebP ou PDF · máximo de 5 MB</small>
+                      <strong>{t("community.materials.fileEmpty")}</strong>
+                      <small>{t("community.materials.fileHelp")}</small>
                     </label>
                   )}
                   </div>
                   {category === "exam" ? <>
                     <div className={styles.privateNotice} role="note">
                       <ShieldCheck />
-                      <span><strong>{"Envio privado para a Comiss\u00e3o de Curso"}</strong><small>Estas fotografias nunca aparecem na biblioteca. Servem apenas para a CC preparar e publicar posteriormente um PDF final.</small></span>
+                      <span><strong>{t("community.materials.privateTitle")}</strong><small>{t("community.materials.privateNotice")}</small></span>
                     </div>
                     <MultiFileUploadField
                       accept="image/jpeg,image/png,image/webp"
-                      emptyLabel={"Selecionar fotografias do exame ou frequ\u00eancia"}
+                      emptyLabel={t("community.materials.selectExamPhotos")}
                       files={examFiles}
-                      help={`JPG, PNG ou WebP. At\u00e9 ${MAX_PHOTOS} fotos, 5 MB por foto e 24 MB no total.`}
-                      label="Fotografias privadas"
+                      help={t("community.materials.photoHelp", { count: MAX_PHOTOS })}
+                      label={t("community.materials.privatePhotos")}
                       maxFiles={MAX_PHOTOS}
                       onChange={(event) => void pickExamPhotos(event)}
                       onRemove={(index) => setExamFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
                     />
                   </> : <FileUploadField
                       accept="image/jpeg,image/png,image/webp,application/pdf"
-                      emptyLabel="Fotografia ou documento PDF"
+                      emptyLabel={t("community.materials.fileEmpty")}
                       file={file}
-                      help="JPG, PNG, WebP ou PDF. Tamanho maximo: 5 MB."
+                      help={t("community.materials.fileHelp")}
                       onChange={(event) => void pick(event)}
                       onRemove={() => { setFile(null); setFileData(""); }}
                       previewUrl={fileData}
@@ -610,12 +615,8 @@ export function MaterialLibrary() {
                       onChange={(event) => setAnonymous(event.target.checked)}
                     />
                     <span>
-                      <strong>Enviar anonimamente</strong>
-                      <small>
-                        O teu nome não será apresentado no material nem aos
-                        restantes estudantes. A equipa de moderação mantém
-                        apenas os dados técnicos necessários à segurança.
-                      </small>
+                      <strong>{t("community.materials.anonymous")}</strong>
+                      <small>{t("community.materials.anonymousHint")}</small>
                     </span>
                   </label>
                   <div className={styles.formActions}>
@@ -624,7 +625,7 @@ export function MaterialLibrary() {
                       type="button"
                       onClick={reset}
                     >
-                      Cancelar
+                      {t("community.common.cancel")}
                     </button>
                     <button
                       className="button button--primary"
@@ -636,7 +637,7 @@ export function MaterialLibrary() {
                       ) : (
                         <Send />
                       )}
-                      {saving ? "A enviar…" : "Enviar para moderação"}
+                      {saving ? t("community.materials.sending") : t("community.materials.send")}
                     </button>
                   </div>
                 </form>
@@ -647,34 +648,34 @@ export function MaterialLibrary() {
                 <div>
                   <h2>
                     {canModerate
-                      ? "Biblioteca e moderação"
-                      : "Biblioteca de materiais"}
+                      ? t("community.materials.libraryModeration")
+                      : t("community.materials.library")}
                   </h2>
                   <p>
                     {canModerate
-                      ? "Os materiais pendentes aparecem primeiro para validação."
-                      : "Recursos aprovados e disponibilizados à comunidade."}
+                      ? t("community.materials.pendingFirst")
+                      : t("community.materials.approvedCommunity")}
                   </p>
                 </div>
                 {!loading && (
                   <span className={styles.count}>
                     {visible.length}{" "}
-                    {visible.length === 1 ? "material" : "materiais"}
+                    {visible.length === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}
                   </span>
                 )}
               </div>
               <div className={styles.toolbar}>
                 <label>
-                  <span className="sr-only">Filtrar por tipo</span>
+                  <span className="sr-only">{t("community.materials.filter")}</span>
                   <select
                     className={styles.select}
                     value={filter}
                     onChange={(event) => setFilter(event.target.value)}
                   >
-                    <option value="all">Todos os materiais</option>
-                    {Object.entries(categoryLabels).filter(([value]) => canModerate || value !== "exam").map(([value, label]) => (
+                    <option value="all">{t("community.materials.all")}</option>
+                    {Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => (
                       <option value={value} key={value}>
-                        {label}
+                        {t(key)}
                       </option>
                     ))}
                   </select>
@@ -683,17 +684,17 @@ export function MaterialLibrary() {
               {loading ? (
                 <div className={styles.state}>
                   <LoaderCircle className={styles.spin} />
-                  <strong>A carregar materiais…</strong>
+                  <strong>{t("community.materials.loading")}</strong>
                 </div>
               ) : visible.length === 0 ? (
                 <div className={styles.state}>
                   <FolderOpen />
-                  <strong>Ainda não existem materiais nesta categoria.</strong>
-                  <p>Podes ser a primeira pessoa a contribuir.</p>
+                  <strong>{t("community.materials.empty")}</strong>
+                  <p>{t("community.materials.emptyHint")}</p>
                 </div>
               ) : (
                 <div className={styles.materialGrid}>
-                  {visible.map((item) => (
+                  {visible.map((item) => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale }); return (
                     <article className={styles.material} key={item.id}>
                       <div className={styles.materialThumb}>
                         {item.fileType.startsWith("image/") && item.fileUrl ? (
@@ -705,12 +706,12 @@ export function MaterialLibrary() {
                       <div className={styles.materialBody}>
                         <div className={styles.cardTop}>
                           <span className={styles.tag}>
-                            {categoryLabels[item.category]}
+                            {t(categoryLabelKeys[item.category])}
                           </span>
                           <span
                             className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : item.status === "archived" ? styles.statusArchived : styles.statusPending}`}
                           >
-                            {statusLabels[item.status]}
+                            {t(statusLabelKeys[item.status])}
                           </span>
                         </div>
                         <div>
@@ -725,7 +726,7 @@ export function MaterialLibrary() {
                         <div className={styles.meta}>
                           <span className={styles.metaRow}>
                             {item.anonymous ? <ShieldCheck /> : <ImageIcon />}
-                            <span>{item.authorName}</span>
+                              <PersonName person={author} />
                           </span>
                           <span className={styles.metaRow}>
                             <FileText />
@@ -734,8 +735,8 @@ export function MaterialLibrary() {
                         </div>
                         {canModerate && item.category === "exam" && item.attachments.length > 0 && (
                           <div className={styles.photoDownloads}>
-                            <strong>{item.attachments.length} {item.attachments.length === 1 ? "fotografia privada" : "fotografias privadas"}</strong>
-                            <div>{item.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download />Foto {index + 1}<small>{attachment.name}</small></a>)}</div>
+                            <strong>{item.attachments.length} {item.attachments.length === 1 ? t("community.materials.photo") : t("community.materials.photoPlural")}</strong>
+                            <div>{item.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download />{t("community.materials.photoNumber", { number: index + 1 })}<small>{attachment.name}</small></a>)}</div>
                           </div>
                         )}
                         {canModerate && item.status === "pending" ? (
@@ -751,7 +752,7 @@ export function MaterialLibrary() {
                               ) : (
                                 <Check />
                               )}
-                              {item.category === "exam" ? "Concluir an\u00e1lise" : "Aprovar"}
+                              {item.category === "exam" ? t("community.materials.finishReview") : t("community.materials.approve")}
                             </button>
                             <button
                               className="button button--danger button--compact"
@@ -760,7 +761,7 @@ export function MaterialLibrary() {
                               disabled={moderating === item.id}
                             >
                               <X />
-                              Recusar
+                              {t("community.materials.reject")}
                             </button>
                           </div>
                         ) : (
@@ -774,17 +775,17 @@ export function MaterialLibrary() {
                               rel="noreferrer"
                             >
                               <Download />
-                              Abrir material
+                              {t("community.materials.open")}
                             </a>
                           )
                         )}
                         <footer className={styles.materialFooter}>
-                          <span>{date(item.createdAt)}</span>
-                          <span>{item.unit?.name ?? "Geral"}</span>
+                          <span>{date(item.createdAt, locale)}</span>
+                          <span>{item.unit?.name ?? t("community.common.general")}</span>
                         </footer>
                       </div>
                     </article>
-                  ))}
+                  ); })}
                 </div>
               )}
             </section>

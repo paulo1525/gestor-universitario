@@ -25,6 +25,7 @@ import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
 import { ModuleGuard } from "@/components/module-guard";
+import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/academic-calendar.module.css";
 
@@ -49,15 +50,9 @@ type EventForm = { title: string; description: string; type: string; startsAt: s
 
 const emptyEventForm: EventForm = { title: "", description: "", type: "assessment", startsAt: "", endsAt: "", location: "", unitId: "" };
 
-const eventLabels: Record<string, string> = {
-  assessment: "Avaliação",
-  exam: "Exame",
-  deadline: "Entrega",
-  academic: "Evento académico",
-  meeting: "Reunião",
-};
+const eventLabelKeys = { assessment: "community.calendar.type.assessment", exam: "community.calendar.type.exam", deadline: "community.calendar.type.deadline", academic: "community.calendar.type.academic", meeting: "community.calendar.type.meeting" } as const;
 
-const weekDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const weekDayKeys = ["community.calendar.week.mon", "community.calendar.week.tue", "community.calendar.week.wed", "community.calendar.week.thu", "community.calendar.week.fri", "community.calendar.week.sat", "community.calendar.week.sun"] as const;
 
 function value(source: Record<string, unknown>, ...keys: string[]) {
   for (const key of keys) if (source[key] != null) return source[key];
@@ -68,11 +63,11 @@ function dateInput(raw: unknown): DateInput {
   return typeof raw === "number" ? raw : String(raw || "");
 }
 
-function normaliseEvent(raw: Record<string, unknown>): CalendarEvent {
+function normaliseEvent(raw: Record<string, unknown>, fallbackTitle: string): CalendarEvent {
   const unit = (raw.unit && typeof raw.unit === "object" ? raw.unit : {}) as Record<string, unknown>;
   return {
     id: String(value(raw, "id") || ""),
-    title: String(value(raw, "title", "name") || "Evento"),
+    title: String(value(raw, "title", "name") || fallbackTitle),
     description: String(value(raw, "description", "details") || ""),
     type: String(value(raw, "type", "eventType", "event_type") || "academic"),
     startsAt: dateInput(value(raw, "startsAt", "starts_at", "date")),
@@ -126,10 +121,10 @@ function formForEvent(item: CalendarEvent): EventForm {
   };
 }
 
-function formatDate(input: DateInput, includeDate = true) {
+function formatDate(input: DateInput, includeDate = true, locale = "pt-PT", fallback = "Date to be confirmed") {
   const date = validDate(input);
-  if (!date) return "Data por confirmar";
-  return new Intl.DateTimeFormat("pt-PT", includeDate
+  if (!date) return fallback;
+  return new Intl.DateTimeFormat(locale, includeDate
     ? { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
     : { hour: "2-digit", minute: "2-digit" }).format(date);
 }
@@ -168,6 +163,9 @@ function eventPayload(form: EventForm, current?: CalendarEvent) {
 
 export function AcademicCalendar() {
   const { user } = useAuth();
+  const { locale, t } = useI18n();
+  const eventLabels = useMemo(() => Object.fromEntries(Object.entries(eventLabelKeys).map(([key, labelKey]) => [key, t(labelKey)])), [t]);
+  const weekDays = useMemo(() => weekDayKeys.map((key) => t(key)), [t]);
   const managementEnabled = useModuleEnabled("calendar.management");
   const canManage = managementEnabled && (user?.role === "admin" || Boolean(user?.commissionPosition));
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -197,15 +195,15 @@ export function AcademicCalendar() {
     try {
       const response = await fetch("/api/calendar-events", { cache: "no-store" });
       const data = await response.json() as { events?: Record<string, unknown>[]; calendarEvents?: Record<string, unknown>[]; units?: Record<string, unknown>[]; curricularUnits?: Record<string, unknown>[]; error?: string };
-      if (!response.ok) throw new Error(data.error || "Não foi possível carregar o calendário.");
-      setEvents((data.events || data.calendarEvents || []).map(normaliseEvent));
+      if (!response.ok) throw new Error(data.error || t("community.calendar.loadError"));
+      setEvents((data.events || data.calendarEvents || []).map((item) => normaliseEvent(item, t("community.calendar.eventFallback"))));
       setUnits((data.units || data.curricularUnits || []).map(normaliseUnit));
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível carregar o calendário." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("community.calendar.loadError") });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
@@ -320,7 +318,7 @@ export function AcademicCalendar() {
     if (!canManage || movingEventId) return;
     const moved = moveEventToDate(item, target);
     if (!moved) {
-      setNotice({ kind: "error", message: "Este evento não tem uma data válida para reagendar." });
+      setNotice({ kind: "error", message: t("community.calendar.invalidDate") });
       return;
     }
     const previousEvents = events;
@@ -334,11 +332,11 @@ export function AcademicCalendar() {
         body: JSON.stringify({ id: item.id, startsAt: moved.startsAt, endsAt: moved.endsAt }),
       });
       const data = await response.json() as { error?: string; conflicts?: { id?: string; title?: string }[] };
-      if (!response.ok) throw new Error(data.error || "Não foi possível reagendar o evento.");
+      if (!response.ok) throw new Error(data.error || t("community.calendar.rescheduleError"));
       setRescheduleDate(dateKey(target));
       setNotice(data.conflicts?.length
-        ? { kind: "warning", message: `Evento reagendado, mas coincide com ${data.conflicts.length} ${data.conflicts.length === 1 ? "outra avaliação" : "outras avaliações"}.` }
-        : { kind: "success", message: "Evento reagendado com sucesso." });
+        ? { kind: "warning", message: t(data.conflicts.length === 1 ? "community.calendar.rescheduledConflict" : "community.calendar.rescheduledConflicts", { count: data.conflicts.length }) }
+        : { kind: "success", message: t("community.calendar.rescheduled") });
     } catch (error) {
       setEvents(previousEvents);
       const previousDate = validDate(item.startsAt);
@@ -346,7 +344,7 @@ export function AcademicCalendar() {
         setSelectedDate(dateKey(previousDate));
         setRescheduleDate(dateKey(previousDate));
       }
-      setNotice({ kind: "error", message: error instanceof Error ? `${error.message} A alteração foi revertida.` : "Não foi possível reagendar o evento. A alteração foi revertida." });
+      setNotice({ kind: "error", message: t("community.calendar.reverted", { message: error instanceof Error ? error.message : t("community.calendar.rescheduleError") }) });
     } finally {
       setMovingEventId(null);
     }
@@ -371,18 +369,18 @@ export function AcademicCalendar() {
         body: JSON.stringify(eventPayload(form)),
       });
       const data = await response.json() as { error?: string; conflicts?: { title?: string }[] };
-      if (!response.ok) throw new Error(data.error || "Não foi possível criar o evento.");
+      if (!response.ok) throw new Error(data.error || t("community.calendar.createError"));
       const eventDate = new Date(form.startsAt);
       setForm(emptyEventForm);
       setEditor(false);
       setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
       setSelectedDate(dateKey(eventDate));
       setNotice(data.conflicts?.length
-        ? { kind: "warning", message: `Evento guardado, mas coincide com ${data.conflicts.length} ${data.conflicts.length === 1 ? "outra avaliação" : "outras avaliações"}.` }
-        : { kind: "success", message: "Evento adicionado ao calendário." });
+        ? { kind: "warning", message: t(data.conflicts.length === 1 ? "community.calendar.createdConflict" : "community.calendar.createdConflicts", { count: data.conflicts.length }) }
+        : { kind: "success", message: t("community.calendar.created") });
       await load();
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível criar o evento." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("community.calendar.createError") });
     } finally {
       setSaving(false);
     }
@@ -399,44 +397,44 @@ export function AcademicCalendar() {
         body: JSON.stringify(eventPayload(form, selectedEvent)),
       });
       const data = await response.json() as { error?: string; conflicts?: { title?: string }[] };
-      if (!response.ok) throw new Error(data.error || "Não foi possível atualizar o evento.");
+      if (!response.ok) throw new Error(data.error || t("community.calendar.updateError"));
       const eventDate = new Date(form.startsAt);
       setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
       setSelectedDate(dateKey(eventDate));
       setEditingEvent(false);
       setNotice(data.conflicts?.length
-        ? { kind: "warning", message: `Evento atualizado, mas coincide com ${data.conflicts.length} ${data.conflicts.length === 1 ? "outra avaliação" : "outras avaliações"}.` }
-        : { kind: "success", message: "Evento atualizado com sucesso." });
+        ? { kind: "warning", message: t(data.conflicts.length === 1 ? "community.calendar.updatedConflict" : "community.calendar.updatedConflicts", { count: data.conflicts.length }) }
+        : { kind: "success", message: t("community.calendar.updated") });
       await load();
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível atualizar o evento." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("community.calendar.updateError") });
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm("Eliminar este evento do calendário?")) return;
+    if (!window.confirm(t("community.calendar.deleteConfirm"))) return;
     try {
       const response = await fetch("/api/calendar-events", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
       const data = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(data.error || "Não foi possível eliminar o evento.");
+      if (!response.ok) throw new Error(data.error || t("community.calendar.deleteError"));
       setSelectedEventId(null);
-      setNotice({ kind: "success", message: "Evento eliminado." });
+      setNotice({ kind: "success", message: t("community.calendar.deleted") });
       await load();
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível eliminar o evento." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("community.calendar.deleteError") });
     }
   };
 
   const renderEventFields = (mode: "create" | "edit") => <div className={styles.formGrid}>
-    <label className={styles.wide}><span className={styles.fieldLabel}><PencilLine />Título</span><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder="Ex.: Frequência de Anatomia II" /></label>
-    <label><span className={styles.fieldLabel}><Tag />Tipo</span><select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value }))}>{Object.entries(eventLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-    <label><span className={styles.fieldLabel}><BookOpen />Unidade curricular</span><select value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">Geral / não aplicável</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
-    <label><span className={styles.fieldLabel}><Clock3 />Início</span><input required type="datetime-local" value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
-    <label><span className={styles.fieldLabel}><CalendarClock />Fim <small>(opcional)</small></span><input type="datetime-local" min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
-    <label className={styles.wide}><span className={styles.fieldLabel}><MapPin />Local ou ligação <small>(opcional)</small></span><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
-    <label className={styles.full}><span className={styles.fieldLabel}><FileText />Descrição <small>(opcional)</small></span><textarea rows={4} maxLength={2000} value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} /></label>
+    <label className={styles.wide}><span className={styles.fieldLabel}><PencilLine />{t("community.calendar.title")}</span><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={t("community.calendar.titlePlaceholder")} /></label>
+    <label><span className={styles.fieldLabel}><Tag />{t("community.calendar.type")}</span><select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value }))}>{Object.entries(eventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</select></label>
+    <label><span className={styles.fieldLabel}><BookOpen />{t("community.calendar.unit")}</span><select value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">{t("community.calendar.general")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
+    <label><span className={styles.fieldLabel}><Clock3 />{t("community.calendar.start")}</span><input required type="datetime-local" value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
+    <label><span className={styles.fieldLabel}><CalendarClock />{t("community.calendar.end")} <small>({t("community.common.optional")})</small></span><input type="datetime-local" min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
+    <label className={styles.wide}><span className={styles.fieldLabel}><MapPin />{t("community.calendar.locationOptional")} <small>({t("community.common.optional")})</small></span><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
+    <label className={styles.full}><span className={styles.fieldLabel}><FileText />{t("community.calendar.descriptionLabel")} <small>({t("community.common.optional")})</small></span><textarea rows={4} maxLength={2000} value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} /></label>
   </div>;
 
   return <AuthGuard><ModuleGuard moduleKey="calendar.events"><AppShell active="calendar" breadcrumb="Calendário académico">
@@ -457,7 +455,7 @@ export function AcademicCalendar() {
           <button type="button" onClick={() => moveMonth(-1)} aria-label="Mês anterior"><ChevronLeft /></button>
           <button type="button" onClick={() => moveMonth(1)} aria-label="Mês seguinte"><ChevronRight /></button>
           <button type="button" className={styles.todayButton} onClick={goToToday}>Hoje</button>
-          <h2>{new Intl.DateTimeFormat("pt-PT", { month: "long", year: "numeric" }).format(visibleMonth)}</h2>
+          <h2>{new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(visibleMonth)}</h2>
         </div>
         <div className={styles.viewSwitch} aria-label="Vista do calendário">
           <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />Mês</button>

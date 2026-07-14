@@ -15,9 +15,9 @@ type Student={id:string;full_name:string;student_number:string;class_id:number;s
 type Destination={student_id:string;destination_class:number;rank:number};
 type Move={studentId:string;originClass:number;destinationClass:number;rank:number|null;status:string;points?:number;manualReview:boolean;manualOverride?:boolean};
 type Proposal={id:string;status:string;invalidated_at?:number;published_at?:number;result_snapshot:string;created_at:number};
+function parseMoves(value?:string){try{const parsed=JSON.parse(value||"[]");return Array.isArray(parsed)?parsed as Move[]:[]}catch{return []}}
 const validationLabels:Record<ValidationKey,string>={friends_other_class:"Tem amigos noutra turma",integration_bullying:"Sofre bullying / está mal integrado",other:"Outro"};
 const statusLabels:Record<string,string>={draft:"Rascunho",approved:"Aprovada",applied:"Aplicada",published:"Publicada",rolled_back:"Revertida"};
-function parseMoves(value?:string){try{const parsed=JSON.parse(value||"[]");return Array.isArray(parsed)?parsed as Move[]:[]}catch{return []}}
 function validationTypesFor(student:Student){try{const parsed=JSON.parse(student.considerations||"[]");if(Array.isArray(parsed)){const values=parsed.filter((value):value is ValidationKey=>typeof value==="string"&&value in validationLabels);if(values.length)return [...new Set(values)]}}catch{}return student.additional_info_validation?[student.additional_info_validation]:[]}
 function fixedValidationPoints(values:ValidationKey[]){return (values.includes("friends_other_class")?1:0)+(values.includes("integration_bullying")?2:0)}
 const emptyFilters={query:"",origin:"",destination:"",decision:"",result:"",validation:"",points:"",assignment:""};

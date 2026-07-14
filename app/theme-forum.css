@@ -1,4 +1,4 @@
-/* Tema FCP
+/* Tema Azul
    An original, forum-inspired interface using only the application's own
    structure and assets. Every rule is scoped to the selected theme. */
 
@@ -432,6 +432,19 @@ html[data-theme="forum"] .workspace [class*="Card"]:not([class*="CardHeader"]):n
   box-shadow: var(--shadow-panel);
 }
 
+html[data-theme="forum"] [class*="announcements-board-module"][class*="card"] {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="forum"] [class*="announcements-board-module"][class*="feed"] {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
 html[data-theme="forum"] .panel__header,
 html[data-theme="forum"] .admin-settings__header,
 html[data-theme="forum"] .listHeading,
@@ -571,6 +584,17 @@ html[data-theme="forum"] [contenteditable="true"]:focus {
   box-shadow: var(--focus-ring);
 }
 
+html[data-theme="forum"] [class*="community-suite-module"][class*="search"]:focus-within {
+  border-color: #278eba;
+  box-shadow: var(--focus-ring);
+}
+
+html[data-theme="forum"] [class*="community-suite-module"][class*="search"] input:focus {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 html[data-theme="forum"] .form-label,
 html[data-theme="forum"] .field,
 html[data-theme="forum"] [class*="field"] > label {
@@ -659,22 +683,104 @@ html[data-theme="forum"] [role="tablist"] button[class*="active"] {
 }
 
 html[data-theme="forum"] .status,
-html[data-theme="forum"] [class*="badge"],
-html[data-theme="forum"] [class*="Badge"] {
-  border-radius: 999px;
+html[data-theme="forum"] .nav-count,
+html[data-theme="forum"] .admin-role,
+html[data-theme="forum"] .maintenance-status,
+html[data-theme="forum"] .preference-pill,
+html[data-theme="forum"] .placement-stay-label,
+html[data-theme="forum"] .placement-preference-order > span,
+html[data-theme="forum"] .preference-window-grid legend span,
+html[data-theme="forum"] .preflight-check > b,
+html[data-theme="forum"] .preflight-group > header span,
+html[data-theme="forum"] .placement-preflight__competition-table td span,
+html[data-theme="forum"] .ticket-class-badge,
+html[data-theme="forum"] .ticket-status,
+html[data-theme="forum"] .topbar-search-option__type,
+html[data-theme="forum"] [class*="academic-calendar-module"][class*="filterTitle"] > strong,
+html[data-theme="forum"] span[class*="announcements-board-module"][class*="priority"],
+html[data-theme="forum"] [class*="announcements-board-module"][class*="count"],
+html[data-theme="forum"] [class*="commission-directory-module"][class*="count"],
+html[data-theme="forum"] [class*="commission-directory-module"][class*="position"],
+html[data-theme="forum"] [class*="commission-directory-module"][class*="units"] > div:first-child > span,
+html[data-theme="forum"] [class*="community-suite-module"][class*="count"],
+html[data-theme="forum"] [class*="material-library-module"][class*="count"],
+html[data-theme="forum"] [class*="curricular-units-management-module"][class*="code"]:not([class*="codeField"]),
+html[data-theme="forum"] [class*="badge"]:not([class*="badges"]):not([class*="badgeRow"]),
+html[data-theme="forum"] [class*="Badge"]:not([class*="Badges"]):not([class*="BadgeRow"]),
+html[data-theme="forum"] [class*="tag"]:not([class*="tags"]):not([class*="stage"]),
+html[data-theme="forum"] [class*="Tag"]:not([class*="Tags"]):not([class*="Stage"]),
+html[data-theme="forum"] [class*="polls-hub-module"][class*="anonymous"],
+html[data-theme="forum"] [class*="polls-hub-module"][class*="multiple"],
+html[data-theme="forum"] [class*="unitCode"],
+html[data-theme="forum"] [class*="statusPending"],
+html[data-theme="forum"] [class*="statusApproved"],
+html[data-theme="forum"] [class*="statusExecuted"],
+html[data-theme="forum"] [class*="statusRejected"],
+html[data-theme="forum"] [class*="statusArchived"],
+html[data-theme="forum"] [class*="statusExecutionError"],
+html[data-theme="forum"] [class*="status_active"],
+html[data-theme="forum"] [class*="status_scheduled"],
+html[data-theme="forum"] [class*="status_draft"],
+html[data-theme="forum"] [class*="status_closed"],
+html[data-theme="forum"] [class*="status_expired"],
+html[data-theme="forum"] [class*="status_archived"] {
+  min-height: 20px;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 5px;
+  font-weight: 600;
+  line-height: 1.2;
   box-shadow: none;
 }
 
+html[data-theme="forum"] .admin-role {
+  color: #285f83;
+  background-color: #e6f1f7;
+}
+
 html[data-theme="forum"] .status--success,
-html[data-theme="forum"] [class*="success"] {
+html[data-theme="forum"] [class*="success"],
+html[data-theme="forum"] [class*="statusApproved"],
+html[data-theme="forum"] [class*="statusExecuted"],
+html[data-theme="forum"] [class*="status_active"] {
   color: var(--color-success-text);
   background-color: var(--color-success-soft);
 }
 
 html[data-theme="forum"] .status--warning,
-html[data-theme="forum"] [class*="warning"] {
+html[data-theme="forum"] [class*="warning"],
+html[data-theme="forum"] [class*="statusPending"],
+html[data-theme="forum"] [class*="status_scheduled"],
+html[data-theme="forum"] [class*="status_draft"] {
   color: var(--color-warning);
   background-color: var(--color-warning-soft);
+}
+
+html[data-theme="forum"] .status--danger,
+html[data-theme="forum"] [class*="priority_urgent"] [class*="announcements-board-module"][class*="priority"],
+html[data-theme="forum"] [class*="statusRejected"],
+html[data-theme="forum"] [class*="statusExecutionError"] {
+  color: var(--color-danger-text);
+  background-color: var(--color-danger-soft);
+}
+
+html[data-theme="forum"] [class*="priority_important"] [class*="announcements-board-module"][class*="priority"] {
+  color: var(--color-warning);
+  background-color: var(--color-warning-soft);
+}
+
+html[data-theme="forum"] [class*="priority_normal"] [class*="announcements-board-module"][class*="priority"] {
+  color: #286b97;
+  background-color: #e4f2fa;
+}
+
+html[data-theme="forum"] .status--neutral,
+html[data-theme="forum"] [class*="statusArchived"],
+html[data-theme="forum"] [class*="status_closed"],
+html[data-theme="forum"] [class*="status_expired"],
+html[data-theme="forum"] [class*="status_archived"] {
+  color: #526575;
+  background-color: #e8eef3;
 }
 
 html[data-theme="forum"] .admin-notice,

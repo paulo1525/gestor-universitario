@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Underline } from "lucide-react";
+import { useI18n } from "@/components/i18n-context";
 import { richTextDisplayHtml, richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import styles from "@/components/rich-text-editor.module.css";
 
@@ -26,9 +27,11 @@ export function RichTextContent({ value, className = "" }: RichTextContentProps)
   return <div className={`${styles.content} ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Escreve aqui…", maxLength, disabled = false, minHeight = "regular", onInvalidLink }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink }: RichTextEditorProps) {
+  const { t } = useI18n();
   const editorRef = useRef<HTMLDivElement>(null);
   const plainLength = richTextPlainText(value).length;
+  const resolvedPlaceholder = placeholder ?? t("richText.placeholder");
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -48,7 +51,7 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Escr
 
   const addLink = () => {
     if (disabled) return;
-    const value = window.prompt("Indica o endereço completo da ligação (https://…)");
+    const value = window.prompt(t("richText.linkPrompt"));
     if (!value) return;
     try {
       const url = new URL(value);
@@ -62,16 +65,16 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder = "Escr
   };
 
   return <div className={`${styles.editor} ${styles[minHeight]} ${disabled ? styles.disabled : ""}`}>
-    <div className={styles.toolbar} role="toolbar" aria-label={`Formatação: ${ariaLabel}`}>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("bold")} aria-label="Negrito" title="Negrito"><Bold /></button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("italic")} aria-label="Itálico" title="Itálico"><Italic /></button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("underline")} aria-label="Sublinhado" title="Sublinhado"><Underline /></button>
+    <div className={styles.toolbar} role="toolbar" aria-label={t("richText.toolbar", { label: ariaLabel })}>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("bold")} aria-label={t("richText.bold")} title={t("richText.bold")}><Bold /></button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("italic")} aria-label={t("richText.italic")} title={t("richText.italic")}><Italic /></button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("underline")} aria-label={t("richText.underline")} title={t("richText.underline")}><Underline /></button>
       <span aria-hidden="true" />
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label="Lista com marcas" title="Lista com marcas"><List /></button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("insertOrderedList")} aria-label="Lista numerada" title="Lista numerada"><ListOrdered /></button>
-      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addLink} aria-label="Adicionar ligação" title="Adicionar ligação"><Link2 /></button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("insertUnorderedList")} aria-label={t("richText.bullets")} title={t("richText.bullets")}><List /></button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("insertOrderedList")} aria-label={t("richText.numbered")} title={t("richText.numbered")}><ListOrdered /></button>
+      <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addLink} aria-label={t("richText.link")} title={t("richText.link")}><Link2 /></button>
     </div>
-    <div ref={editorRef} className={styles.editable} contentEditable={!disabled} role="textbox" aria-label={ariaLabel} aria-multiline="true" aria-disabled={disabled} data-placeholder={placeholder} onInput={emit} onBlur={() => { const safeValue = sanitizeRichTextHtml(editorRef.current?.innerHTML ?? ""); if (editorRef.current) editorRef.current.innerHTML = safeValue; onChange(safeValue); }} onPaste={(event) => { event.preventDefault(); document.execCommand("insertText", false, event.clipboardData.getData("text/plain")); emit(); }} suppressContentEditableWarning />
+    <div ref={editorRef} className={styles.editable} contentEditable={!disabled} role="textbox" aria-label={ariaLabel} aria-multiline="true" aria-disabled={disabled} data-placeholder={resolvedPlaceholder} onInput={emit} onBlur={() => { const safeValue = sanitizeRichTextHtml(editorRef.current?.innerHTML ?? ""); if (editorRef.current) editorRef.current.innerHTML = safeValue; onChange(safeValue); }} onPaste={(event) => { event.preventDefault(); document.execCommand("insertText", false, event.clipboardData.getData("text/plain")); emit(); }} suppressContentEditableWarning />
     {maxLength != null && <div className={`${styles.counter} ${plainLength > maxLength ? styles.counterOver : ""}`} aria-live="polite">{plainLength}/{maxLength}</div>}
   </div>;
 }

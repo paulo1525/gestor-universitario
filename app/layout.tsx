@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import { AuthProvider } from "@/components/auth-context";
 import { CookiePreferences } from "@/components/cookie-preferences";
+import { I18nProvider } from "@/components/i18n-context";
 import { ModuleProvider } from "@/components/module-context";
 import "./globals.css";
 import "./theme-forum.css";
@@ -31,8 +32,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-PT" data-scroll-behavior="smooth" data-theme="cc" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("gestor-theme");document.documentElement.dataset.theme=theme==="forum"?"forum":"cc"}catch(error){document.documentElement.dataset.theme="cc"}` }} /></head>
-      <body className={`${inter.variable} ${manrope.variable}`}><AuthProvider><ModuleProvider>{children}<CookiePreferences /></ModuleProvider></AuthProvider></body>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("gestor-theme");var language=localStorage.getItem("gestor-language");document.documentElement.dataset.theme=theme==="forum"?"forum":"cc";document.documentElement.lang=language==="en"?"en":"pt-PT"}catch(error){document.documentElement.dataset.theme="cc";document.documentElement.lang="pt-PT"}` }} /></head>
+      <body className={`${inter.variable} ${manrope.variable}`}><I18nProvider><AuthProvider><ModuleProvider>{children}<CookiePreferences /></ModuleProvider></AuthProvider></I18nProvider></body>
     </html>
   );
 }
