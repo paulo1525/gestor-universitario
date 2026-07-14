@@ -37,7 +37,7 @@
 }
 
 .stickyForm { position: static; }
-.form { display: grid; width:min(980px,100%); }
+.form { display: grid; width:min(980px,100%); margin-inline:auto; }
 .formHeading { padding: 20px 22px 16px; border-bottom: 1px solid #eceae2; }
 .formHeading h2, .sectionHead h2 { margin: 0; font-size: 17px; letter-spacing: -.015em; }
 .formHeading p, .sectionHead p { margin: 5px 0 0; color: #77756d; font-size: 12px; line-height: 1.6; }
@@ -74,10 +74,11 @@
 .privacyOptions legend { margin-bottom: 7px; color: #535149; font-size: 11px; font-weight: 800; }
 .privacyOptions label {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
-  padding: 12px;
+  grid-template-columns: 16px 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 72px;
+  padding: 10px 12px;
   border: 1px solid #dedbd0;
   border-radius: 12px;
   background: #fcfcfa;
@@ -86,14 +87,15 @@
 }
 .privacyOptions label:hover { border-color: #c8bb80; }
 .privacyOptions label.optionSelected { border-color: #c6a320; background: #fff9df; box-shadow: 0 0 0 2px rgba(221, 181, 28, .10); }
-.privacyOptions input { width: 15px; height: 15px; margin: 2px 0 0; accent-color: #a57d00; }
+.privacyOptions input { width: 15px; min-height: 15px; height: 15px; margin: 0; padding: 0; accent-color: #a57d00; }
 .privacyOptions svg { width: 17px; height: 17px; color: #876900; }
 .privacyOptions label span { display: grid; gap: 3px; }
 .privacyOptions strong { color: #39372f; font-size: 11px; line-height: 1.25; }
 .privacyOptions label small { color: #7d7a70; font-size: 10px; line-height: 1.35; }
 
-.formActions { display: flex; justify-content: flex-end; padding: 16px 22px; border-top: 1px solid #eceae2; background: #faf9f5; }
-.formActions :global(.button), .manageRequest :global(.button) { min-height: 43px; font-size: 11px; }
+.formActions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px; border-top: 1px solid #eceae2; background: #faf9f5; }
+.formActions :global(.button), .manageRequest :global(.button) { min-height: 38px; font-size: 10px; }
+.formActions :global(.button) svg { width: 15px; height: 15px; }
 
 .sectionHead { display: flex; align-items: center; gap: 14px; padding: 19px 20px; border-bottom: 1px solid #e8e6dd; background: #fcfcfa; }
 .sectionHead > div { flex: 1; min-width: 0; }
@@ -199,6 +201,15 @@
 }
 .privacyOptions label,.manageRequest { border-color:var(--line); background:#fafaf7; }
 .privacyOptions label.optionSelected { border-color:#c6a320; background:#fff9df; }
+.formGrid .privacyOptions input { width:15px; min-height:15px; height:15px; padding:0; }
+:global(html[data-theme="forum"]) .privacyOptions label.optionSelected {
+  border-color:#3b98c4;
+  background:#eaf5fb;
+  box-shadow:inset 3px 0 #2184b2;
+}
+:global(html[data-theme="forum"]) .privacyOptions input { accent-color:#247ca9; }
+:global(html[data-theme="forum"]) .privacyOptions svg { color:#1977a5; }
+:global(html[data-theme="forum"]) .formActions :global(.button) { min-height:38px; padding-inline:12px; }
 .requestList { background:#f8f8f5; }
 .badge { color:#654f00; background:#fff0af; }
 .statusBadge { background:var(--green-soft); }
