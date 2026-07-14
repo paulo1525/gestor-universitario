@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { FormLabel } from "@/components/form-label";
 import { useAuth } from "@/components/auth-context";
+import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/curricular-units-management.module.css";
 
 type ApiUnit = {
@@ -75,16 +76,18 @@ function normaliseRepresentative(representative: ApiRepresentative): Representat
   };
 }
 
-function validate(form: UnitForm): FieldErrors {
+type Translator = ReturnType<typeof useI18n>["t"];
+
+function validate(form: UnitForm, t: Translator): FieldErrors {
   const errors: FieldErrors = {};
-  if (!form.code.trim()) errors.code = "Indique o código da unidade curricular.";
-  else if (form.code.trim().length > 20) errors.code = "O código não pode ter mais de 20 caracteres.";
-  if (!form.name.trim()) errors.name = "Indique o nome da unidade curricular.";
-  else if (form.name.trim().length > 160) errors.name = "O nome não pode ter mais de 160 caracteres.";
-  if (!Number.isFinite(form.ects) || form.ects < 0.5 || form.ects > 60) errors.ects = "Indique entre 0,5 e 60 ECTS.";
-  if (!Number.isInteger(form.year) || form.year < 1 || form.year > 6) errors.year = "Selecione um ano válido.";
-  if (form.semester !== 1 && form.semester !== 2) errors.semester = "Selecione um semestre válido.";
-  if (!form.representativeUserId) errors.representativeUserId = "Selecione o representante da CC.";
+  if (!form.code.trim()) errors.code = t("classes.units.validationCodeRequired");
+  else if (form.code.trim().length > 20) errors.code = t("classes.units.validationCodeLength");
+  if (!form.name.trim()) errors.name = t("classes.units.validationNameRequired");
+  else if (form.name.trim().length > 160) errors.name = t("classes.units.validationNameLength");
+  if (!Number.isFinite(form.ects) || form.ects < 0.5 || form.ects > 60) errors.ects = t("classes.units.validationEcts");
+  if (!Number.isInteger(form.year) || form.year < 1 || form.year > 6) errors.year = t("classes.units.validationYear");
+  if (form.semester !== 1 && form.semester !== 2) errors.semester = t("classes.units.validationSemester");
+  if (!form.representativeUserId) errors.representativeUserId = t("classes.units.validationRepresentative");
   return errors;
 }
 
@@ -99,6 +102,7 @@ async function responseMessage(response: Response, fallback: string): Promise<st
 
 export function CurricularUnitsManagement() {
   const { user } = useAuth();
+  const { locale, t } = useI18n();
   const [units, setUnits] = useState<CurricularUnit[]>([]);
   const [representatives, setRepresentatives] = useState<Representative[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,16 +121,16 @@ export function CurricularUnitsManagement() {
     setLoadError("");
     try {
       const response = await fetch("/api/admin/curricular-units", { cache: "no-store" });
-      if (!response.ok) throw new Error(await responseMessage(response, "Não foi possível carregar as unidades curriculares."));
+      if (!response.ok) throw new Error(await responseMessage(response, t("classes.units.loadError")));
       const data = await response.json() as { units?: ApiUnit[]; representatives?: ApiRepresentative[] };
       setUnits((data.units || []).map(normaliseUnit));
       setRepresentatives((data.representatives || []).map(normaliseRepresentative));
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Não foi possível carregar as unidades curriculares.");
+      setLoadError(error instanceof Error ? error.message : t("classes.units.loadError"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // O pedido é iniciado pelo efeito; as atualizações de estado acontecem após a resposta da API.
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -140,10 +144,10 @@ export function CurricularUnitsManagement() {
   const save = async (mode: "create" | "edit", event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = mode === "create" ? createForm : editForm;
-    const errors = validate(form);
+    const errors = validate(form, t);
     if (mode === "create") setCreateErrors(errors); else setEditErrors(errors);
     if (Object.keys(errors).length) {
-      setNotice({ kind: "error", message: "Revê os campos assinalados antes de guardar." });
+      setNotice({ kind: "error", message: t("classes.units.validationReview") });
       return;
     }
     setSaving(true);
@@ -163,8 +167,8 @@ export function CurricularUnitsManagement() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(await responseMessage(response, "Não foi possível guardar a unidade curricular."));
-      setNotice({ kind: "success", message: mode === "create" ? "Unidade curricular criada." : "Unidade curricular atualizada." });
+      if (!response.ok) throw new Error(await responseMessage(response, t("classes.units.saveError")));
+      setNotice({ kind: "success", message: mode === "create" ? t("classes.units.created") : t("classes.units.updated") });
       setShowCreate(false);
       setCreateForm(emptyForm);
       setCreateErrors({});
@@ -172,7 +176,7 @@ export function CurricularUnitsManagement() {
       setEditErrors({});
       await load();
     } catch (error) {
-      setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível guardar a unidade curricular." });
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("classes.units.saveError") });
     } finally {
       setSaving(false);
     }
@@ -186,33 +190,33 @@ export function CurricularUnitsManagement() {
   };
 
   if (user?.commissionDepartment !== "management" && user?.email.toLowerCase() !== "up202507850@up.pt") {
-    return <main className="auth-loading"><ShieldCheck size={28} /><strong>Acesso reservado ao Núcleo de Gestão.</strong></main>;
+    return <main className="auth-loading"><ShieldCheck size={28} /><strong>{t("classes.units.accessDenied")}</strong></main>;
   }
 
-  return <AppShell active="curricular_units_management" breadcrumb="Gerir unidades">
+  return <AppShell active="curricular_units_management" breadcrumb={t("classes.units.breadcrumb")}>
     <header className={styles.heading}>
-      <div><span className="eyebrow">Núcleo de Gestão</span><h1>Unidades curriculares</h1><p>Regista as unidades curriculares, os respetivos créditos e o representante da Comissão de Curso.</p></div>
-      <button className="button button--primary" type="button" onClick={() => { setShowCreate(true); setNotice(null); }} disabled={showCreate}><Plus />Adicionar unidade curricular</button>
+      <div><span className="eyebrow">{t("classes.units.eyebrow")}</span><h1>{t("classes.units.title")}</h1><p>{t("classes.units.description")}</p></div>
+      <button className="button button--primary" type="button" onClick={() => { setShowCreate(true); setNotice(null); }} disabled={showCreate}><Plus />{t("classes.units.add")}</button>
     </header>
 
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
     {showCreate && <section className={`panel ${styles.editor}`} aria-labelledby="nova-unidade">
-      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><h2 id="nova-unidade">Nova unidade curricular</h2><p>Todos os campos são obrigatórios.</p></div></div><button type="button" className={styles.closeButton} onClick={() => { setShowCreate(false); setCreateErrors({}); }} aria-label="Cancelar criação"><X /></button></div>
-      <UnitEditor form={createForm} setForm={setCreateForm} errors={createErrors} representatives={representatives} saving={saving} submitLabel="Criar unidade curricular" onSubmit={event => void save("create", event)} onCancel={() => { setShowCreate(false); setCreateErrors({}); }} />
+      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><h2 id="nova-unidade">{t("classes.units.new")}</h2><p>{t("classes.units.required")}</p></div></div><button type="button" className={styles.closeButton} onClick={() => { setShowCreate(false); setCreateErrors({}); }} aria-label={t("classes.units.cancelCreate")}><X /></button></div>
+      <UnitEditor form={createForm} setForm={setCreateForm} errors={createErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.create")} onSubmit={event => void save("create", event)} onCancel={() => { setShowCreate(false); setCreateErrors({}); }} />
     </section>}
 
     <section className={`panel ${styles.list}`} aria-labelledby="lista-unidades">
-      <div className={styles.listHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><span className="eyebrow">Plano curricular</span><h2 id="lista-unidades">Unidades registadas</h2></div></div>{!loading && !loadError && <span>{units.length} {units.length === 1 ? "unidade" : "unidades"}</span>}</div>
-      {loading ? <div className={styles.state} role="status"><LoaderCircle className={styles.spin} /><strong>A carregar unidades curriculares…</strong></div>
-        : loadError ? <div className={`${styles.state} ${styles.errorState}`} role="alert"><strong>{loadError}</strong><button className="button button--secondary button--compact" type="button" onClick={() => void load()}>Tentar novamente</button></div>
-        : units.length === 0 ? <div className={styles.state}><BookOpen /><strong>Ainda não existem unidades curriculares.</strong><p>Adiciona a primeira unidade para começar a construir o plano curricular.</p><button className="button button--secondary button--compact" type="button" onClick={() => setShowCreate(true)}><Plus />Adicionar primeira unidade</button></div>
-        : <div className={styles.unitGrid}>{units.map(unit => <div className={styles.unitEntry} key={unit.id}>{editingId === unit.id ? <article className={styles.editCard}><div className={styles.editContext}><span className={styles.code}>{unit.code}</span><div><strong>A editar {unit.name}</strong><small>Altera apenas os campos necessários e guarda no final.</small></div></div><UnitEditor form={editForm} setForm={setEditForm} errors={editErrors} representatives={representatives} saving={saving} submitLabel="Guardar alterações" onSubmit={event => void save("edit", event)} onCancel={() => { setEditingId(null); setEditErrors({}); }} /></article> : <article className={styles.unitCard}>
+      <div className={styles.listHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><span className="eyebrow">{t("classes.units.plan")}</span><h2 id="lista-unidades">{t("classes.units.registered")}</h2></div></div>{!loading && !loadError && <span>{units.length} {units.length === 1 ? t("classes.units.countOne") : t("classes.units.countMany")}</span>}</div>
+      {loading ? <div className={styles.state} role="status"><LoaderCircle className={styles.spin} /><strong>{t("classes.units.loading")}</strong></div>
+        : loadError ? <div className={`${styles.state} ${styles.errorState}`} role="alert"><strong>{loadError}</strong><button className="button button--secondary button--compact" type="button" onClick={() => void load()}>{t("classes.units.retry")}</button></div>
+        : units.length === 0 ? <div className={styles.state}><BookOpen /><strong>{t("classes.units.empty")}</strong><p>{t("classes.units.emptyDescription")}</p><button className="button button--secondary button--compact" type="button" onClick={() => setShowCreate(true)}><Plus />{t("classes.units.addFirst")}</button></div>
+        : <div className={styles.unitGrid}>{units.map(unit => <div className={styles.unitEntry} key={unit.id}>{editingId === unit.id ? <article className={styles.editCard}><div className={styles.editContext}><span className={styles.code}>{unit.code}</span><div><strong>{t("classes.units.editing", { name: unit.name })}</strong><small>{t("classes.units.editHint")}</small></div></div><UnitEditor form={editForm} setForm={setEditForm} errors={editErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.saveChanges")} onSubmit={event => void save("edit", event)} onCancel={() => { setEditingId(null); setEditErrors({}); }} /></article> : <article className={styles.unitCard}>
           <div className={styles.identity}><span className={styles.code}>{unit.code}</span><h3>{unit.name}</h3></div>
-          <div className={styles.metric}><span>Créditos</span><strong>{unit.ects.toLocaleString("pt-PT")} <small>ECTS</small></strong></div>
-          <div className={styles.metric}><span>Período</span><strong>{unit.year}.º ano <small>· {unit.semester}.º semestre</small></strong></div>
-          <div className={styles.representative}><span>Representante da CC</span>{representativesById.get(unit.representativeUserId) ? <><strong>{representativesById.get(unit.representativeUserId)?.fullName}</strong><small>{representativesById.get(unit.representativeUserId)?.email}</small></> : <strong className={styles.missingRepresentative}>Representante por atribuir</strong>}</div>
-          <button className={styles.editButton} type="button" onClick={() => beginEdit(unit)} aria-label={`Editar ${unit.name}`}><Pencil />Editar</button>
+          <div className={styles.metric}><span>{t("classes.units.credits")}</span><strong>{unit.ects.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} <small>ECTS</small></strong></div>
+          <div className={styles.metric}><span>{t("classes.units.period")}</span><strong>{t("classes.units.yearValue", { year: unit.year })} <small>· {t("classes.units.semesterValue", { semester: unit.semester })}</small></strong></div>
+          <div className={styles.representative}><span>{t("classes.units.representative")}</span>{representativesById.get(unit.representativeUserId) ? <><strong>{representativesById.get(unit.representativeUserId)?.fullName}</strong><small>{representativesById.get(unit.representativeUserId)?.email}</small></> : <strong className={styles.missingRepresentative}>{t("classes.units.noRepresentative")}</strong>}</div>
+          <button className={styles.editButton} type="button" onClick={() => beginEdit(unit)} aria-label={t("classes.units.editAria", { name: unit.name })}><Pencil />{t("classes.units.edit")}</button>
         </article>}</div>)}</div>}
     </section>
   </AppShell>;
@@ -228,16 +232,17 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const field = <Key extends keyof UnitForm>(key: Key, value: UnitForm[Key]) => setForm({ ...form, [key]: value });
   return <form className={styles.form} onSubmit={onSubmit} noValidate>
     <div className={styles.formGrid}>
-      <label className={styles.codeField}><FormLabel icon={Hash}>Código</FormLabel><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder="Ex.: ANAT2" aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
-      <label className={styles.nameField}><FormLabel icon={BookOpen}>Nome da unidade curricular</FormLabel><input value={form.name} onChange={event => field("name", event.target.value)} maxLength={160} placeholder="Ex.: Anatomia II" aria-invalid={Boolean(errors.name)} />{errors.name && <small>{errors.name}</small>}</label>
-      <label><FormLabel icon={Award}>Créditos ECTS</FormLabel><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
-      <label><FormLabel icon={GraduationCap}>Ano</FormLabel><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{year}.º ano</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
-      <label><FormLabel icon={CalendarRange}>Semestre</FormLabel><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>1.º semestre</option><option value={2}>2.º semestre</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
-      <label className={styles.representativeField}><FormLabel icon={UserRound}>Representante da Comissão de Curso</FormLabel><select value={form.representativeUserId} onChange={event => field("representativeUserId", event.target.value)} aria-invalid={Boolean(errors.representativeUserId)}><option value="">Selecionar representante…</option>{representatives.map(representative => <option value={representative.id} key={representative.id}>{representative.fullName} · {representative.email}</option>)}</select>{errors.representativeUserId && <small>{errors.representativeUserId}</small>}{!representatives.length && <small className={styles.hint}>Não existem membros da CC elegíveis. Atribui primeiro um cargo no controlo administrativo.</small>}</label>
+      <label className={styles.codeField}><FormLabel icon={Hash}>{t("classes.units.code")}</FormLabel><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder={t("classes.units.codePlaceholder")} aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
+      <label className={styles.nameField}><FormLabel icon={BookOpen}>{t("classes.units.name")}</FormLabel><input value={form.name} onChange={event => field("name", event.target.value)} maxLength={160} placeholder={t("classes.units.namePlaceholder")} aria-invalid={Boolean(errors.name)} />{errors.name && <small>{errors.name}</small>}</label>
+      <label><FormLabel icon={Award}>{t("classes.units.ects")}</FormLabel><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
+      <label><FormLabel icon={GraduationCap}>{t("classes.units.year")}</FormLabel><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{t("classes.units.yearValue", { year })}</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
+      <label><FormLabel icon={CalendarRange}>{t("classes.units.semester")}</FormLabel><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>{t("classes.units.semesterValue", { semester: 1 })}</option><option value={2}>{t("classes.units.semesterValue", { semester: 2 })}</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
+      <label className={styles.representativeField}><FormLabel icon={UserRound}>{t("classes.units.committeeRepresentative")}</FormLabel><select value={form.representativeUserId} onChange={event => field("representativeUserId", event.target.value)} aria-invalid={Boolean(errors.representativeUserId)}><option value="">{t("classes.units.selectRepresentative")}</option>{representatives.map(representative => <option value={representative.id} key={representative.id}>{representative.fullName} · {representative.email}</option>)}</select>{errors.representativeUserId && <small>{errors.representativeUserId}</small>}{!representatives.length && <small className={styles.hint}>{t("classes.units.noEligibleRepresentative")}</small>}</label>
     </div>
-    <div className={styles.formActions}><button className="button button--secondary button--compact" type="button" onClick={onCancel} disabled={saving}>Cancelar</button><button className="button button--primary button--compact" type="submit" disabled={saving}>{saving ? <><LoaderCircle className={styles.spin} />A guardar…</> : <><Save />{submitLabel}</>}</button></div>
+    <div className={styles.formActions}><button className="button button--secondary button--compact" type="button" onClick={onCancel} disabled={saving}>{t("classes.common.cancel")}</button><button className="button button--primary button--compact" type="submit" disabled={saving}>{saving ? <><LoaderCircle className={styles.spin} />{t("classes.common.saving")}</> : <><Save />{submitLabel}</>}</button></div>
   </form>;
 }

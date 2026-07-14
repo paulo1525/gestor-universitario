@@ -14,8 +14,8 @@ test("private exam photos use multiple attachments and stay out of the public li
   assert.match(backend, /submission\?\.material_type === "exam_photo" && status === "published"/);
   assert.match(backend, /photos\.slice\(1\)/);
   assert.match(materials, /MultiFileUploadField/);
-  assert.match(materials, /Fotos de exame\/frequ/);
-  assert.match(materials, /nunca aparecem na biblioteca/);
+  assert.match(materials, /community\.materials\.category\.exam/);
+  assert.match(materials, /community\.materials\.privateNotice/);
   assert.match(fixture, /local-exam-photo-3/);
 });
 

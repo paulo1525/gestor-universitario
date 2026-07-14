@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n-context";
 import { announcementPlainText } from "@/lib/announcement-content";
 
 type ApiAnnouncement = { id: string | number; title: string; body?: string; content?: string; priority?: string; published_at?: string | number; publishedAt?: string | number };
 type UrgentAnnouncement = { id: string; title: string; body: string };
 
 export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
+  const { t } = useI18n();
   const [announcement, setAnnouncement] = useState<UrgentAnnouncement | null>(null);
 
   useEffect(() => {
@@ -35,10 +37,10 @@ export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
     setAnnouncement(null);
   };
 
-  return <aside className="urgent-announcement" aria-label="Comunicado urgente">
+  return <aside className="urgent-announcement" aria-label={t("urgent.label")}>
     <span className="urgent-announcement__icon"><AlertTriangle /></span>
-    <div className="urgent-announcement__content"><span>Comunicado urgente</span><strong>{announcement.title}</strong><p>{summary.length > 180 ? `${summary.slice(0, 177)}…` : summary}</p></div>
-    <Link href="/avisos">Ler comunicado <ArrowRight /></Link>
-    <button type="button" onClick={dismiss} aria-label={`Descartar comunicado urgente: ${announcement.title}`}><X /></button>
+    <div className="urgent-announcement__content"><span>{t("urgent.label")}</span><strong>{announcement.title}</strong><p>{summary.length > 180 ? `${summary.slice(0, 177)}…` : summary}</p></div>
+    <Link href="/avisos">{t("urgent.read")} <ArrowRight /></Link>
+    <button type="button" onClick={dismiss} aria-label={t("urgent.dismiss", { title: announcement.title })}><X /></button>
   </aside>;
 }

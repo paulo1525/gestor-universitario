@@ -36,7 +36,7 @@ test("módulos e submódulos têm controlo persistente e exclusivo do administra
   assert.match(modules, /normalizeEmail\(user\.email\) !== PERMANENT_ADMIN_EMAIL/);
   assert.match(modules, /app_module_updated/);
   assert.match(moduleUi, /up202507850@up\.pt/);
-  assert.match(moduleUi, /Inativo por herança/);
+  assert.match(moduleUi, /admin\.modules\.inheritedInactive/);
   assert.match(migration, /CREATE TABLE app_module_settings/);
 });
 
@@ -95,8 +95,8 @@ test("comunicados podem ser pesquisados, filtrados e paginados", () => {
   assert.match(announcementsUi, /priorityFilter/);
   assert.match(announcementsUi, /authorFilter/);
   assert.match(announcementsUi, /paginatedAnnouncements/);
-  assert.match(announcementsUi, /aria-label="Paginação dos comunicados"/);
-  assert.match(announcementsUi, /Limpar filtros/);
+  assert.match(announcementsUi, /announcements\.pagination\.aria/);
+  assert.match(announcementsUi, /announcements\.filters\.reset/);
 });
 
 test("a pesquisa global ocupa a barra superior e o diretório apresenta responsabilidades", () => {
@@ -104,7 +104,7 @@ test("a pesquisa global ocupa a barra superior e o diretório apresenta responsa
   assert.doesNotMatch(shell, /href="\/pesquisa"><Search/);
   assert.match(topbarSearch, /role="search"/);
   assert.match(topbarSearch, /Ctrl K/);
-  assert.match(directoryUi, /Unidades acompanhadas/);
+  assert.match(directoryUi, /community\.directory\.followedUnits/);
   assert.match(directoryUi, /mailto:/);
 });
 

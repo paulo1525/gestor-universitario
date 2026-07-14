@@ -165,8 +165,8 @@ async function documentInput(request: Request): Promise<Record<string, unknown> 
   }
 }
 
-function documentDto(row: Record<string, unknown>, includeContent = true) {
-  return { id: row.id, title: row.title, description: row.description, type: row.document_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, url: row.url || row.attachment_data_url, content: includeContent ? row.content : undefined, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: includeContent ? row.attachment_data_url : undefined, visibility: row.visibility === "students" ? "authenticated" : row.visibility === "cc" ? "commission" : row.visibility, status: row.status, publishedAt: row.published_at, authorName: row.author_name, createdAt: row.created_at, updatedAt: row.updated_at };
+function documentDto(row: Record<string, unknown>, includeContent = true, revealAuthorIdentity = false) {
+  return { id: row.id, title: row.title, description: row.description, type: row.document_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, url: row.url || row.attachment_data_url, content: includeContent ? row.content : undefined, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: includeContent ? row.attachment_data_url : undefined, visibility: row.visibility === "students" ? "authenticated" : row.visibility === "cc" ? "commission" : row.visibility, status: row.status, publishedAt: row.published_at, authorName: row.author_name, authorId: revealAuthorIdentity ? row.author_id : undefined, authorEmail: revealAuthorIdentity ? row.author_email : undefined, authorStudentNumber: revealAuthorIdentity ? row.author_student_number : undefined, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 async function documents(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -176,8 +176,8 @@ async function documents(request: Request, env: HubEnv, url: URL, user: HubUser 
   if (request.method === "GET") {
     const id = text(url.searchParams.get("id"), 80), unitId = text(url.searchParams.get("unitId"), 80);
     const scope = isCommission(user) ? "1=1" : user ? "d.visibility IN ('public','students') AND d.status='published'" : "d.visibility='public' AND d.status='published'";
-    const [result, units] = await Promise.all([env.DB.prepare(`SELECT d.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS author_name FROM academic_documents d LEFT JOIN curricular_units cu ON cu.id=d.curricular_unit_id JOIN users u ON u.id=d.created_by WHERE ${scope} AND (?='' OR d.id=?) AND (?='' OR d.curricular_unit_id=?) ORDER BY COALESCE(d.published_at,d.created_at) DESC LIMIT 300`).bind(id, id, unitId, unitId).all(), unitChoices(env)]);
-    return json({ documents: result.results.map((row) => documentDto(rowObject(row), true)), units });
+    const [result, units] = await Promise.all([env.DB.prepare(`SELECT d.*,cu.code AS unit_code,cu.name AS unit_name,u.id AS author_id,u.full_name AS author_name,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM academic_documents d LEFT JOIN curricular_units cu ON cu.id=d.curricular_unit_id JOIN users u ON u.id=d.created_by WHERE ${scope} AND (?='' OR d.id=?) AND (?='' OR d.curricular_unit_id=?) ORDER BY COALESCE(d.published_at,d.created_at) DESC LIMIT 300`).bind(id, id, unitId, unitId).all(), unitChoices(env)]);
+    return json({ documents: result.results.map((row) => documentDto(rowObject(row), true, isCommission(user))), units });
   }
   const body = await documentInput(request);
   if (!body) return json({ error: "Pedido inválido." }, 400);
@@ -212,19 +212,38 @@ async function documents(request: Request, env: HubEnv, url: URL, user: HubUser 
 function requestDto(row: Record<string, unknown>, viewer: HubUser, management: boolean) {
   const owns = row.submitted_by === viewer.id;
   const dto: Record<string, unknown> = { id: row.id, subject: row.subject, body: row.body, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, anonymous: row.anonymous === 1, status: row.status, response: row.response, responseVisibility: row.response_visibility, respondedAt: row.responded_at, createdAt: row.created_at, updatedAt: row.updated_at, isOwn: owns };
-  if (row.anonymous !== 1 && (management || owns)) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email };
-  if (row.anonymous === 1 && isPrimary(viewer)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email };
+  if (row.anonymous !== 1 && (management || owns)) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: management ? row.submitter_student_number : undefined };
+  if (row.anonymous === 1 && isPrimary(viewer)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number };
   return dto;
 }
 
 async function requests(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
+  if (request.method === "DELETE") {
+    const id = text(url.searchParams.get("id"), 80);
+    if (!id) return json({ error: "Pedido inválido." }, 400);
+    const current = await env.DB.prepare("SELECT id,subject,submitted_by FROM course_requests WHERE id=?").bind(id).first<Record<string, unknown>>();
+    if (!current) return json({ error: "Pedido não encontrado." }, 404);
+    const managing = isCommission(user), owns = String(current.submitted_by) === user.id;
+    if (!managing && !owns) return json({ error: "Não tem permissão para apagar este pedido." }, 403);
+    if (!await enabled(managing ? "requests.management" : "requests.submission")) return disabled();
+    const details = JSON.stringify({ id, subject: String(current.subject) });
+    const deletion = managing
+      ? env.DB.prepare("DELETE FROM course_requests WHERE id=?").bind(id)
+      : env.DB.prepare("DELETE FROM course_requests WHERE id=? AND submitted_by=?").bind(id, user.id);
+    const result = await env.DB.batch([
+      deletion,
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) SELECT ?,'course_request_deleted',?,? WHERE changes()>0").bind(actor(user), details, Date.now()),
+    ]);
+    if (!result[0]?.meta.changes) return json({ error: "Pedido não encontrado." }, 404);
+    return json({ ok: true });
+  }
   const management = request.method === "PATCH" || url.searchParams.get("scope") === "management";
   if (!await enabled(management ? "requests.management" : "requests.submission")) return disabled();
   if (management && !isCommission(user)) return forbidden();
   if (request.method === "GET") {
     const where = management ? "1=1" : "(r.submitted_by=? OR (r.response_visibility='public' AND r.response IS NOT NULL))";
-    const query = `SELECT r.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id JOIN users u ON u.id=r.submitted_by WHERE ${where} ORDER BY r.created_at DESC LIMIT 500`;
+    const query = `SELECT r.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id JOIN users u ON u.id=r.submitted_by WHERE ${where} ORDER BY r.created_at DESC LIMIT 500`;
     const [result, units] = await Promise.all([management ? env.DB.prepare(query).all() : env.DB.prepare(query).bind(user.id).all(), unitChoices(env)]);
     return json({ requests: result.results.map((row) => requestDto(rowObject(row), user, management)), units });
   }
@@ -271,12 +290,12 @@ async function unitDetail(env: HubEnv, id: string, user: HubUser | null, enabled
   const visibility = isCommission(user) ? "1=1" : user ? "visibility!='cc'" : "visibility='public'";
   const [eventsResult, docsResult, announcementsResult, materialsResult] = await Promise.all([
     env.DB.prepare(`SELECT * FROM academic_events WHERE curricular_unit_id=? AND ${visibility} AND status='scheduled' ORDER BY starts_at LIMIT 100`).bind(id).all(),
-    env.DB.prepare(`SELECT * FROM academic_documents WHERE curricular_unit_id=? AND ${visibility} AND status='published' ORDER BY published_at DESC LIMIT 100`).bind(id).all(),
+    env.DB.prepare(`SELECT d.*,u.id AS author_id,u.full_name AS author_name,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM academic_documents d JOIN users u ON u.id=d.created_by WHERE d.curricular_unit_id=? AND ${visibility} AND d.status='published' ORDER BY d.published_at DESC LIMIT 100`).bind(id).all(),
     env.DB.prepare("SELECT a.* FROM announcements a JOIN announcement_curricular_units acu ON acu.announcement_id=a.id WHERE acu.curricular_unit_id=? AND a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) ORDER BY a.published_at DESC LIMIT 50").bind(id, Date.now()).all(),
     env.DB.prepare("SELECT id,title,description,material_type,academic_year,attachment_name,attachment_mime,attachment_data_url,created_at FROM material_submissions WHERE curricular_unit_id=? AND status='published' AND material_type!='exam_photo' ORDER BY created_at DESC LIMIT 100").bind(id).all(),
   ]);
   const row = rowObject(unit);
-  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representative: { id: row.representative_id, fullName: row.representative_name, email: row.representative_email, position: row.representative_position, department: row.representative_department } }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false)), announcements: announcementsResult.results, materials: materialsResult.results.map((item) => materialDto(item)) });
+  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representative: { id: row.representative_id, fullName: row.representative_name, email: row.representative_email, position: row.representative_position, department: row.representative_department } }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false, isCommission(user))), announcements: announcementsResult.results, materials: materialsResult.results.map((item) => materialDto(item)) });
 }
 
 function pollDto(row: Record<string, unknown>, questions: Array<Record<string, unknown>>, options: Array<Record<string, unknown>>, canResults: boolean, voted: boolean) {
@@ -426,7 +445,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     const showModeration = moderation || canModerate;
     const materialVisibility = showModeration ? "1=1" : "m.status='published' AND m.material_type!='exam_photo'";
     const [result, units, attachmentResult] = await Promise.all([
-      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(unitId, unitId).all(),
+      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(unitId, unitId).all(),
       unitChoices(env),
       env.DB.prepare(`SELECT a.* FROM material_submission_attachments a JOIN material_submissions m ON m.id=a.submission_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY a.submission_id,a.sort_order,a.created_at`).bind(unitId, unitId).all(),
     ]);
@@ -435,7 +454,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
       const attachment = rowObject(item), submissionId = String(attachment.submission_id);
       attachmentsBySubmission.set(submissionId, [...(attachmentsBySubmission.get(submissionId) ?? []), attachment]);
     }
-    return json({ materials: result.results.map((item) => { const row = rowObject(item), dto = materialDto(item, attachmentsBySubmission.get(String(row.id)) ?? []) as Record<string, unknown>; if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email }; return dto; }), units, canModerate });
+    return json({ materials: result.results.map((item) => { const row = rowObject(item), dto = materialDto(item, attachmentsBySubmission.get(String(row.id)) ?? []) as Record<string, unknown>; if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) { dto.authorId = row.submitted_by; dto.authorEmail = row.submitter_email; dto.authorStudentNumber = row.submitter_student_number; dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; } if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; return dto; }), units, canModerate });
   }
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
@@ -498,7 +517,11 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
   if (query.length < 2) return json({ results: [] });
   const pattern = `%${query.replace(/[%_]/g, "")}%`;
   const cc = isCommission(user), visibility = cc ? "1=1" : "visibility!='cc'";
-  const [units, events, docs, announcements, materialRows, members] = await Promise.all([
+  const classesEnabled = await enabled("classes.rosters");
+  const [classes, units, events, docs, announcements, materialRows, members] = await Promise.all([
+    classesEnabled
+      ? env.DB.prepare("SELECT id,'Turma' AS eyebrow,('Turma ' || id) AS title,('Ano letivo ' || academic_year || ' · ' || (SELECT COUNT(*) FROM class_students cs WHERE cs.class_id=classes.id AND cs.removed_at IS NULL) || ' estudantes') AS description,'class' AS type,updated_at AS date FROM classes WHERE (('Turma ' || id) LIKE ? OR CAST(id AS TEXT) LIKE ? OR academic_year LIKE ?) ORDER BY id LIMIT 20").bind(pattern, pattern, pattern).all()
+      : Promise.resolve({ results: [] }),
     env.DB.prepare("SELECT id,code AS eyebrow,name AS title,'curricular_unit' AS type,('ECTS: ' || ects || ' · ' || study_year || '.º ano') AS description FROM curricular_units WHERE active=1 AND (name LIKE ? OR code LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare(`SELECT id,event_type AS eyebrow,title,description,'event' AS type,starts_at AS date FROM academic_events WHERE ${visibility} AND status='scheduled' AND (title LIKE ? OR description LIKE ?) LIMIT 20`).bind(pattern, pattern).all(),
     env.DB.prepare(`SELECT id,document_type AS eyebrow,title,description,'document' AS type,published_at AS date FROM academic_documents WHERE ${visibility} AND status='published' AND (title LIKE ? OR description LIKE ? OR content LIKE ?) LIMIT 20`).bind(pattern, pattern, pattern).all(),
@@ -506,8 +529,8 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
     env.DB.prepare("SELECT id,material_type AS eyebrow,title,description,'material' AS type,created_at AS date FROM material_submissions WHERE status='published' AND material_type!='exam_photo' AND (title LIKE ? OR description LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare("SELECT u.id,p.label AS eyebrow,u.full_name AS title,COALESCE(d.label,p.label) AS description,'member' AS type,u.updated_at AS date FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' AND (u.full_name LIKE ? OR p.label LIKE ? OR d.label LIKE ?) LIMIT 20").bind(pattern, pattern, pattern).all(),
   ]);
-  const hrefs: Record<string, (id: unknown) => string> = { announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao" };
-  const results = [...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
+  const hrefs: Record<string, (id: unknown) => string> = { class: (id) => `/turmas/${encodeURIComponent(String(id))}`, announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao" };
+  const results = [...classes.results, ...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
   return json({ query, results });
 }
 

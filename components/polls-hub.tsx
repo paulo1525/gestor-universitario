@@ -29,6 +29,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
+import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
 import styles from "@/components/polls-hub.module.css";
 
@@ -104,7 +105,7 @@ function inputDate(value: string | null) {
   return local.toISOString().slice(0, 16);
 }
 
-function normalize(item: ApiPoll): Poll {
+function normalize(item: ApiPoll, optionFallback: string): Poll {
   const status = item.status === "published" ? "active" : item.status ?? "active";
   return {
     id: String(item.id),
@@ -121,19 +122,25 @@ function normalize(item: ApiPoll): Poll {
     selectedOptionIds: (item.selectedOptionIds ?? item.selected_option_ids ?? []).map(String),
     options: (item.options ?? []).map((option) => ({
       id: String(option.id),
-      label: option.label ?? option.text ?? "Opção",
+      label: option.label ?? option.text ?? optionFallback,
       votes: Number(option.votes ?? option.voteCount ?? option.vote_count ?? 0),
     })),
   };
 }
 
-function localDate(value: string) {
-  return new Intl.DateTimeFormat("pt-PT", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Lisbon" }).format(new Date(value));
+function localDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Lisbon" }).format(new Date(value));
 }
 
-const statusLabels: Record<Poll["status"], string> = { active: "A decorrer", draft: "Rascunho", closed: "Encerrado", archived: "Arquivado" };
-
 export function PollsHub() {
+  const { locale, t } = useI18n();
+  const dateLocale = locale === "en" ? "en-GB" : "pt-PT";
+  const statusLabels = useMemo<Record<Poll["status"], string>>(() => ({
+    active: t("polls.status.active"),
+    draft: t("polls.status.draft"),
+    closed: t("polls.status.closed"),
+    archived: t("polls.status.archived"),
+  }), [t]);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -154,15 +161,15 @@ export function PollsHub() {
     try {
       const response = await fetch("/api/polls?scope=management", { cache: "no-store" });
       const data = (await response.json()) as { polls?: ApiPoll[]; canCreate?: boolean; canManage?: boolean; error?: string };
-      if (!response.ok) throw new Error(data.error || "Não foi possível carregar os inquéritos.");
-      setPolls((data.polls ?? []).map(normalize));
+      if (!response.ok) throw new Error(data.error || t("polls.loadError"));
+      setPolls((data.polls ?? []).map((poll) => normalize(poll, t("polls.optionFallback"))));
       setCanManage(data.canManage ?? data.canCreate ?? false);
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível carregar os inquéritos." });
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.loadError") });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -175,9 +182,9 @@ export function PollsHub() {
   }), [polls]);
 
   const visible = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("pt-PT");
-    return polls.filter((poll) => (filter === "all" || poll.status === filter) && (!term || `${poll.title} ${poll.description}`.toLocaleLowerCase("pt-PT").includes(term)));
-  }, [filter, polls, query]);
+    const term = query.trim().toLocaleLowerCase(dateLocale);
+    return polls.filter((poll) => (filter === "all" || poll.status === filter) && (!term || `${poll.title} ${poll.description}`.toLocaleLowerCase(dateLocale).includes(term)));
+  }, [dateLocale, filter, polls, query]);
 
   const editingPoll = editingId ? polls.find((poll) => poll.id === editingId) ?? null : null;
   const optionsLocked = Boolean(editor === "edit" && editingPoll && editingPoll.totalVotes > 0);
@@ -217,18 +224,18 @@ export function PollsHub() {
   async function vote(poll: Poll) {
     const optionIds = choices[poll.id] ?? [];
     if (!optionIds.length) {
-      setNotice({ kind: "warning", message: "Seleciona pelo menos uma opção antes de votar." });
+      setNotice({ kind: "warning", message: t("polls.vote.select") });
       return;
     }
     setVotingId(poll.id);
     try {
       const response = await fetch(`/api/polls/${encodeURIComponent(poll.id)}/vote`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ optionIds }) });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error || "Não foi possível registar o voto.");
-      setNotice({ kind: "success", message: "O teu voto foi registado de forma anónima." });
+      if (!response.ok) throw new Error(data.error || t("polls.vote.error"));
+      setNotice({ kind: "success", message: t("polls.vote.success") });
       await load();
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível registar o voto." });
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.vote.error") });
     } finally {
       setVotingId(null);
     }
@@ -238,11 +245,11 @@ export function PollsHub() {
     event.preventDefault();
     const cleanOptions = form.options.map((value) => value.trim()).filter(Boolean);
     if (!form.title.trim() || cleanOptions.length < 2) {
-      setNotice({ kind: "warning", message: "Indica um título e pelo menos duas opções." });
+      setNotice({ kind: "warning", message: t("polls.validation.minimum") });
       return;
     }
-    if (new Set(cleanOptions.map((option) => option.toLocaleLowerCase("pt-PT"))).size !== cleanOptions.length) {
-      setNotice({ kind: "warning", message: "As opções de resposta não podem estar repetidas." });
+    if (new Set(cleanOptions.map((option) => option.toLocaleLowerCase(dateLocale))).size !== cleanOptions.length) {
+      setNotice({ kind: "warning", message: t("polls.validation.duplicate") });
       return;
     }
     setSubmitting(true);
@@ -269,12 +276,12 @@ export function PollsHub() {
       }
       const response = await fetch("/api/polls", { method: editing ? "PATCH" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error || `Não foi possível ${editing ? "atualizar" : "criar"} o inquérito.`);
+      if (!response.ok) throw new Error(data.error || t(editing ? "polls.save.updateError" : "polls.save.createError"));
       closeEditor();
-      setNotice({ kind: "success", message: editing ? "Inquérito atualizado." : "Inquérito publicado." });
+      setNotice({ kind: "success", message: t(editing ? "polls.save.updated" : "polls.save.published") });
       await load();
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível guardar o inquérito." });
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.save.error") });
     } finally {
       setSubmitting(false);
     }
@@ -286,13 +293,13 @@ export function PollsHub() {
     try {
       const response = await fetch("/api/polls", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }) });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error || "Não foi possível apagar o inquérito.");
+      if (!response.ok) throw new Error(data.error || t("polls.delete.error"));
       if (editingId === deleteTarget.id) closeEditor();
       setDeleteTarget(null);
-      setNotice({ kind: "success", message: "Inquérito apagado definitivamente." });
+      setNotice({ kind: "success", message: t("polls.delete.success") });
       await load();
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível apagar o inquérito." });
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.delete.error") });
     } finally {
       setDeleting(false);
     }
@@ -301,23 +308,23 @@ export function PollsHub() {
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="polls.voting">
-        <AppShell active="polls" breadcrumb="Inquéritos">
+        <AppShell active="polls" breadcrumb={t("polls.breadcrumb")}>
           <main className={styles.page}>
             <section className={styles.hero}>
               <div className={styles.heroContent}>
                 <span className={styles.heroIcon}><Vote /></span>
                 <div>
-                  <span className={styles.eyebrow}>Participação académica</span>
-                  <h1>A tua opinião conta.</h1>
-                  <p>Vota nas decisões da comunidade com privacidade. A participação é validada, mas a resposta nunca fica ligada ao teu perfil.</p>
+                  <span className={styles.eyebrow}>{t("polls.eyebrow")}</span>
+                  <h1>{t("polls.title")}</h1>
+                  <p>{t("polls.intro")}</p>
                 </div>
               </div>
               <div className={styles.heroActions}>
                 <div className={styles.heroStats}>
-                  <span><strong>{counts.active}</strong> em curso</span>
-                  <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> participações</span>
+                  <span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span>
+                  <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span>
                 </div>
-                {canManage && <button className={styles.createButton} type="button" onClick={openCreate}><Plus /> Novo inquérito</button>}
+                {canManage && <button className={styles.createButton} type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
               </div>
             </section>
 
@@ -327,33 +334,33 @@ export function PollsHub() {
               <section className={styles.editor} aria-labelledby="poll-editor-title">
                 <header className={styles.editorHeader}>
                   <div>
-                    <span className={styles.eyebrow}>{editor === "edit" ? "Gestão do inquérito" : "Novo inquérito"}</span>
-                    <h2 id="poll-editor-title">{editor === "edit" ? "Editar inquérito" : "Criar uma votação"}</h2>
-                    <p>{optionsLocked ? "Já existem votos: a pergunta, o estado e as datas podem ser ajustados, mas as opções ficam protegidas." : "Define uma pergunta clara, as respostas disponíveis e quando termina."}</p>
+                    <span className={styles.eyebrow}>{editor === "edit" ? t("polls.editor.management") : t("polls.editor.new")}</span>
+                    <h2 id="poll-editor-title">{editor === "edit" ? t("polls.editor.edit") : t("polls.editor.create")}</h2>
+                    <p>{optionsLocked ? t("polls.editor.lockedIntro") : t("polls.editor.intro")}</p>
                   </div>
-                  <button className={styles.closeButton} type="button" onClick={closeEditor} aria-label="Fechar editor"><X /></button>
+                  <button className={styles.closeButton} type="button" onClick={closeEditor} aria-label={t("polls.editor.close")}><X /></button>
                 </header>
                 <form className={styles.editorBody} onSubmit={save}>
                   <div className={styles.editorMain}>
-                    <label className={styles.field}><FormLabel icon={MessageSquareText}>Pergunta</FormLabel><input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} maxLength={180} required placeholder="O que gostarias de perguntar?" /></label>
-                    <label className={styles.field}><FormLabel icon={AlignLeft} optional>Contexto</FormLabel><textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={3000} placeholder="Explica brevemente o objetivo desta votação…" /></label>
+                    <label className={styles.field}><FormLabel icon={MessageSquareText}>{t("polls.editor.question")}</FormLabel><input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} maxLength={180} required placeholder={t("polls.editor.questionPlaceholder")} /></label>
+                    <label className={styles.field}><FormLabel icon={AlignLeft} optional>{t("polls.editor.context")}</FormLabel><textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={3000} placeholder={t("polls.editor.contextPlaceholder")} /></label>
                     <div className={styles.optionsHeading}>
-                      <div><strong>Opções de resposta</strong><small>{optionsLocked ? "Protegidas porque o inquérito já recebeu votos." : "Entre 2 e 20 opções diferentes."}</small></div>
-                      {!optionsLocked && <button className={styles.textButton} type="button" onClick={() => setForm((current) => ({ ...current, options: [...current.options, ""] }))} disabled={form.options.length >= 20}><Plus /> Adicionar</button>}
+                      <div><strong>{t("polls.editor.options")}</strong><small>{optionsLocked ? t("polls.editor.optionsLocked") : t("polls.editor.optionsHelp")}</small></div>
+                      {!optionsLocked && <button className={styles.textButton} type="button" onClick={() => setForm((current) => ({ ...current, options: [...current.options, ""] }))} disabled={form.options.length >= 20}><Plus /> {t("polls.editor.add")}</button>}
                     </div>
                     <div className={styles.optionEditor}>
                       {form.options.map((value, index) => (
-                        <div className={styles.optionInput} key={index}><span>{index + 1}</span><input value={value} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, options: current.options.map((item, itemIndex) => itemIndex === index ? event.target.value : item) }))} maxLength={180} required={index < 2} placeholder={`Opção ${index + 1}`} />{!optionsLocked && form.options.length > 2 && <button type="button" onClick={() => setForm((current) => ({ ...current, options: current.options.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={`Remover opção ${index + 1}`}><X /></button>}</div>
+                        <div className={styles.optionInput} key={index}><span>{index + 1}</span><input value={value} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, options: current.options.map((item, itemIndex) => itemIndex === index ? event.target.value : item) }))} maxLength={180} required={index < 2} placeholder={t("polls.editor.option", { number: index + 1 })} />{!optionsLocked && form.options.length > 2 && <button type="button" onClick={() => setForm((current) => ({ ...current, options: current.options.filter((_, itemIndex) => itemIndex !== index) }))} aria-label={t("polls.editor.removeOption", { number: index + 1 })}><X /></button>}</div>
                       ))}
                     </div>
                   </div>
                   <aside className={styles.editorAside}>
-                    {editor === "edit" && <label className={styles.field}><FormLabel icon={CircleDot}>Estado</FormLabel><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PollForm["status"] }))}><option value="draft">Rascunho</option><option value="published">Publicado</option><option value="closed">Encerrado</option><option value="archived">Arquivado</option></select></label>}
-                    <label className={styles.field}><FormLabel icon={CalendarClock} optional>Termina em</FormLabel><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
-                    <label className={styles.field}><FormLabel icon={Eye}>Mostrar resultados</FormLabel><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">Depois de votar</option><option value="always">Sempre</option><option value="after_close">Depois de encerrar</option><option value="cc">Só à Comissão de Curso</option></select></label>
-                    <div className={styles.privacyCard}><ShieldCheck /><div><strong>Votação anónima</strong><small>A identidade valida uma única participação, mas nunca é guardada junto da resposta.</small></div></div>
-                    <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>Escolha múltipla</strong><small>Permite selecionar várias respostas.</small></span></label>
-                    <div className={styles.editorActions}><button className={styles.secondaryButton} type="button" onClick={closeEditor}>Cancelar</button><button className={styles.primaryButton} type="submit" disabled={submitting}>{submitting ? <LoaderCircle className={styles.spin} /> : <Send />}{submitting ? "A guardar…" : editor === "edit" ? "Guardar alterações" : "Publicar"}</button></div>
+                    {editor === "edit" && <label className={styles.field}><FormLabel icon={CircleDot}>{t("polls.editor.status")}</FormLabel><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PollForm["status"] }))}><option value="draft">{t("polls.status.draft")}</option><option value="published">{t("polls.editor.statusPublished")}</option><option value="closed">{t("polls.status.closed")}</option><option value="archived">{t("polls.status.archived")}</option></select></label>}
+                    <label className={styles.field}><FormLabel icon={CalendarClock} optional>{t("polls.editor.endsAt")}</FormLabel><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
+                    <label className={styles.field}><FormLabel icon={Eye}>{t("polls.editor.results")}</FormLabel><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">{t("polls.editor.afterVote")}</option><option value="always">{t("polls.editor.always")}</option><option value="after_close">{t("polls.editor.afterClose")}</option><option value="cc">{t("polls.editor.onlyCommittee")}</option></select></label>
+                    <div className={styles.privacyCard}><ShieldCheck /><div><strong>{t("polls.editor.anonymous")}</strong><small>{t("polls.editor.anonymousHelp")}</small></div></div>
+                    <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>{t("polls.editor.multiple")}</strong><small>{t("polls.editor.multipleHelp")}</small></span></label>
+                    <div className={styles.editorActions}><button className={styles.secondaryButton} type="button" onClick={closeEditor}>{t("polls.editor.cancel")}</button><button className={styles.primaryButton} type="submit" disabled={submitting}>{submitting ? <LoaderCircle className={styles.spin} /> : <Send />}{submitting ? t("polls.editor.saving") : editor === "edit" ? t("polls.editor.save") : t("polls.editor.publish")}</button></div>
                   </aside>
                 </form>
               </section>
@@ -361,24 +368,24 @@ export function PollsHub() {
 
             <section className={styles.workspace}>
               <header className={styles.toolbar}>
-                <div className={styles.tabs} role="tablist" aria-label="Filtrar inquéritos">
-                  {(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"]) ] as Filter[]).map((value) => <button key={value} type="button" className={filter === value ? styles.activeTab : ""} onClick={() => setFilter(value)}>{value === "all" ? "Todos" : statusLabels[value]}<span>{counts[value]}</span></button>)}
+                <div className={styles.tabs} role="tablist" aria-label={t("polls.filters.aria")}>
+                  {(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"]) ] as Filter[]).map((value) => <button key={value} type="button" className={filter === value ? styles.activeTab : ""} onClick={() => setFilter(value)}>{value === "all" ? t("polls.filters.all") : statusLabels[value]}<span>{counts[value]}</span></button>)}
                 </div>
-                <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar inquéritos" /></label>
+                <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("polls.filters.search")} /></label>
               </header>
 
-              {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>A carregar inquéritos…</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>Nenhum inquérito por aqui</strong><p>Experimenta outro filtro ou cria uma nova votação.</p></div> : <div className={styles.pollList}>
+              {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>{t("polls.loading")}</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>{t("polls.empty.title")}</strong><p>{t("polls.empty.body")}</p></div> : <div className={styles.pollList}>
                 {visible.map((poll) => {
                   const selected = choices[poll.id] ?? poll.selectedOptionIds;
                   const showResults = poll.hasVoted || poll.status === "closed" || canManage;
                   return <article className={styles.pollCard} key={poll.id}>
                     <header className={styles.pollHeader}>
                       <div className={styles.pollTitleBlock}>
-                        <div className={styles.statusLine}><span className={`${styles.status} ${styles[`status_${poll.status}`]}`}><CircleDot />{statusLabels[poll.status]}</span><span className={styles.anonymous}><LockKeyhole /> Voto anónimo</span>{poll.allowMultiple && <span className={styles.multiple}>Escolha múltipla</span>}</div>
+                        <div className={styles.statusLine}><span className={`${styles.status} ${styles[`status_${poll.status}`]}`}><CircleDot />{statusLabels[poll.status]}</span><span className={styles.anonymous}><LockKeyhole /> {t("polls.anonymousVote")}</span>{poll.allowMultiple && <span className={styles.multiple}>{t("polls.multipleChoice")}</span>}</div>
                         <h2>{poll.title}</h2>
                         {poll.description && <p>{poll.description}</p>}
                       </div>
-                      {canManage && <div className={styles.pollActions}><button className={styles.editButton} type="button" onClick={() => openEdit(poll)}><Edit3 /> Editar</button><button className={styles.deleteButton} type="button" onClick={() => setDeleteTarget(poll)}><Trash2 /> Apagar</button></div>}
+                      {canManage && <div className={styles.pollActions}><button className={styles.editButton} type="button" onClick={() => openEdit(poll)}><Edit3 /> {t("polls.edit")}</button><button className={styles.deleteButton} type="button" onClick={() => setDeleteTarget(poll)}><Trash2 /> {t("polls.delete")}</button></div>}
                     </header>
                     <div className={styles.optionList}>
                       {poll.options.map((option) => {
@@ -394,15 +401,15 @@ export function PollsHub() {
                       })}
                     </div>
                     <footer className={styles.pollFooter}>
-                      <div className={styles.pollMeta}><span><Users /> {poll.totalVotes} {poll.totalVotes === 1 ? "participação" : "participações"}</span><span>{poll.endsAt ? <><CalendarClock /> Termina {localDate(poll.endsAt)}</> : <><Clock3 /> Sem data de fim</>}</span>{poll.hasVoted && <span className={styles.voted}><CheckCircle2 /> Já participaste</span>}</div>
-                      {poll.status === "active" && !poll.hasVoted && <button className={styles.voteButton} type="button" onClick={() => void vote(poll)} disabled={votingId === poll.id}>{votingId === poll.id ? <LoaderCircle className={styles.spin} /> : <Vote />}{votingId === poll.id ? "A registar…" : "Submeter voto"}</button>}
+                      <div className={styles.pollMeta}><span><Users /> {poll.totalVotes} {t(poll.totalVotes === 1 ? "polls.participation.one" : "polls.participation.many")}</span><span>{poll.endsAt ? <><CalendarClock /> {t("polls.ends", { date: localDate(poll.endsAt, dateLocale) })}</> : <><Clock3 /> {t("polls.noEnd")}</>}</span>{poll.hasVoted && <span className={styles.voted}><CheckCircle2 /> {t("polls.voted")}</span>}</div>
+                      {poll.status === "active" && !poll.hasVoted && <button className={styles.voteButton} type="button" onClick={() => void vote(poll)} disabled={votingId === poll.id}>{votingId === poll.id ? <LoaderCircle className={styles.spin} /> : <Vote />}{votingId === poll.id ? t("polls.vote.submitting") : t("polls.vote.submit")}</button>}
                     </footer>
                   </article>;
                 })}
               </div>}
             </section>
 
-            {deleteTarget && <div className={styles.confirmBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deleting) setDeleteTarget(null); }}><section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="delete-poll-title"><span className={styles.confirmIcon}><AlertTriangle /></span><div><span className={styles.eyebrow}>Eliminação definitiva</span><h2 id="delete-poll-title">Apagar “{deleteTarget.title}”?</h2><p>O inquérito, as opções, as participações anónimas e os resultados serão eliminados. Esta ação não pode ser anulada.</p></div><footer><button className={styles.secondaryButton} type="button" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancelar</button><button className={styles.dangerButton} type="button" disabled={deleting} onClick={() => void deletePoll()}>{deleting ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deleting ? "A apagar…" : "Apagar definitivamente"}</button></footer></section></div>}
+            {deleteTarget && <div className={styles.confirmBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deleting) setDeleteTarget(null); }}><section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="delete-poll-title"><span className={styles.confirmIcon}><AlertTriangle /></span><div><span className={styles.eyebrow}>{t("polls.delete.eyebrow")}</span><h2 id="delete-poll-title">{t("polls.delete.title", { title: deleteTarget.title })}</h2><p>{t("polls.delete.intro")}</p></div><footer><button className={styles.secondaryButton} type="button" disabled={deleting} onClick={() => setDeleteTarget(null)}>{t("polls.delete.cancel")}</button><button className={styles.dangerButton} type="button" disabled={deleting} onClick={() => void deletePoll()}>{deleting ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deleting ? t("polls.delete.deleting") : t("polls.delete.confirm")}</button></footer></section></div>}
           </main>
         </AppShell>
       </ModuleGuard>

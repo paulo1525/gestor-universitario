@@ -25,6 +25,8 @@ import { FileUploadField } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/documents-library.module.css";
+import { personDisplay } from "@/lib/person-display";
+import { PersonName } from "@/components/person-name";
 
 type DateInput = string | number;
 type DocumentItem = {
@@ -38,6 +40,9 @@ type DocumentItem = {
   unitId: string;
   unitName: string;
   authorName: string;
+  authorEmail: string;
+  authorStudentNumber: string;
+  authorId: string;
   createdAt: DateInput;
 };
 type Unit = { id: string; code: string; name: string };
@@ -84,6 +89,9 @@ function normalise(raw: Record<string, unknown>): DocumentItem {
     unitId: String(first(raw, "unitId", "unit_id") ?? unit.id ?? ""),
     unitName: String(first(raw, "unitName", "unit_name") ?? unit.name ?? ""),
     authorName: String(first(raw, "authorName", "author_name") || "Comiss\u00e3o de Curso"),
+    authorEmail: String(first(raw, "authorEmail", "author_email") || ""),
+    authorStudentNumber: String(first(raw, "authorStudentNumber", "author_student_number") || ""),
+    authorId: String(first(raw, "authorId", "author_id", "createdBy", "created_by") || ""),
     createdAt: dateInput(first(raw, "createdAt", "created_at")),
   };
 }
@@ -229,11 +237,11 @@ export function DocumentsLibrary() {
             </div>
             {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} />{"A carregar arquivo\u2026"}</div>
               : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{"Ainda n\u00e3o existem documentos"}</strong><span>{"Os documentos publicados aparecer\u00e3o aqui."}</span></div>
-                : <div className={styles.cardGrid}>{visible.map((item) => <article className={styles.fileCard} key={item.id}>
+                : <div className={styles.cardGrid}>{visible.map((item) => { const author = personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage }); return <article className={styles.fileCard} key={item.id}>
                   <div className={styles.fileIcon}>{item.type === "minutes" ? <FileArchive /> : <FileText />}</div>
-                  <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} {item.authorName} {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>
+                    <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} <PersonName person={author} /> {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>
                   <div className={styles.cardActions}>{item.fileUrl && <a className="button" href={item.fileUrl} download={item.fileName}><Download />Descarregar</a>}{canManage && <button className={styles.iconDanger} type="button" onClick={() => void remove(item.id)} aria-label={`Eliminar ${item.title}`}><Trash2 /></button>}</div>
-                </article>)}</div>}
+                </article>; })}</div>}
           </section>
         </AppShell>
       </ModuleGuard>

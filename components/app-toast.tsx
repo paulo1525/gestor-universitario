@@ -2,6 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert, X } from "lucide-react";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { useI18n } from "@/components/i18n-context";
 
 export type ToastKind = "success" | "error" | "warning" | "info";
 
@@ -13,13 +14,6 @@ type Props = {
   onDismiss?: () => void;
 };
 
-const titles: Record<ToastKind, string> = {
-  success: "Concluído com sucesso",
-  error: "Não foi possível concluir",
-  warning: "Atenção necessária",
-  info: "Informação",
-};
-
 const icons = {
   success: CheckCircle2,
   error: ShieldAlert,
@@ -28,6 +22,7 @@ const icons = {
 };
 
 export function AppToast({ message, kind = "success", title, duration = 3000, onDismiss }: Props) {
+  const { t } = useI18n();
   const [leaving, setLeaving] = useState(false);
   const exitTimer = useRef<number | null>(null);
   const Icon = icons[kind];
@@ -55,8 +50,8 @@ export function AppToast({ message, kind = "success", title, duration = 3000, on
     style={{ "--toast-duration": `${duration}ms` } as CSSProperties}
   >
     <span className="app-toast__icon" aria-hidden="true"><Icon /></span>
-    <span className="app-toast__copy"><strong>{title || titles[kind]}</strong><span>{message}</span></span>
-    {onDismiss && <button type="button" className="app-toast__close" aria-label="Fechar aviso" onClick={dismiss}><X /></button>}
+    <span className="app-toast__copy"><strong>{title || t(`toast.${kind}`)}</strong><span>{message}</span></span>
+    {onDismiss && <button type="button" className="app-toast__close" aria-label={t("toast.close")} onClick={dismiss}><X /></button>}
     {duration > 0 && onDismiss && <span className="app-toast__progress" aria-hidden="true" />}
   </aside>;
 }

@@ -22,9 +22,9 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/const readOnlyStudent = !canManageAll\(user\) && !user\.preview/);
   assert.match(worker,/const canReadBaseClasses = request\.method === "GET"/);
   assert.match(worker,/preferencia:readOnlyStudent \? "A aguardar decisão"/);
-  assert.match(dashboard,/Turmas base/);
+  assert.match(dashboard,/classes\.dashboard\.baseClasses/);
   assert.match(dashboard,/showDecisions = !preferenceOnly && !placementsPublished/);
-  assert.match(dashboard,/showDecisions && <th>Decisões dos estudantes<\/th>/);
+  assert.match(dashboard,/showDecisions && <th>\{t\("classes\.dashboard\.decisions"\)\}<\/th>/);
   assert.match(detail,/hideDecisions/);
 });
 
@@ -81,8 +81,8 @@ test("o validador oferece um Excel completo e formatado",()=>{
 
 test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.match(detail,/\/api\/classes\/\$\{turma\.id\}\/save/);
-  assert.match(detail,/!row\.fullName\.trim\(\)\|\|!\/\^\[0-9\]\{9\}\$\//);
-  assert.match(detail,/Guardar e continuar/);
+  assert.match(detail,/!row\.fullName\.trim\(\) \|\| !\/\^\[0-9\]\{9\}\$\/\.test\(row\.studentNumber\)/);
+  assert.match(detail,/classes\.detail\.saveContinue/);
   assert.doesNotMatch(detail,/Revisão final|Submeter turma|class-progress/);
   assert.match(worker,/action==="save"/);
   assert.match(worker,/class_roster_saved/);
@@ -118,7 +118,7 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(worker,/distribution_unpublished/);
   assert.match(worker,/placementsPreserved:true/);
   assert.match(worker,/UPDATE classes SET status='submitted'.*status='published'/);
-  assert.match(detail,/A decisão é tomada mais tarde por cada estudante/);
+  assert.match(detail,/classes\.detail\.composeDescription/);
 });
 
 test("aprovação confirma e publica automaticamente",()=>{
@@ -139,11 +139,11 @@ test("editor lista preferências por ordem e integra o destino final",()=>{
 });
 
 test("publicação aparece na página inicial",()=>{
-  assert.match(dashboard,/Turmas do 2\.º ano/);
+  assert.match(dashboard,/classes\.dashboard\.yearClasses/);
   assert.match(dashboard,/published-badge/);
-  assert.match(dashboard,/Publicadas/);
-  assert.match(dashboard,/Descarregar turmas em PDF/);
-  assert.match(dashboard,/placementsPublished&&<Link/);
+  assert.match(dashboard,/classes\.dashboard\.publishedBadge/);
+  assert.match(dashboard,/classes\.dashboard\.pdf/);
+  assert.match(dashboard,/placementsPublished && <Link/);
   assert.match(worker,/handlePublicClassesPdf/);
   assert.match(worker,/content-type":"application\/pdf/);
   assert.match(worker,/SELECT class_id,full_name,student_number FROM class_students/);
@@ -206,22 +206,22 @@ test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.match(placements,/apresentados acima/);
   assert.match(placements,/na página principal de Colocações/);
   assert.match(placements,/disabled=\{calculateBlocked\}/);
-  assert.match(preflight,/Pré-validação operacional/);
-  assert.match(preflight,/Pré-visualização do cálculo/);
+  assert.match(preflight,/classes\.preflight\.eyebrow/);
+  assert.match(preflight,/classes\.preflight\.previewEyebrow/);
   assert.match(preflight,/competition/);
-  assert.match(preflight,/Vagas máx\./);
-  assert.match(preflight,/diferença máxima de 3 estudantes entre turmas/);
-  assert.match(preflight,/Colisões 1\.ª opção/);
-  assert.match(preflight,/Turmas analisadas/);
-  assert.match(preflight,/Desempates decisivos/);
+  assert.match(preflight,/classes\.preflight\.maxVacancies/);
+  assert.match(preflight,/classes\.preflight\.vacanciesLegend/);
+  assert.match(preflight,/classes\.preflight\.collisionColumn/);
+  assert.match(preflight,/classes\.preflight\.classes/);
+  assert.match(preflight,/classes\.preflight\.tiebreaks/);
   assert.match(worker,/firstChoiceCandidates/);
   assert.match(worker,/candidateCapacity/);
   assert.match(worker,/maximumSize-\(finalSize-placed\)/);
   assert.doesNotMatch(preflight,/Simulação sem gravação|não grava alterações|sem alterar nem gravar/);
   assert.match(preflight,/onReviewStudent/);
-  assert.match(preflight,/Casos por página/);
-  assert.match(preflight,/Filtrar por prioridade/);
-  assert.match(preflight,/Primeira página de casos/);
+  assert.match(preflight,/classes\.preflight\.perPageAria/);
+  assert.match(preflight,/classes\.preflight\.priorityAria/);
+  assert.match(preflight,/classes\.preflight\.firstCasesPage/);
   assert.match(placements,/preflight&&!activeDistribution/);
   assert.match(placements,/A calcular e analisar a nova proposta/);
   assert.match(placements,/As pautas de colocação estão publicadas/);
@@ -235,10 +235,10 @@ test("ordem de preferências é explícita e a submissão pode ser editada até 
   assert.doesNotMatch(placements,/\.join\(" → "\)/);
   assert.match(placements,/placement-preference-order/);
   assert.match(placements,/\{index\+1\}\.ª<\/b> Turma/);
-  assert.match(preferences,/Formulário submetido/);
-  assert.match(preferences,/Editar submissão/);
-  assert.match(preferences,/Guardar nova versão/);
-  assert.match(preferences,/destinations:decision==="move"\?destinations:\[\]/);
+  assert.match(preferences,/classes\.preferences\.submittedTitle/);
+  assert.match(preferences,/classes\.preferences\.edit/);
+  assert.match(preferences,/classes\.preferences\.saveVersion/);
+  assert.match(preferences,/destinations: decision === "move" \? destinations : \[\]/);
 });
 
 test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo",()=>{
@@ -287,14 +287,14 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.doesNotMatch(worker,/code:"PONTOS_INCONSISTENTES"/);
   assert.match(worker,/code:"INFORMACAO_VALIDADA_SEM_PONTOS"/);
   assert.match(worker,/additional_info_review_status==="valid"&&Number\(student\.exception_points\|\|0\)===0/);
-  assert.match(preflight,/Informação válida sem pontos extra/);
+  assert.match(preflight,/classDataLabel\(locale,"preflightGroup",code\)/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
   assert.match(worker,/function canEditClass\(user: CurrentUser, classId: number\).*canManageAll\(user\)/);
   assert.match(phasedMigration,/preferences_group_4_close_at/);
-  assert.match(admin,/Janelas de preferências por bloco/);
-  assert.match(preferences,/Informação adicional para análise pela CC/);
+  assert.match(admin,/admin\.control\.preferenceWindows/);
+  assert.match(preferences,/classes\.preferences\.notes/);
   assert.doesNotMatch(preferences,/bullying|amigos|Pessoa específica/i);
 });
 
