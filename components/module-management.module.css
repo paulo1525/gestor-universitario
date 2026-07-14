@@ -361,7 +361,8 @@
   }
 
   .submoduleList {
-    margin: 0 12px 9px 23px;
+    margin: 0 10px 9px;
+    padding-left: 8px;
   }
 
   .submoduleRow {
@@ -380,5 +381,29 @@
   .state {
     flex-wrap: wrap;
     text-align: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .header {
+    align-items: flex-start;
+  }
+
+  .icon {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .moduleList {
+    padding: 6px;
+  }
+
+  .moduleRow {
+    padding: 10px;
+  }
+
+  .submoduleRow {
+    padding-right: 4px;
   }
 }
