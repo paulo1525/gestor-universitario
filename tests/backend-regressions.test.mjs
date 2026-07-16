@@ -142,7 +142,9 @@ test("estatutos especiais são validados e só ficam ativos quando o submódulo 
  assert.match(distributionCheck,/specialStatusesEnabled=await isModuleEnabled\(env,"classes\.special_statuses"\)/);
  assert.match(distributionCheck,/eligibleStudents=specialStatusesEnabled\?students\.results\.filter\(student=>student\.special_status==="none"\):students\.results/);
  assert.match(classes,/specialStatus=specialStatusesEnabled&&parsedStatus\?parsedStatus:"none"/);
- assert.match(classes,/specialStatusesIgnored:!specialStatusesEnabled/);
+ assert.match(classes,/acceptedRows=specialStatusesEnabled\?importedRows:importedRows\.filter\(row=>row\.parsedStatus==="none"\)/);
+ assert.match(classes,/specialStatusRowsSkipped:skipped/);
+ assert.match(classes,/imported:0,skipped,classes:\[\]/);
  assert.match(classes,/DELETE FROM student_destinations.*special_status<>'none'/);
  assert.match(classes,/nextEligibleIds/);
  assert.match(placements,/statusFilter=specialStatusesEnabled\?" AND special_status='none'":""/);
