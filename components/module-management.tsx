@@ -260,7 +260,7 @@ export function ModuleManagement() {
           </div>
         </div>
         <div className={styles.toolbar}>
-          <label className={styles.searchControl}>
+          <label className={`search-field ${styles.searchControl}`}>
             <Search aria-hidden="true" />
             <span className="sr-only">{t("admin.modules.search")}</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("admin.modules.searchPlaceholder")} />

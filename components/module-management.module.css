@@ -71,8 +71,7 @@
   cursor: pointer;
 }
 
-.homeControl select:focus-visible,
-.searchControl:focus-within {
+.homeControl select:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--gold) 30%, transparent);
   outline-offset: 2px;
 }
@@ -82,28 +81,26 @@
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(250px, 360px) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--color-surface-subtle);
 }
 
 .searchControl {
-  display: flex;
-  min-height: 38px;
-  align-items: center;
-  gap: 8px;
-  padding: 0 11px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 86%, var(--line));
+  width: 100%;
+  height: 38px;
+  border-color: var(--line);
+  border-radius: 10px;
+  background: var(--surface);
 }
 
 .searchControl svg { flex: 0 0 auto; width: 15px; height: 15px; color: var(--muted); }
-.searchControl input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 10px; }
+.searchControl input { width: 100%; min-width: 0; height: 36px; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font: inherit; font-size: 10px; }
 .searchControl input::placeholder { color: var(--muted); }
+.searchControl:focus-within { border-color: #947000; box-shadow: 0 0 0 3px rgba(246, 201, 69, .18); }
 
 .filters {
   display: inline-flex;
@@ -132,6 +129,7 @@
 .filters .selectedFilter { color: var(--ink); background: var(--surface); box-shadow: 0 2px 8px rgba(25, 30, 35, .08); }
 
 .summary {
+  justify-self: end;
   padding: 7px 10px;
   border-radius: 999px;
   color: var(--muted);
