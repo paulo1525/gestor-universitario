@@ -586,6 +586,9 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .nav-list a[href="/admin/pedidos"],.distribution-export a[href="/api/admin/export-validation"]{display:none}.preference-help-tooltip{color:#fff!important}.workspace .distribution-export{max-width:none!important;width:100%}@keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
 .admin-empty { padding:24px; color:var(--muted); text-align:center; font-size:10px; }
 .admin-role { display:inline-flex; min-height:36px; align-items:center; font-size:9px; font-weight:800; white-space:nowrap; }
+.admin-role--admin { color:#7a2448; border-color:#e6b9ca; background:#fbeaf1; }
+.admin-role--representative { color:#155c82; border-color:#b7d6e7; background:#e9f5fb; }
+.admin-role--student { color:#27613f; border-color:#b8dbc6; background:#ebf7ef; }
 .admin-access { display:flex; align-items:center; gap:7px; min-width:125px; font-size:9px; font-weight:700; }
 .admin-access input { width:16px !important; min-height:16px !important; accent-color:var(--green); }
 .class-representative { display:grid; gap:6px; min-width:130px; }
