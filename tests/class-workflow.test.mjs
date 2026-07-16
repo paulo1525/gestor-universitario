@@ -104,10 +104,16 @@ test("a importação global aparece antes da lista de turmas e inclui ajuda para
   assert.match(csvImport,/nunca para os converter para N/);
   assert.match(csvImport,/navigator\.clipboard\.writeText\(AI_PROMPT\)/);
   assert.match(csvImport,/fetch\("\/api\/classes\/import"/);
-  assert.match(csvImport,/access\["classes\.special_statuses"\] === true/);
-  assert.match(csvImport,/classes\.import\.statusesIgnored/);
+  assert.match(csvImport,/classes\.import\.aiHelpAction/);
+  assert.doesNotMatch(csvImport,/classes\.import\.formatTitle|classes\.import\.statusesIgnored|STUDENT_STATUS_OPTIONS/);
+  assert.doesNotMatch(csvImport,/button--secondary[^>]*>\{t\("classes\.import\.close"\)\}/);
   assert.match(csvImport,/classes\.import\.successWithSkipped/);
   assert.match(csvImport,/classes\.import\.onlySkipped/);
+});
+
+test("as notificações ficam acessíveis no topo sem ocupar a navegação lateral",()=>{
+  assert.doesNotMatch(shell,/active === "notifications"/);
+  assert.match(shell,/topbar-notifications/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{

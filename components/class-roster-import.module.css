@@ -1,26 +1,16 @@
 .panel { overflow: hidden; margin-bottom: 16px; padding: 0; border-color: color-mix(in srgb, var(--gold) 32%, var(--line)); }
-.header { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; padding: 18px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(115deg, color-mix(in srgb, var(--gold-soft) 42%, var(--surface)), var(--surface) 62%); }
+.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px 20px; border-bottom: 1px solid var(--line); background: linear-gradient(115deg, color-mix(in srgb, var(--gold-soft) 42%, var(--surface)), var(--surface) 62%); }
+.headerCopy { min-width: 0; }
 .header h2 { margin: 0; font-size: 16px; }
 .header p { max-width: 760px; margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; color: #775a00; background: var(--gold-soft); }
 .icon svg { width: 20px; }
-.titleLine { display: flex; align-items: center; gap: 8px; }
-.helpButton { display: grid; width: 25px; height: 25px; padding: 0; place-items: center; border: 1px solid #d5c27d; border-radius: 50%; color: #6e5708; background: #fffdf3; cursor: pointer; }
-.helpButton:hover,.helpButton:focus-visible { border-color: #a67f00; background: var(--gold-soft); outline: 3px solid color-mix(in srgb, var(--gold) 25%, transparent); }
-.helpButton svg { width: 15px; }
-.body { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 16px; padding: 18px 20px; }
+.helpButton { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--gold) 38%, var(--line)); border-radius: 9px; color: #665000; background: color-mix(in srgb, var(--gold-soft) 46%, var(--surface)); font: inherit; font-size: 9px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.helpButton:hover { border-color: #b28b0b; background: var(--gold-soft); }
+.helpButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--gold) 25%, transparent); outline-offset: 2px; }
+.helpButton svg { width: 14px; height: 14px; }
+.body { padding: 18px 20px; }
 .uploadColumn { display: grid; align-content: start; gap: 10px; }
-.format { display: grid; align-content: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in srgb, var(--surface) 76%, var(--line)); }
-.formatHeading { display: flex; align-items: center; gap: 9px; }
-.formatHeading>svg { width: 18px; color: #806000; }
-.formatHeading>div { display: grid; min-width: 0; gap: 2px; }
-.formatHeading strong { font-size: 10px; }
-.formatHeading small { overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
-.codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-.codes span { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 8px; font-weight: 650; }
-.codes b { display: grid; min-width: 27px; height: 24px; padding: 0 6px; place-items: center; border-radius: 7px; color: #5f4800; background: var(--gold-soft); font-size: 8px; }
-.statusesIgnored { display: flex; align-items: flex-start; gap: 7px; margin: 1px 0 0; padding: 8px 9px; border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--line)); border-radius: 8px; color: color-mix(in srgb, var(--warning) 72%, var(--ink)); background: var(--warning-soft); font-size: 8px; line-height: 1.45; }
-.statusesIgnored svg { flex: 0 0 auto; width: 14px; height: 14px; }
 .summary { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #b9dcc5; border-radius: 9px; color: #1f7040; background: #f1fbf4; }
 .summary>svg { width: 16px; }
 .summary span { display: grid; gap: 1px; }
@@ -41,4 +31,4 @@
 .modal>footer { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 20px 18px; }
 .modal>footer button { min-width: 120px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media(max-width:760px){.body{grid-template-columns:1fr}.format{min-width:0}.footer{align-items:stretch;flex-direction:column}.footer button{width:100%}.modalBackdrop{padding:12px}.modal{max-height:calc(100dvh - 24px)}.modal>footer{flex-direction:column-reverse}.modal>footer button{width:100%}}
+@media(max-width:760px){.header{grid-template-columns:auto minmax(0,1fr)}.helpButton{grid-column:1/-1;width:100%;justify-content:center}.footer{align-items:stretch;flex-direction:column}.footer button{width:100%}.modalBackdrop{padding:12px}.modal{max-height:calc(100dvh - 24px)}.modal>footer button{width:100%}}
