@@ -291,6 +291,9 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.doesNotMatch(preflight,/classId\?t\("classes\.common\.class".*:issue\.code/);
   assert.match(admin,/admin-role--\$\{user\.role\}/);
   assert.match(styles,/\.panel__header\s*>\s*\.panel-tools\s*\{[^}]*margin-left:\s*auto/);
+  assert.match(styles,/\.topbar-global-search\{[^}]*margin-left:auto;margin-right:0/);
+  assert.match(styles,/\.test-mode-control\{position:relative;margin-left:0\}/);
+  assert.match(styles,/@media\(max-width:900px\).*\.test-mode-control\{margin-left:auto\}/s);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
