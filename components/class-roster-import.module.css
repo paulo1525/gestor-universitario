@@ -19,6 +19,8 @@
 .codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .codes span { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 8px; font-weight: 650; }
 .codes b { display: grid; min-width: 27px; height: 24px; padding: 0 6px; place-items: center; border-radius: 7px; color: #5f4800; background: var(--gold-soft); font-size: 8px; }
+.statusesIgnored { display: flex; align-items: flex-start; gap: 7px; margin: 1px 0 0; padding: 8px 9px; border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--line)); border-radius: 8px; color: color-mix(in srgb, var(--warning) 72%, var(--ink)); background: var(--warning-soft); font-size: 8px; line-height: 1.45; }
+.statusesIgnored svg { flex: 0 0 auto; width: 14px; height: 14px; }
 .summary { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #b9dcc5; border-radius: 9px; color: #1f7040; background: #f1fbf4; }
 .summary>svg { width: 16px; }
 .summary span { display: grid; gap: 1px; }

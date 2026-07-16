@@ -22,7 +22,8 @@ const styles=readFileSync(new URL("../app/globals.css",import.meta.url),"utf8");
 test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/const readOnlyStudent = !canManageAll\(user\) && !user\.preview/);
   assert.match(worker,/const canReadBaseClasses = request\.method === "GET"/);
-  assert.match(worker,/preferencia:student\.special_status!=="none"\?"Estatuto especial":readOnlyStudent \? "A aguardar decisão"/);
+  assert.match(worker,/const specialStatus=specialStatusesEnabled\?student\.special_status:"none"/);
+  assert.match(worker,/preferencia:specialStatus!=="none"\?"Estatuto especial":readOnlyStudent \? "A aguardar decisão"/);
   assert.match(dashboard,/classes\.dashboard\.baseClasses/);
   assert.match(dashboard,/showDecisions = !preferenceOnly && !placementsPublished/);
   assert.match(dashboard,/showDecisions && <th>\{t\("classes\.dashboard\.decisions"\)\}<\/th>/);
@@ -91,6 +92,7 @@ test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.match(detail,/specialStatus: "none"/);
   assert.match(detail,/classes\.common\.status/);
   assert.match(detail,/STUDENT_STATUS_OPTIONS/);
+  assert.match(detail,/specialStatusesEnabled && <th>/);
 });
 
 test("a importação global aparece antes da lista de turmas e inclui ajuda para IA",()=>{
@@ -100,6 +102,8 @@ test("a importação global aparece antes da lista de turmas e inclui ajuda para
   assert.match(csvImport,/N = Nenhum; TE = Trabalhador-Estudante; A = Atleta; O = Outro/);
   assert.match(csvImport,/navigator\.clipboard\.writeText\(AI_PROMPT\)/);
   assert.match(csvImport,/fetch\("\/api\/classes\/import"/);
+  assert.match(csvImport,/access\["classes\.special_statuses"\] === true/);
+  assert.match(csvImport,/classes\.import\.statusesIgnored/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{

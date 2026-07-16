@@ -135,14 +135,17 @@ test("importação CSV administrativa é aditiva, auditada e bloqueia conflitos"
  assert.match(classes,/special_status,created_by/);
 });
 
-test("estatutos especiais são validados, limpos e excluídos do algoritmo",()=>{
+test("estatutos especiais são validados e só ficam ativos quando o submódulo está ligado",()=>{
  assert.match(specialStatusMigration,/DEFAULT 'none'/);
  assert.match(specialStatusMigration,/worker_student.*athlete.*other/s);
  assert.match(distributionInputs,/special_status='none'/);
- assert.match(distributionCheck,/eligibleStudents=students\.results\.filter\(student=>student\.special_status==="none"\)/);
+ assert.match(distributionCheck,/specialStatusesEnabled=await isModuleEnabled\(env,"classes\.special_statuses"\)/);
+ assert.match(distributionCheck,/eligibleStudents=specialStatusesEnabled\?students\.results\.filter\(student=>student\.special_status==="none"\):students\.results/);
+ assert.match(classes,/specialStatus=specialStatusesEnabled&&parsedStatus\?parsedStatus:"none"/);
+ assert.match(classes,/specialStatusesIgnored:!specialStatusesEnabled/);
  assert.match(classes,/DELETE FROM student_destinations.*special_status<>'none'/);
  assert.match(classes,/nextEligibleIds/);
- assert.match(placements,/special_status='none'/);
+ assert.match(placements,/statusFilter=specialStatusesEnabled\?" AND special_status='none'":""/);
 });
 
 test("revisões manuais só podem ser fechadas no rascunho",()=>{

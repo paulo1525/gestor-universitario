@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const worker = readFileSync(new URL("../worker/index.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../migrations/0020_modules_announcements_curricular_units.sql", import.meta.url), "utf8");
+const specialStatusModuleMigration = readFileSync(new URL("../migrations/0026_special_status_module.sql", import.meta.url), "utf8");
 const definitions = readFileSync(new URL("../lib/app-modules.ts", import.meta.url), "utf8");
 const moduleUi = readFileSync(new URL("../components/module-management.tsx", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
@@ -38,6 +39,8 @@ test("módulos e submódulos têm controlo persistente e exclusivo do administra
   assert.match(moduleUi, /up202507850@up\.pt/);
   assert.match(moduleUi, /admin\.modules\.inheritedInactive/);
   assert.match(migration, /CREATE TABLE app_module_settings/);
+  assert.match(definitions, /key: "classes\.special_statuses"[\s\S]*defaultEnabled: false/);
+  assert.match(specialStatusModuleMigration, /classes\.special_statuses', 0/);
 });
 
 test("rotas existentes são bloqueadas no backend quando o respetivo submódulo está desligado", () => {

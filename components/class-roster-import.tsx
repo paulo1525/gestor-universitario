@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CircleHelp, Clipboard, FileSpreadsheet, LoaderCircle, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, CircleHelp, Clipboard, FileSpreadsheet, LoaderCircle, Upload, X } from "lucide-react";
 import { AppToast } from "@/components/app-toast";
 import { FileUploadField } from "@/components/file-upload-field";
 import { useI18n } from "@/components/i18n-context";
+import { useModules } from "@/components/module-context";
 import { parseStudentCsv, type CsvStudent } from "@/lib/student-csv";
 import { STUDENT_STATUS_OPTIONS, studentStatusLabel } from "@/lib/student-status";
 import styles from "@/components/class-roster-import.module.css";
@@ -28,6 +29,8 @@ Regras obrigatórias:
 
 export function ClassRosterImport({ onImported }: { onImported?: () => void | Promise<void> }) {
   const { locale, t } = useI18n();
+  const { access } = useModules();
+  const specialStatusesEnabled = access["classes.special_statuses"] === true;
   const [file, setFile] = useState<File | null>(null), [students, setStudents] = useState<CsvStudent[]>([]), [importing, setImporting] = useState(false), [notice, setNotice] = useState(""), [noticeError, setNoticeError] = useState(false), [showPrompt, setShowPrompt] = useState(false), [copied, setCopied] = useState(false);
 
   const clearFile = () => { setFile(null); setStudents([]); };
@@ -74,6 +77,7 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
         <aside className={styles.format}>
           <div className={styles.formatHeading}><FileSpreadsheet /><div><strong>{t("classes.import.formatTitle")}</strong><small>turma,nome,n_mecanografico,codigo_estatuto</small></div></div>
           <div className={styles.codes}>{STUDENT_STATUS_OPTIONS.map((option) => <span key={option.code}><b>{option.code}</b>{studentStatusLabel(option.value, locale)}</span>)}</div>
+          {!specialStatusesEnabled && <p className={styles.statusesIgnored}><AlertTriangle />{t("classes.import.statusesIgnored")}</p>}
         </aside>
       </div>
       <footer className={styles.footer}><span>{importing ? <><LoaderCircle className={styles.spinner} />{t("classes.import.importing")}</> : t("classes.import.additive")}</span><button type="button" className="button button--primary button--compact" disabled={!file || !students.length || importing} onClick={() => void importCsv()}>{importing ? <LoaderCircle className={styles.spinner} /> : <Upload />}{importing ? t("classes.import.importingShort") : t("classes.import.action")}</button></footer>
