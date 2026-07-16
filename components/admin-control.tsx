@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, CalendarClock, Check, CheckCircle2, Clock3, Download, Eye, FlaskConical, LoaderCircle, Save, Search, Settings, ShieldCheck, Upload, Users } from "lucide-react";
+import { Ban, CalendarClock, Check, CheckCircle2, Clock3, Download, Eye, FlaskConical, LoaderCircle, Save, Search, Settings, ShieldCheck, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { FormLabel } from "@/components/form-label";
@@ -9,7 +9,6 @@ import { useAuth } from "@/components/auth-context";
 import { useI18n } from "@/components/i18n-context";
 import { adminDataLabel } from "@/lib/i18n-admin";
 import { setTestMode } from "@/lib/test-mode";
-import { parseStudentCsv } from "@/lib/student-csv";
 
 type Role = "student" | "representative" | "admin";
 type Status = "active" | "pending" | "suspended" | "banned";
@@ -48,10 +47,6 @@ export function AdminControl() {
   const [savingSection, setSavingSection] = useState<"maintenance" | "preference_windows" | null>(null);
   const [savedSection, setSavedSection] = useState<"maintenance" | "preference_windows" | null>(null);
   const [page, setPage] = useState(1);
-  const [importClass, setImportClass] = useState(1);
-  const [importing, setImporting] = useState(false);
-  const [importNotice, setImportNotice] = useState("");
-  const [importError, setImportError] = useState(false);
 
   const statusLabels = useMemo<Record<Status, string>>(() => ({
     active: t("admin.control.statusActive"),
@@ -130,20 +125,6 @@ export function AdminControl() {
     } finally { setSavingSection(null); }
   };
 
-  const importCsv = async (file: File | undefined) => {
-    if (!file) return;
-    setImporting(true); setImportNotice(""); setImportError(false);
-    try {
-      if (!file.name.toLocaleLowerCase().endsWith(".csv") || file.size > 1_000_000) throw new Error("Seleciona um ficheiro .csv com até 1 MB.");
-      const students = parseStudentCsv(await file.text());
-      const response = await fetch(`/api/classes/${importClass}/import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ students }) });
-      const data = await response.json() as { error?: string; imported?: number };
-      if (!response.ok) throw new Error(data.error || "Não foi possível importar o CSV.");
-      setImportNotice(`${data.imported || students.length} estudantes adicionados à Turma ${importClass}.`);
-    } catch (error) { setImportError(true); setImportNotice(error instanceof Error ? error.message : "Não foi possível importar o CSV."); }
-    finally { setImporting(false); }
-  };
-
   if (sessionUser?.role !== "admin") return <main className="auth-loading"><ShieldCheck size={28} /><strong>{t("admin.control.adminOnly")}</strong></main>;
 
   const roleLabel = (role: Role) => role === "admin" ? t("admin.control.administrator") : role === "representative" ? t("admin.control.representative") : t("admin.control.student");
@@ -163,13 +144,11 @@ export function AdminControl() {
 
     <section className="panel admin-settings class-deadline-settings"><div className="admin-settings__header"><span className="admin-settings__icon"><CalendarClock /></span><div><span className="eyebrow">{t("admin.control.stagedCalendar")}{sessionUser.testMode ? ` · ${t("admin.control.testSuffix")}` : ""}</span><h2>{t("admin.control.preferenceWindows")}</h2><p>{sessionUser.testMode ? t("admin.control.preferenceWindowsTestDescription") : t("admin.control.preferenceWindowsDescription")}</p></div></div>{deadlineNotice && <p className="admin-notice" role="status">{deadlineNotice}</p>}<div className="preference-window-grid">{preferenceWindows.map((window, index) => <fieldset key={window.group}><legend><strong>{t("admin.control.block", { number: window.group })}</strong><span>{t("admin.control.classes", { classes: window.classes })}</span></legend><div className="deadline-fields"><label><FormLabel icon={CalendarClock}>{t("admin.control.opens")}</FormLabel><input type="datetime-local" value={window.openAt} onChange={(event) => setPreferenceWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, openAt: event.target.value } : item))} /><small>{t("admin.control.lisbonTime")}</small></label><label><FormLabel icon={Clock3}>{t("admin.control.closes")}</FormLabel><input type="datetime-local" min={window.openAt} value={window.closeAt} onChange={(event) => setPreferenceWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, closeAt: event.target.value } : item))} /><small>{t("admin.control.lisbonTime")}</small></label></div></fieldset>)}</div><div className="admin-settings__actions"><button className="button button--primary button--compact" onClick={() => void saveSettings("preference_windows")} disabled={savingSection === "preference_windows"}>{savingSection === "preference_windows" ? <><LoaderCircle className="spin" />{t("admin.common.saving")}</> : savedSection === "preference_windows" ? <><Check />{t("admin.common.saved")}</> : <><Save />{t("admin.control.saveCalendar")}</>}</button></div></section>
 
-    <section className="panel admin-settings"><div className="admin-settings__header"><span className="admin-settings__icon"><Upload /></span><div><span className="eyebrow">Importação de pautas</span><h2>Adicionar estudantes por CSV</h2><p>Seleciona a turma e um ficheiro CSV. Os estudantes são adicionados sem remover os existentes.</p></div></div>{importNotice && <p className={`admin-notice${importError ? " is-error" : ""}`} role="status">{importNotice}</p>}<div className="deadline-fields"><label><FormLabel icon={Users}>Turma de destino</FormLabel><select value={importClass} onChange={(event) => setImportClass(Number(event.target.value))}>{Array.from({ length: 20 }, (_, index) => <option key={index + 1} value={index + 1}>{t("admin.common.class", { number: index + 1 })}</option>)}</select></label><label><FormLabel icon={Upload}>Ficheiro CSV</FormLabel><input type="file" accept=".csv,text/csv" disabled={importing} onChange={(event) => { void importCsv(event.target.files?.[0]); event.currentTarget.value = ""; }} /><small>Máximo 1 MB · apenas as colunas nome e n_mecanografico.</small></label></div>{importing && <p className="admin-notice" role="status"><LoaderCircle className="spin" />A importar estudantes…</p>}</section>
-
     <section className="panel admin-users"><div className="panel__header"><div className="admin-card-heading"><span className="admin-settings__icon"><Users /></span><div><span className="eyebrow">{t("admin.control.accounts")}</span><h2>{t("admin.control.usersPermissions")}</h2></div></div><div className="panel-tools"><label className="search-field"><Search size={16} /><input placeholder={t("admin.control.searchUsers")} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></label><select value={filter} onChange={(event) => { setFilter(event.target.value as Status | "all"); setPage(1); }}><option value="all">{t("admin.control.allStatuses")}</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></div>
       {userNotice && <p className="admin-notice" role="status">{userNotice}</p>}
       {loading ? <p className="admin-empty">{t("admin.control.loadingUsers")}</p> : <><div className="admin-table-wrap"><table><thead><tr><th>{t("admin.control.user")}</th><th>{t("admin.control.role")}</th><th>{t("admin.control.committeeRole")}</th><th>{t("admin.control.department")}</th><th>{t("admin.control.classRepresentative")}</th><th>{t("admin.control.adminAccess")}</th><th>{t("admin.control.status")}</th><th>{t("admin.control.blockReason")}</th><th>{t("admin.control.blockEnd")}</th><th>{t("admin.control.lastAccess")}</th><th>{t("admin.control.actions")}</th></tr></thead><tbody>{pagedUsers.map((user) => <tr key={user.id}>
         <td><input className="admin-name" value={user.full_name} onChange={(event) => updateLocal(user.id, { full_name: event.target.value })} /><small>{user.email}</small></td>
-        <td><span className={`admin-role admin-role--${user.role}`}>{roleLabel(user.role)}</span></td>
+        <td><span className="admin-role">{roleLabel(user.role)}</span></td>
         <td><select value={user.commission_position || ""} onChange={(event) => updateLocal(user.id, { commission_position: event.target.value || null })}><option value="">{t("admin.control.noRole")}</option>{positions.map((position) => <option key={position.code} value={position.code}>{adminDataLabel(locale, "position", position.code) || fallbackDataLabel(position.code, position.label, locale)}</option>)}</select></td>
         <td><select value={user.commission_department || ""} onChange={(event) => updateLocal(user.id, { commission_department: event.target.value || null })}><option value="">{t("admin.control.noDepartment")}</option>{departments.map((department) => <option key={department.code} value={department.code}>{adminDataLabel(locale, "department", department.code) || fallbackDataLabel(department.code, department.label, locale)}</option>)}</select></td>
         <td><div className="class-representative"><label className="admin-access"><input type="checkbox" checked={user.class_representative === 1} onChange={(event) => updateLocal(user.id, { class_representative: event.target.checked ? 1 : 0, represented_class: event.target.checked ? (user.represented_class || 1) : null })} />{t("admin.control.yes")}</label>{user.class_representative === 1 && <select aria-label={t("admin.control.representedClass")} value={user.represented_class || 1} onChange={(event) => updateLocal(user.id, { represented_class: Number(event.target.value) })}>{Array.from({ length: 20 }, (_, index) => <option key={index + 1} value={index + 1}>{t("admin.common.class", { number: index + 1 })}</option>)}</select>}</div></td>

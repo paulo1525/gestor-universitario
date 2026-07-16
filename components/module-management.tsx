@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Boxes, Check, LoaderCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Boxes, Check, House, LoaderCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-context";
 import { AppToast } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
 import { useModules } from "@/components/module-context";
 import { adminDataLabel } from "@/lib/i18n-admin";
+import type { ResolvedModuleHomepage } from "@/lib/module-homepages";
 import styles from "./module-management.module.css";
 
 const MODULE_MANAGER_EMAIL = "up202507850@up.pt";
@@ -25,10 +26,12 @@ export type ManagedModule = {
   label: string;
   description?: string;
   enabled: boolean;
+  homepageEligible?: boolean;
+  isHomepage?: boolean;
   submodules: ManagedSubmodule[];
 };
 
-type ModulesResponse = { modules: ManagedModule[]; error?: string };
+type ModulesResponse = { modules: ManagedModule[]; home?: ResolvedModuleHomepage | null; error?: string };
 type SavingTarget = { moduleKey: string; submoduleKey?: string };
 type Notice = { kind: "success" | "error"; message: string } | null;
 
@@ -42,12 +45,14 @@ export function ModuleManagement() {
   const { synchronize } = useModules();
   const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
   const [modules, setModules] = useState<ManagedModule[]>([]);
+  const [home, setHome] = useState<ResolvedModuleHomepage | null>(null);
   const [loading, setLoading] = useState(true);
   const [requestVersion, setRequestVersion] = useState(0);
   const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [savedTarget, setSavedTarget] = useState("");
   const [savingTargets, setSavingTargets] = useState<Set<string>>(() => new Set());
+  const [savingHome, setSavingHome] = useState(false);
 
   useEffect(() => {
     if (!canManageModules) return;
@@ -65,7 +70,8 @@ export function ModuleManagement() {
       })
       .then((data) => {
         setModules(data.modules);
-        synchronize(data.modules);
+        setHome(data.home ?? null);
+        synchronize(data.modules, data.home ?? null);
         setLoadError("");
       })
       .catch((error: unknown) => {
@@ -112,7 +118,8 @@ export function ModuleManagement() {
       const data = await response.json() as ModulesResponse;
       if (!response.ok) throw new Error(data.error || t("admin.modules.saveError"));
       setModules(data.modules);
-      synchronize(data.modules);
+      setHome(data.home ?? null);
+      synchronize(data.modules, data.home ?? null);
       setSavedTarget(id);
       const parent = modules.find((module) => module.key === target.moduleKey);
       const item = target.submoduleKey ? parent?.submodules.find((submodule) => submodule.key === target.submoduleKey) : parent;
@@ -130,6 +137,41 @@ export function ModuleManagement() {
       });
     }
   };
+
+  const updateHomepage = async (moduleKey: string | null) => {
+    setSavingHome(true);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/admin/modules/home", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ moduleKey }),
+      });
+      const data = await response.json() as ModulesResponse;
+      if (!response.ok) throw new Error(data.error || t("admin.modules.homeSaveError"));
+      setModules(data.modules);
+      setHome(data.home ?? null);
+      synchronize(data.modules, data.home ?? null);
+      setNotice({ kind: "success", message: t("admin.modules.homeUpdated") });
+    } catch (error: unknown) {
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("admin.modules.homeSaveError") });
+    } finally {
+      setSavingHome(false);
+    }
+  };
+
+  const resolvedHomeModule = modules.find((module) => module.key === home?.resolvedModuleKey);
+  const resolvedHomeLabel = resolvedHomeModule
+    ? adminDataLabel(locale, "module", resolvedHomeModule.key) || resolvedHomeModule.label
+    : "";
+  const homeStatus = home?.mode === "configured"
+    ? t("admin.modules.homeConfigured", { label: resolvedHomeLabel })
+    : home?.mode === "automatic"
+      ? t("admin.modules.homeAutomaticStatus", { label: resolvedHomeLabel })
+      : home?.mode === "manager"
+        ? t("admin.modules.homeManagerStatus")
+        : t("admin.modules.homeUnavailableStatus");
 
   return (<>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
@@ -162,6 +204,30 @@ export function ModuleManagement() {
       ) : modules.length === 0 ? (
         <div className={styles.state} role="status">{t("admin.modules.empty")}</div>
       ) : (
+        <>
+        <div className={styles.homeSetting}>
+          <span className={styles.homeIcon} aria-hidden="true"><House /></span>
+          <div className={styles.homeCopy}>
+            <label htmlFor="module-homepage">{t("admin.modules.homeTitle")}</label>
+            <p>{t("admin.modules.homeDescription")}</p>
+            <small>{homeStatus}</small>
+          </div>
+          <div className={styles.homeControl}>
+            <select
+              id="module-homepage"
+              aria-label={t("admin.modules.homeSelect")}
+              value={home?.configuredModuleKey ?? ""}
+              disabled={savingHome}
+              onChange={(event) => void updateHomepage(event.target.value || null)}
+            >
+              <option value="">{t("admin.modules.homeAutomatic")}</option>
+              {modules.filter((module) => module.homepageEligible).map((module) => (
+                <option value={module.key} key={module.key}>{adminDataLabel(locale, "module", module.key) || module.label}</option>
+              ))}
+            </select>
+            {savingHome && <LoaderCircle className={styles.spin} aria-hidden="true" />}
+          </div>
+        </div>
         <div className={styles.moduleList}>
           {modules.map((module) => {
             const moduleLabel = adminDataLabel(locale, "module", module.key) || module.label;
@@ -175,6 +241,7 @@ export function ModuleManagement() {
                     <div className={styles.titleLine}>
                       <h3>{moduleLabel}</h3>
                       <span className={module.enabled ? styles.activeBadge : styles.inactiveBadge}>{module.enabled ? t("admin.modules.active") : t("admin.modules.inactive")}</span>
+                      {module.isHomepage && <span className={styles.homeBadge}><House aria-hidden="true" />{t("admin.modules.homeBadge")}</span>}
                     </div>
                     {moduleDescription && <p>{moduleDescription}</p>}
                   </div>
@@ -230,6 +297,7 @@ export function ModuleManagement() {
             );
           })}
         </div>
+        </>
       )}
     </section>
     </>

@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 
 const worker=readFileSync(new URL("../worker/index.ts",import.meta.url),"utf8");
 const activeDistributionMigration=readFileSync(new URL("../migrations/0019_single_active_distribution.sql",import.meta.url),"utf8");
+const specialStatusMigration=readFileSync(new URL("../migrations/0025_special_student_status.sql",import.meta.url),"utf8");
 
 function section(start,end){
  const from=worker.indexOf(start),to=worker.indexOf(end,from+start.length);
@@ -58,6 +59,9 @@ test("formulário do estudante grava uma decisão explícita e nunca conserva de
  assert.match(ownDestinations,/return json\(\{ok:true,submittedAt:now\}\)/);
  assert.match(distributionCheck,/ownDestinations=student\.student_decision==="move"\?/);
  assert.doesNotMatch(distributionCheck,/student\?\.student_decision==="move"/);
+ assert.match(ownDestinations,/special_status/);
+ assert.match(ownDestinations,/Alunos com estatutos especiais não podem preencher, ainda, o formulário de preferências/);
+ assert.match(ownDestinations,/canSubmitPreferences:false/);
 });
 
 test("snapshot preserva manual_review e retirar publicação preserva colocações",()=>{
@@ -121,11 +125,24 @@ test("aprovação e aplicação são idempotentes e validam o snapshot integral"
 });
 
 test("importação CSV administrativa é aditiva, auditada e bloqueia conflitos",()=>{
- assert.match(classes,/action==="import"/);
+ assert.match(classes,/pathname==="\/api\/classes\/import"/);
+ assert.match(classes,/codigo_estatuto N, TE, A ou O/);
  assert.match(classes,/class_csv_imported/);
- assert.match(classes,/O CSV contém um estudante que já pertence a esta turma/);
+ assert.match(classes,/classes_csv_imported/);
+ assert.match(classes,/já está associado à Turma/);
  assert.match(classes,/Existe uma distribuição aplicada.*antes de importar estudantes/);
  assert.match(classes,/UPDATE classes SET status='submitted'/);
+ assert.match(classes,/special_status,created_by/);
+});
+
+test("estatutos especiais são validados, limpos e excluídos do algoritmo",()=>{
+ assert.match(specialStatusMigration,/DEFAULT 'none'/);
+ assert.match(specialStatusMigration,/worker_student.*athlete.*other/s);
+ assert.match(distributionInputs,/special_status='none'/);
+ assert.match(distributionCheck,/eligibleStudents=students\.results\.filter\(student=>student\.special_status==="none"\)/);
+ assert.match(classes,/DELETE FROM student_destinations.*special_status<>'none'/);
+ assert.match(classes,/nextEligibleIds/);
+ assert.match(placements,/special_status='none'/);
 });
 
 test("revisões manuais só podem ser fechadas no rascunho",()=>{

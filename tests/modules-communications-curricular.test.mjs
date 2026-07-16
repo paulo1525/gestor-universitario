@@ -59,7 +59,7 @@ test("o estado dos módulos é partilhado e não bloqueia novamente cada navega�
   assert.doesNotMatch(shell, /fetch\("\/api\/modules"/);
   assert.doesNotMatch(moduleGuard, /fetch\("\/api\/modules"/);
   assert.doesNotMatch(shell, /"classes\.rosters":true/);
-  assert.match(moduleUi, /synchronize\(data\.modules\)/);
+  assert.match(moduleUi, /synchronize\(data\.modules, data\.home \?\? null\)/);
 });
 
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {
