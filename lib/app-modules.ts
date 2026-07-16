@@ -3,6 +3,7 @@ export type AppModuleKey =
   | "classes.rosters"
   | "classes.preferences"
   | "classes.placements"
+  | "classes.special_statuses"
   | "announcements"
   | "announcements.feed"
   | "announcements.publishing"
@@ -57,6 +58,7 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: "classes.rosters", label: "Listas e composição", description: "Consulta, composição e submissão das listas de turma.", parentKey: "classes", defaultEnabled: true },
   { key: "classes.preferences", label: "Preferências dos estudantes", description: "Recolha das decisões de permanência ou mudança de turma.", parentKey: "classes", defaultEnabled: true },
   { key: "classes.placements", label: "Colocações", description: "Validação, cálculo, revisão e publicação das colocações.", parentKey: "classes", defaultEnabled: true },
+  { key: "classes.special_statuses", label: "Estatutos especiais", description: "Identificação de Trabalhadores-Estudantes, Atletas e outros estatutos especiais.", parentKey: "classes", defaultEnabled: false },
   { key: "announcements", label: "Avisos e comunicados", description: "Comunicação institucional da Comissão de Curso.", parentKey: null, defaultEnabled: true },
   { key: "announcements.feed", label: "Consulta de avisos", description: "Apresentação dos avisos publicados aos utilizadores.", parentKey: "announcements", defaultEnabled: true },
   { key: "announcements.publishing", label: "Publicação por membros CC", description: "Editor de comunicados para membros com cargo na Comissão.", parentKey: "announcements", defaultEnabled: true },

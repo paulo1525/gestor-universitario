@@ -845,6 +845,7 @@ async function usefulLinks(request: Request, env: HubEnv, url: URL, user: HubUse
 async function personalDashboard(env: HubEnv, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("dashboard.personal")) return disabled();
+  const specialStatusesEnabled = await enabled("classes.special_statuses");
   const now = Date.now(), preferencesPromise = loadNotificationPreferences(env, user.id);
   const studentNumber = /^(?:up)?(\d{9})@/i.exec(user.email)?.[1] ?? "";
   const [upcomingResult, requestsResult, favoritesResult, urgentResult, pollsResult, preferences, classInfo] = await Promise.all([
@@ -864,7 +865,7 @@ async function personalDashboard(env: HubEnv, user: HubUser | null, enabled: Mod
   const announcementItems = urgentResult.results.map((item) => { const row = rowObject(item); return { id: row.id, title: row.title, description: row.body, priority: "urgent", publishedAt: row.published_at, href: "/avisos" }; });
   const classId = Number(classInfo?.class_id ?? user.representedClass ?? 0) || null;
   const classSummary = classId ? { id: classId, classId, name: `Turma ${classId}`, status: classInfo?.class_status ?? "" } : null;
-  const hasSpecialStatus = Boolean(classInfo?.special_status && classInfo.special_status !== "none"), classPreferences = { status: hasSpecialStatus ? "special_status" : classInfo?.student_decision ?? classInfo?.preference ?? "", summary: hasSpecialStatus ? "Alunos com estatutos especiais não podem preencher, ainda, o formulário de preferências." : classInfo?.student_decision ?? classInfo?.preference ?? "", decidedAt: hasSpecialStatus ? null : classInfo?.decision_at ?? null };
+  const hasSpecialStatus = specialStatusesEnabled && Boolean(classInfo?.special_status && classInfo.special_status !== "none"), classPreferences = { status: hasSpecialStatus ? "special_status" : classInfo?.student_decision ?? classInfo?.preference ?? "", summary: hasSpecialStatus ? "Alunos com estatutos especiais não podem preencher, ainda, o formulário de preferências." : classInfo?.student_decision ?? classInfo?.preference ?? "", decidedAt: hasSpecialStatus ? null : classInfo?.decision_at ?? null };
   return json({ generatedAt: now, unreadNotifications: notificationItems.length, summary: { unreadNotifications: notificationItems.length, upcomingEvents: upcomingEvents.length, openRequests: requestItems.length, activePolls: pendingPolls.length, favoriteMaterials: favoriteMaterials.length }, notifications: notificationItems.slice(0, 8), upcomingEvents, requests: requestItems, recentRequests: requestItems, polls: pendingPolls, activePolls: pendingPolls, favoriteMaterials, urgentAnnouncements: announcementItems, announcements: announcementItems, recentAnnouncements: announcementItems, classId, classInfo: classSummary, classSummary, preferences: classPreferences, classPreferences, management: isCommission(user) });
 }
 
