@@ -225,6 +225,10 @@ a { color: inherit; }
 .icon-button:hover { border-color: #c8c8c2; background: #f9f9f7; }
 .has-notification { position: relative; }
 .has-notification::after { content: ""; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border: 2px solid #fff; border-radius: 50%; background: #d53b3b; }
+.topbar-notifications { position:relative; flex:0 0 auto; text-decoration:none; }
+.topbar-notifications > svg { width:17px; }
+.topbar-notifications > span { position:absolute; top:-5px; right:-7px; min-width:18px; height:18px; display:grid; place-items:center; padding:0 4px; border:2px solid #fff; border-radius:999px; color:#fff; background:#b53b34; font-size:8px; font-weight:900; line-height:1; }
+.topbar-notifications.has-notification::after { display:none; }
 .mobile-menu { display: none; }
 .announcement { min-height: 42px; display: flex; align-items: center; gap: 10px; padding: 8px 34px; color: #3e330c; background: var(--gold-soft); border-bottom: 1px solid #eedc91; font-size: 12px; }
 .announcement a { margin-left: auto; font-weight: 800; }

@@ -20,8 +20,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Gestor Universitário | Turmas",
-  description: "Painel de gestão das turmas da Comissão de Curso FMUP 2025–2031.",
+  title: "Gestor Universitário | Dashboard",
+  description: "Centro académico da Comissão de Curso FMUP 2025–2031.",
   icons: {
     icon: "/favicon.png",
     shortcut: "/favicon.png",

@@ -1,7 +1,7 @@
-import { TurmasDashboard } from "@/components/turmas-dashboard";
+import { PersonalDashboard } from "@/components/personal-dashboard";
 import { AuthGuard } from "@/components/auth-guard";
-import { HomeModuleGuard } from "@/components/module-guard";
+import { ModuleGuard } from "@/components/module-guard";
 
 export default function Home() {
-  return <AuthGuard><HomeModuleGuard><TurmasDashboard /></HomeModuleGuard></AuthGuard>;
+  return <AuthGuard><ModuleGuard moduleKey="dashboard.personal"><PersonalDashboard /></ModuleGuard></AuthGuard>;
 }
