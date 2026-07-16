@@ -288,6 +288,8 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.match(worker,/code:"INFORMACAO_VALIDADA_SEM_PONTOS"/);
   assert.match(worker,/additional_info_review_status==="valid"&&Number\(student\.exception_points\|\|0\)===0/);
   assert.match(preflight,/classDataLabel\(locale,"preflightGroup",code\)/);
+  assert.doesNotMatch(preflight,/classId\?t\("classes\.common\.class".*:issue\.code/);
+  assert.match(admin,/admin-role--\$\{user\.role\}/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
