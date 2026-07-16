@@ -276,7 +276,9 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/Abrir tabela em ecrã inteiro/);
   assert.match(placements,/tableOnly\?<main className="placement-table-page"/);
   assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{calculateAction\}/);
-  assert.match(placements,/button button--primary" disabled=\{calculateBlocked\}/);
+  assert.match(placements,/recalculation\?"button--secondary":"button--primary"/);
+  assert.match(placements,/<Calculator\/>Calcular nova proposta/);
+  assert.match(styles,/\.button:disabled \{[^}]*background: #f1f1ee;[^}]*box-shadow: none/);
   assert.match(placements,/placement-runbar__actions"><div className="placement-action-tools">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
