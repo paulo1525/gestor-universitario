@@ -16,13 +16,13 @@ Devolve apenas um bloco de código CSV, sem explicações antes ou depois. Usa e
 turma,nome,n_mecanografico,codigo_estatuto
 
 Regras obrigatórias:
-1. Cria uma linha por aluno e inclui alunos de todas as turmas existentes no Excel.
+1. Inclui alunos de todas as turmas existentes no Excel, mas exclui completamente qualquer aluno com estatuto Trabalhador-Estudante, Atleta ou Outro estatuto especial.
 2. "turma" deve ser um número inteiro entre 1 e 20.
 3. "nome" deve manter o nome completo tal como aparece no Excel.
 4. "n_mecanografico" deve conter exatamente 9 algarismos. Preserva zeros à esquerda e remove prefixos como "up".
-5. "codigo_estatuto" só pode usar um destes códigos: N = Nenhum; TE = Trabalhador-Estudante; A = Atleta; O = Outro.
-6. Se o estatuto estiver vazio ou não existir no Excel, usa N. Não inventes um estatuto especial.
-7. Aceita variações evidentes como "trabalhador estudante", "trabalhador-estudante" ou "TE" como TE.
+5. "codigo_estatuto" deve ser sempre N em todas as linhas devolvidas.
+6. Se o estatuto estiver vazio ou não existir no Excel, usa N.
+7. Reconhece variações como "trabalhador estudante", "trabalhador-estudante", "TE", "atleta", "A" ou outros estatutos especiais para excluir esses alunos do CSV, nunca para os converter para N.
 8. Não alteres nomes, não inventes números mecanográficos e não cries alunos duplicados.
 9. Se um valor obrigatório não puder ser determinado com segurança, não inventes: identifica a linha problemática em vez de produzir um CSV incorreto.
 10. Coloca entre aspas qualquer nome que contenha vírgulas e escapa aspas internas duplicando-as.`;
@@ -53,10 +53,10 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
     if (!file || !students.length) return;
     setImporting(true); setNotice(""); setNoticeError(false);
     try {
-      const response = await fetch("/api/classes/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ students }) }), data = await response.json() as { error?: string; imported?: number; classes?: number[] };
+      const response = await fetch("/api/classes/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ students }) }), data = await response.json() as { error?: string; imported?: number; skipped?: number; classes?: number[] };
       if (!response.ok) throw new Error(data.error || t("classes.import.error"));
-      const classCount = data.classes?.length || new Set(students.map((student) => student.turma)).size;
-      setNotice(t("classes.import.success", { students: data.imported || students.length, classes: classCount })); clearFile();
+      const imported = data.imported ?? students.length, skipped = data.skipped ?? 0, classCount = data.classes?.length ?? new Set(students.map((student) => student.turma)).size;
+      setNotice(skipped ? t(imported ? "classes.import.successWithSkipped" : "classes.import.onlySkipped", { students: imported, classes: classCount, skipped }) : t("classes.import.success", { students: imported, classes: classCount })); clearFile();
       await onImported?.();
     } catch (error) { setNoticeError(true); setNotice(error instanceof Error ? error.message : t("classes.import.error")); }
     finally { setImporting(false); }

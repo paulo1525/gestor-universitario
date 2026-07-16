@@ -99,11 +99,15 @@ test("a importação global aparece antes da lista de turmas e inclui ajuda para
   assert.match(dashboard,/canImport && <ClassRosterImport onImported=\{load\} \/>.*\{classOverview\}/s);
   assert.doesNotMatch(admin,/parseStudentCsv|Importação de pautas|api\/classes\/.*\/import/);
   assert.match(csvImport,/turma,nome,n_mecanografico,codigo_estatuto/);
-  assert.match(csvImport,/N = Nenhum; TE = Trabalhador-Estudante; A = Atleta; O = Outro/);
+  assert.match(csvImport,/exclui completamente qualquer aluno com estatuto Trabalhador-Estudante, Atleta ou Outro/);
+  assert.match(csvImport,/"codigo_estatuto" deve ser sempre N/);
+  assert.match(csvImport,/nunca para os converter para N/);
   assert.match(csvImport,/navigator\.clipboard\.writeText\(AI_PROMPT\)/);
   assert.match(csvImport,/fetch\("\/api\/classes\/import"/);
   assert.match(csvImport,/access\["classes\.special_statuses"\] === true/);
   assert.match(csvImport,/classes\.import\.statusesIgnored/);
+  assert.match(csvImport,/classes\.import\.successWithSkipped/);
+  assert.match(csvImport,/classes\.import\.onlySkipped/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{
