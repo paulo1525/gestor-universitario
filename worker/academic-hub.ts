@@ -10,6 +10,7 @@ export type HubUser = {
   commissionDepartment: string | null;
   commissionPosition: string | null;
   commissionPositionLabel: string | null;
+  representedClass?: number | null;
   actorId?: string;
 };
 
@@ -22,6 +23,9 @@ const MATERIAL_MIMES = new Set([
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
+const NOTIFICATION_TYPES = new Set(["announcement", "event", "poll", "request", "material"]);
+const USEFUL_LINK_PRIORITIES = new Set(["urgent", "important", "normal"]);
+const USEFUL_LINK_CATEGORIES = new Set(["academic", "platform", "curricular_unit", "support", "association", "other"]);
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -45,6 +49,7 @@ function longText(value: unknown, max: number): string {
 
 function actor(user: HubUser): string { return user.actorId || user.id; }
 function isCommission(user: HubUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionPosition)); }
+function canManageCore(user: HubUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionDepartment === "management")); }
 function isPrimary(user: HubUser | null): boolean { return user?.email.toLowerCase().replace("@edu.med.up.pt", "@up.pt") === PRIMARY_ADMIN; }
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
 function unauthenticated(): Response { return json({ error: "Sessão inválida." }, 401); }
@@ -420,11 +425,16 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
   return json({ error: "Operação não suportada." }, 405);
 }
 
-function materialDto(item: unknown, extraAttachments: Array<Record<string, unknown>> = []) {
+function materialVersionDto(item: unknown) {
+  const row = rowObject(item);
+  return { id: row.id, version: Number(row.version_number), versionNumber: Number(row.version_number), fileName: row.attachment_name, fileUrl: row.attachment_data_url, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, notes: row.change_note, changeNote: row.change_note, createdAt: row.created_at };
+}
+
+function materialDto(item: unknown, extraAttachments: Array<Record<string, unknown>> = [], versions: Array<Record<string, unknown>> = []) {
   const row = rowObject(item);
   const categories: Record<string, string> = { exam_photo: "exam", summary: "summary", notes: "notes", other: "other" };
   const attachments = [{ id: `${String(row.id)}-legacy`, name: row.attachment_name, mime: row.attachment_mime, dataUrl: row.attachment_data_url }, ...extraAttachments.map((attachment) => ({ id: attachment.id, name: attachment.attachment_name, mime: attachment.attachment_mime, dataUrl: attachment.attachment_data_url }))];
-  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, favorite: row.is_favorite === 1, isFavorite: row.is_favorite === 1, favoriteCount: Number(row.favorite_count || 0), helpful: row.helpful_by_me === 1, helpfulByMe: row.helpful_by_me === 1, helpfulCount: Number(row.helpful_count || 0), outdated: row.outdated_by_me === 1, reportedOutdated: row.outdated_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1, outdatedCount: Number(row.outdated_count || 0), currentVersion: Number(row.current_version || versions[0]?.version_number || 1), versionCount: Number(row.version_count || Math.max(1, versions.length)), versions: versions.map(materialVersionDto), createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function validDataUrl(value: string): { mime: string; bytes: number } | null {
@@ -444,17 +454,23 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     const canModerate = isCommission(user) && await enabled("materials.moderation");
     const showModeration = moderation || canModerate;
     const materialVisibility = showModeration ? "1=1" : "m.status='published' AND m.material_type!='exam_photo'";
-    const [result, units, attachmentResult] = await Promise.all([
-      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(unitId, unitId).all(),
+    const [result, units, attachmentResult, versionResult] = await Promise.all([
+      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number,EXISTS(SELECT 1 FROM material_favorites mf WHERE mf.material_id=m.id AND mf.user_id=?) AS is_favorite,(SELECT COUNT(*) FROM material_favorites mf WHERE mf.material_id=m.id) AS favorite_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.helpful=1) AS helpful_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.outdated=1) AS outdated_count,COALESCE((SELECT fb.helpful FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS helpful_by_me,COALESCE((SELECT fb.outdated FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS outdated_by_me,COALESCE((SELECT MAX(mv.version_number) FROM material_versions mv WHERE mv.material_id=m.id),1) AS current_version,MAX(1,(SELECT COUNT(*) FROM material_versions mv WHERE mv.material_id=m.id)) AS version_count FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(user.id, user.id, user.id, unitId, unitId).all(),
       unitChoices(env),
       env.DB.prepare(`SELECT a.* FROM material_submission_attachments a JOIN material_submissions m ON m.id=a.submission_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY a.submission_id,a.sort_order,a.created_at`).bind(unitId, unitId).all(),
+      env.DB.prepare(`SELECT mv.* FROM material_versions mv JOIN material_submissions m ON m.id=mv.material_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY mv.material_id,mv.version_number DESC`).bind(unitId, unitId).all(),
     ]);
     const attachmentsBySubmission = new Map<string, Array<Record<string, unknown>>>();
     for (const item of attachmentResult.results) {
       const attachment = rowObject(item), submissionId = String(attachment.submission_id);
       attachmentsBySubmission.set(submissionId, [...(attachmentsBySubmission.get(submissionId) ?? []), attachment]);
     }
-    return json({ materials: result.results.map((item) => { const row = rowObject(item), dto = materialDto(item, attachmentsBySubmission.get(String(row.id)) ?? []) as Record<string, unknown>; if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) { dto.authorId = row.submitted_by; dto.authorEmail = row.submitter_email; dto.authorStudentNumber = row.submitter_student_number; dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; } if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; return dto; }), units, canModerate });
+    const versionsBySubmission = new Map<string, Array<Record<string, unknown>>>();
+    for (const item of versionResult.results) {
+      const version = rowObject(item), submissionId = String(version.material_id);
+      versionsBySubmission.set(submissionId, [...(versionsBySubmission.get(submissionId) ?? []), version]);
+    }
+    return json({ materials: result.results.map((item) => { const row = rowObject(item), dto = materialDto(item, attachmentsBySubmission.get(String(row.id)) ?? [], versionsBySubmission.get(String(row.id)) ?? []) as Record<string, unknown>; if (row.anonymous !== 1) dto.authorName = row.submitter_name; if (showModeration && row.anonymous !== 1) { dto.authorId = row.submitted_by; dto.authorEmail = row.submitter_email; dto.authorStudentNumber = row.submitter_student_number; dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; } if (showModeration && row.anonymous === 1 && isPrimary(user)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number }; return dto; }), units, canModerate });
   }
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
@@ -492,6 +508,366 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
   return json({ error: "Operação não suportada." }, 405);
 }
 
+async function materialFavorites(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.favorites")) return disabled();
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,mf.created_at AS favorited_at,1 AS is_favorite,(SELECT COUNT(*) FROM material_favorites all_favorites WHERE all_favorites.material_id=m.id) AS favorite_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.helpful=1) AS helpful_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.outdated=1) AS outdated_count,COALESCE((SELECT fb.helpful FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS helpful_by_me,COALESCE((SELECT fb.outdated FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS outdated_by_me,COALESCE((SELECT MAX(mv.version_number) FROM material_versions mv WHERE mv.material_id=m.id),1) AS current_version,MAX(1,(SELECT COUNT(*) FROM material_versions mv WHERE mv.material_id=m.id)) AS version_count FROM material_favorites mf JOIN material_submissions m ON m.id=mf.material_id LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE mf.user_id=? AND m.status='published' AND m.material_type!='exam_photo' ORDER BY mf.created_at DESC LIMIT 300").bind(user.id, user.id, user.id).all();
+    return json({ favorites: result.results.map((item) => ({ ...materialDto(item), favoritedAt: rowObject(item).favorited_at })) });
+  }
+  const body = await bodyJson(request), materialId = text(body?.materialId ?? url.searchParams.get("materialId"), 80);
+  if (!body && request.method !== "DELETE" || !materialId) return json({ error: "Material invalido." }, 400);
+  if (request.method === "PUT") {
+    const material = await env.DB.prepare("SELECT id FROM material_submissions WHERE id=? AND status='published' AND material_type!='exam_photo'").bind(materialId).first();
+    if (!material) return json({ error: "Material publicado nao encontrado." }, 404);
+    const result = await env.DB.prepare("INSERT OR IGNORE INTO material_favorites(user_id,material_id,created_at) VALUES (?,?,?)").bind(user.id, materialId, Date.now()).run();
+    return json({ ok: true, materialId, isFavorite: true, created: Boolean(result.meta.changes) }, result.meta.changes ? 201 : 200);
+  }
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM material_favorites WHERE user_id=? AND material_id=?").bind(user.id, materialId).run();
+    return json({ ok: true, materialId, isFavorite: false });
+  }
+  return json({ error: "Operacao nao suportada." }, 405);
+}
+
+async function materialFeedback(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.feedback")) return disabled();
+  const materialId = text(url.searchParams.get("materialId"), 80);
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT m.id,(SELECT COUNT(*) FROM material_feedback f WHERE f.material_id=m.id AND f.helpful=1) AS helpful_count,(SELECT COUNT(*) FROM material_feedback f WHERE f.material_id=m.id AND f.outdated=1) AS outdated_count,COALESCE((SELECT f.helpful FROM material_feedback f WHERE f.material_id=m.id AND f.user_id=?),0) AS helpful_by_me,COALESCE((SELECT f.outdated FROM material_feedback f WHERE f.material_id=m.id AND f.user_id=?),0) AS outdated_by_me FROM material_submissions m WHERE m.status='published' AND m.material_type!='exam_photo' AND (?='' OR m.id=?) ORDER BY m.updated_at DESC LIMIT 300").bind(user.id, user.id, materialId, materialId).all();
+    return json({ feedback: result.results.map((item) => { const row = rowObject(item); return { materialId: row.id, helpfulCount: row.helpful_count, outdatedCount: row.outdated_count, helpfulByMe: row.helpful_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1 }; }) });
+  }
+  const body = await bodyJson(request), id = text(body?.materialId ?? materialId, 80);
+  if (!id || !body && request.method !== "DELETE") return json({ error: "Material invalido." }, 400);
+  if (request.method === "PUT") {
+    const hasHelpful = typeof body?.helpful === "boolean", hasOutdated = typeof body?.outdated === "boolean";
+    if (!hasHelpful && !hasOutdated) return json({ error: "Indique feedback util ou desatualizado." }, 400);
+    const material = await env.DB.prepare("SELECT id FROM material_submissions WHERE id=? AND status='published' AND material_type!='exam_photo'").bind(id).first();
+    if (!material) return json({ error: "Material publicado nao encontrado." }, 404);
+    const current = await env.DB.prepare("SELECT helpful,outdated,created_at FROM material_feedback WHERE user_id=? AND material_id=?").bind(user.id, id).first<{ helpful: number; outdated: number; created_at: number }>();
+    const helpful = hasHelpful ? body?.helpful === true : current?.helpful === 1, outdated = hasOutdated ? body?.outdated === true : current?.outdated === 1, now = Date.now();
+    await env.DB.prepare("INSERT INTO material_feedback(user_id,material_id,helpful,outdated,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,material_id) DO UPDATE SET helpful=excluded.helpful,outdated=excluded.outdated,updated_at=excluded.updated_at")
+      .bind(user.id, id, helpful ? 1 : 0, outdated ? 1 : 0, current?.created_at ?? now, now).run();
+    return json({ ok: true, materialId: id, helpful, outdated });
+  }
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM material_feedback WHERE user_id=? AND material_id=?").bind(user.id, id).run();
+    return json({ ok: true, materialId: id, helpful: false, outdated: false });
+  }
+  return json({ error: "Operacao nao suportada." }, 405);
+}
+
+async function materialVersions(request: Request, env: HubEnv, materialId: string, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.versioning")) return disabled();
+  const material = await env.DB.prepare("SELECT * FROM material_submissions WHERE id=?").bind(materialId).first<Record<string, unknown>>();
+  if (!material || (!isCommission(user) && (material.status !== "published" || material.material_type === "exam_photo"))) return json({ error: "Material nao encontrado." }, 404);
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT id,version_number,attachment_name,attachment_mime,attachment_data_url,change_note,created_at FROM material_versions WHERE material_id=? ORDER BY version_number DESC").bind(materialId).all();
+    const versions = result.results.length ? result.results.map((item) => { const row = rowObject(item); return { id: row.id, version: row.version_number, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, changeNote: row.change_note, createdAt: row.created_at }; }) : [{ id: `${materialId}-v1`, version: 1, attachmentName: material.attachment_name, attachmentMime: material.attachment_mime, attachmentDataUrl: material.attachment_data_url, changeNote: "Versao original", createdAt: material.created_at }];
+    return json({ materialId, currentVersion: Number(rowObject(versions[0]).version), versions, canCreate: isCommission(user) });
+  }
+  if (request.method !== "POST") return json({ error: "Operacao nao suportada." }, 405);
+  if (!isCommission(user)) return forbidden();
+  const body = await bodyJson(request), file = body?.file && typeof body.file === "object" && !Array.isArray(body.file) ? body.file as Record<string, unknown> : {};
+  if (!body) return json({ error: "Pedido JSON invalido." }, 400);
+  const attachmentName = text(body.attachmentName ?? file.name, 180), attachmentDataUrl = typeof (body.attachmentDataUrl ?? file.dataUrl) === "string" ? String(body.attachmentDataUrl ?? file.dataUrl) : "", parsed = validDataUrl(attachmentDataUrl), changeNote = longText(body.changeNote, 1000);
+  if (!attachmentName || !parsed || parsed.bytes > 8 * 1024 * 1024) return json({ error: "Versao invalida. O ficheiro deve ter ate 8 MB." }, 400);
+  const latest = await env.DB.prepare("SELECT MAX(version_number) AS n FROM material_versions WHERE material_id=?").bind(materialId).first<{ n: number | null }>(), version = Math.max(2, Number(latest?.n || 1) + 1), now = Date.now();
+  const statements: D1PreparedStatement[] = [];
+  if (!latest?.n) statements.push(env.DB.prepare("INSERT INTO material_versions(id,material_id,version_number,attachment_name,attachment_mime,attachment_data_url,change_note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), materialId, 1, material.attachment_name, material.attachment_mime, material.attachment_data_url, "Versao original", material.submitted_by, material.created_at));
+  statements.push(
+    env.DB.prepare("INSERT INTO material_versions(id,material_id,version_number,attachment_name,attachment_mime,attachment_data_url,change_note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), materialId, version, attachmentName, parsed.mime, attachmentDataUrl, changeNote, actor(user), now),
+    env.DB.prepare("UPDATE material_submissions SET attachment_name=?,attachment_mime=?,attachment_data_url=?,updated_at=? WHERE id=?").bind(attachmentName, parsed.mime, attachmentDataUrl, now, materialId),
+    env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'material_version_created',?,?)").bind(actor(user), JSON.stringify({ materialId, version, attachmentName }), now),
+  );
+  try { await env.DB.batch(statements); } catch { return json({ error: "Outra versao foi criada em simultaneo. Atualize e tente novamente." }, 409); }
+  return json({ ok: true, materialId, version, createdAt: now }, 201);
+}
+
+type NotificationPreferences = {
+  announcements: boolean;
+  calendar: boolean;
+  polls: boolean;
+  requests: boolean;
+  materials: boolean;
+  email: boolean;
+  urgentOnly: boolean;
+  unitIds: string[];
+};
+
+function notificationPreferencesDto(preferences: NotificationPreferences) {
+  const categories = { announcements: preferences.announcements, calendar: preferences.calendar, polls: preferences.polls, requests: preferences.requests, materials: preferences.materials };
+  return { ...preferences, categories, enabledCategories: Object.entries(categories).filter(([, value]) => value).map(([key]) => key), onlyUrgent: preferences.urgentOnly, curricularUnitIds: preferences.unitIds };
+}
+
+function stringArray(value: unknown, maxItems = 100): string[] | null {
+  if (!Array.isArray(value) || value.length > maxItems) return null;
+  const items = value.map((item) => text(item, 80));
+  if (items.some((item) => !item) || new Set(items).size !== items.length) return null;
+  return items;
+}
+
+function parsedStringArray(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  try { return stringArray(JSON.parse(value)) ?? []; } catch { return []; }
+}
+
+async function validUnitIds(env: HubEnv, unitIds: string[]): Promise<boolean> {
+  if (!unitIds.length) return true;
+  const placeholders = unitIds.map(() => "?").join(",");
+  const result = await env.DB.prepare(`SELECT COUNT(*) AS n FROM curricular_units WHERE active=1 AND id IN (${placeholders})`).bind(...unitIds).first<{ n: number }>();
+  return Number(result?.n || 0) === unitIds.length;
+}
+
+async function loadNotificationPreferences(env: HubEnv, userId: string): Promise<NotificationPreferences> {
+  const row = await env.DB.prepare("SELECT * FROM notification_preferences WHERE user_id=?").bind(userId).first<Record<string, unknown>>();
+  return {
+    announcements: row?.announcements_enabled !== 0,
+    calendar: row?.calendar_enabled !== 0,
+    polls: row?.polls_enabled !== 0,
+    requests: row?.requests_enabled !== 0,
+    materials: row?.materials_enabled !== 0,
+    email: row?.email_enabled === 1,
+    urgentOnly: row?.urgent_only === 1,
+    unitIds: parsedStringArray(row?.curricular_unit_ids),
+  };
+}
+
+function notificationDto(item: unknown) {
+  const row = rowObject(item);
+  return { id: `${String(row.source_type)}:${String(row.source_id)}`, notificationId: `${String(row.source_type)}:${String(row.source_id)}`, sourceType: row.source_type, sourceId: row.source_id, type: row.source_type, category: row.source_type, title: row.title, body: row.description, description: row.description, priority: row.priority, href: row.href, unitId: row.unit_id, unitCode: row.unit_code, unitName: row.unit_name ?? row.unit_code, occurredAt: row.occurred_at, createdAt: row.occurred_at, read: row.read_at !== null, readAt: row.read_at, archived: row.archived_at !== null, archivedAt: row.archived_at };
+}
+
+async function loadNotifications(env: HubEnv, user: HubUser, preferences: NotificationPreferences, limit: number, unreadOnly: boolean, includeArchived: boolean) {
+  const sources: string[] = [];
+  const bindings: unknown[] = [];
+  if (preferences.announcements) {
+    sources.push("SELECT a.id AS source_id,'announcement' AS source_type,a.title,substr(a.body,1,300) AS description,a.priority,'/avisos' AS href,NULL AS unit_id,NULL AS unit_code,a.published_at AS occurred_at FROM announcements a WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?)");
+    bindings.push(Date.now());
+  }
+  if (preferences.calendar) sources.push("SELECT e.id AS source_id,'event' AS source_type,e.title,substr(e.description,1,300) AS description,CASE WHEN e.event_type IN ('exam','assessment','evaluation') THEN 'important' ELSE 'normal' END AS priority,'/calendario' AS href,e.curricular_unit_id AS unit_id,cu.code AS unit_code,e.starts_at AS occurred_at FROM academic_events e LEFT JOIN curricular_units cu ON cu.id=e.curricular_unit_id WHERE e.status='scheduled' AND e.visibility!='cc' AND e.starts_at>=unixepoch()*1000-86400000");
+  if (preferences.polls) sources.push("SELECT p.id AS source_id,'poll' AS source_type,p.title,substr(p.description,1,300) AS description,'normal' AS priority,'/inqueritos' AS href,NULL AS unit_id,NULL AS unit_code,p.created_at AS occurred_at FROM polls p WHERE p.status='published' AND (p.starts_at IS NULL OR p.starts_at<=unixepoch()*1000) AND (p.ends_at IS NULL OR p.ends_at>=unixepoch()*1000)");
+  if (preferences.requests) {
+    sources.push("SELECT r.id AS source_id,'request' AS source_type,r.subject AS title,('Estado: '||r.status) AS description,CASE WHEN r.status IN ('resolved','closed') THEN 'important' ELSE 'normal' END AS priority,'/pedidos' AS href,r.curricular_unit_id AS unit_id,cu.code AS unit_code,r.updated_at AS occurred_at FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id WHERE r.submitted_by=?");
+    bindings.push(user.id);
+  }
+  if (preferences.materials) sources.push("SELECT m.id AS source_id,'material' AS source_type,m.title,substr(m.description,1,300) AS description,'normal' AS priority,'/materiais' AS href,m.curricular_unit_id AS unit_id,cu.code AS unit_code,m.updated_at AS occurred_at FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.status='published' AND m.material_type!='exam_photo'");
+  if (!sources.length) return [];
+  const unitClause = preferences.unitIds.length ? `AND (feed.unit_id IS NULL OR feed.unit_id IN (${preferences.unitIds.map(() => "?").join(",")}))` : "";
+  bindings.push(user.id, includeArchived ? 1 : 0, unreadOnly ? 1 : 0, preferences.urgentOnly ? 1 : 0, ...preferences.unitIds, limit);
+  const result = await env.DB.prepare(`WITH feed AS (${sources.join(" UNION ALL ")}) SELECT feed.*,state.read_at,state.archived_at FROM feed LEFT JOIN notification_states state ON state.user_id=? AND state.source_type=feed.source_type AND state.source_id=feed.source_id WHERE (?=1 OR state.archived_at IS NULL) AND (?=0 OR state.read_at IS NULL) AND (?=0 OR feed.priority='urgent') ${unitClause} ORDER BY feed.occurred_at DESC LIMIT ?`).bind(...bindings).all();
+  return result.results.map(notificationDto);
+}
+
+function secureCalendarToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function calendarTokenHash(token: string): Promise<string> {
+  return bytesBase64(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
+}
+
+async function calendarSubscription(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("calendar.subscription")) return disabled();
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT id,label,curricular_unit_ids,created_at,last_used_at,revoked_at FROM calendar_subscription_tokens WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+    return json({ subscriptions: result.results.map((item) => { const row = rowObject(item); return { id: row.id, label: row.label, unitIds: parsedStringArray(row.curricular_unit_ids), createdAt: row.created_at, lastUsedAt: row.last_used_at, revokedAt: row.revoked_at, active: row.revoked_at === null }; }) });
+  }
+  if (request.method === "POST") {
+    const body = await bodyJson(request);
+    if (!body) return json({ error: "Pedido JSON invalido." }, 400);
+    const label = text(body.label, 80) || "Calendario pessoal", unitIds = stringArray(body.unitIds ?? []);
+    if (!unitIds || !await validUnitIds(env, unitIds)) return json({ error: "Unidades curriculares invalidas." }, 400);
+    const token = secureCalendarToken(), id = crypto.randomUUID(), now = Date.now();
+    await env.DB.prepare("INSERT INTO calendar_subscription_tokens(id,user_id,token_hash,label,curricular_unit_ids,created_at) VALUES (?,?,?,?,?,?)")
+      .bind(id, user.id, await calendarTokenHash(token), label, JSON.stringify(unitIds), now).run();
+    await audit(env, user, "calendar_subscription_created", { id, label, unitIds });
+    return json({ id, label, unitIds, token, feedUrl: `${url.origin}/api/calendar-feed.ics?token=${encodeURIComponent(token)}`, createdAt: now }, 201);
+  }
+  if (request.method === "DELETE") {
+    const body = await bodyJson(request), id = text(body?.id, 80);
+    if (!body || !id) return json({ error: "Subscricao invalida." }, 400);
+    const now = Date.now(), result = await env.DB.prepare("UPDATE calendar_subscription_tokens SET revoked_at=? WHERE id=? AND user_id=? AND revoked_at IS NULL").bind(now, id, user.id).run();
+    if (!result.meta.changes) return json({ error: "Subscricao ativa nao encontrada." }, 404);
+    await audit(env, user, "calendar_subscription_revoked", { id });
+    return json({ ok: true, id, revokedAt: now });
+  }
+  return json({ error: "Operacao nao suportada." }, 405);
+}
+
+function icsText(value: unknown): string {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function icsDate(value: unknown): string {
+  return new Date(Number(value)).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+async function calendarFeed(env: HubEnv, url: URL, enabled: ModuleChecker): Promise<Response> {
+  if (!await enabled("calendar.subscription")) return disabled();
+  const token = url.searchParams.get("token") || "";
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return new Response("Subscricao nao encontrada.", { status: 404 });
+  const subscription = await env.DB.prepare("SELECT id,user_id,curricular_unit_ids FROM calendar_subscription_tokens WHERE token_hash=? AND revoked_at IS NULL").bind(await calendarTokenHash(token)).first<Record<string, unknown>>();
+  if (!subscription) return new Response("Subscricao nao encontrada.", { status: 404 });
+  const unitIds = parsedStringArray(subscription.curricular_unit_ids), unitClause = unitIds.length ? `AND (e.curricular_unit_id IS NULL OR e.curricular_unit_id IN (${unitIds.map(() => "?").join(",")}))` : "";
+  const from = Date.now() - 30 * 86400000, to = Date.now() + 550 * 86400000;
+  const events = await env.DB.prepare(`SELECT e.*,cu.code AS unit_code,cu.name AS unit_name FROM academic_events e LEFT JOIN curricular_units cu ON cu.id=e.curricular_unit_id WHERE e.status='scheduled' AND e.visibility!='cc' AND e.ends_at>=? AND e.starts_at<=? ${unitClause} ORDER BY e.starts_at LIMIT 1000`).bind(from, to, ...unitIds).all();
+  await env.DB.prepare("UPDATE calendar_subscription_tokens SET last_used_at=? WHERE id=? AND revoked_at IS NULL").bind(Date.now(), subscription.id).run();
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Gestor Universitario//Calendario Academico//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Gestor Universitario"];
+  for (const item of events.results) {
+    const row = rowObject(item), description = [row.description, row.unit_code ? `${row.unit_code} - ${row.unit_name}` : ""].filter(Boolean).join("\\n");
+    lines.push("BEGIN:VEVENT", `UID:${icsText(row.id)}@gestoruniversitario.cc`, `DTSTAMP:${icsDate(row.updated_at)}`, `DTSTART:${icsDate(row.starts_at)}`, `DTEND:${icsDate(row.ends_at)}`, `SUMMARY:${icsText(row.title)}`, `DESCRIPTION:${icsText(description)}`);
+    if (row.location) lines.push(`LOCATION:${icsText(row.location)}`);
+    lines.push("END:VEVENT");
+  }
+  lines.push("END:VCALENDAR", "");
+  return new Response(lines.join("\r\n"), { headers: { "content-type": "text/calendar; charset=utf-8", "cache-control": "private, no-store", "content-disposition": "inline; filename=gestor-universitario.ics" } });
+}
+
+async function notifications(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("notifications.feed")) return disabled();
+  if (request.method === "GET") {
+    const rawLimit = Number(url.searchParams.get("limit") || 50);
+    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > 100) return json({ error: "Limite de notificacoes invalido." }, 400);
+    const preferences = await loadNotificationPreferences(env, user.id);
+    const items = await loadNotifications(env, user, preferences, rawLimit, url.searchParams.get("unreadOnly") === "true", url.searchParams.get("includeArchived") === "true");
+    return json({ notifications: items, unreadCount: items.filter((item) => !item.read && !item.archived).length, preferences: notificationPreferencesDto(preferences) });
+  }
+  if (request.method !== "PATCH") return json({ error: "Operacao nao suportada." }, 405);
+  const body = await bodyJson(request);
+  if (!body) return json({ error: "Pedido JSON invalido." }, 400);
+  let rawItems = Array.isArray(body.items) ? body.items : [body];
+  if (body.all === true || body.action === "mark_all_read") {
+    const preferences = await loadNotificationPreferences(env, user.id);
+    rawItems = (await loadNotifications(env, user, preferences, 100, false, false)).map((item) => ({ sourceType: item.sourceType, sourceId: item.sourceId, read: true }));
+    if (!rawItems.length) return json({ ok: true, updated: 0 });
+  }
+  if (!rawItems.length || rawItems.length > 100) return json({ error: "Indique entre uma e cem notificacoes." }, 400);
+  const now = Date.now(), statements: D1PreparedStatement[] = [];
+  for (const raw of rawItems) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return json({ error: "Estado de notificacao invalido." }, 400);
+    const item = raw as Record<string, unknown>, composite = text(item.notificationId ?? item.id, 120), separator = composite.indexOf(":"), sourceType = text(item.sourceType ?? item.type ?? (separator > 0 ? composite.slice(0, separator) : ""), 30), sourceId = text(item.sourceId ?? (separator > 0 ? composite.slice(separator + 1) : composite), 80);
+    const hasRead = typeof item.read === "boolean", hasArchived = typeof item.archived === "boolean";
+    if (!NOTIFICATION_TYPES.has(sourceType) || !sourceId || (!hasRead && !hasArchived)) return json({ error: "Estado de notificacao invalido." }, 400);
+    const readAt = item.read === true ? now : null, archivedAt = item.archived === true ? now : null;
+    statements.push(env.DB.prepare("INSERT INTO notification_states(user_id,source_type,source_id,read_at,archived_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,source_type,source_id) DO UPDATE SET read_at=CASE WHEN ?=1 THEN ? ELSE notification_states.read_at END,archived_at=CASE WHEN ?=1 THEN ? ELSE notification_states.archived_at END,updated_at=excluded.updated_at")
+      .bind(user.id, sourceType, sourceId, readAt, archivedAt, now, hasRead ? 1 : 0, readAt, hasArchived ? 1 : 0, archivedAt));
+  }
+  await env.DB.batch(statements);
+  return json({ ok: true, updated: statements.length });
+}
+
+async function notificationPreferences(request: Request, env: HubEnv, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("notifications.preferences")) return disabled();
+  if (request.method === "GET") return json({ preferences: notificationPreferencesDto(await loadNotificationPreferences(env, user.id)), units: await unitChoices(env) });
+  if (request.method !== "PUT") return json({ error: "Operacao nao suportada." }, 405);
+  const body = await bodyJson(request);
+  if (!body) return json({ error: "Pedido JSON invalido." }, 400);
+  const current = await loadNotificationPreferences(env, user.id), categoryInput = body.categories && typeof body.categories === "object" && !Array.isArray(body.categories) ? body.categories as Record<string, unknown> : null;
+  const enabledCategories = Array.isArray(body.enabledCategories) ? new Set(body.enabledCategories.map(String)) : null;
+  const valueFor = (key: "announcements" | "calendar" | "polls" | "requests" | "materials") => typeof body[key] === "boolean" ? body[key] === true : typeof categoryInput?.[key] === "boolean" ? categoryInput[key] === true : enabledCategories ? enabledCategories.has(key) : current[key];
+  const email = typeof body.email === "boolean" ? body.email === true : current.email, urgentOnly = typeof body.urgentOnly === "boolean" ? body.urgentOnly === true : typeof body.onlyUrgent === "boolean" ? body.onlyUrgent === true : current.urgentOnly;
+  const unitIds = stringArray(body.unitIds ?? body.curricularUnitIds ?? []);
+  if (!unitIds || !await validUnitIds(env, unitIds)) return json({ error: "Unidades curriculares invalidas." }, 400);
+  await env.DB.prepare("INSERT INTO notification_preferences(user_id,announcements_enabled,calendar_enabled,polls_enabled,requests_enabled,materials_enabled,email_enabled,urgent_only,curricular_unit_ids,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET announcements_enabled=excluded.announcements_enabled,calendar_enabled=excluded.calendar_enabled,polls_enabled=excluded.polls_enabled,requests_enabled=excluded.requests_enabled,materials_enabled=excluded.materials_enabled,email_enabled=excluded.email_enabled,urgent_only=excluded.urgent_only,curricular_unit_ids=excluded.curricular_unit_ids,updated_at=excluded.updated_at")
+    .bind(user.id, valueFor("announcements") ? 1 : 0, valueFor("calendar") ? 1 : 0, valueFor("polls") ? 1 : 0, valueFor("requests") ? 1 : 0, valueFor("materials") ? 1 : 0, email ? 1 : 0, urgentOnly ? 1 : 0, JSON.stringify(unitIds), Date.now()).run();
+  return json({ ok: true, preferences: notificationPreferencesDto(await loadNotificationPreferences(env, user.id)) });
+}
+
+function httpsUrl(value: unknown): string | null {
+  const candidate = text(value, 2048);
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.toString() : null;
+  } catch { return null; }
+}
+
+function usefulLinkDto(item: unknown) {
+  const row = rowObject(item);
+  return { id: row.id, title: row.title, url: row.url, description: row.description, priority: row.priority, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+async function usefulLinks(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  const canManage = canManageCore(user), mutation = request.method !== "GET", management = canManage && (mutation || url.searchParams.get("scope") === "management");
+  if (!await enabled(management ? "useful_links.management" : "useful_links.library")) return disabled();
+  if (mutation && !canManage) return forbidden();
+  if (request.method === "GET") {
+    const unitId = text(url.searchParams.get("unitId"), 80), category = text(url.searchParams.get("category"), 30), priority = text(url.searchParams.get("priority"), 20);
+    if (category && !USEFUL_LINK_CATEGORIES.has(category) || priority && !USEFUL_LINK_PRIORITIES.has(priority)) return json({ error: "Filtro de links invalido." }, 400);
+    const scope = management ? "1=1" : `l.status='published' AND (l.visibility!='cc' OR ${isCommission(user) ? "1=1" : "1=0"})`;
+    const result = await env.DB.prepare(`SELECT l.*,cu.code AS unit_code,cu.name AS unit_name FROM useful_links l LEFT JOIN curricular_units cu ON cu.id=l.curricular_unit_id WHERE ${scope} AND (?='' OR l.curricular_unit_id=?) AND (?='' OR l.category=?) AND (?='' OR l.priority=?) ORDER BY CASE l.priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,cu.name COLLATE NOCASE,l.title COLLATE NOCASE`).bind(unitId, unitId, category, category, priority, priority).all();
+    return json({ links: result.results.map(usefulLinkDto), units: await unitChoices(env), canManage, capabilities: { manage: canManage } });
+  }
+  const body = await bodyJson(request);
+  if (!body) return json({ error: "Pedido JSON invalido." }, 400);
+  if (request.method === "DELETE") {
+    const id = text(body.id, 80), current = id ? await env.DB.prepare("SELECT id,title,url FROM useful_links WHERE id=?").bind(id).first<Record<string, unknown>>() : null;
+    if (!current) return json({ error: "Link nao encontrado." }, 404);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM useful_links WHERE id=?").bind(id),
+      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'useful_link_deleted',?,?)").bind(actor(user), JSON.stringify(current), Date.now()),
+    ]);
+    return json({ ok: true, id });
+  }
+  if (!['POST', 'PUT', 'PATCH'].includes(request.method)) return json({ error: "Operacao nao suportada." }, 405);
+  if (request.method === "PATCH" && Object.keys(body).every((key) => ["id", "status"].includes(key))) {
+    const id = text(body.id, 80), status = text(body.status, 20);
+    if (!id || !["draft", "published", "archived"].includes(status)) return json({ error: "Estado do link invalido." }, 400);
+    const now = Date.now(), result = await env.DB.prepare("UPDATE useful_links SET status=?,updated_by=?,updated_at=? WHERE id=?").bind(status, actor(user), now, id).run();
+    if (!result.meta.changes) return json({ error: "Link nao encontrado." }, 404);
+    await audit(env, user, "useful_link_status_updated", { id, status });
+    return json({ ok: true, id, status });
+  }
+  const id = request.method === "POST" ? crypto.randomUUID() : text(body.id, 80), title = text(body.title, 180), linkUrl = httpsUrl(body.url), description = longText(body.description, 2000), priority = text(body.priority, 20) || "normal", category = text(body.category, 30) || "other", unitId = text(body.unitId, 80), visibility = text(body.visibility, 20) || "students", status = text(body.status, 20) || "published";
+  if (!id || title.length < 3 || !linkUrl || !USEFUL_LINK_PRIORITIES.has(priority) || !USEFUL_LINK_CATEGORIES.has(category) || !["public", "students", "cc"].includes(visibility) || !["draft", "published", "archived"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do link invalido. O endereco tem de usar HTTPS." }, 400);
+  const now = Date.now();
+  if (request.method === "POST") {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO useful_links(id,title,url,description,priority,category,curricular_unit_id,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, title, linkUrl, description, priority, category, unitId || null, visibility, status, actor(user), actor(user), now, now),
+      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'useful_link_created',?,?)").bind(actor(user), JSON.stringify({ id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, status }), now),
+    ]);
+  } else {
+    const result = await env.DB.prepare("UPDATE useful_links SET title=?,url=?,description=?,priority=?,category=?,curricular_unit_id=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?").bind(title, linkUrl, description, priority, category, unitId || null, visibility, status, actor(user), now, id).run();
+    if (!result.meta.changes) return json({ error: "Link nao encontrado." }, 404);
+    await audit(env, user, "useful_link_updated", { id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, status });
+  }
+  return json({ ok: true, id }, request.method === "POST" ? 201 : 200);
+}
+
+async function personalDashboard(env: HubEnv, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("dashboard.personal")) return disabled();
+  const now = Date.now(), preferencesPromise = loadNotificationPreferences(env, user.id);
+  const studentNumber = /^(?:up)?(\d{9})@/i.exec(user.email)?.[1] ?? "";
+  const [upcomingResult, requestsResult, favoritesResult, urgentResult, pollsResult, preferences, classInfo] = await Promise.all([
+    env.DB.prepare("SELECT e.*,cu.code AS unit_code,cu.name AS unit_name FROM academic_events e LEFT JOIN curricular_units cu ON cu.id=e.curricular_unit_id WHERE e.status='scheduled' AND e.visibility!='cc' AND e.starts_at BETWEEN ? AND ? ORDER BY e.starts_at LIMIT 10").bind(now, now + 30 * 86400000).all(),
+    env.DB.prepare("SELECT r.id,r.subject,r.status,r.updated_at,cu.code AS unit_code,cu.name AS unit_name FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id WHERE r.submitted_by=? AND r.status NOT IN ('resolved','closed') ORDER BY r.updated_at DESC LIMIT 6").bind(user.id).all(),
+    env.DB.prepare("SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,mf.created_at AS favorited_at,1 AS is_favorite FROM material_favorites mf JOIN material_submissions m ON m.id=mf.material_id LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE mf.user_id=? AND m.status='published' AND m.material_type!='exam_photo' ORDER BY mf.created_at DESC LIMIT 6").bind(user.id).all(),
+    env.DB.prepare("SELECT id,title,body,published_at FROM announcements WHERE status='published' AND priority='urgent' AND (expires_at IS NULL OR expires_at>?) ORDER BY published_at DESC LIMIT 5").bind(now).all(),
+    env.DB.prepare("SELECT id,title,description,ends_at FROM polls WHERE status='published' AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) ORDER BY COALESCE(ends_at,created_at) LIMIT 10").bind(now, now).all(),
+    preferencesPromise,
+    studentNumber ? env.DB.prepare("SELECT cs.class_id,cs.preference,cs.student_decision,cs.decision_at,c.status AS class_status FROM class_students cs JOIN classes c ON c.id=cs.class_id WHERE cs.student_number=? AND cs.removed_at IS NULL LIMIT 1").bind(studentNumber).first<Record<string, unknown>>() : Promise.resolve(null),
+  ]);
+  const participation = await Promise.all(pollsResult.results.map(async (item) => { const id = String(rowObject(item).id); return Boolean(await env.DB.prepare("SELECT 1 FROM poll_participations WHERE poll_id=? AND voter_hash=?").bind(id, await voterHash(env, user, id)).first()); }));
+  const pendingPolls = pollsResult.results.filter((_, index) => !participation[index]).map((item) => { const row = rowObject(item); return { id: row.id, title: row.title, description: row.description, endsAt: row.ends_at, href: "/inqueritos" }; });
+  const notificationItems = await loadNotifications(env, user, preferences, 100, true, false);
+  const upcomingEvents = upcomingResult.results.map((item) => eventDto(rowObject(item))), favoriteMaterials = favoritesResult.results.map((item) => ({ ...materialDto(item), favoritedAt: rowObject(item).favorited_at }));
+  const requestItems = requestsResult.results.map((item) => { const row = rowObject(item); return { id: row.id, subject: row.subject, status: row.status, updatedAt: row.updated_at, unitCode: row.unit_code, unitName: row.unit_name, href: "/pedidos" }; });
+  const announcementItems = urgentResult.results.map((item) => { const row = rowObject(item); return { id: row.id, title: row.title, description: row.body, priority: "urgent", publishedAt: row.published_at, href: "/avisos" }; });
+  const classId = Number(classInfo?.class_id ?? user.representedClass ?? 0) || null;
+  const classSummary = classId ? { id: classId, classId, name: `Turma ${classId}`, status: classInfo?.class_status ?? "" } : null;
+  const classPreferences = { status: classInfo?.student_decision ?? classInfo?.preference ?? "", summary: classInfo?.student_decision ?? classInfo?.preference ?? "", decidedAt: classInfo?.decision_at ?? null };
+  return json({ generatedAt: now, unreadNotifications: notificationItems.length, summary: { unreadNotifications: notificationItems.length, upcomingEvents: upcomingEvents.length, openRequests: requestItems.length, activePolls: pendingPolls.length, favoriteMaterials: favoriteMaterials.length }, notifications: notificationItems.slice(0, 8), upcomingEvents, requests: requestItems, recentRequests: requestItems, polls: pendingPolls, activePolls: pendingPolls, favoriteMaterials, urgentAnnouncements: announcementItems, announcements: announcementItems, recentAnnouncements: announcementItems, classId, classInfo: classSummary, classSummary, preferences: classPreferences, classPreferences, management: isCommission(user) });
+}
+
 async function dashboard(env: HubEnv, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("dashboard.analytics")) return disabled();
@@ -517,8 +893,8 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
   if (query.length < 2) return json({ results: [] });
   const pattern = `%${query.replace(/[%_]/g, "")}%`;
   const cc = isCommission(user), visibility = cc ? "1=1" : "visibility!='cc'";
-  const classesEnabled = await enabled("classes.rosters");
-  const [classes, units, events, docs, announcements, materialRows, members] = await Promise.all([
+  const [classesEnabled, linksEnabled] = await Promise.all([enabled("classes.rosters"), enabled("useful_links.library")]);
+  const [classes, units, events, docs, announcements, materialRows, members, linkRows] = await Promise.all([
     classesEnabled
       ? env.DB.prepare("SELECT id,'Turma' AS eyebrow,('Turma ' || id) AS title,('Ano letivo ' || academic_year || ' · ' || (SELECT COUNT(*) FROM class_students cs WHERE cs.class_id=classes.id AND cs.removed_at IS NULL) || ' estudantes') AS description,'class' AS type,updated_at AS date FROM classes WHERE (('Turma ' || id) LIKE ? OR CAST(id AS TEXT) LIKE ? OR academic_year LIKE ?) ORDER BY id LIMIT 20").bind(pattern, pattern, pattern).all()
       : Promise.resolve({ results: [] }),
@@ -528,19 +904,23 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
     env.DB.prepare("SELECT id,priority AS eyebrow,title,substr(body,1,220) AS description,'announcement' AS type,published_at AS date FROM announcements WHERE status='published' AND (title LIKE ? OR body LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare("SELECT id,material_type AS eyebrow,title,description,'material' AS type,created_at AS date FROM material_submissions WHERE status='published' AND material_type!='exam_photo' AND (title LIKE ? OR description LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare("SELECT u.id,p.label AS eyebrow,u.full_name AS title,COALESCE(d.label,p.label) AS description,'member' AS type,u.updated_at AS date FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' AND (u.full_name LIKE ? OR p.label LIKE ? OR d.label LIKE ?) LIMIT 20").bind(pattern, pattern, pattern).all(),
+    linksEnabled ? env.DB.prepare(`SELECT l.id,l.category AS eyebrow,l.title,l.description,'useful_link' AS type,l.updated_at AS date FROM useful_links l WHERE l.status='published' AND ${cc ? "1=1" : "l.visibility!='cc'"} AND (l.title LIKE ? OR l.description LIKE ? OR l.url LIKE ?) LIMIT 20`).bind(pattern, pattern, pattern).all() : Promise.resolve({ results: [] }),
   ]);
-  const hrefs: Record<string, (id: unknown) => string> = { class: (id) => `/turmas/${encodeURIComponent(String(id))}`, announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao" };
-  const results = [...classes.results, ...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
+  const hrefs: Record<string, (id: unknown) => string> = { class: (id) => `/turmas/${encodeURIComponent(String(id))}`, announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao", useful_link: () => "/links-uteis" };
+  const results = [...classes.results, ...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results, ...linkRows.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
   return json({ query, results });
 }
 
 export function isAcademicHubPath(pathname: string): boolean {
-  return pathname === "/api/calendar-events" || pathname === "/api/documents" || pathname === "/api/requests" || pathname === "/api/commission-directory" || pathname === "/api/curricular-units" || /^\/api\/curricular-units\/[^/]+$/.test(pathname) || pathname === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(pathname) || pathname === "/api/dashboard" || pathname === "/api/search" || pathname === "/api/material-submissions";
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  return path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/commission-directory" || path === "/api/curricular-units" || /^\/api\/curricular-units\/[^/]+$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
 export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (pathname === "/api/calendar-events") return calendar(request, env, url, user, enabled);
+  if (pathname === "/api/calendar-subscription" || pathname === "/api/calendar-subscriptions") return calendarSubscription(request, env, url, user, enabled);
+  if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);
   if (pathname === "/api/documents") return documents(request, env, url, user, enabled);
   if (pathname === "/api/requests") return requests(request, env, url, user, enabled);
   if (pathname === "/api/commission-directory" && request.method === "GET") return directory(env, user, enabled);
@@ -551,7 +931,15 @@ export async function handleAcademicHubRoute(request: Request, env: HubEnv, url:
   if (vote) return polls(request, env, url, user, enabled, decodeURIComponent(vote[1]), "vote");
   if (pathname === "/api/polls") return polls(request, env, url, user, enabled);
   if (pathname === "/api/dashboard" && request.method === "GET") return dashboard(env, user, enabled);
+  if (pathname === "/api/dashboard/personal" && request.method === "GET") return personalDashboard(env, user, enabled);
+  if (pathname === "/api/notifications") return notifications(request, env, url, user, enabled);
+  if (pathname === "/api/notification-preferences") return notificationPreferences(request, env, user, enabled);
   if (pathname === "/api/search" && request.method === "GET") return search(env, url, user, enabled);
   if (pathname === "/api/material-submissions") return materials(request, env, url, user, enabled);
+  if (pathname === "/api/material-favorites") return materialFavorites(request, env, url, user, enabled);
+  if (pathname === "/api/material-feedback") return materialFeedback(request, env, url, user, enabled);
+  const versions = pathname.match(/^\/api\/material-submissions\/([^/]+)\/versions$/);
+  if (versions) return materialVersions(request, env, decodeURIComponent(versions[1]), user, enabled);
+  if (pathname === "/api/useful-links") return usefulLinks(request, env, url, user, enabled);
   return json({ error: "Operação não suportada." }, 405);
 }

@@ -9,6 +9,8 @@ const ptPT = {
   ...COMMUNITY_MESSAGES["pt-PT"],
   ...ADMIN_MESSAGES["pt-PT"],
   ...CLASSES_MESSAGES["pt-PT"],
+  ...LINKS_MESSAGES["pt-PT"],
+  ...DASHBOARD_MESSAGES["pt-PT"],
   "common.close": "Fechar",
   "common.open": "Abrir",
   "common.content": "Conteúdo da aplicação",
@@ -143,6 +145,8 @@ const en: Record<MessageKey, string> = {
   ...COMMUNITY_MESSAGES.en,
   ...ADMIN_MESSAGES.en,
   ...CLASSES_MESSAGES.en,
+  ...LINKS_MESSAGES.en,
+  ...DASHBOARD_MESSAGES.en,
   "common.close": "Close",
   "common.open": "Open",
   "common.content": "Application content",
@@ -310,6 +314,9 @@ const englishBreadcrumbs: Record<string, string> = {
   "Colocações": "Placements",
   "Pesquisa": "Search",
   "Tickets": "Tickets",
+  "Dashboard": "Dashboard",
+  "Notificações": "Notifications",
+  "Links úteis": "Useful links",
 };
 
 export function translateBreadcrumb(label: string, locale: AppLocale) {
@@ -322,3 +329,5 @@ import { ADMIN_MESSAGES } from "./i18n-admin.ts";
 import { CLASSES_MESSAGES } from "./i18n-classes.ts";
 import { COMMUNITY_MESSAGES } from "./i18n-community.ts";
 import { PUBLIC_MESSAGES } from "./i18n-public.ts";
+import { LINKS_MESSAGES } from "./i18n-links.ts";
+import { DASHBOARD_MESSAGES } from "./i18n-dashboard.ts";

@@ -17,9 +17,14 @@ import {
   FolderOpen,
   Image as ImageIcon,
   LoaderCircle,
+  Flag,
+  History,
   Send,
   ShieldCheck,
+  Star,
+  ThumbsUp,
   Upload,
+  UploadCloud,
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -28,6 +33,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
 import { FileUploadField, MultiFileUploadField, SelectedUpload } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
+import { useModuleEnabled } from "@/components/use-module-enabled";
 import { useI18n } from "@/components/i18n-context";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
@@ -37,6 +43,24 @@ import styles from "@/components/material-library.module.css";
 
 type Status = "pending" | "approved" | "rejected" | "archived";
 type Category = "exam" | "summary" | "notes" | "other";
+
+function MaterialThumbnail({ fileType, src, title }: { fileType: string; src: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+  const isSupportedSource = /^(https?:\/\/|\/(?!\/)|data:image\/(?:jpeg|png|webp);base64,|blob:)/i.test(src.trim());
+  const showImage = fileType.startsWith("image/") && isSupportedSource && !failed;
+
+  return (
+    <div className={styles.materialThumb} data-placeholder={!showImage}>
+      {showImage ? (
+        <img src={src} alt={title} onError={() => setFailed(true)} />
+      ) : (
+        <span className={styles.thumbPlaceholder} aria-hidden="true">
+          <FileText />
+        </span>
+      )}
+    </div>
+  );
+}
 type ApiMaterial = {
   id: string | number;
   title: string;
@@ -69,8 +93,45 @@ type ApiMaterial = {
   unit?: { id: string | number; code?: string; name?: string };
   curricularUnit?: { id: string | number; code?: string; name?: string };
   attachments?: Array<{ id?: string; name?: string; mime?: string; dataUrl?: string; fileName?: string; fileType?: string; fileUrl?: string }>;
+  favorite?: boolean;
+  isFavorite?: boolean;
+  favorited?: boolean;
+  helpful?: boolean;
+  isHelpful?: boolean;
+  helpfulByMe?: boolean;
+  helpfulCount?: number;
+  usefulCount?: number;
+  outdated?: boolean;
+  reportedOutdated?: boolean;
+  isOutdatedReported?: boolean;
+  reportedOutdatedByMe?: boolean;
+  outdatedCount?: number;
+  reportCount?: number;
+  version?: number;
+  versionNumber?: number;
+  currentVersion?: number;
+  versionCount?: number;
+  versions?: ApiMaterialVersion[];
+  versionHistory?: ApiMaterialVersion[];
+};
+type ApiMaterialVersion = {
+  id?: string | number;
+  version?: number;
+  versionNumber?: number;
+  fileName?: string;
+  file_name?: string;
+  fileUrl?: string;
+  file_url?: string;
+  attachmentName?: string;
+  attachmentDataUrl?: string;
+  notes?: string;
+  description?: string;
+  changeNote?: string;
+  createdAt?: string;
+  created_at?: string;
 };
 type MaterialAttachment = { id: string; name: string; mime: string; dataUrl: string };
+type MaterialVersion = { id: string; number: number; fileName: string; fileUrl: string; notes: string; createdAt: string };
 type Material = {
   id: string;
   title: string;
@@ -88,6 +149,15 @@ type Material = {
   attachments: MaterialAttachment[];
   createdAt: string;
   unit: { id: string; code: string; name: string } | null;
+  favorite: boolean;
+  helpful: boolean;
+  helpfulCount: number;
+  reportedOutdated: boolean;
+  outdatedCount: number;
+  version: number;
+  versionCount: number;
+  versions: MaterialVersion[];
+  versionsLoaded: boolean;
 };
 type Unit = { id: string; code: string; name: string };
 type Notice = { kind: ToastKind; message: string } | null;
@@ -134,6 +204,15 @@ function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: stri
     mime: attachment.mime ?? attachment.fileType ?? "application/octet-stream",
     dataUrl: attachment.dataUrl ?? attachment.fileUrl ?? "",
   })).filter((attachment) => attachment.dataUrl) ?? [];
+  const rawVersions = item.versions ?? item.versionHistory ?? [];
+  const versions = rawVersions.map((version, index) => ({
+    id: String(version.id ?? `${item.id}-version-${index}`),
+    number: version.version ?? version.versionNumber ?? rawVersions.length - index,
+    fileName: version.fileName ?? version.file_name ?? version.attachmentName ?? "ficheiro",
+    fileUrl: version.fileUrl ?? version.file_url ?? version.attachmentDataUrl ?? "",
+    notes: version.notes ?? version.changeNote ?? version.description ?? "",
+    createdAt: version.createdAt ?? version.created_at ?? item.createdAt ?? item.created_at ?? new Date().toISOString(),
+  })).sort((a, b) => b.number - a.number);
   return {
     id: String(item.id),
     title: item.title,
@@ -172,6 +251,15 @@ function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: stri
           name: unit.name ?? unitLabel,
         }
       : null,
+    favorite: item.favorite ?? item.isFavorite ?? item.favorited ?? false,
+    helpful: item.helpfulByMe ?? item.helpful ?? item.isHelpful ?? false,
+    helpfulCount: item.helpfulCount ?? item.usefulCount ?? 0,
+    reportedOutdated: item.reportedOutdatedByMe ?? item.outdated ?? item.reportedOutdated ?? item.isOutdatedReported ?? false,
+    outdatedCount: item.outdatedCount ?? item.reportCount ?? 0,
+    version: item.currentVersion ?? item.version ?? item.versionNumber ?? versions[0]?.number ?? 1,
+    versionCount: item.versionCount ?? Math.max(1, versions.length),
+    versions,
+    versionsLoaded: Boolean(item.versions || item.versionHistory),
   };
 }
 function date(value: string, locale: string) {
@@ -196,6 +284,11 @@ function readFileDataUrl(file: File) {
 export function MaterialLibrary() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
+  const submissionEnabled = useModuleEnabled("materials.submission");
+  const moderationEnabled = useModuleEnabled("materials.moderation");
+  const favoritesEnabled = useModuleEnabled("materials.favorites");
+  const feedbackEnabled = useModuleEnabled("materials.feedback");
+  const versioningEnabled = useModuleEnabled("materials.versioning");
   const [materials, setMaterials] = useState<Material[]>([]),
     [units, setUnits] = useState<Unit[]>([]),
     [canModerate, setCanModerate] = useState(false),
@@ -204,6 +297,14 @@ export function MaterialLibrary() {
     [editor, setEditor] = useState(false),
     [saving, setSaving] = useState(false),
     [moderating, setModerating] = useState<string | null>(null),
+    [feedbackBusy, setFeedbackBusy] = useState<string | null>(null),
+    [versionsOpen, setVersionsOpen] = useState<string | null>(null),
+    [versionsLoading, setVersionsLoading] = useState<string | null>(null),
+    [versionEditor, setVersionEditor] = useState<string | null>(null),
+    [versionFile, setVersionFile] = useState<File | null>(null),
+    [versionFileData, setVersionFileData] = useState(""),
+    [versionNotes, setVersionNotes] = useState(""),
+    [publishingVersion, setPublishingVersion] = useState(false),
     [filter, setFilter] = useState("all");
   const [title, setTitle] = useState(""),
     [description, setDescription] = useState(""),
@@ -216,12 +317,9 @@ export function MaterialLibrary() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const moderator =
-        user?.role === "admin" || Boolean(user?.commissionPosition);
-      const materialResponse = await fetch(
-        `/api/material-submissions${moderator ? "?scope=moderation" : ""}`,
-        { cache: "no-store" },
-      );
+      const moderator = moderationEnabled &&
+        (user?.role === "admin" || Boolean(user?.commissionPosition));
+      const materialResponse = await fetch(`/api/material-submissions${moderator ? "?scope=moderation" : ""}`, { cache: "no-store" });
       const materialData = (await materialResponse.json()) as {
         materials?: ApiMaterial[];
         submissions?: ApiMaterial[];
@@ -263,13 +361,13 @@ export function MaterialLibrary() {
     } finally {
       setLoading(false);
     }
-  }, [t, user]);
+  }, [moderationEnabled, t, user]);
   useEffect(() => {
     void load();
   }, [load]);
   const visible = useMemo(
     () =>
-      materials.filter((item) => filter === "all" || item.category === filter),
+      materials.filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter)),
     [materials, filter],
   );
   const pick = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -437,6 +535,140 @@ export function MaterialLibrary() {
       setModerating(null);
     }
   };
+  const toggleFavorite = async (item: Material) => {
+    setFeedbackBusy(`favorite-${item.id}`);
+    try {
+      const response = await fetch("/api/material-favorites", {
+        method: item.favorite ? "DELETE" : "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ materialId: item.id }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error || t("community.materials.feedbackError"));
+      setMaterials((current) => current.map((material) => material.id === item.id ? { ...material, favorite: !item.favorite } : material));
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("community.materials.feedbackError") });
+    } finally {
+      setFeedbackBusy(null);
+    }
+  };
+  const setFeedback = async (item: Material, type: "helpful" | "outdated") => {
+    setFeedbackBusy(`${type}-${item.id}`);
+    const nextValue = type === "helpful" ? !item.helpful : !item.reportedOutdated;
+    try {
+      const response = await fetch("/api/material-feedback", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ materialId: item.id, [type]: nextValue }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error || t("community.materials.feedbackError"));
+      setMaterials((current) => current.map((material) => {
+        if (material.id !== item.id) return material;
+        if (type === "helpful") return { ...material, helpful: nextValue, helpfulCount: Math.max(0, material.helpfulCount + (nextValue ? 1 : -1)) };
+        return { ...material, reportedOutdated: nextValue, outdatedCount: Math.max(0, material.outdatedCount + (nextValue ? 1 : -1)) };
+      }));
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("community.materials.feedbackError") });
+    } finally {
+      setFeedbackBusy(null);
+    }
+  };
+  const toggleVersions = async (item: Material, force = false) => {
+    if (!force && versionsOpen === item.id) {
+      setVersionsOpen(null);
+      return;
+    }
+    setVersionsOpen(item.id);
+    if (!force && item.versionsLoaded) return;
+    setVersionsLoading(item.id);
+    try {
+      const response = await fetch(`/api/material-submissions/${encodeURIComponent(item.id)}/versions`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({})) as {
+        error?: string;
+        currentVersion?: number;
+        versions?: ApiMaterialVersion[];
+      };
+      if (!response.ok) throw new Error(data.error || t("community.materials.versionsError"));
+      const rawVersions = data.versions ?? [];
+      const versions = rawVersions.map((version, index) => ({
+        id: String(version.id ?? `${item.id}-version-${index}`),
+        number: version.version ?? version.versionNumber ?? rawVersions.length - index,
+        fileName: version.fileName ?? version.file_name ?? version.attachmentName ?? t("community.materials.file"),
+        fileUrl: version.fileUrl ?? version.file_url ?? version.attachmentDataUrl ?? "",
+        notes: version.notes ?? version.changeNote ?? version.description ?? "",
+        createdAt: version.createdAt ?? version.created_at ?? item.createdAt,
+      })).sort((a, b) => b.number - a.number);
+      setMaterials((current) => current.map((material) => material.id === item.id ? {
+        ...material,
+        version: data.currentVersion ?? versions[0]?.number ?? material.version,
+        versionCount: Math.max(1, versions.length),
+        versions,
+        versionsLoaded: true,
+      } : material));
+    } catch (reason) {
+      setVersionsOpen(null);
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("community.materials.versionsError") });
+    } finally {
+      setVersionsLoading(null);
+    }
+  };
+  const pickVersionFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0] ?? null;
+    if (!selected) return;
+    if (!allowed.includes(selected.type)) {
+      setNotice({ kind: "warning", message: t("community.materials.fileTypeError") });
+      event.target.value = "";
+      return;
+    }
+    if (selected.size > MAX_SIZE) {
+      setNotice({ kind: "warning", message: t("community.materials.fileSizeError") });
+      event.target.value = "";
+      return;
+    }
+    try {
+      setVersionFile(selected);
+      setVersionFileData(await readFileDataUrl(selected));
+    } catch {
+      setNotice({ kind: "error", message: t("community.materials.fileReadError") });
+    }
+  };
+  const closeVersionEditor = () => {
+    setVersionEditor(null);
+    setVersionFile(null);
+    setVersionFileData("");
+    setVersionNotes("");
+  };
+  const publishVersion = async (item: Material) => {
+    if (!versionFile || !versionFileData) {
+      setNotice({ kind: "warning", message: t("community.materials.versionRequired") });
+      return;
+    }
+    setPublishingVersion(true);
+    try {
+      const response = await fetch(`/api/material-submissions/${encodeURIComponent(item.id)}/versions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          attachmentName: versionFile.name,
+          attachmentDataUrl: versionFileData,
+          changeNote: versionNotes.trim(),
+        }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error || t("community.materials.versionError"));
+      closeVersionEditor();
+      setMaterials((current) => current.map((material) => material.id === item.id ? { ...material, versionsLoaded: false } : material));
+      setVersionsOpen(null);
+      setNotice({ kind: "success", message: t("community.materials.versionPublished") });
+      await load();
+      await toggleVersions({ ...item, versionsLoaded: false }, true);
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("community.materials.versionError") });
+    } finally {
+      setPublishingVersion(false);
+    }
+  };
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="materials.library">
@@ -453,7 +685,7 @@ export function MaterialLibrary() {
                   <p>{t("community.materials.description")}</p>
                 </div>
               </div>
-              <div className={styles.heroActions}>
+              {submissionEnabled && <div className={styles.heroActions}>
                 <button
                   className="button button--primary"
                   type="button"
@@ -462,7 +694,7 @@ export function MaterialLibrary() {
                   {editor ? <X /> : <Upload />}
                   {editor ? t("community.materials.closeForm") : t("community.materials.share")}
                 </button>
-              </div>
+              </div>}
             </header>
             {notice && (
               <AppToast
@@ -471,7 +703,7 @@ export function MaterialLibrary() {
                 onDismiss={() => setNotice(null)}
               />
             )}{" "}
-            {editor && (
+            {submissionEnabled && editor && (
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
@@ -673,6 +905,7 @@ export function MaterialLibrary() {
                     onChange={(event) => setFilter(event.target.value)}
                   >
                     <option value="all">{t("community.materials.all")}</option>
+                    {favoritesEnabled && <option value="favorites">{t("community.materials.favorites")}</option>}
                     {Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => (
                       <option value={value} key={value}>
                         {t(key)}
@@ -696,13 +929,7 @@ export function MaterialLibrary() {
                 <div className={styles.materialGrid}>
                   {visible.map((item) => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale }); return (
                     <article className={styles.material} key={item.id}>
-                      <div className={styles.materialThumb}>
-                        {item.fileType.startsWith("image/") && item.fileUrl ? (
-                          <img src={item.fileUrl} alt="" />
-                        ) : (
-                          <FileText />
-                        )}
-                      </div>
+                      <MaterialThumbnail key={`${item.id}-${item.fileUrl}`} fileType={item.fileType} src={item.fileUrl} title={item.title} />
                       <div className={styles.materialBody}>
                         <div className={styles.cardTop}>
                           <span className={styles.tag}>
@@ -723,6 +950,7 @@ export function MaterialLibrary() {
                             {item.unit.code}
                           </span>
                         )}
+                        {versioningEnabled && <span className={styles.versionBadge}>{t("community.materials.version", { number: item.version })}</span>}
                         <div className={styles.meta}>
                           <span className={styles.metaRow}>
                             {item.anonymous ? <ShieldCheck /> : <ImageIcon />}
@@ -733,6 +961,48 @@ export function MaterialLibrary() {
                             <span>{item.fileName}</span>
                           </span>
                         </div>
+                        {item.status === "approved" && (favoritesEnabled || feedbackEnabled) && (
+                          <div className={styles.feedbackActions}>
+                            {favoritesEnabled && <button className={`${styles.feedbackButton} ${item.favorite ? styles.isActive : ""}`} type="button" onClick={() => void toggleFavorite(item)} disabled={feedbackBusy === `favorite-${item.id}`} aria-pressed={item.favorite} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}>
+                              {feedbackBusy === `favorite-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Star />}
+                              <span>{t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}</span>
+                            </button>}
+                            {feedbackEnabled && <button className={`${styles.feedbackButton} ${item.helpful ? styles.isActive : ""}`} type="button" onClick={() => void setFeedback(item, "helpful")} disabled={feedbackBusy === `helpful-${item.id}`} aria-pressed={item.helpful}>
+                              {feedbackBusy === `helpful-${item.id}` ? <LoaderCircle className={styles.spin} /> : <ThumbsUp />}
+                              <span>{t(item.helpful ? "community.materials.notHelpful" : "community.materials.helpful")}</span><b>{item.helpfulCount}</b>
+                            </button>}
+                            {feedbackEnabled && <button className={`${styles.feedbackButton} ${item.reportedOutdated ? styles.isWarning : ""}`} type="button" onClick={() => void setFeedback(item, "outdated")} disabled={feedbackBusy === `outdated-${item.id}`} aria-pressed={item.reportedOutdated}>
+                              {feedbackBusy === `outdated-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Flag />}
+                              <span>{t(item.reportedOutdated ? "community.materials.outdatedMarked" : "community.materials.outdated")}</span>{item.outdatedCount > 0 && <b>{item.outdatedCount}</b>}
+                            </button>}
+                          </div>
+                        )}
+                        {versioningEnabled && item.status === "approved" && (
+                          <div className={styles.versionArea}>
+                            <div className={styles.versionActions}>
+                              <button type="button" onClick={() => void toggleVersions(item)} disabled={versionsLoading === item.id}>{versionsLoading === item.id ? <LoaderCircle className={styles.spin} /> : <History />}{t(versionsLoading === item.id ? "community.materials.loadingVersions" : versionsOpen === item.id ? "community.materials.hideVersions" : "community.materials.versions")}</button>
+                              {canModerate && <button type="button" onClick={() => { if (versionEditor === item.id) closeVersionEditor(); else { closeVersionEditor(); setVersionEditor(item.id); } }}><UploadCloud />{t(versionEditor === item.id ? "community.materials.closeVersion" : "community.materials.publishVersion")}</button>}
+                            </div>
+                            {versionsOpen === item.id && (
+                              <div className={styles.versionList}>
+                                <strong>{t("community.materials.currentVersion")}: {t("community.materials.version", { number: item.version })}</strong>
+                                {item.versions.length === 0 ? <p>{t("community.materials.noVersions")}</p> : item.versions.map((version) => (
+                                  <div className={styles.versionRow} key={version.id}>
+                                    <span><b>{t("community.materials.version", { number: version.number })}</b><small>{date(version.createdAt, locale)}{version.notes ? ` · ${version.notes}` : ""}</small></span>
+                                    {version.fileUrl && <a href={version.fileUrl} target="_blank" rel="noreferrer" download={version.fileName} title={version.fileName}><Download /></a>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {canModerate && versionEditor === item.id && (
+                              <div className={styles.versionForm}>
+                                <label><span>{t("community.materials.versionFile")}</span><input type="file" accept={allowed.join(",")} onChange={(event) => void pickVersionFile(event)} />{versionFile && <small>{versionFile.name} · {size(versionFile.size, locale)}</small>}</label>
+                                <label><span>{t("community.materials.versionNotes")}</span><textarea value={versionNotes} onChange={(event) => setVersionNotes(event.target.value)} maxLength={500} placeholder={t("community.materials.versionNotesPlaceholder")} /></label>
+                                <button className="button button--primary button--compact" type="button" onClick={() => void publishVersion(item)} disabled={publishingVersion}>{publishingVersion && <LoaderCircle className={styles.spin} />}{t(publishingVersion ? "community.materials.publishingVersion" : "community.materials.publishVersion")}</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {canModerate && item.category === "exam" && item.attachments.length > 0 && (
                           <div className={styles.photoDownloads}>
                             <strong>{item.attachments.length} {item.attachments.length === 1 ? t("community.materials.photo") : t("community.materials.photoPlural")}</strong>

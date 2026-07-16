@@ -27,6 +27,7 @@ import { useAuth } from "@/components/auth-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
+import { CalendarSubscription } from "@/components/calendar-subscription";
 import styles from "@/components/academic-calendar.module.css";
 
 type DateInput = string | number;
@@ -167,6 +168,7 @@ export function AcademicCalendar() {
   const eventLabels = useMemo(() => Object.fromEntries(Object.entries(eventLabelKeys).map(([key, labelKey]) => [key, t(labelKey)])), [t]);
   const weekDays = useMemo(() => weekDayKeys.map((key) => t(key)), [t]);
   const managementEnabled = useModuleEnabled("calendar.management");
+  const subscriptionEnabled = useModuleEnabled("calendar.subscription");
   const canManage = managementEnabled && (user?.role === "admin" || Boolean(user?.commissionPosition));
   const today = useMemo(() => startOfDay(new Date()), []);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -448,6 +450,8 @@ export function AcademicCalendar() {
         <p>Avaliações, entregas e acontecimentos importantes numa agenda partilhada.{canManage && " Seleciona um dia para adicionar um evento."}</p>
       </div>
     </header>
+
+    {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
 
     <section className={styles.calendarShell} aria-label="Calendário académico">
       <div className={styles.toolbar}>
