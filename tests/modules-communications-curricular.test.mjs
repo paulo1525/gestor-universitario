@@ -38,6 +38,11 @@ test("módulos e submódulos têm controlo persistente e exclusivo do administra
   assert.match(modules, /app_module_updated/);
   assert.match(moduleUi, /up202507850@up\.pt/);
   assert.match(moduleUi, /admin\.modules\.inheritedInactive/);
+  assert.match(moduleUi, /expandedModules/);
+  assert.match(moduleUi, /admin\.modules\.searchPlaceholder/);
+  assert.match(moduleUi, /visibleModules\.map/);
+  assert.match(moduleUi, /admin\.modules\.featureCount/);
+  assert.doesNotMatch(moduleUi, /styles\.activeBadge|styles\.inactiveBadge/);
   assert.match(migration, /CREATE TABLE app_module_settings/);
   assert.match(definitions, /key: "classes\.special_statuses"[\s\S]*defaultEnabled: false/);
   assert.match(specialStatusModuleMigration, /classes\.special_statuses', 0/);
