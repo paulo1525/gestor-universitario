@@ -703,7 +703,7 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
       : result.results;
     return json({ classes, settings, serverNow: Date.now() });
   }
-  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(save|draft|submit|reopen|tickets))?$/);
+  const match = pathname.match(/^\/api\/classes\/(\d+)(?:\/(save|draft|submit|reopen|tickets|import))?$/);
   if (!match) return json({ error: "Turma não encontrada." }, 404);
   const classId = Number(match[1]), action = match[2] || "detail";
   if (classId < 1 || classId > 20) return json({ error: "Turma inválida." }, 400);
@@ -748,6 +748,21 @@ async function handleClassesV2(request: Request, env: Env, user: CurrentUser, pa
    const classAudit=JSON.stringify({reason:reason||null,before:before.results,after:canonicalStudents.map(student=>({id:student.id,fullName:student.fullName,studentNumber:student.studentNumber})),students:canonicalStudents.length});if(publishedCorrection)writes.push(env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) SELECT ?,?,'published_roster_corrected',?,? WHERE EXISTS (SELECT 1 FROM distribution_proposals WHERE id=? AND status='published' AND result_snapshot=?)").bind(classId,actorId,classAudit,now,...correctionBindings),env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) SELECT ?,'published_roster_corrected',?,? WHERE EXISTS (SELECT 1 FROM distribution_proposals WHERE id=? AND status='published' AND result_snapshot=?)").bind(actorId,JSON.stringify({classId,reason,before:before.results,after:canonicalStudents}),now,...correctionBindings));else writes.push(env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) SELECT ?,?,'class_roster_saved',?,? WHERE NOT EXISTS (SELECT 1 FROM distribution_proposals WHERE invalidated_at IS NULL AND status IN ('applied','published'))").bind(classId,actorId,classAudit,now));
    const batch=await env.DB.batch(writes);if(publishedCorrection&&!batch[0]?.meta.changes)return json({error:"A pauta foi alterada por outro administrador. Atualize os dados e tente novamente."},409);if(!publishedCorrection&&!batch[classTransitionIndex]?.meta.changes)return json({error:"Foi aplicada uma distribuição enquanto editavas a turma. Atualiza os dados e tenta novamente."},409);
     return json({ok:true});
+  }
+
+  if(request.method==="POST"&&action==="import"){
+   if(!canManageAll(user))return json({error:"A importação CSV está reservada ao Núcleo da CC."},403);
+   if(klass.status==="published")return json({error:"Não é possível importar estudantes para uma pauta publicada."},409);
+   const activeDistribution=await env.DB.prepare("SELECT id FROM distribution_proposals WHERE invalidated_at IS NULL AND status IN ('applied','published') LIMIT 1").first();
+   if(activeDistribution)return json({error:"Existe uma distribuição aplicada. Conclua esse ciclo antes de importar estudantes."},409);
+   const body=await parseJson(request),rows=Array.isArray(body?.students)?body.students:[],normalized=normalizeDraftStudents(rows.map((student)=>({fullName:student?.nome,studentNumber:String(student?.n_mecanografico||""),preference:"stay"})));
+   if(normalized.error||!normalized.students?.length)return json({error:normalized.error||"O CSV não contém estudantes válidos."},400);
+   const existing=await env.DB.prepare("SELECT student_number FROM class_students WHERE class_id=? AND removed_at IS NULL").bind(classId).all<{student_number:string}>(),existingNumbers=new Set(existing.results.map(student=>student.student_number));
+   if(normalized.students.some(student=>existingNumbers.has(student.studentNumber)))return json({error:"O CSV contém um estudante que já pertence a esta turma."},409);
+   const conflict=await conflictingStudent(env,classId,normalized.students.map(student=>student.studentNumber));if(conflict)return json({error:`O estudante ${conflict.student_number} já está associado à Turma ${conflict.class_id}.`},409);
+   const now=Date.now(),actorId=user.actorId||user.id,writes=normalized.students.map(student=>env.DB.prepare("INSERT INTO class_students (id,class_id,full_name,student_number,preference,preference_locked_at,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(student.id,classId,student.fullName,student.studentNumber,"stay",now,actorId,now,now));
+   writes.push(env.DB.prepare("UPDATE classes SET status='submitted',workflow_step=3,submitted_at=COALESCE(submitted_at,?),submitted_by=COALESCE(submitted_by,?),updated_at=? WHERE id=?").bind(now,actorId,now,classId),env.DB.prepare("INSERT INTO class_audit_log (class_id,actor_user_id,action,details,created_at) VALUES (?,?,'class_csv_imported',?,?)").bind(classId,actorId,JSON.stringify({students:normalized.students.length}),now));
+   await env.DB.batch(writes);return json({ok:true,imported:normalized.students.length});
   }
 
   if (request.method === "PUT" && action === "draft") {
@@ -961,9 +976,8 @@ async function handleGlobalTicketsV2(request:Request,env:Env,user:CurrentUser):P
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- versão legada preservada durante a transição para V2
 async function handleDistributionCheck(env:Env,user:CurrentUser):Promise<Response>{
  if(!canManageAll(user))return json({error:"Acesso reservado ao Núcleo de Gestão."},403);
- const [classes,students,openTickets]=await Promise.all([env.DB.prepare("SELECT id,status FROM classes ORDER BY id").all<{id:number;status:string}>(),env.DB.prepare("SELECT id,class_id,student_number,preference,student_decision FROM class_students WHERE removed_at IS NULL").all<{id:string;class_id:number;student_number:string;preference:string;student_decision:string|null}>(),env.DB.prepare("SELECT id,class_id,category FROM class_tickets WHERE status IN ('open','review','information_needed')").all<{id:string;class_id:number;category:string}>()]);
+ const [students,openTickets]=await Promise.all([env.DB.prepare("SELECT id,class_id,student_number,preference,student_decision FROM class_students WHERE removed_at IS NULL").all<{id:string;class_id:number;student_number:string;preference:string;student_decision:string|null}>(),env.DB.prepare("SELECT id,class_id,category FROM class_tickets WHERE status IN ('open','review','information_needed')").all<{id:string;class_id:number;category:string}>()]);
  const issues:Array<{severity:"blocker"|"warning";code:string;message:string;classId?:number}>=[];
- for(const klass of classes.results)if(["draft","reopened"].includes(klass.status))issues.push({severity:"blocker",code:"CLASS_NOT_SUBMITTED",message:`A Turma ${klass.id} ainda não foi submetida.`,classId:klass.id});
  for(const student of students.results){if(!/^\d{9}$/.test(student.student_number))issues.push({severity:"blocker",code:"INVALID_NUMBER",message:`Número mecanográfico inválido na Turma ${student.class_id}.`,classId:student.class_id});if(student.student_decision==="move"){const count=await env.DB.prepare("SELECT COUNT(*) total FROM student_destinations WHERE student_id=?").bind(student.id).first<{total:number}>();if(!count?.total)issues.push({severity:"blocker",code:"MISSING_DESTINATION",message:`Há um aluno que pretende mudar sem destinos na Turma ${student.class_id}.`,classId:student.class_id});}}
  for(const ticket of openTickets.results)issues.push({severity:"blocker",code:"OPEN_TICKET",message:`A Turma ${ticket.class_id} tem um pedido pendente (${ticket.category}).`,classId:ticket.class_id});
  const counts=await env.DB.prepare("SELECT class_id,COUNT(*) total FROM class_students WHERE removed_at IS NULL GROUP BY class_id ORDER BY class_id").all<{class_id:number;total:number}>();const values=counts.results.map(r=>r.total);if(values.length===20&&Math.max(...values)-Math.min(...values)>3)issues.push({severity:"warning",code:"IMBALANCE",message:"A diferença atual entre a maior e a menor turma excede três alunos."});
@@ -973,18 +987,20 @@ async function handleDistributionCheck(env:Env,user:CurrentUser):Promise<Respons
 type DistributionCheckIssue={severity:"blocker"|"warning";code:string;message:string;classId?:number;studentId?:string;studentName?:string;studentNumber?:string};
 function destinationsPreferredToCurrent<T extends {destination_class:number}>(destinations:T[],currentClass:number){const currentIndex=destinations.findIndex(destination=>destination.destination_class===currentClass),preferred=currentIndex>=0?destinations.slice(0,currentIndex):destinations.filter(destination=>destination.destination_class!==currentClass);return preferred.map((destination,index)=>({...destination,rank:index+1}))}
 async function buildDistributionCheck(env:Env){
- const [classes,students,destinations,activeProposal]=await Promise.all([
+ const [classes,students,destinations,activeProposal,settings]=await Promise.all([
   env.DB.prepare("SELECT id,status FROM classes ORDER BY id").all<{id:number;status:string}>(),
   env.DB.prepare("SELECT id,full_name,student_number,class_id,student_decision,notes,considerations,exception_points,exception_reviewed_at,additional_info_validation,additional_info_validation_note,additional_info_review_status FROM class_students WHERE removed_at IS NULL ORDER BY class_id,full_name COLLATE NOCASE").all<{id:string;full_name:string;student_number:string;class_id:number;student_decision:string|null;notes:string|null;considerations:string;exception_points:number;exception_reviewed_at:number|null;additional_info_validation:string|null;additional_info_validation_note:string|null;additional_info_review_status:string|null}>(),
   env.DB.prepare("SELECT student_id,destination_class,rank FROM student_destinations ORDER BY student_id,rank").all<{student_id:string;destination_class:number;rank:number}>(),
-  env.DB.prepare("SELECT id,status FROM distribution_proposals WHERE invalidated_at IS NULL AND (status='published' OR (status='applied' AND published_at IS NULL)) ORDER BY created_at DESC LIMIT 1").first<{id:string;status:string}>()
+  env.DB.prepare("SELECT id,status FROM distribution_proposals WHERE invalidated_at IS NULL AND (status='published' OR (status='applied' AND published_at IS NULL)) ORDER BY created_at DESC LIMIT 1").first<{id:string;status:string}>(),
+  classSettings(env)
  ]);
  const issues:DistributionCheckIssue[]=[],activeClassIds=new Set(classes.results.map(row=>row.id)),destinationsById=new Map<string,typeof destinations.results>();
  for(const destination of destinations.results)destinationsById.set(destination.student_id,[...(destinationsById.get(destination.student_id)||[]),destination]);
  if(!classes.results.length)issues.push({severity:"blocker",code:"SEM_TURMAS",message:"Não existem turmas ativas para distribuir."});
  if(!students.results.length)issues.push({severity:"blocker",code:"SEM_ESTUDANTES",message:"Não existem estudantes ativos para distribuir."});
+ if(settings.preferenceWindows.some(window=>!Number.isFinite(Date.parse(window.closeAt))||Date.now()<Date.parse(window.closeAt)))issues.push({severity:"blocker",code:"JANELAS_PREFERENCIAS_ABERTAS",message:"Só é possível calcular uma nova proposta depois de todas as janelas de preferências encerrarem."});
  const counts=new Map(classes.results.map(row=>[row.id,0]));for(const student of students.results)counts.set(student.class_id,(counts.get(student.class_id)||0)+1);
- for(const klass of classes.results){if(["draft","reopened"].includes(klass.status))issues.push({severity:"blocker",code:"TURMA_NAO_SUBMETIDA",message:`A Turma ${klass.id} ainda não foi submetida.`,classId:klass.id});if(!(counts.get(klass.id)||0))issues.push({severity:"blocker",code:"TURMA_VAZIA",message:`A Turma ${klass.id} não tem estudantes.`,classId:klass.id})}
+ for(const klass of classes.results)if(!(counts.get(klass.id)||0))issues.push({severity:"blocker",code:"TURMA_VAZIA",message:`A Turma ${klass.id} não tem estudantes.`,classId:klass.id});
  let automaticStays=0,exceptionalPending=0;
  for(const student of students.results){
   const identity={classId:student.class_id,studentId:student.id,studentName:student.full_name,studentNumber:student.student_number},ownDestinations=student.student_decision==="move"?destinationsPreferredToCurrent(destinationsById.get(student.id)||[],student.class_id):[];
@@ -1010,8 +1026,8 @@ async function buildDistributionCheck(env:Env){
   simulation={possible:true,moved:results.filter(result=>result.status==="moved").length,manualReviews:results.filter(result=>result.manualReview).length,tieBreakStudents:results.filter(result=>result.randomized).length,classCounts:Object.fromEntries(input.classIds.map(id=>[id,classCounts.get(id)||0])),competition};
  }catch(error){issues.push({severity:"blocker",code:"DISTRIBUICAO_IMPOSSIVEL",message:error instanceof Error?error.message:"O motor não encontrou uma distribuição válida."})}}
  const categories=[
-  {key:"roster",label:"Turmas e estudantes",description:"Turmas submetidas, não vazias e identificadores válidos.",codes:["SEM_TURMAS","SEM_ESTUDANTES","TURMA_NAO_SUBMETIDA","TURMA_VAZIA","NUMERO_INVALIDO"]},
-  {key:"preferences",label:"Preferências",description:"Decisões e destinos ativos, únicos e ordenados.",codes:["PREFERENCIAS_EM_FALTA","DESTINO_INVALIDO","ORDEM_PREFERENCIAS_INVALIDA"]},
+  {key:"roster",label:"Turmas e estudantes",description:"Turmas não vazias e identificadores válidos.",codes:["SEM_TURMAS","SEM_ESTUDANTES","TURMA_VAZIA","NUMERO_INVALIDO"]},
+  {key:"preferences",label:"Preferências",description:"Janelas encerradas e destinos ativos, únicos e ordenados.",codes:["JANELAS_PREFERENCIAS_ABERTAS","PREFERENCIAS_EM_FALTA","DESTINO_INVALIDO","ORDEM_PREFERENCIAS_INVALIDA"]},
   {key:"review",label:"Informação adicional",description:"Informação confidencial classificada pela CC.",codes:["INFORMACAO_POR_VALIDAR","INFORMACAO_VALIDADA_SEM_PONTOS"]},
    {key:"simulation",label:"Equilíbrio e cálculo",description:"Pré-visualização concluída e limites respeitados.",codes:["DESEQUILIBRIO","DISTRIBUICAO_IMPOSSIVEL","DISTRIBUICAO_ATIVA"]}
  ];

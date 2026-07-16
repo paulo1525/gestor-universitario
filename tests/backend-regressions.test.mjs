@@ -84,6 +84,9 @@ test("cada cálculo usa e persiste uma seed aleatória para desempates auditáve
 
 test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálculo",()=>{
  assert.match(distributionCheck,/code:"TURMA_VAZIA"/);
+ assert.doesNotMatch(distributionCheck,/TURMA_NAO_SUBMETIDA|ainda não foi submetida/);
+ assert.match(distributionCheck,/code:"JANELAS_PREFERENCIAS_ABERTAS"/);
+ assert.match(distributionCheck,/settings\.preferenceWindows\.some/);
  assert.match(distributionCheck,/new Map\(classes\.results\.map\(row=>\[row\.id,0\]\)\)/);
  assert.doesNotMatch(distributionCheck,/code:"REFERENCIA_SEM_PONTO"/);
  assert.match(distributionCheck,/calculateDistribution\(input\.students,\{seed:`preflight:/);
@@ -115,6 +118,14 @@ test("aprovação e aplicação são idempotentes e validam o snapshot integral"
  assert.match(proposals,/typeof result\.manualReview!=="boolean"/);
  assert.match(proposals,/EXISTS \(SELECT 1 FROM distribution_proposals WHERE id=\? AND status='approved' AND invalidated_at IS NULL\)/);
  assert.match(proposals,/WHERE id=\? AND status='approved' AND invalidated_at IS NULL/);
+});
+
+test("importação CSV administrativa é aditiva, auditada e bloqueia conflitos",()=>{
+ assert.match(classes,/action==="import"/);
+ assert.match(classes,/class_csv_imported/);
+ assert.match(classes,/O CSV contém um estudante que já pertence a esta turma/);
+ assert.match(classes,/Existe uma distribuição aplicada.*antes de importar estudantes/);
+ assert.match(classes,/UPDATE classes SET status='submitted'/);
 });
 
 test("revisões manuais só podem ser fechadas no rascunho",()=>{

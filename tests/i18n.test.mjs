@@ -76,3 +76,19 @@ test("public interaction modules use the shared bilingual catalogue", async () =
   assert.match(catalogue, /"search\.title": "Global search"/);
   assert.match(catalogue, /"polls\.editor\.edit": "Edit survey"/);
 });
+
+test("the classes dashboard interpolates the class number", async () => {
+  const dashboard = await readFile(
+    new URL("../components/turmas-dashboard.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    dashboard,
+    /t\("classes\.common\.class", \{ number: item\.id \}\)/,
+  );
+  assert.doesNotMatch(
+    dashboard,
+    /t\("classes\.common\.class", \{ id: item\.id \}\)/,
+  );
+});
