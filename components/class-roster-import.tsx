@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Check, CircleHelp, Clipboard, FileSpreadsheet, LoaderCircle, Upload, X } from "lucide-react";
+import { Check, Clipboard, LoaderCircle, Sparkles, Upload, X } from "lucide-react";
 import { AppToast } from "@/components/app-toast";
 import { FileUploadField } from "@/components/file-upload-field";
 import { useI18n } from "@/components/i18n-context";
-import { useModules } from "@/components/module-context";
 import { parseStudentCsv, type CsvStudent } from "@/lib/student-csv";
-import { STUDENT_STATUS_OPTIONS, studentStatusLabel } from "@/lib/student-status";
 import styles from "@/components/class-roster-import.module.css";
 
 const AI_PROMPT = `Analisa o ficheiro Excel que te forneci e converte a pauta para um ficheiro CSV UTF-8 pronto a importar no Gestor Universitário.
@@ -28,9 +26,7 @@ Regras obrigatórias:
 10. Coloca entre aspas qualquer nome que contenha vírgulas e escapa aspas internas duplicando-as.`;
 
 export function ClassRosterImport({ onImported }: { onImported?: () => void | Promise<void> }) {
-  const { locale, t } = useI18n();
-  const { access } = useModules();
-  const specialStatusesEnabled = access["classes.special_statuses"] === true;
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null), [students, setStudents] = useState<CsvStudent[]>([]), [importing, setImporting] = useState(false), [notice, setNotice] = useState(""), [noticeError, setNoticeError] = useState(false), [showPrompt, setShowPrompt] = useState(false), [copied, setCopied] = useState(false);
 
   const clearFile = () => { setFile(null); setStudents([]); };
@@ -67,21 +63,17 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
     <section className={`panel ${styles.panel}`}>
       <header className={styles.header}>
         <span className={styles.icon}><Upload /></span>
-        <div><span className="eyebrow">{t("classes.import.eyebrow")}</span><div className={styles.titleLine}><h2>{t("classes.import.title")}</h2><button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><CircleHelp /></button></div><p>{t("classes.import.description")}</p></div>
+        <div className={styles.headerCopy}><span className="eyebrow">{t("classes.import.eyebrow")}</span><h2>{t("classes.import.title")}</h2><p>{t("classes.import.description")}</p></div>
+        <button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><Sparkles />{t("classes.import.aiHelpAction")}</button>
       </header>
       <div className={styles.body}>
         <div className={styles.uploadColumn}>
           <FileUploadField accept=".csv,text/csv" emptyLabel={t("classes.import.emptyFile")} file={file} help={t("classes.import.fileHelp")} label={t("classes.import.fileLabel")} onChange={(event) => void selectFile(event.target.files?.[0])} onRemove={clearFile} />
           {students.length > 0 && <div className={styles.summary} aria-live="polite"><Check /><span><strong>{t("classes.import.ready", { count: students.length })}</strong><small>{t("classes.import.readyClasses", { count: new Set(students.map((student) => student.turma)).size })}</small></span></div>}
         </div>
-        <aside className={styles.format}>
-          <div className={styles.formatHeading}><FileSpreadsheet /><div><strong>{t("classes.import.formatTitle")}</strong><small>turma,nome,n_mecanografico,codigo_estatuto</small></div></div>
-          <div className={styles.codes}>{STUDENT_STATUS_OPTIONS.map((option) => <span key={option.code}><b>{option.code}</b>{studentStatusLabel(option.value, locale)}</span>)}</div>
-          {!specialStatusesEnabled && <p className={styles.statusesIgnored}><AlertTriangle />{t("classes.import.statusesIgnored")}</p>}
-        </aside>
       </div>
       <footer className={styles.footer}><span>{importing ? <><LoaderCircle className={styles.spinner} />{t("classes.import.importing")}</> : t("classes.import.additive")}</span><button type="button" className="button button--primary button--compact" disabled={!file || !students.length || importing} onClick={() => void importCsv()}>{importing ? <LoaderCircle className={styles.spinner} /> : <Upload />}{importing ? t("classes.import.importingShort") : t("classes.import.action")}</button></footer>
     </section>
-    {showPrompt && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowPrompt(false); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="csv-ai-prompt-title"><header><div><span className="eyebrow">{t("classes.import.aiEyebrow")}</span><h2 id="csv-ai-prompt-title">{t("classes.import.aiTitle")}</h2></div><button type="button" onClick={() => setShowPrompt(false)} aria-label={t("classes.import.close")}><X /></button></header><p>{t("classes.import.aiDescription")}</p><pre>{AI_PROMPT}</pre><footer><button type="button" className="button button--secondary" onClick={() => setShowPrompt(false)}>{t("classes.import.close")}</button><button type="button" className="button button--primary" onClick={() => void copyPrompt()}>{copied ? <Check /> : <Clipboard />}{copied ? t("classes.import.copied") : t("classes.import.copy")}</button></footer></section></div>}
+    {showPrompt && <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowPrompt(false); }}><section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="csv-ai-prompt-title"><header><div><span className="eyebrow">{t("classes.import.aiEyebrow")}</span><h2 id="csv-ai-prompt-title">{t("classes.import.aiTitle")}</h2></div><button type="button" onClick={() => setShowPrompt(false)} aria-label={t("classes.import.close")}><X /></button></header><p>{t("classes.import.aiDescription")}</p><pre>{AI_PROMPT}</pre><footer><button type="button" className="button button--primary" onClick={() => void copyPrompt()}>{copied ? <Check /> : <Clipboard />}{copied ? t("classes.import.copied") : t("classes.import.copy")}</button></footer></section></div>}
   </>;
 }
