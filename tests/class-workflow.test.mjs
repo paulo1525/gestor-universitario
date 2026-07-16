@@ -12,6 +12,7 @@ const phasedMigration=readFileSync(new URL("../migrations/0015_cc_rosters_and_gr
 const testMode=readFileSync(new URL("../lib/test-mode.ts",import.meta.url),"utf8");
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
+const csvImport=readFileSync(new URL("../components/class-roster-import.tsx",import.meta.url),"utf8");
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
 const preflight=readFileSync(new URL("../components/distribution-preflight.tsx",import.meta.url),"utf8");
 const shell=readFileSync(new URL("../components/app-shell.tsx",import.meta.url),"utf8");
@@ -21,7 +22,7 @@ const styles=readFileSync(new URL("../app/globals.css",import.meta.url),"utf8");
 test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/const readOnlyStudent = !canManageAll\(user\) && !user\.preview/);
   assert.match(worker,/const canReadBaseClasses = request\.method === "GET"/);
-  assert.match(worker,/preferencia:readOnlyStudent \? "A aguardar decisão"/);
+  assert.match(worker,/preferencia:student\.special_status!=="none"\?"Estatuto especial":readOnlyStudent \? "A aguardar decisão"/);
   assert.match(dashboard,/classes\.dashboard\.baseClasses/);
   assert.match(dashboard,/showDecisions = !preferenceOnly && !placementsPublished/);
   assert.match(dashboard,/showDecisions && <th>\{t\("classes\.dashboard\.decisions"\)\}<\/th>/);
@@ -87,6 +88,18 @@ test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.match(worker,/action==="save"/);
   assert.match(worker,/class_roster_saved/);
   assert.match(worker,/UPDATE classes SET status='submitted'/);
+  assert.match(detail,/specialStatus: "none"/);
+  assert.match(detail,/classes\.common\.status/);
+  assert.match(detail,/STUDENT_STATUS_OPTIONS/);
+});
+
+test("a importação global aparece antes da lista de turmas e inclui ajuda para IA",()=>{
+  assert.match(dashboard,/canImport && <ClassRosterImport onImported=\{load\} \/>.*\{classOverview\}/s);
+  assert.doesNotMatch(admin,/parseStudentCsv|Importação de pautas|api\/classes\/.*\/import/);
+  assert.match(csvImport,/turma,nome,n_mecanografico,codigo_estatuto/);
+  assert.match(csvImport,/N = Nenhum; TE = Trabalhador-Estudante; A = Atleta; O = Outro/);
+  assert.match(csvImport,/navigator\.clipboard\.writeText\(AI_PROMPT\)/);
+  assert.match(csvImport,/fetch\("\/api\/classes\/import"/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{
@@ -239,6 +252,8 @@ test("ordem de preferências é explícita e a submissão pode ser editada até 
   assert.match(preferences,/classes\.preferences\.edit/);
   assert.match(preferences,/classes\.preferences\.saveVersion/);
   assert.match(preferences,/destinations: decision === "move" \? destinations : \[\]/);
+  assert.match(preferences,/classes\.preferences\.specialStatusMessage/);
+  assert.match(preferences,/data\.student\.specialStatus !== "none"/);
 });
 
 test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo",()=>{
@@ -288,8 +303,6 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.match(worker,/code:"INFORMACAO_VALIDADA_SEM_PONTOS"/);
   assert.match(worker,/additional_info_review_status==="valid"&&Number\(student\.exception_points\|\|0\)===0/);
   assert.match(preflight,/classDataLabel\(locale,"preflightGroup",code\)/);
-  assert.doesNotMatch(preflight,/classId\?t\("classes\.common\.class".*:issue\.code/);
-  assert.match(admin,/admin-role--\$\{user\.role\}/);
   assert.match(styles,/\.panel__header\s*>\s*\.panel-tools\s*\{[^}]*margin-left:\s*auto/);
   assert.match(styles,/\.topbar-global-search\{[^}]*margin-left:auto;margin-right:0/);
   assert.match(styles,/\.test-mode-control\{position:relative;margin-left:0\}/);

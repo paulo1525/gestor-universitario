@@ -83,6 +83,96 @@
   color: var(--green);
 }
 
+.homeSetting {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(190px, 260px);
+  align-items: center;
+  gap: 12px;
+  margin: 10px 10px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold-soft) 45%, var(--surface));
+}
+
+.homeIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  color: #715700;
+  background: var(--gold-soft);
+}
+
+.homeIcon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.homeCopy {
+  min-width: 0;
+}
+
+.homeCopy label {
+  display: block;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.homeCopy p,
+.homeCopy small {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.homeCopy small {
+  color: color-mix(in srgb, var(--green) 82%, var(--ink));
+  font-weight: 700;
+}
+
+.homeControl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.homeControl select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 34px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.homeControl select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--gold) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.homeControl select:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.homeControl svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--green);
+}
+
 .moduleList {
   display: grid;
   gap: 8px;
@@ -146,7 +236,8 @@
 
 .activeBadge,
 .inactiveBadge,
-.inheritedBadge {
+.inheritedBadge,
+.homeBadge {
   padding: 3px 6px;
   border-radius: 999px;
   font-size: 8px;
@@ -166,6 +257,19 @@
 .inheritedBadge {
   color: var(--warning);
   background: var(--warning-soft);
+}
+
+.homeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #715700;
+  background: var(--gold-soft);
+}
+
+.homeBadge svg {
+  width: 9px;
+  height: 9px;
 }
 
 .submoduleList {
@@ -347,6 +451,16 @@
 
   .moduleList {
     padding: 8px;
+  }
+
+  .homeSetting {
+    grid-template-columns: 34px minmax(0, 1fr);
+    margin: 8px 8px 0;
+    padding: 11px 12px;
+  }
+
+  .homeControl {
+    grid-column: 1 / -1;
   }
 
   .moduleRow,

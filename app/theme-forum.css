@@ -744,24 +744,6 @@ html[data-theme="forum"] .admin-role {
   background-color: #e6f1f7;
 }
 
-html[data-theme="forum"] .admin-role--admin {
-  color: #713f8f;
-  border-color: #cbb6dc;
-  background-color: #f1e9f7;
-}
-
-html[data-theme="forum"] .admin-role--representative {
-  color: #175f8b;
-  border-color: #aacde2;
-  background-color: #e3f2fa;
-}
-
-html[data-theme="forum"] .admin-role--student {
-  color: #226344;
-  border-color: #add5bd;
-  background-color: #e5f5eb;
-}
-
 html[data-theme="forum"] .status--success,
 html[data-theme="forum"] [class*="success"],
 html[data-theme="forum"] [class*="statusApproved"],

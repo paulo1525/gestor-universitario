@@ -2,12 +2,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Check, CheckCircle2, CircleHelp, Clock3, LockKeyhole, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, CheckCircle2, CircleHelp, Clock3, LockKeyhole, Pencil, Plus, Send, ShieldAlert, Trash2, X } from "lucide-react";
 import { AppToast } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
+import type { StudentSpecialStatus } from "@/lib/student-status";
 
 type Decision = "stay" | "move" | null;
-type PreferenceData = { student: { classId: number; decision: Decision; submittedAt: number | null; notes: string; destinations: number[] }; activeClasses: number[]; settings: { preferencesOpenAt?: string; preferencesCloseAt?: string; groupLabel?: string }; serverNow: number };
+type PreferenceData = { student: { classId: number; decision: Decision; submittedAt: number | null; notes: string; destinations: number[]; specialStatus: StudentSpecialStatus; canSubmitPreferences: boolean }; activeClasses: number[]; settings: { preferencesOpenAt?: string; preferencesCloseAt?: string; groupLabel?: string }; serverNow: number };
 
 export function StudentPreferencePanel() {
   const { locale, t } = useI18n();
@@ -15,6 +16,7 @@ export function StudentPreferencePanel() {
   const load = useCallback(async () => { const response = await fetch("/api/student/destinations", { cache: "no-store" }); if (!response.ok) return; const result = await response.json() as PreferenceData; setData(result); setDecision(result.student.decision); setDestinations(result.student.decision === "move" ? result.student.destinations : []); setNotes(result.student.decision === "move" ? result.student.notes || "" : ""); setEditing(!result.student.submittedAt); }, []);
   useEffect(() => { void load(); }, [load]);
   if (!data) return null;
+  if (data.student.specialStatus !== "none" || !data.student.canSubmitPreferences) return <section className="student-special-status-message"><span><ShieldAlert /></span><p>{t("classes.preferences.specialStatusMessage")}</p></section>;
   const format = (value: number) => new Date(value).toLocaleString(locale);
   const opensAt = data.settings.preferencesOpenAt ? Date.parse(data.settings.preferencesOpenAt) : 0, closesAt = data.settings.preferencesCloseAt ? Date.parse(data.settings.preferencesCloseAt) : 0;
   const beforeOpen = Boolean(opensAt && data.serverNow < opensAt), closed = Boolean(closesAt && data.serverNow >= closesAt), locked = beforeOpen || closed, submitted = Boolean(data.student.submittedAt), moving = decision === "move";
