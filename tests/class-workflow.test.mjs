@@ -290,6 +290,7 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.match(preflight,/classDataLabel\(locale,"preflightGroup",code\)/);
   assert.doesNotMatch(preflight,/classId\?t\("classes\.common\.class".*:issue\.code/);
   assert.match(admin,/admin-role--\$\{user\.role\}/);
+  assert.match(styles,/\.panel__header\s*>\s*\.panel-tools\s*\{[^}]*margin-left:\s*auto/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{

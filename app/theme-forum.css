@@ -477,6 +477,12 @@ html[data-theme="forum"] .panel__header > div {
   text-align: left;
 }
 
+html[data-theme="forum"] .panel__header > .panel-tools {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
 html[data-theme="forum"] .panel__header h2,
 html[data-theme="forum"] .panel__header p {
   text-align: left;
