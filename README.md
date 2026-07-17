@@ -1,283 +1,147 @@
 # Gestor Universitário
 
-Aplicação da Comissão de Curso de Medicina 2025–2031, alojada em Cloudflare
-Workers e publicada exclusivamente através da integração GitHub → Cloudflare.
+<p align="center">
+  <img src="public/logo-comissao-curso-fmup-2025-2031.png" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
+</p>
 
-## Fonte canónica e produção
+<p align="center">
+  Plataforma digital da Comissão de Curso de Medicina 2025–2031 da FMUP.
+  Um ponto único para acompanhar a vida académica, comunicar com a Comissão e organizar recursos do curso.
+</p>
 
-- Código oficial: <https://github.com/paulo1525/gestor-universitario>
-- Produção: <https://gestoruniversitario.cc>
-- Cópia local recomendada: `C:\Projetos\gestor-universitario`
-- Ramo de produção: `main`
-- Não colocar este repositório no OneDrive.
-- Nunca executar um deploy da Cloudflare a partir do computador local.
+<p align="center">
+  <a href="https://gestoruniversitario.cc"><strong>Abrir o Gestor Universitário</strong></a>
+</p>
 
-Fluxo obrigatório:
+## O que é
 
-```text
-local → testes locais → GitHub main → Cloudflare Workers Build → produção
-```
+O **Gestor Universitário** centraliza informação e tarefas que, de outra forma, ficam dispersas por emails, formulários, ficheiros e diferentes plataformas. Foi criado para aproximar os estudantes e a Comissão de Curso, facilitar a consulta de informação relevante e tornar os processos internos mais claros e auditáveis.
+
+A plataforma serve dois públicos:
+
+- **estudantes**, que encontram num só lugar avisos, calendário, unidades curriculares, documentos, materiais e canais de contacto;
+- **membros e representantes da Comissão**, que dispõem de ferramentas para publicar conteúdos, responder a pedidos, gerir turmas e acompanhar os vários processos do curso.
+
+O acesso a informação reservada é feito por autenticação com código temporário enviado para um email institucional previamente autorizado.
+
+## Principais funcionalidades
+
+### Informação académica
+
+- **Dashboard pessoal** com avaliações, prazos, avisos, pedidos e atividade relevante.
+- **Avisos e comunicados** publicados pela Comissão de Curso.
+- **Calendário académico** com avaliações, entregas, eventos e prazos, filtros por unidade curricular e subscrição por ICS.
+- **Unidades curriculares** com ano, semestre, ECTS, representantes e informação associada.
+- **Pesquisa global** em comunicados, cadeiras, documentos, eventos e materiais.
+- **Centro de notificações** com estado lido/não lido e preferências pessoais.
+
+### Recursos e participação
+
+- **Biblioteca de documentos** para atas, regulamentos, formulários e outros ficheiros úteis.
+- **Materiais de estudo** organizados por unidade curricular, com submissão, moderação, favoritos, feedback e histórico de versões.
+- **Links úteis** pesquisáveis e organizados por categoria, prioridade e unidade curricular.
+- **Pedidos e sugestões**, identificados ou anónimos, com acompanhamento do respetivo estado.
+- **Inquéritos rápidos** para auscultar os estudantes e divulgar resultados.
+- **Diretório da Comissão** com membros, cargos, núcleos e contactos.
+
+### Gestão de turmas
+
+O módulo de turmas apoia a transição e distribuição dos estudantes entre turmas, preservando tanto quanto possível a composição existente e respeitando as regras de capacidade e equilíbrio.
+
+Permite:
+
+- importar e validar listas de estudantes;
+- recolher preferências de permanência ou mudança;
+- impedir números mecanográficos duplicados;
+- registar estatutos especiais quando aplicável;
+- calcular trocas diretas, ciclos de troca e ocupação de vagas livres;
+- simular e rever colocações antes da aprovação;
+- manter um histórico auditável de alterações e decisões;
+- exportar os resultados finais.
+
+Os detalhes funcionais deste processo encontram-se em [README-ATRIBUICAO-TURMAS.md](README-ATRIBUICAO-TURMAS.md) e [README-PERMUTAS.md](README-PERMUTAS.md).
+
+## Perfis e controlo de acesso
+
+A aplicação apresenta apenas as áreas e operações permitidas a cada utilizador:
+
+- **Estudante:** consulta informação académica, utiliza os recursos disponíveis e envia pedidos ou contributos.
+- **Representante de turma:** acompanha e submete os dados da turma que representa.
+- **Membro da Comissão:** publica e gere conteúdos dentro das responsabilidades que lhe foram atribuídas.
+- **Núcleo de Gestão e administração:** configura módulos, utilizadores e processos, valida submissões e consulta o histórico administrativo.
+
+Os módulos podem ser ativados ou desativados individualmente, permitindo adaptar a plataforma às diferentes fases do ano letivo.
+
+## Privacidade e segurança
+
+O projeto segue os princípios de minimização de dados e acesso por função:
+
+- o repositório não contém nomes, emails, números mecanográficos nem ficheiros reais de estudantes;
+- dados académicos pessoais ficam na base de dados privada e só são apresentados a utilizadores autorizados;
+- códigos de autenticação têm validade curta, utilização única e proteção contra tentativas abusivas;
+- operações administrativas relevantes são registadas para auditoria;
+- materiais submetidos passam por moderação antes de serem publicados;
+- tokens, palavras-passe e outros segredos são mantidos fora do Git.
+
+## Tecnologia
+
+- [Next.js 16](https://nextjs.org/) e [React 19](https://react.dev/)
+- TypeScript
+- Cloudflare Workers através de OpenNext
+- Cloudflare D1 para persistência de dados
+- Cloudflare Turnstile e rate limiting para proteção contra abuso
+- Resend para envio dos códigos temporários de autenticação
+- testes com o runner nativo do Node.js e análise estática com ESLint
 
 ## Desenvolvimento local
 
-Requisitos: Node.js 20 ou superior e pnpm 11.0.7.
+### Requisitos
+
+- Node.js 20 ou superior
+- pnpm 11.0.7
 
 ```powershell
 corepack pnpm install --frozen-lockfile
 corepack pnpm dev
 ```
 
-A aplicação abre em <http://127.0.0.1:3000>. O servidor não é exposto à rede.
+A aplicação fica disponível em <http://127.0.0.1:3000>.
 
-### Ambiente local com dados fictícios
-
-Para preparar uma base D1 exclusivamente local com cinco turmas, cinco
-representantes e 50 estudantes fictícios:
+Para preparar uma base D1 exclusivamente local com utilizadores, turmas e estudantes fictícios:
 
 ```powershell
 corepack pnpm run test:local:setup
 corepack pnpm dev
 ```
 
-O comando aplica as migrações e recria apenas os dados da base local. No fim,
-apresenta as contas de teste e a palavra-passe comum no terminal. Também cria
-`.dev.vars`, que está ignorado pelo Git e contém apenas valores de teste locais.
+O comando apresenta no terminal as contas de teste e a palavra-passe comum. Os dados criados são fictícios e não afetam a produção.
 
-Antes de enviar alterações:
+### Validação
 
 ```powershell
+corepack pnpm test
 corepack pnpm lint
 corepack pnpm run build
 ```
 
-O preview Cloudflare é local e nunca publica:
-
-```powershell
-corepack pnpm run preview
-```
-
-No Windows, o OpenNext pode necessitar de WSL ou Developer Mode para criar
-ligações simbólicas. O build normal do Next.js não tem essa dependência.
-
-## Scripts
-
-- `dev`: inicia o Next.js em `127.0.0.1`.
-- `build`: compila e valida a aplicação localmente.
-- `lint`: executa ESLint.
-- `preview`: compila com OpenNext e inicia preview local.
-- `deploy`: compila com OpenNext e executa Wrangler; reservado exclusivamente
-  ao ambiente automático da Cloudflare.
-
-## Variáveis e bindings
-
-O ficheiro `.dev.vars.example` documenta os segredos exigidos localmente. Copiar
-para `.dev.vars` apenas quando for necessário testar autenticação completa:
-
-- `AUTH_PEPPER`
-- `RESEND_API_KEY`
-- `TURNSTILE_SECRET_KEY`
-
-Nunca versionar `.dev.vars`, `.env.local`, tokens ou valores reais. Em produção,
-estes segredos são configurados no Worker. Os bindings D1 e rate limiter estão
-declarados em `wrangler.jsonc`.
+As variáveis necessárias estão documentadas em `.dev.vars.example`. O ficheiro local `.dev.vars` e quaisquer outros ficheiros com segredos nunca devem ser adicionados ao Git.
 
 ## Publicação
 
-O push para `main` é o único evento autorizado a desencadear a produção. Nas
-definições de Builds do Cloudflare usar:
+A versão de produção é publicada exclusivamente pela integração entre o GitHub e a Cloudflare:
 
-- Production branch: `main`
-- Build command: `pnpm build`
-- Deploy command: `pnpm exec wrangler deploy`
-- Root directory: `/`
+```text
+alteração local → testes e build → GitHub main → Cloudflare Workers Build → produção
+```
 
-Não adicionar uma GitHub Action de deploy quando a integração nativa do
-Cloudflare estiver ativa.
+Não são feitos deploys da aplicação ou do Worker diretamente a partir de um computador de desenvolvimento. Quando uma versão altera o esquema da base de dados, as migrations D1 são aplicadas separadamente depois de os testes, o build, o commit e o push estarem concluídos.
+
+## Ligações
+
+- **Aplicação:** <https://gestoruniversitario.cc>
+- **Código-fonte:** <https://github.com/paulo1525/gestor-universitario>
+- **Comissão:** Comissão de Curso de Medicina da FMUP, mandato 2025–2031
 
 ---
 
-Plataforma digital da Comissão de Curso de Medicina 2025–2031.
-
-<p align="center">
-  <img src="public/logo-comissao-curso-fmup-2025-2031.png" alt="Logótipo da Comissão de Curso FMUP 2025–2031" width="280">
-</p>
-
-> **Estado atual:** autenticação institucional, sessões seguras e base D1 ativas;
-> dashboard em modo de manutenção para utilizadores comuns. Os dados das turmas
-> continuam fictícios até existir importação e validação institucional.
-
-## Executar o protótipo
-
-Requisitos: Node.js 20 ou superior e pnpm.
-
-```bash
-pnpm install
-pnpm dev
-```
-
-A aplicação fica disponível em `http://localhost:3000`. Nesta fase, todas as alterações existem apenas na memória do navegador e desaparecem ao atualizar a página.
-
-## Visão da plataforma
-
-O Gestor Universitário será o ponto central de comunicação, organização e partilha de recursos da Comissão de Curso. A gestão das turmas do 2.º ano será a primeira aplicação, seguindo-se os módulos abaixo.
-
-### Módulos previstos
-
-- **Avisos importantes:** faixa destacada no topo da aplicação, com nível de prioridade, período de exibição e ligação para informação adicional.
-- **Feedback e sugestões:** formulário que permite enviar opiniões à Comissão de forma anónima, sem guardar a identidade do autor, sujeito a medidas contra abuso.
-- **Envio de materiais para a CC:** estudantes autorizados podem submeter materiais, identificando cadeira, ano, tipo de documento e origem; a Comissão revê antes de publicar.
-- **Biblioteca de estudo:** área organizada por cadeira para sebentas, compêndios, exames anteriores e outros recursos académicos aprovados, com pesquisa e controlo de versões.
-- **Cadeiras e horários:** página central com cadeiras do ano, horários, documentos relevantes e ligações úteis, atualizada pela Comissão.
-- **Contactos e identidade:** apresentação do logótipo e do email oficial da Comissão de Curso.
-
-Materiais submetidos nunca são publicados automaticamente. A Comissão deve confirmar a origem, remover dados pessoais e rejeitar conteúdos obtidos ilegitimamente, avaliações futuras ou ainda ativas e materiais cuja partilha viole direitos aplicáveis.
-
-## Primeira aplicação: turmas do 2.º ano
-
-### Decisão aprovada pelos estudantes
-
-As turmas do 1.º ano serão mantidas como base para o 2.º ano, permitindo apenas trocas pontuais que respeitem as vagas e não provoquem desequilíbrios na distribuição final.
-
-### Enquadramento regulamentar considerado
-
-- no 2.º e 3.º anos são constituídas obrigatoriamente **20 turmas**;
-- a diferença entre a turma com menos e a turma com mais estudantes não deve exceder **três estudantes**;
-- um exemplo de distribuição normal é existirem turmas entre 14 e 17 estudantes;
-- uma distribuição fora desse intervalo pode ser proposta, mas fica pendente de validação pela Direção do Mestrado Integrado em Medicina.
-
-### Objetivo do MVP
-
-Permitir que os representantes de turma registem a constituição atual das turmas e as preferências dos estudantes, para que a Comissão valide uma proposta final equilibrada e preserve ao máximo as turmas existentes.
-
-### Autenticação e autorização
-
-- A aplicação terá **autenticação própria por código temporário enviado para o email institucional**.
-- O utilizador introduz o email, recebe um código de utilização única e usa-o para iniciar uma sessão segura.
-- Ter um email institucional válido não concede acesso automaticamente: o endereço tem também de constar da lista de pessoas autorizadas da aplicação.
-- Cada utilizador autorizado terá um perfil e um âmbito definidos, como Comissão ou representante de uma turma específica.
-- Os códigos terão validade curta, limite de tentativas e pedidos, utilização única e serão guardados apenas de forma protegida.
-- A resposta ao pedido de código não revelará se determinado endereço existe na lista, reduzindo a possibilidade de enumeração de utilizadores.
-
-### Regras funcionais propostas
-
-1. A colocação inicial de cada estudante é a sua turma do 1.º ano.
-2. Cada representante de turma só pode preencher e consultar o formulário da turma que lhe foi atribuída.
-3. Cada aluno inserido tem obrigatoriamente **nome completo** e **número mecanográfico**.
-4. O número mecanográfico é único em todo o ano e o sistema impede duplicados entre turmas.
-5. Para cada aluno, o representante seleciona uma das opções:
-   - **Prefere ficar:** o aluno fica bloqueado na turma atual e não participa nas permutações;
-   - **Prefere mudar:** é obrigatório indicar a turma de destino preferida e o aluno fica elegível para permutações.
-6. Um bloqueio só pode ser removido pela Comissão, com justificação registada, enquanto o processo não estiver encerrado.
-7. Se não for encontrada uma mudança válida para um aluno que prefere mudar, este mantém-se na turma atual.
-8. O sistema privilegia, por esta ordem:
-   - trocas diretas entre dois estudantes;
-   - ciclos de troca entre várias turmas;
-   - mudanças para vagas livres, sem ultrapassar limites mínimos ou máximos.
-9. Nenhuma preferência garante uma mudança; a Comissão revê e aprova o resultado antes da publicação.
-10. Todas as submissões, alterações e decisões ficam registadas para auditoria e eventual fase de reclamação.
-
-### Fluxo principal
-
-1. A Comissão cria as turmas, define as capacidades e associa cada representante à sua turma.
-2. O representante autentica-se e abre o formulário da turma atribuída.
-3. Preenche a turma num formulário em lote, com linhas dinâmicas para nome completo, número mecanográfico e preferência: ficar ou mudar.
-4. Quando escolhe mudar, indica obrigatoriamente a turma de destino preferida.
-5. O representante revê a lista e submete a versão completa da turma dentro do prazo.
-6. A Comissão valida duplicados, omissões e eventuais conflitos entre submissões.
-7. O sistema fixa os alunos que preferem ficar e calcula permutações apenas entre os restantes.
-8. A Comissão simula, revê exceções e aprova a distribuição.
-9. O sistema permite exportar a lista final e mantém o histórico das decisões.
-
-### Funcionalidades do MVP
-
-- autenticação por código temporário enviado para emails institucionais previamente autorizados;
-- lista explícita de utilizadores autorizados e controlo de acesso por perfil e turma;
-- importação e exportação em CSV;
-- gestão de turmas, capacidades e prazos;
-- formulário em lote do representante, com linhas que podem ser acrescentadas ou removidas dinamicamente;
-- bloqueio automático dos alunos que preferem ficar;
-- validação de campos obrigatórios, números mecanográficos duplicados, omissões e conflitos;
-- submissões versionadas, com possibilidade de correção até ao prazo definido;
-- validação automática de vagas e equilíbrio;
-- cálculo de trocas diretas, ciclos e vagas livres;
-- painel administrativo com simulação antes da aprovação;
-- histórico de alterações e exportação do resultado final;
-- comunicação do estado do pedido ao estudante.
-
-### Perfis
-
-- **Representante de turma:** preenche e submete exclusivamente a lista da sua turma.
-- **Comissão de Curso:** autoriza utilizadores, configura regras, valida submissões, acompanha preferências e aprova resultados.
-- **Estudante:** poderá consultar apenas o seu resultado numa fase posterior, se esta funcionalidade for aprovada.
-
-### Tecnologia prevista
-
-- **Aplicação:** Next.js e TypeScript;
-- **Base de dados:** PostgreSQL com Supabase;
-- **Autenticação:** código temporário enviado por email, com sessões seguras e lista de endereços autorizados;
-- **Alojamento:** Vercel;
-- **Qualidade:** testes automáticos e GitHub Actions.
-
-Esta opção permite desenvolver rapidamente, manter tipagem de ponta a ponta e começar com serviços gratuitos ou de baixo custo. A arquitetura será confirmada antes da programação.
-
-### Privacidade e segurança
-
-- o repositório público nunca conterá nomes, números mecanográficos, emails ou ficheiros reais de estudantes;
-- recolha mínima de dados e acesso por perfil;
-- cada representante acede apenas aos dados da turma que representa;
-- nomes completos e números mecanográficos são guardados apenas na base de dados privada da aplicação;
-- a preferência de mudança é tratada como dado de acesso restrito à Comissão e ao representante responsável;
-- segredos apenas em variáveis de ambiente;
-- registo das operações administrativas;
-- política de conservação e eliminação de dados a definir antes do lançamento;
-- conformidade com o RGPD e validação institucional antes de usar dados reais.
-
-### Critérios de sucesso
-
-- nenhuma colocação muda sem pedido ou decisão administrativa registada;
-- todos os alunos submetidos têm nome completo e número mecanográfico válido e único;
-- todos os alunos marcados como «prefere ficar» permanecem bloqueados na turma atual;
-- só os alunos marcados como «prefere mudar» participam no cálculo de permutações;
-- as vagas são atribuídas primeiro pela posição da preferência, depois pela maior pontuação dentro da mesma posição e, apenas em empate exato, por uma seed reproduzível e auditável;
-- nenhuma turma termina fora dos limites aprovados;
-- um aluno sem permutação válida mantém a turma atual;
-- o resultado pode ser reproduzido e auditado;
-- cada utilizador vê apenas os dados correspondentes ao seu perfil e âmbito autorizado.
-
-### Decisões necessárias antes da implementação
-
-- lista dos representantes e respetiva turma;
-- possibilidade de cada aluno indicar apenas uma ou várias turmas de destino;
-- regras de prioridade e desempate;
-- tratamento de casos excecionais e reclamações;
-- domínios institucionais aceites e lista inicial de endereços autorizados;
-- serviço de envio de emails transacionais e respetivos limites;
-- datas das fases de pedido, revisão e publicação;
-- responsável pelo tratamento dos dados e prazo de conservação.
-
-## Roteiro
-
-1. Validar regras e modelo de dados da gestão de turmas com a Comissão.
-2. Criar protótipo dos ecrãs e testar o fluxo sem dados reais.
-3. Implementar autenticação por email, importação e formulários das turmas.
-4. Implementar e testar o motor de permutações.
-5. Criar painel administrativo, auditoria e exportação.
-6. Fazer teste-piloto com dados fictícios e realizar revisão de segurança/RGPD.
-7. Lançar a gestão de turmas.
-8. Acrescentar avisos, contactos e feedback anónimo.
-9. Acrescentar cadeiras, horários, submissão de materiais e biblioteca de estudo.
-
-## Alterações à base de dados D1
-
-Sempre que uma funcionalidade adicionar ou alterar tabelas, colunas, índices ou valores estruturais da base de dados:
-
-- criar uma migração SQL versionada na pasta `migrations`;
-- atualizar também `ensureOperationalSchema` no Worker com uma inicialização idempotente e compatível com bases de dados ainda desatualizadas;
-- garantir que as colunas necessárias são criadas antes de qualquer consulta que as utilize;
-- confirmar a existência de cada coluna através de `PRAGMA table_info` antes de executar `ALTER TABLE`, para que pedidos simultâneos não provoquem erros;
-- preservar valores existentes e definir valores padrão seguros para novas colunas obrigatórias;
-- testar tanto uma base de dados nova como a atualização de uma base já existente;
-- executar lint e `pnpm run build` antes de publicar.
-
-Não se deve assumir que a migração D1 já foi aplicada quando a nova versão do Worker começa a receber pedidos. O código publicado deve tolerar esse intervalo e nunca devolver erro 500 apenas porque o esquema ainda não foi atualizado.
-
+Desenvolvido para tornar a comunicação, os recursos e os processos académicos mais simples, centralizados e transparentes.
