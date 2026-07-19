@@ -14,6 +14,7 @@ import {
   Check,
   Download,
   FileText,
+  Filter,
   FolderOpen,
   Image as ImageIcon,
   LoaderCircle,
@@ -676,7 +677,7 @@ export function MaterialLibrary() {
           <div className={styles.page}>
             <header className={styles.hero}>
               <div className={styles.heroCopy}>
-                <span className={styles.heroIcon}>
+                <span className={styles.heroIcon} aria-hidden="true">
                   <FolderOpen />
                 </span>
                 <div>
@@ -706,9 +707,12 @@ export function MaterialLibrary() {
             {submissionEnabled && editor && (
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
-                  <div>
-                    <h2>{t("community.materials.new")}</h2>
-                    <p>{t("community.materials.moderationInfo")}</p>
+                  <div className={styles.panelHeading}>
+                    <span className={styles.panelIcon} aria-hidden="true"><UploadCloud /></span>
+                    <div>
+                      <h2>{t("community.materials.new")}</h2>
+                      <p>{t("community.materials.moderationInfo")}</p>
+                    </div>
                   </div>
                 </div>
                 <form className={styles.form} onSubmit={submit}>
@@ -877,17 +881,20 @@ export function MaterialLibrary() {
             )}
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
-                <div>
-                  <h2>
-                    {canModerate
-                      ? t("community.materials.libraryModeration")
-                      : t("community.materials.library")}
-                  </h2>
-                  <p>
-                    {canModerate
-                      ? t("community.materials.pendingFirst")
-                      : t("community.materials.approvedCommunity")}
-                  </p>
+                <div className={styles.panelHeading}>
+                  <span className={styles.panelIcon} aria-hidden="true"><FolderOpen /></span>
+                  <div>
+                    <h2>
+                      {canModerate
+                        ? t("community.materials.libraryModeration")
+                        : t("community.materials.library")}
+                    </h2>
+                    <p>
+                      {canModerate
+                        ? t("community.materials.pendingFirst")
+                        : t("community.materials.approvedCommunity")}
+                    </p>
+                  </div>
                 </div>
                 {!loading && (
                   <span className={styles.count}>
@@ -897,8 +904,8 @@ export function MaterialLibrary() {
                 )}
               </div>
               <div className={styles.toolbar}>
-                <label>
-                  <span className="sr-only">{t("community.materials.filter")}</span>
+                <label className={styles.filterControl}>
+                  <span className={styles.filterLabel}><Filter aria-hidden="true" />{t("community.materials.filter")}</span>
                   <select
                     className={styles.select}
                     value={filter}
@@ -916,14 +923,20 @@ export function MaterialLibrary() {
               </div>
               {loading ? (
                 <div className={styles.state}>
-                  <LoaderCircle className={styles.spin} />
+                  <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
                   <strong>{t("community.materials.loading")}</strong>
                 </div>
               ) : visible.length === 0 ? (
                 <div className={styles.state}>
-                  <FolderOpen />
+                  <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
                   <strong>{t("community.materials.empty")}</strong>
                   <p>{t("community.materials.emptyHint")}</p>
+                  {filter !== "all" && (
+                    <button className={styles.emptyAction} type="button" onClick={() => setFilter("all")}>
+                      <X aria-hidden="true" />
+                      {t("community.materials.all")}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className={styles.materialGrid}>

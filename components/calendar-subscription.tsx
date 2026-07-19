@@ -146,32 +146,33 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
 
   return <section className={styles.shell}>
     <div className={styles.summary}>
-      <span className={styles.summaryIcon}><CalendarPlus /></span>
+      <span className={styles.summaryIcon} aria-hidden="true"><CalendarPlus /></span>
       <div className={styles.summaryCopy}>
         <h2>{t("calendar.subscription.title")}</h2>
         <p>{t("calendar.subscription.description")}</p>
         <span><RefreshCw />{t("calendar.subscription.autoSync")}</span>
       </div>
-      <button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}>
-        {open ? <X /> : <Settings2 />}
+      <button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="calendar-subscription-panel">
+        {open ? <X aria-hidden="true" /> : <Settings2 aria-hidden="true" />}
         {t(open ? "calendar.subscription.close" : "calendar.subscription.open")}
       </button>
     </div>
 
-    {open && <div className={styles.body}>
-      <div className={styles.explainer} aria-label={t("calendar.subscription.howTitle")}>
-        <div className={styles.explainerHeading}>
-          <strong>{t("calendar.subscription.howTitle")}</strong>
-          <span>{t("calendar.subscription.howDescription")}</span>
+    {open && <div className={styles.body} id="calendar-subscription-panel">
+      <div className={styles.setup}>
+        <div className={styles.explainer} aria-label={t("calendar.subscription.howTitle")}>
+          <div className={styles.explainerHeading}>
+            <strong>{t("calendar.subscription.howTitle")}</strong>
+            <span>{t("calendar.subscription.howDescription")}</span>
+          </div>
+          <ol>
+            <li><span>1</span><div><strong>{t("calendar.subscription.stepLink")}</strong><small>{t("calendar.subscription.stepLinkHelp")}</small></div></li>
+            <li><span>2</span><div><strong>{t("calendar.subscription.stepApp")}</strong><small>{t("calendar.subscription.stepAppHelp")}</small></div></li>
+            <li><span>3</span><div><strong>{t("calendar.subscription.stepSync")}</strong><small>{t("calendar.subscription.stepSyncHelp")}</small></div></li>
+          </ol>
         </div>
-        <ol>
-          <li><span>1</span><div><strong>{t("calendar.subscription.stepLink")}</strong><small>{t("calendar.subscription.stepLinkHelp")}</small></div></li>
-          <li><span>2</span><div><strong>{t("calendar.subscription.stepApp")}</strong><small>{t("calendar.subscription.stepAppHelp")}</small></div></li>
-          <li><span>3</span><div><strong>{t("calendar.subscription.stepSync")}</strong><small>{t("calendar.subscription.stepSyncHelp")}</small></div></li>
-        </ol>
-      </div>
 
-      {!created ? <form className={styles.form} onSubmit={create}>
+        {!created ? <form className={styles.form} onSubmit={create}>
         <div className={styles.formHeading}>
           <div><strong>{t("calendar.subscription.createTitle")}</strong><span>{t("calendar.subscription.createHelp")}</span></div>
           <ShieldCheck />
@@ -201,11 +202,13 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
           </div>
         </details>
 
-        <button className={styles.primary} disabled={saving}>
-          {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
-          {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
-        </button>
-        <p className={styles.revokeHint}><ShieldCheck />{t("calendar.subscription.revokeHint")}</p>
+        <div className={styles.actionRow}>
+          <button className={styles.primary} disabled={saving}>
+            {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
+            {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
+          </button>
+          <p className={styles.revokeHint}><ShieldCheck />{t("calendar.subscription.revokeHint")}</p>
+        </div>
       </form> : <div className={styles.created}>
         <header><span><Check /></span><div><strong>{t("calendar.subscription.createdTitle")}</strong><p>{t("calendar.subscription.created")}</p></div></header>
         <div className={styles.external}>
@@ -222,6 +225,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
         </details>
         <p className={styles.syncNote}><RefreshCw />{t("calendar.subscription.syncNote")}</p>
       </div>}
+      </div>
 
       <details className={styles.management}>
         <summary>
