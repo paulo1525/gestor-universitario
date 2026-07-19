@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ArrowUpRight, Bell, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, FileHeart, Inbox, LayoutDashboard, LoaderCircle, Megaphone, RefreshCw, Star, Users, Vote } from "lucide-react";
+import { AlertCircle, Bell, BookOpen, CalendarDays, ChevronRight, ClipboardCheck, FileHeart, Inbox, LayoutDashboard, LoaderCircle, Megaphone, RefreshCw, Star, Users, Vote } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-context";
@@ -63,10 +63,9 @@ export function PersonalDashboard() {
           <span className={styles.itemCopy}><strong>{item.title || t("personalDashboard.untitled")}</strong>{item.description && <p>{item.description}</p>}{kind === "event" ? item.label && <small>{priorityLabel(item.label)}</small> : date && <small>{date}</small>}</span>
           <span className={styles.itemMeta}>{item.label && <span className={styles.badge} data-tone={kind === "request" ? "blue" : kind === "poll" ? "green" : undefined}>{priorityLabel(item.label)}</span>}{kind === "material" ? <Star className={styles.favorite} aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}</span>
         </Link>;
-      })}</div> : <div className={styles.empty}>
+      })}</div> : <div className={styles.empty} role="status">
         <span className={styles.stateIcon} aria-hidden="true"><Icon /></span>
         <strong>{t(`personalDashboard.empty.${kind}`)}</strong>
-        <Link href={href}>{t("personalDashboard.viewAll")}<ArrowUpRight aria-hidden="true" /></Link>
       </div>}
     </section>;
   };

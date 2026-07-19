@@ -424,7 +424,7 @@ html[data-theme="forum"] .workspace :where(
   box-shadow: var(--shadow-panel);
 }
 
-html[data-theme="forum"] .workspace [class*="__panel"]:not([class*="Header"]):not([class*="Heading"]),
+html[data-theme="forum"] .workspace :is([class$="__panel"], [class*="__panel "]),
 html[data-theme="forum"] .workspace [class*="Card"]:not([class*="CardHeader"]):not([class*="CardContent"]):not([class*="CardActions"]) {
   border-color: var(--color-border-strong);
   border-radius: var(--radius-panel);
