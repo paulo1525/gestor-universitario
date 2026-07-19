@@ -17,8 +17,9 @@ function sourceBetween(source, start, end) {
 }
 
 function cssRule(source, selector) {
+  const normalizedSource = source.replace(/\r\n/g, "\n");
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = source.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
+  const match = normalizedSource.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
   assert.ok(match, `missing CSS rule: ${selector}`);
   return match[1];
 }
