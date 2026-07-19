@@ -12,10 +12,12 @@ import {
   LoaderCircle,
   LockKeyhole,
   Plus,
+  Search,
   Tags,
   Trash2,
   Type,
   Users,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
@@ -109,6 +111,7 @@ export function DocumentsLibrary() {
   const [editor, setEditor] = useState(false);
   const [typeFilter, setTypeFilter] = useState("all");
   const [unitFilter, setUnitFilter] = useState("all");
+  const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<Notice>(null);
   const [form, setForm] = useState(emptyForm);
   const [file, setFile] = useState<File | null>(null);
@@ -142,10 +145,19 @@ export function DocumentsLibrary() {
 
   const visible = useMemo(
     () => documents
-      .filter((item) => (typeFilter === "all" || item.type === typeFilter) && (unitFilter === "all" || item.unitId === unitFilter))
+      .filter((item) => {
+        const term = query.trim().toLocaleLowerCase("pt-PT");
+        return (!term || [item.title, item.description, item.fileName, item.unitName, item.authorName].join(" ").toLocaleLowerCase("pt-PT").includes(term))
+          && (typeFilter === "all" || item.type === typeFilter)
+          && (unitFilter === "all" || item.unitId === unitFilter);
+      })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [documents, typeFilter, unitFilter],
+    [documents, query, typeFilter, unitFilter],
   );
+
+  const filtersActive = Boolean(query.trim() || typeFilter !== "all" || unitFilter !== "all");
+  const activeFilterCount = [query.trim(), typeFilter !== "all", unitFilter !== "all"].filter(Boolean).length;
+  const clearFilters = () => { setQuery(""); setTypeFilter("all"); setUnitFilter("all"); };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -231,12 +243,18 @@ export function DocumentsLibrary() {
 
           <section className={styles.panel}>
             <div className={styles.filterBar}>
-              <span><Filter />Filtrar arquivo</span>
-              <label><span className={styles.srOnly}>Tipo</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-              <label><span className={styles.srOnly}>Unidade curricular</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">Todas as unidades curriculares</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"\u00b7"} {unit.name}</option>)}</select></label>
+              <div className={styles.filterHeading}>
+                <div className={styles.filterTitle}><span><Filter /></span><div><strong>Pesquisar e filtrar</strong><small>Encontra rapidamente documentos, atas e regulamentos no arquivo.</small></div></div>
+                <div className={styles.filterActions}><span className={styles.resultCount}>{visible.length} {visible.length === 1 ? "resultado" : "resultados"}</span>{filtersActive && <span className={styles.activeFilters}>{activeFilterCount} {activeFilterCount === 1 ? "filtro ativo" : "filtros ativos"}</span>}{filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />Limpar</button>}</div>
+              </div>
+              <div className={styles.filterControls}>
+                <label className={`${styles.filterField} ${styles.searchFilter}`}><span><Search />Pesquisa</span><div className={styles.searchControl}><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por título, descrição ou ficheiro…" /></div></label>
+                <label className={styles.filterField}><span><Tags />Tipo de documento</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
+                <label className={styles.filterField}><span><GraduationCap />Unidade curricular</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">Todas as unidades curriculares</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"\u00b7"} {unit.name}</option>)}</select></label>
+              </div>
             </div>
             {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} />{"A carregar arquivo\u2026"}</div>
-              : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{"Ainda n\u00e3o existem documentos"}</strong><span>{"Os documentos publicados aparecer\u00e3o aqui."}</span></div>
+              : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{filtersActive ? "Não existem documentos com estes filtros" : "Ainda não existem documentos"}</strong><span>{filtersActive ? "Experimenta limpar os filtros ou pesquisar outros termos." : "Os documentos publicados aparecerão aqui."}</span>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />Limpar filtros</button>}</div>
                 : <div className={styles.cardGrid}>{visible.map((item) => { const author = personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage }); return <article className={styles.fileCard} key={item.id}>
                   <div className={styles.fileIcon}>{item.type === "minutes" ? <FileArchive /> : <FileText />}</div>
                     <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} <PersonName person={author} /> {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>

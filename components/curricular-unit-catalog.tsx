@@ -8,12 +8,14 @@ import {
   BookOpen,
   CalendarDays,
   FileText,
+  Filter,
   GraduationCap,
   LoaderCircle,
   Mail,
   Megaphone,
   Search,
   UserRound,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
@@ -163,6 +165,9 @@ export function CurricularUnitCatalog() {
             .includes(term)),
     );
   }, [locale, units, query, year]);
+  const filtersActive = Boolean(query.trim() || year !== "all");
+  const activeFilterCount = [query.trim(), year !== "all"].filter(Boolean).length;
+  const clearFilters = () => { setQuery(""); setYear("all"); };
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="curricular_units.catalog">
@@ -201,31 +206,24 @@ export function CurricularUnitCatalog() {
                   </span>
                 )}
               </div>
-              <div className={styles.toolbar}>
-                <label className={styles.search}>
-                  <Search />
-                  <span className="sr-only">{t("community.units.search")}</span>
-                  <input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("community.units.searchPlaceholder")}
-                  />
-                </label>
-                <label>
-                  <span className="sr-only">{t("community.units.filterYear")}</span>
-                  <select
-                    className={styles.select}
-                    value={year}
-                    onChange={(event) => setYear(event.target.value)}
-                  >
-                    <option value="all">{t("community.units.allYears")}</option>
-                    {[1, 2, 3, 4, 5, 6].map((value) => (
-                      <option value={value} key={value}>
-                        {t("community.units.yearOption", { year: value })}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className={styles.catalogToolbar} aria-label={t("community.units.filters")}>
+                <div className={styles.filterHeading}>
+                  <div className={styles.filterTitle}><span><Filter /></span><div><strong>{t("community.units.filters")}</strong><small>{t("community.units.filtersHint")}</small></div></div>
+                  <div className={styles.filterActions}>{filtersActive && <span className={styles.activeFilters}>{activeFilterCount} {t(activeFilterCount === 1 ? "community.units.activeFilter" : "community.units.activeFilters")}</span>}{filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}</div>
+                </div>
+                <div className={styles.catalogFilterGrid}>
+                  <label className={`${styles.filterField} ${styles.catalogSearch}`}>
+                    <span><Search />{t("community.units.search")}</span>
+                    <div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("community.units.searchPlaceholder")} /></div>
+                  </label>
+                  <label className={styles.filterField}>
+                    <span><GraduationCap />{t("community.units.filterYear")}</span>
+                    <select value={year} onChange={(event) => setYear(event.target.value)}>
+                      <option value="all">{t("community.units.allYears")}</option>
+                      {[1, 2, 3, 4, 5, 6].map((value) => <option value={value} key={value}>{t("community.units.yearOption", { year: value })}</option>)}
+                    </select>
+                  </label>
+                </div>
               </div>
               {loading ? (
                 <div className={styles.state}>
@@ -236,6 +234,7 @@ export function CurricularUnitCatalog() {
                 <div className={styles.state}>
                   <Search />
                   <strong>{t("community.units.empty")}</strong>
+                  {filtersActive && <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></>}
                 </div>
               ) : (
                 <div className={styles.grid}>

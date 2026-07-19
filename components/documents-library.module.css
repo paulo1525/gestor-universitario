@@ -32,10 +32,32 @@
 .fileField input { padding: 8px; background: #fff; }
 .formActions { display: flex; justify-content: flex-end; padding: 16px 22px; border-top: 1px solid #e9e7df; background: #faf9f5; }
 
-.filterBar { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(170px, .75fr) minmax(220px, 1fr); align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid #e6e4dc; background: #faf9f5; }
-.filterBar > span { display: flex; align-items: center; gap: 8px; color: #49473f; font-size: 11px; font-weight: 850; }
-.filterBar > span svg { width: 17px; height: 17px; color: #8b6c00; }
-.filterBar label { min-width: 0; }
+.filterBar { display: grid; gap: 14px; padding: 15px 18px 18px; border-bottom: 1px solid #e6e4dc; background: linear-gradient(180deg, #fdfcf7 0%, #faf9f5 100%); }
+.filterHeading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.filterTitle { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.filterTitle > span { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border: 1px solid #eadb99; border-radius: 10px; color: #765b00; background: var(--gold-soft); }
+.filterTitle svg { width: 16px; height: 16px; }
+.filterTitle strong, .filterTitle small { display: block; }
+.filterTitle strong { color: var(--ink); font-size: 11px; }
+.filterTitle small { margin-top: 2px; color: var(--muted); font-size: 9px; font-weight: 500; line-height: 1.4; }
+.filterActions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.resultCount, .activeFilters { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border-radius: 999px; font-size: 8px; font-weight: 850; white-space: nowrap; }
+.resultCount { color: #555249; background: #eeede8; }
+.activeFilters { color: #695300; background: #fff2bb; }
+.clearFilters, .emptyAction { display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--line); border-radius: 9px; color: #625f55; background: var(--surface); font: 800 9px inherit; cursor: pointer; }
+.clearFilters { min-height: 30px; padding: 0 9px; }
+.clearFilters:hover, .emptyAction:hover { border-color: #d4bd59; color: #5f4a00; background: var(--gold-soft); }
+.clearFilters svg, .emptyAction svg { width: 13px; height: 13px; }
+.filterControls { display: grid; grid-template-columns: minmax(260px, 1.45fr) minmax(170px, .72fr) minmax(220px, 1fr); gap: 10px; }
+.filterField { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.filterField > span { display: flex; align-items: center; gap: 6px; color: #625f55; font-size: 9px; font-weight: 800; }
+.filterField > span svg { width: 13px; height: 13px; color: #896900; }
+.filterBar input, .filterBar select { width: 100%; min-width: 0; min-height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; outline: none; color: var(--ink); background: var(--surface); font: 500 11px/1.4 inherit; }
+.filterBar input:focus, .filterBar select:focus { border-color: #c3a01e; box-shadow: 0 0 0 3px rgba(246,201,69,.2); }
+.searchControl { position: relative; min-width: 0; }
+.searchControl > svg { position: absolute; z-index: 1; top: 13px; left: 12px; width: 16px; height: 16px; color: #8b887e; pointer-events: none; }
+.searchControl input { padding-left: 36px; }
+.emptyAction { min-height: 38px; margin-top: 4px; padding: 0 12px; }
 
 .cardGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 16px; background: #f8f8f5; }
 .fileCard { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; gap: 13px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(36,34,25,.045); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
@@ -66,14 +88,16 @@
 @media (max-width: 860px) {
   .hero { align-items: flex-start; flex-wrap: wrap; }
   .hero :global(.button) { width: 100%; justify-content: center; }
-  .filterBar { grid-template-columns: 1fr 1fr; }
-  .filterBar > span { grid-column: 1 / -1; }
+  .filterControls { grid-template-columns: 1fr 1fr; }
+  .searchFilter { grid-column: 1 / -1; }
   .cardGrid { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
   .hero { padding: 4px 2px; }
-  .formGrid, .filterBar { grid-template-columns: 1fr; }
-  .full, .wide, .filterBar > span { grid-column: auto; }
+  .formGrid, .filterControls { grid-template-columns: 1fr; }
+  .full, .wide, .searchFilter { grid-column: auto; }
+  .filterHeading { align-items: flex-start; flex-direction: column; }
+  .filterActions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
   .formActions :global(.button) { width: 100%; justify-content: center; }
 }
 
