@@ -5,12 +5,17 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ExternalLink,
+  Eye,
+  Filter,
+  Flag,
+  GraduationCap,
   Link2,
   LoaderCircle,
   Pencil,
   Plus,
   Search,
   ShieldCheck,
+  Tags,
   Trash2,
   X,
 } from "lucide-react";
@@ -249,6 +254,7 @@ export function UsefulLinks() {
   };
 
   const filtersActive = Boolean(query || priorityFilter !== "all" || categoryFilter !== "all" || unitFilter !== "all" || visibilityFilter !== "all" || statusFilter !== "all");
+  const activeFilterCount = [query.trim(), priorityFilter !== "all", categoryFilter !== "all", unitFilter !== "all", visibilityFilter !== "all", statusFilter !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setPriorityFilter("all"); setCategoryFilter("all"); setUnitFilter("all"); setVisibilityFilter("all"); setStatusFilter("all"); };
 
   return (
@@ -288,13 +294,18 @@ export function UsefulLinks() {
             <section className={styles.panel}>
               <div className={styles.panelHeader}><div><h2>{t("links.library")}</h2><p>{t("links.libraryHint")}</p></div>{!loading && <span className={styles.count}>{visible.length} {t(visible.length === 1 ? "links.result" : "links.results")}</span>}</div>
               <div className={styles.toolbar} aria-label={t("links.filters")}>
-                <label className={styles.search}><Search /><span className="sr-only">{t("links.search")}</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("links.search")} /></label>
-                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} aria-label={t("links.field.priority")}><option value="all">{t("links.allPriorities")}</option>{priorities.map((value) => <option key={value} value={value}>{t(`links.priority.${value}`)}</option>)}</select>
-                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label={t("links.field.category")}><option value="all">{t("links.allCategories")}</option>{categories.map((value) => <option key={value} value={value}>{t(`links.category.${value}`)}</option>)}</select>
-                <select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)} aria-label={t("links.field.unit")}><option value="all">{t("links.allUnits")}</option><option value="general">{t("links.noUnit")}</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}</select>
-                {canManage && <select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value)} aria-label={t("links.field.visibility")}><option value="all">{t("links.allVisibilities")}</option>{visibilities.map((value) => <option key={value} value={value}>{t(`links.visibility.${value}`)}</option>)}</select>}
-                {canManage && <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label={t("links.field.status")}><option value="all">{t("links.allStatuses")}</option>{statuses.map((value) => <option key={value} value={value}>{t(`links.status.${value}`)}</option>)}</select>}
-                {filtersActive && <button className={styles.clear} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}
+                <div className={styles.filterHeading}>
+                  <div className={styles.filterTitle}><span><Filter /></span><div><strong>{t("links.filters")}</strong><small>{t("links.filtersHint")}</small></div></div>
+                  <div className={styles.filterActions}>{filtersActive && <span className={styles.activeFilters}>{activeFilterCount} {t(activeFilterCount === 1 ? "links.activeFilter" : "links.activeFilters")}</span>}{filtersActive && <button className={styles.clear} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}</div>
+                </div>
+                <div className={styles.filterGrid}>
+                <label className={`${styles.filterField} ${styles.search}`}><span><Search />{t("links.searchLabel")}</span><div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("links.search")} /></div></label>
+                <label className={styles.filterField}><span><Flag />{t("links.field.priority")}</span><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="all">{t("links.allPriorities")}</option>{priorities.map((value) => <option key={value} value={value}>{t(`links.priority.${value}`)}</option>)}</select></label>
+                <label className={styles.filterField}><span><Tags />{t("links.field.category")}</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">{t("links.allCategories")}</option>{categories.map((value) => <option key={value} value={value}>{t(`links.category.${value}`)}</option>)}</select></label>
+                <label className={styles.filterField}><span><GraduationCap />{t("links.field.unit")}</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">{t("links.allUnits")}</option><option value="general">{t("links.noUnit")}</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
+                {canManage && <label className={styles.filterField}><span><Eye />{t("links.field.visibility")}</span><select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value)}><option value="all">{t("links.allVisibilities")}</option>{visibilities.map((value) => <option key={value} value={value}>{t(`links.visibility.${value}`)}</option>)}</select></label>}
+                {canManage && <label className={styles.filterField}><span><Archive />{t("links.field.status")}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t("links.allStatuses")}</option>{statuses.map((value) => <option key={value} value={value}>{t(`links.status.${value}`)}</option>)}</select></label>}
+                </div>
               </div>
               {loading ? <div className={styles.state} aria-live="polite"><LoaderCircle className={styles.spin} /><strong>{t("links.loading")}</strong></div> : visible.length === 0 ? <div className={styles.state}><Link2 /><strong>{t("links.empty")}</strong><p>{t("links.emptyHint")}</p>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}</div> : (
                 <div className={styles.grid}>
