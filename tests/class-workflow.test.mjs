@@ -36,7 +36,8 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/\/api\/admin\/distribution-check/);
   assert.match(testMode,/\/api\/admin\/placements/);
   assert.match(testMode,/\/api\/admin\/export-validation/);
-  assert.match(testMode,/colocacoes-ambiente-teste\.xls/);
+  assert.match(testMode,/colocacoes-\$\{layout==="classes"\?"por-turma-":""\}ambiente-teste\.xls/);
+  assert.match(testMode,/layout==="classes".*Turma \$\{classId\}/s);
   assert.match(testMode,/Excel\.Sheet/);
   assert.match(testMode,/AutoFilter/);
   assert.match(testMode,/FreezePanes/);
@@ -69,7 +70,10 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/handleValidationExport/);
   assert.match(worker,/\/api\/admin\/export-validation/);
   assert.match(worker,/application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
-  assert.match(worker,/filename="auditoria-pautas-colocacao-.*\.xlsx/);
+  assert.match(worker,/layout==="classes"\?"pautas-colocacao-por-turma":"auditoria-pautas-colocacao"/);
+  assert.match(worker,/new Set\(exportRows\.map\(row=>row\.classId\)\)/);
+  assert.match(worker,/name:`Turma \$\{classId\}`/);
+  assert.match(worker,/worksheets\/sheet\$\{index\+1\}\.xml/);
   assert.match(worker,/xlsxZip/);
   assert.match(worker,/Critérios validados/);
   assert.doesNotMatch(worker,/Colegas indicados|student_friend_preferences|support_class|friend_group_code/);
@@ -77,8 +81,10 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/Seed do sorteio/);
   assert.match(worker,/Hash dos dados de entrada/);
   assert.match(worker,/Alteração manual do destino/);
-  assert.match(placements,/\/api\/admin\/export-validation/);
+  assert.match(placements,/\/api\/admin\/export-validation\?layout=\$\{layout\}/);
   assert.match(placements,/Exportar Excel/);
+  assert.match(placements,/Lista geral/);
+  assert.match(placements,/Por turma final/);
 });
 
 test("composição é guardada diretamente e exige todos os campos",()=>{
@@ -282,7 +288,8 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/placement-runbar__actions"><div className="placement-action-tools">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
-  assert.match(styles,/\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden/);
+  assert.match(styles,/\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain/);
+  assert.match(styles,/\.placement-table-page>\.placement-sheet\{min-height:0;display:flex;flex:1 1 auto;flex-direction:column\}/);
   assert.match(placements,/selected&&<PlacementEditor/);
   assert.match(placementTablePage,/PlacementWorkbench tableOnly/);
 });
