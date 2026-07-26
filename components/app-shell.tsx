@@ -51,10 +51,10 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
   const ownActive = Boolean(user?.representedClass && visibleClassId === user.representedClass);
   const classesActive = active === "turmas" && !ownActive;
   const preferenceOnly = active === "turmas" && user?.role === "student" && !user.classRepresentative && !user.preview;
-  const hasCommunication = moduleAccess["notifications.feed"] || moduleAccess["announcements.feed"] || moduleAccess["requests.submission"] || moduleAccess["polls.voting"];
+  const hasCommunication = moduleAccess["announcements.feed"] || moduleAccess["requests.submission"] || moduleAccess["polls.voting"];
   const hasAcademicLife = moduleAccess["calendar.events"] || moduleAccess["curricular_units.catalog"] || moduleAccess["documents.library"] || moduleAccess["materials.library"] || moduleAccess["materials.submission"] || moduleAccess["useful_links.library"] || moduleAccess["useful_links"];
   const hasCommunity = moduleAccess["directory.members"];
-  const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === "up202507850@up.pt");
+  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === "up202507850@up.pt");
   useEffect(()=>{if(preferenceOnly||!moduleAccess["classes.rosters"])return;let mounted=true;void loadClassCount().then(count=>{if(mounted)setClassCount(count)}).catch(()=>{});return()=>{mounted=false}},[preferenceOnly,moduleAccess]);
   useEffect(() => {
     if (!moduleAccess["notifications.feed"]) return;
@@ -102,7 +102,6 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
       <nav className="nav-list" aria-label={t("shell.primaryNavigation")}>
         {moduleAccess["dashboard.personal"]&&<div className="nav-section"><Link className={active === "overview" ? "is-active" : ""} href="/dashboard"><LayoutDashboard/><span><strong>{t("nav.personalDashboard.title")}</strong><small>{t("nav.personalDashboard.description")}</small></span></Link></div>}
         {hasCommunication&&<div className="nav-section"><span className="nav-label">{t("nav.communication")}</span>
-          {moduleAccess["notifications.feed"]&&<Link className={active === "notifications" ? "is-active" : ""} href="/notificacoes"><Bell/><span><strong>{t("nav.notifications.title")}</strong><small>{t("nav.notifications.description")}</small></span>{unreadNotifications > 0 && <span className="nav-count">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}</Link>}
           {moduleAccess["announcements.feed"]&&<Link className={active === "announcements" ? "is-active" : ""} href="/avisos"><Megaphone/><span><strong>{t("nav.announcements.title")}</strong><small>{t("nav.announcements.description")}</small></span></Link>}
           {moduleAccess["requests.submission"]&&<Link className={active === "requests" ? "is-active" : ""} href="/pedidos"><Inbox/><span><strong>{t("nav.requests.title")}</strong><small>{t("nav.requests.description")}</small></span></Link>}
           {moduleAccess["polls.voting"]&&<Link className={active === "polls" ? "is-active" : ""} href="/inqueritos"><Vote/><span><strong>{t("nav.polls.title")}</strong><small>{t("nav.polls.description")}</small></span></Link>}
@@ -122,6 +121,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
       </nav>
       <div className="sidebar__footer">
         <div className="text-size-setting"><span>{t("shell.textSize")}</span><div>{([['small', 'A−'], ['normal', 'A'], ['large', 'A+']] as [FontScale, string][]).map(([value, label]) => <button key={value} className={user?.fontScale === value ? 'is-active' : ''} onClick={() => void setFontScale(value)}>{label}</button>)}</div></div>
+        {moduleAccess["notifications.feed"]&&<Link className={`sidebar-footer-link${active === "notifications" ? " is-active" : ""}`} href="/notificacoes"><Bell/><span><strong>{t("nav.notifications.title")}</strong><small>{t("nav.notifications.description")}</small></span>{unreadNotifications > 0 && <span className="nav-count">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}</Link>}
         <div className="profile-menu-shell" ref={profileMenuRef}>
           {profileMenu&&<div className="profile-menu" role="menu" aria-label={t("profile.menuLabel")}>
             <header><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.fullName || user?.email}</strong><small>{user?.email}</small></span></header>

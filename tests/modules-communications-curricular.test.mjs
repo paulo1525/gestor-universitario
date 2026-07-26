@@ -63,6 +63,21 @@ test("o estado dos módulos é partilhado e não bloqueia novamente cada navega�
   assert.doesNotMatch(moduleGuard, /fetch\("\/api\/modules"/);
   assert.doesNotMatch(shell, /"classes\.rosters":true/);
   assert.match(moduleUi, /synchronize\(data\.modules, data\.home \?\? null\)/);
+  assert.match(moduleUi, /expandedModules/);
+  assert.match(moduleUi, /admin\.modules\.showSubmodules/);
+});
+
+test("as notificações ficam junto ao perfil e fora dos módulos de comunicação", () => {
+  const navigation = shell.slice(shell.indexOf('<nav className="nav-list"'), shell.indexOf('<div className="sidebar__footer">'));
+  const footer = shell.slice(shell.indexOf('<div className="sidebar__footer">'), shell.indexOf('</aside>'));
+  assert.doesNotMatch(navigation, /href="\/notificacoes"/);
+  assert.match(footer, /sidebar-footer-link/);
+  assert.ok(footer.indexOf("sidebar-footer-link") < footer.indexOf("profile-menu-shell"));
+});
+
+test("o gestor de módulos reais não aparece no ambiente de testes", () => {
+  assert.match(shell, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
+  assert.match(moduleUi, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
 });
 
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {

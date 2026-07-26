@@ -32,6 +32,11 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
 
 test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>{
   assert.match(testMode,/gu-test-mode/);
+  assert.match(testMode,/const TEST_MODE_MODULES=/);
+  assert.match(testMode,/\{key:"requests",enabled:false,effectiveEnabled:false/);
+  assert.match(testMode,/\{key:"dashboard",enabled:false,effectiveEnabled:false/);
+  assert.match(testMode,/resolvedModuleKey:"classes",href:"\/turmas"/);
+  assert.match(testMode,/path\.startsWith\("\/api\/"\).*funcionalidade não está disponível no ambiente de testes/s);
   assert.match(testMode,/Array\.from\(\{length:5\}/);
   assert.match(testMode,/\/api\/admin\/distribution-check/);
   assert.match(testMode,/\/api\/admin\/placements/);
@@ -104,6 +109,9 @@ test("a importação global aparece antes da lista de turmas e inclui ajuda para
   assert.match(csvImport,/fetch\("\/api\/classes\/import"/);
   assert.match(csvImport,/access\["classes\.special_statuses"\] === true/);
   assert.match(csvImport,/classes\.import\.statusesIgnored/);
+  assert.match(csvImport,/classes\.import\.aiHelpAction/);
+  assert.match(csvImport,/styles\.actionRow/);
+  assert.doesNotMatch(csvImport,/styles\.footer/);
 });
 
 test("submissão e aprovação são idempotentes",()=>{
@@ -280,6 +288,11 @@ test("editor bloqueia o fundo e a confirmação de publicação é estruturada",
   assert.match(placements,/style\.removeProperty\("overflow"\)/);
   assert.match(styles,/html\.placement-scroll-locked,body\.placement-scroll-locked\{overflow:hidden!important/);
   assert.match(placements,/placement-drawer__close/);
+  assert.match(placements,/<div className="placement-drawer__body">/);
+  assert.match(placements,/<footer className="placement-drawer-actions">/);
+  assert.match(styles,/\.placement-drawer\{display:grid;grid-template-rows:auto minmax\(0,1fr\) auto;height:100dvh;max-height:100dvh;overflow:hidden/);
+  assert.match(styles,/\.placement-drawer__body\{min-height:0;overflow-x:hidden;overflow-y:auto/);
+  assert.match(styles,/html\.placement-scroll-locked \.placement-table-page,\s*body\.placement-scroll-locked \.placement-table-page\{overflow:hidden!important/);
   assert.match(placements,/publish-confirmation__steps/);
   assert.match(placements,/Aprovar e publicar agora/);
 });

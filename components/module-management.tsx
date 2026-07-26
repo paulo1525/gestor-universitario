@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Boxes, Check, House, LoaderCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Boxes, Check, ChevronDown, House, LoaderCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-context";
 import { AppToast } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
@@ -43,7 +43,7 @@ export function ModuleManagement() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { synchronize } = useModules();
-  const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
+  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
   const [modules, setModules] = useState<ManagedModule[]>([]);
   const [home, setHome] = useState<ResolvedModuleHomepage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +53,7 @@ export function ModuleManagement() {
   const [savedTarget, setSavedTarget] = useState("");
   const [savingTargets, setSavingTargets] = useState<Set<string>>(() => new Set());
   const [savingHome, setSavingHome] = useState(false);
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (!canManageModules) return;
@@ -173,6 +174,15 @@ export function ModuleManagement() {
         ? t("admin.modules.homeManagerStatus")
         : t("admin.modules.homeUnavailableStatus");
 
+  const toggleExpanded = (moduleKey: string) => {
+    setExpandedModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleKey)) next.delete(moduleKey);
+      else next.add(moduleKey);
+      return next;
+    });
+  };
+
   return (<>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
     <section className={styles.panel} aria-labelledby="module-management-title">
@@ -234,33 +244,48 @@ export function ModuleManagement() {
             const moduleDescription = adminDataLabel(locale, "moduleDescription", module.key) || module.description;
             const moduleTarget = targetId({ moduleKey: module.key });
             const moduleSaving = savingTargets.has(moduleTarget);
+            const expanded = expandedModules.has(module.key);
             return (
-              <article className={`${styles.moduleCard} ${!module.enabled ? styles.disabled : ""}`} key={module.key}>
+              <article className={`${styles.moduleCard} ${!module.enabled ? styles.disabled : ""} ${expanded ? styles.expanded : ""}`} key={module.key}>
                 <div className={styles.moduleRow}>
                   <div className={styles.moduleCopy}>
                     <div className={styles.titleLine}>
                       <h3>{moduleLabel}</h3>
-                      <span className={module.enabled ? styles.activeBadge : styles.inactiveBadge}>{module.enabled ? t("admin.modules.active") : t("admin.modules.inactive")}</span>
-                      {module.isHomepage && <span className={styles.homeBadge}><House aria-hidden="true" />{t("admin.modules.homeBadge")}</span>}
+                      {home?.resolvedModuleKey === module.key && <span className={styles.homeBadge}><House aria-hidden="true" />{t("admin.modules.homeBadge")}</span>}
                     </div>
                     {moduleDescription && <p>{moduleDescription}</p>}
+                    {module.submodules.length > 0 && <small className={styles.featureCount}>{t("admin.modules.featureCount", { count: module.submodules.length })}</small>}
                   </div>
-                  <label className={styles.switch}>
-                    <input
-                      type="checkbox"
-                      checked={module.enabled}
-                      disabled={moduleSaving}
-                      onChange={(event) => void updateModule({ moduleKey: module.key }, event.target.checked)}
-                      aria-label={t(module.enabled ? "admin.modules.disable" : "admin.modules.enable", { label: moduleLabel })}
-                    />
-                    <span aria-hidden="true" />
-                    <small>{moduleSaving ? t("admin.common.saving") : savedTarget === moduleTarget ? t("admin.common.saved") : module.enabled ? t("admin.modules.active") : t("admin.modules.inactive")}</small>
-                    {moduleSaving ? <LoaderCircle className={styles.switchStatusIcon} aria-hidden="true" /> : savedTarget === moduleTarget ? <Check className={styles.switchStatusIcon} aria-hidden="true" /> : null}
-                  </label>
+                  <div className={styles.moduleControls}>
+                    <label className={styles.switch}>
+                      <input
+                        type="checkbox"
+                        checked={module.enabled}
+                        disabled={moduleSaving}
+                        onChange={(event) => void updateModule({ moduleKey: module.key }, event.target.checked)}
+                        aria-label={t(module.enabled ? "admin.modules.disable" : "admin.modules.enable", { label: moduleLabel })}
+                      />
+                      <span aria-hidden="true" />
+                      <small>{moduleSaving ? t("admin.common.saving") : savedTarget === moduleTarget ? t("admin.common.saved") : module.enabled ? t("admin.modules.active") : t("admin.modules.inactive")}</small>
+                      {moduleSaving ? <LoaderCircle className={styles.switchStatusIcon} aria-hidden="true" /> : savedTarget === moduleTarget ? <Check className={styles.switchStatusIcon} aria-hidden="true" /> : null}
+                    </label>
+                    {module.submodules.length > 0 && (
+                      <button
+                        className={styles.expandButton}
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-controls={`submodules-${module.key}`}
+                        aria-label={t(expanded ? "admin.modules.hideSubmodules" : "admin.modules.showSubmodules", { label: moduleLabel })}
+                        onClick={() => toggleExpanded(module.key)}
+                      >
+                        <ChevronDown aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {module.submodules.length > 0 && (
-                  <div className={styles.submoduleList} aria-label={t("admin.modules.submodules", { label: moduleLabel })}>
+                {module.submodules.length > 0 && expanded && (
+                  <div id={`submodules-${module.key}`} className={styles.submoduleList} aria-label={t("admin.modules.submodules", { label: moduleLabel })}>
                     {module.submodules.map((submodule) => {
                       const submoduleTarget = targetId({ moduleKey: module.key, submoduleKey: submodule.key });
                       const submoduleLabel = adminDataLabel(locale, "module", submodule.key) || submodule.label;
