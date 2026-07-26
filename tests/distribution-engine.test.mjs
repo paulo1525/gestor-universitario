@@ -53,6 +53,15 @@ test("uma distribuição inicialmente desequilibrada pode convergir para uma sol
  assert.deepEqual([counts.get(1),counts.get(2)],[15,15]);
 });
 
+test("uma diferença fixa de seis alunos pode ser calculada com autorização excecional",()=>{
+ const rows=[];
+ for(let index=0;index<10;index+=1)rows.push({...student(`fixed-small-${index}`,1),studentDecision:"stay"});
+ for(let index=0;index<16;index+=1)rows.push({...student(`fixed-large-${index}`,2),studentDecision:"stay"});
+ assert.throws(()=>calculateDistribution(rows,{seed:"excecao-seis",classIds:[1,2],maxDifference:3}));
+ const result=calculateDistribution(rows,{seed:"excecao-seis",classIds:[1,2],maxDifference:6}),counts=result.reduce((all,row)=>all.set(row.destinationClass,(all.get(row.destinationClass)||0)+1),new Map());
+ assert.deepEqual([counts.get(1),counts.get(2)],[10,16]);
+});
+
 test("quando todos obtêm a primeira preferência não é comunicado qualquer sorteio decisivo",()=>{
  const rows=[];for(let classId=1;classId<=5;classId+=1)for(let index=0;index<10;index+=1)rows.push({...student(`first-${classId}-${index}`,classId,index<3?[classId===5?1:classId+1]:[]),studentDecision:index<3?"move":"stay",basePoints:0});
  const result=calculateDistribution(rows,{seed:"sem-sorteio",classIds:[1,2,3,4,5],maxDifference:3});

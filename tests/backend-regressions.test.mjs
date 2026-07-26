@@ -5,6 +5,7 @@ import {readFileSync} from "node:fs";
 const worker=readFileSync(new URL("../worker/index.ts",import.meta.url),"utf8");
 const activeDistributionMigration=readFileSync(new URL("../migrations/0019_single_active_distribution.sql",import.meta.url),"utf8");
 const specialStatusMigration=readFileSync(new URL("../migrations/0025_special_student_status.sql",import.meta.url),"utf8");
+const imbalanceOverrideMigration=readFileSync(new URL("../migrations/0027_distribution_imbalance_override.sql",import.meta.url),"utf8");
 
 function section(start,end){
  const from=worker.indexOf(start),to=worker.indexOf(end,from+start.length);
@@ -31,7 +32,7 @@ test("preferências só mudam fora de uma distribuição ativa e invalidam propo
  assert.match(ownDestinations,/student\.status==="published"/);
  assert.match(ownDestinations,/status='published' OR \(status='applied' AND published_at IS NULL\)/);
  assert.match(ownDestinations,/status IN \('draft','approved'\)/);
- assert.match(proposals,/if\(action==="calculate"\).*status='published' OR \(status='applied' AND published_at IS NULL\)/s);
+ assert.match(proposals,/if\(action==="calculate"\|\|action==="calculate-exception"\).*status='published' OR \(status='applied' AND published_at IS NULL\)/s);
  assert.match(proposals,/status='applied' AND published_at IS NOT NULL/);
 });
 
@@ -82,7 +83,7 @@ test("publicar e retirar publicação usam transições condicionais",()=>{
 test("cada cálculo usa e persiste uma seed aleatória para desempates auditáveis",()=>{
  assert.match(proposals,/seed=crypto\.randomUUID\(\)/);
  assert.match(proposals,/calculateDistribution\(input\.students,\{seed,maxDifference:3,classIds:input\.classIds\}\)/);
- assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot,input_hash,engine_version,created_by,created_at\)/);
+ assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot,input_hash,engine_version,max_difference,final_difference,imbalance_override_reason,created_by,created_at\)/);
  assert.match(proposals,/JSON\.stringify\(\{proposalId:id,seed,inputHash:input\.hash/);
 });
 
@@ -172,7 +173,21 @@ test("correções de pautas publicadas preservam IDs canónicos e rejeitam snaps
  assert.match(classes,/pauta publicada tem um snapshot inválido/);
  assert.match(classes,/knownStudents\.results\.find\(previous=>previous\.student_number===student\.studentNumber\)\?\.id/);
  assert.match(classes,/new Set\(publishedResults\.map\(result=>result\.studentId\)\)\.size!==publishedResults\.length/);
- assert.match(classes,/UPDATE distribution_proposals SET result_snapshot=\? WHERE id=\? AND status='published' AND result_snapshot=\?/);
+ assert.match(classes,/UPDATE distribution_proposals SET result_snapshot=\?,final_difference=\? WHERE id=\? AND status='published' AND result_snapshot=\?/);
  assert.match(classes,/classTransitionIndex=writes\.length/);
  assert.match(classes,/A pauta foi alterada por outro administrador/);
+});
+
+test("publicação excecional contorna apenas o desequilíbrio e fica integralmente auditada",()=>{
+ assert.match(imbalanceOverrideMigration,/ADD COLUMN max_difference/);
+ assert.match(imbalanceOverrideMigration,/ADD COLUMN final_difference/);
+ assert.match(imbalanceOverrideMigration,/ADD COLUMN imbalance_override_reason/);
+ assert.match(proposals,/action==="calculate-exception"/);
+ assert.match(proposals,/reason\.length<10/);
+ assert.match(proposals,/nonBalanceBlockers=blockingIssues\.filter\(issue=>issue\.code!=="DISTRIBUICAO_IMPOSSIVEL"\)/);
+ assert.match(proposals,/calculateBestEffortDistribution\(input,seed\)/);
+ assert.match(proposals,/auditAction=exceptional\?"distribution_calculated_exception":"distribution_calculated"/);
+ assert.match(proposals,/finalDifference>allowedDifference/);
+ assert.match(proposals,/imbalanceOverrideReason:proposal\.imbalance_override_reason/);
+ assert.match(routes,/calculate-exception/);
 });
