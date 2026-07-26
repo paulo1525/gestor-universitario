@@ -70,7 +70,7 @@ A plataforma permite importar listas, validar nomes e números mecanográficos, 
 
 Com base nas decisões submetidas e nos critérios administrativos aprovados, o sistema calcula uma proposta global que pode combinar trocas diretas, ciclos entre várias turmas e utilização de vagas livres. Antes de qualquer publicação, a Comissão dispõe de ferramentas para pré-validar os dados, simular resultados, analisar situações que exigem revisão e efetuar correções justificadas.
 
-As propostas são versionadas e as ações relevantes ficam registadas. Depois da aprovação, o resultado pode ser publicado e exportado, permitindo reproduzir e auditar as decisões tomadas ao longo do processo.
+As propostas são versionadas e as ações relevantes ficam registadas. Depois da aprovação, o resultado pode ser publicado e exportado, permitindo reproduzir e auditar as decisões tomadas ao longo do processo. Quando a diferença máxima de três estudantes não é viável, os administradores podem autorizar e justificar uma publicação excecional; depois da publicação, podem também acrescentar estudantes diretamente à turma, mantendo a correção auditada.
 
 ## Notificações
 
