@@ -94,8 +94,8 @@ html[data-font-scale="small"] { zoom:.9; }
 html[data-font-scale="large"] { zoom:1.12; }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body), Arial, sans-serif; font-size: var(--font-size-body); line-height: var(--line-height-body); }
+html { min-height: 100%; scroll-behavior: smooth; overscroll-behavior-y: none; }
+body { min-height: 100dvh; margin: 0; overscroll-behavior-y: none; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body), Arial, sans-serif; font-size: var(--font-size-body); line-height: var(--line-height-body); }
 html.app-scroll-locked, body.app-scroll-locked { overflow: hidden !important; overscroll-behavior: none !important; }
 button, input, select, textarea { font: inherit; }
 button, a, input, select { -webkit-tap-highlight-color: transparent; }
@@ -1799,6 +1799,149 @@ html body .workspace .main-content table {
 }
 
 @media (max-width: 640px) {
+  .admin-users .panel-tools {
+    align-items: stretch;
+  }
+
+  .admin-users .search-field,
+  .admin-users .panel-tools > select {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .admin-users .search-field {
+    height: 40px;
+  }
+
+  .admin-table-wrap {
+    overflow: visible;
+  }
+
+  .admin-table-wrap table,
+  .admin-table-wrap tbody {
+    width: 100%;
+    min-width: 0;
+    display: block;
+  }
+
+  .admin-table-wrap thead {
+    display: none;
+  }
+
+  .admin-table-wrap tbody {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    background: var(--color-surface-subtle);
+  }
+
+  .admin-table-wrap tbody tr {
+    min-width: 0;
+    display: grid;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    box-shadow: 0 4px 14px rgba(29, 28, 24, .04);
+  }
+
+  .admin-table-wrap tbody td,
+  .admin-table-wrap tbody td:first-child,
+  .admin-table-wrap tbody td:nth-child(4),
+  .admin-table-wrap tbody td:nth-child(8),
+  .admin-table-wrap tbody td:nth-child(9) {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    display: grid;
+    grid-template-columns: minmax(108px, .8fr) minmax(0, 1.2fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border);
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .admin-table-wrap tbody td:last-child {
+    grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .admin-table-wrap tbody td::before {
+    content: attr(data-label);
+    min-width: 0;
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-caption);
+    font-weight: 850;
+    letter-spacing: .045em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .admin-table-wrap tbody td:first-child {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding-block: 12px;
+    background: color-mix(in srgb, var(--color-accent-soft) 42%, var(--color-surface));
+  }
+
+  .admin-table-wrap tbody td:first-child::before {
+    margin-bottom: 2px;
+  }
+
+  .admin-table-wrap td input,
+  .admin-table-wrap td select,
+  .admin-table-wrap .class-representative {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .admin-table-wrap td small {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-table-wrap .admin-role {
+    min-height: 0;
+    white-space: normal;
+  }
+
+  .admin-table-wrap .admin-access {
+    min-width: 0;
+  }
+
+  .admin-table-wrap .admin-not-applicable {
+    text-align: left;
+  }
+
+  .admin-table-wrap .admin-row-actions {
+    width: 100%;
+  }
+
+  .admin-table-wrap .admin-save-user {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-table-wrap .admin-row-actions .admin-save-user:last-child {
+    flex: 0 0 44px;
+  }
+
+  .admin-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-pagination > div {
+    justify-content: space-between;
+  }
+
+  .admin-pagination button {
+    flex: 1;
+  }
+
   .class-overview-table,
   .class-roster .roster-table,
   .submitted-roster .roster-table {

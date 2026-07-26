@@ -37,6 +37,7 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/\{key:"requests",enabled:false,effectiveEnabled:false/);
   assert.match(testMode,/\{key:"dashboard",enabled:false,effectiveEnabled:false/);
   assert.match(testMode,/resolvedModuleKey:"classes",href:"\/turmas"/);
+  assert.match(testMode,/path\.startsWith\("\/api\/auth\/"\)\)return null/);
   assert.match(testMode,/path\.startsWith\("\/api\/"\).*funcionalidade não está disponível no ambiente de testes/s);
   assert.match(testMode,/Array\.from\(\{length:5\}/);
   assert.match(testMode,/\/api\/admin\/distribution-check/);
@@ -304,13 +305,23 @@ test("editor bloqueia o fundo e a confirmação de publicação é estruturada",
   assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\)\)/);
   assert.match(scrollLock,/let activeLocks = 0/);
   assert.match(scrollLock,/body\.style\.position = "fixed"/);
-  assert.match(scrollLock,/window\.scrollTo\(0, lockedScrollY\)/);
+  assert.match(scrollLock,/Math\.min\(lockedScrollY, maxScrollY\)/);
+  assert.match(scrollLock,/window\.requestAnimationFrame/);
   assert.match(styles,/html\.app-scroll-locked, body\.app-scroll-locked \{ overflow: hidden !important; overscroll-behavior: none !important; \}/);
   assert.match(styles,/\.nav-list\s*\{[^}]*overscroll-behavior-y:\s*contain/);
   assert.match(styles,/\.empty-state\s*\{\s*margin:\s*0;\s*padding:\s*30px/);
   assert.match(placements,/placement-drawer__close/);
   assert.match(placements,/publish-confirmation__steps/);
   assert.match(placements,/Aprovar e publicar agora/);
+});
+
+test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
+  assert.match(admin,/data-label=\{t\("admin\.control\.user"\)\}/);
+  assert.match(admin,/data-label=\{t\("admin\.control\.actions"\)\}/);
+  assert.match(styles,/\.admin-users \.search-field,[\s\S]*?flex:\s*0 0 auto/);
+  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(styles,/content:\s*attr\(data-label\)/);
+  assert.match(styles,/html \{[^}]*overscroll-behavior-y:\s*none/);
 });
 
 test("justificação é condicional, critérios são cumulativos e o aluno recebe histórico",()=>{

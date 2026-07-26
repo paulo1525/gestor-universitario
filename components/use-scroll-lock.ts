@@ -82,8 +82,19 @@ function unlockPageScroll() {
   body.style.overflow = restore.bodyOverflow;
   body.style.overscrollBehavior = restore.bodyOverscrollBehavior;
   body.style.paddingRight = restore.bodyPaddingRight;
-  window.scrollTo(0, lockedScrollY);
-  html.style.scrollBehavior = restore.htmlScrollBehavior;
+  const restoreScroll = () => {
+    const viewportHeight = Math.max(0, html.clientHeight || window.innerHeight);
+    const documentHeight = Math.max(html.scrollHeight, body.scrollHeight);
+    const maxScrollY = Math.max(0, documentHeight - viewportHeight);
+    window.scrollTo(0, Math.min(lockedScrollY, maxScrollY));
+  };
+
+  restoreScroll();
+  window.requestAnimationFrame(() => {
+    if (activeLocks > 0) return;
+    restoreScroll();
+    html.style.scrollBehavior = restore.htmlScrollBehavior;
+  });
 }
 
 export function useScrollLock(active: boolean) {
