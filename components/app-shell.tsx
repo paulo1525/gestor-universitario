@@ -55,7 +55,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
   const hasCommunication = moduleAccess["announcements.feed"] || moduleAccess["requests.submission"] || moduleAccess["polls.voting"];
   const hasAcademicLife = moduleAccess["calendar.events"] || moduleAccess["curricular_units.catalog"] || moduleAccess["documents.library"] || moduleAccess["materials.library"] || moduleAccess["materials.submission"] || moduleAccess["useful_links.library"] || moduleAccess["useful_links"];
   const hasCommunity = moduleAccess["directory.members"];
-  const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === "up202507850@up.pt");
+  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === "up202507850@up.pt");
   useScrollLock(open);
   useEffect(()=>{if(preferenceOnly||!moduleAccess["classes.rosters"])return;let mounted=true;void loadClassCount().then(count=>{if(mounted)setClassCount(count)}).catch(()=>{});return()=>{mounted=false}},[preferenceOnly,moduleAccess]);
   useEffect(() => {

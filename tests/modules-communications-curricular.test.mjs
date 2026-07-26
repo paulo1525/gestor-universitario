@@ -70,6 +70,11 @@ test("o estado dos módulos é partilhado e não bloqueia novamente cada navega�
   assert.match(moduleUi, /synchronize\(data\.modules, data\.home \?\? null\)/);
 });
 
+test("o gestor de módulos reais não aparece no ambiente de testes", () => {
+  assert.match(shell, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
+  assert.match(moduleUi, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
+});
+
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {
   assert.match(announcements, /user\.commissionPosition/);
   assert.match(announcements, /author_position_code,author_position_label/);
