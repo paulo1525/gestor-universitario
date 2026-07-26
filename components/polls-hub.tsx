@@ -31,6 +31,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import styles from "@/components/polls-hub.module.css";
 
 type ApiOption = { id: string | number; label?: string; text?: string; votes?: number; voteCount?: number; vote_count?: number };
@@ -151,6 +152,7 @@ export function PollsHub() {
   const [submitting, setSubmitting] = useState(false);
   const [votingId, setVotingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Poll | null>(null);
+  useScrollLock(Boolean(deleteTarget));
   const [deleting, setDeleting] = useState(false);
   const [choices, setChoices] = useState<Record<string, string[]>>({});
   const [filter, setFilter] = useState<Filter>("all");

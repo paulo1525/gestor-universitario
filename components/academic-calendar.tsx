@@ -28,6 +28,7 @@ import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import { CalendarSubscription } from "@/components/calendar-subscription";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import styles from "@/components/academic-calendar.module.css";
 
 type DateInput = string | number;
@@ -260,6 +261,7 @@ export function AcademicCalendar() {
   const days = useMemo(() => monthDays(visibleMonth), [visibleMonth]);
   const selectedEvents = eventsByDay.get(selectedDate) || [];
   const selectedEvent = filtered.find(item => item.id === selectedEventId) || null;
+  useScrollLock(editor || Boolean(selectedEvent));
   const upcoming = useMemo(() => filtered.filter(item => {
     const date = validDate(item.startsAt);
     return date && date >= today;

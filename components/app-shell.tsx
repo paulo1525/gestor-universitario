@@ -9,6 +9,7 @@ import { useI18n } from "@/components/i18n-context";
 import { useModules } from "@/components/module-context";
 import { UrgentAnnouncementBanner } from "@/components/urgent-announcement-banner";
 import { TopbarGlobalSearch } from "@/components/topbar-global-search";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import {setTestPersona,TEST_PERSONAS,testPersona} from "@/lib/test-mode";
 
 export type AppShellActive = "overview" | "turmas" | "notifications" | "useful_links" | "admin" | "modules" | "tickets" | "check" | "placements" | "audit" | "announcements" | "curricular_units" | "curricular_units_management" | "calendar" | "documents" | "requests" | "directory" | "polls" | "dashboard" | "search" | "materials";
@@ -55,6 +56,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", curren
   const hasAcademicLife = moduleAccess["calendar.events"] || moduleAccess["curricular_units.catalog"] || moduleAccess["documents.library"] || moduleAccess["materials.library"] || moduleAccess["materials.submission"] || moduleAccess["useful_links.library"] || moduleAccess["useful_links"];
   const hasCommunity = moduleAccess["directory.members"];
   const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === "up202507850@up.pt");
+  useScrollLock(open);
   useEffect(()=>{if(preferenceOnly||!moduleAccess["classes.rosters"])return;let mounted=true;void loadClassCount().then(count=>{if(mounted)setClassCount(count)}).catch(()=>{});return()=>{mounted=false}},[preferenceOnly,moduleAccess]);
   useEffect(() => {
     if (!moduleAccess["notifications.feed"]) return;

@@ -5,6 +5,7 @@ import { Check, Clipboard, LoaderCircle, Sparkles, Upload, X } from "lucide-reac
 import { AppToast } from "@/components/app-toast";
 import { FileUploadField } from "@/components/file-upload-field";
 import { useI18n } from "@/components/i18n-context";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import { parseStudentCsv, type CsvStudent } from "@/lib/student-csv";
 import styles from "@/components/class-roster-import.module.css";
 
@@ -28,6 +29,7 @@ Regras obrigatórias:
 export function ClassRosterImport({ onImported }: { onImported?: () => void | Promise<void> }) {
   const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null), [students, setStudents] = useState<CsvStudent[]>([]), [importing, setImporting] = useState(false), [notice, setNotice] = useState(""), [noticeError, setNoticeError] = useState(false), [showPrompt, setShowPrompt] = useState(false), [copied, setCopied] = useState(false);
+  useScrollLock(showPrompt);
 
   const clearFile = () => { setFile(null); setStudents([]); };
   const selectFile = async (selected: File | undefined) => {
