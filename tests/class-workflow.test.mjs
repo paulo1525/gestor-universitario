@@ -49,7 +49,7 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/AutoFilter/);
   assert.match(testMode,/FreezePanes/);
   assert.match(testMode,/#F6C945/);
-  assert.match(testMode,/action==="calculate"\?"draft"/);
+  assert.match(testMode,/s\.proposalStatus=calculation\?"draft"/);
   assert.match(testMode,/classes:"1–2"/);
   assert.match(testMode,/classes:"3–5"/);
 });
@@ -106,6 +106,9 @@ test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.match(detail,/classes\.common\.status/);
   assert.match(detail,/STUDENT_STATUS_OPTIONS/);
   assert.match(detail,/specialStatusesEnabled && <th>/);
+  assert.match(detail,/addPublishedStudent/);
+  assert.match(detail,/classes\.detail\.addPublished/);
+  assert.match(detail,/isPublished && data\.permissions\.edit && !editingPublished/);
 });
 
 test("a importação global aparece antes da lista de turmas e inclui ajuda para IA",()=>{
@@ -165,6 +168,15 @@ test("aprovação confirma e publica automaticamente",()=>{
   assert.match(placements,/Aprovar e publicar as turmas\?/);
   assert.match(placements,/\["approve","apply","publish"\]/);
   assert.match(placements,/Aprovar e publicar agora/);
+});
+
+test("desequilíbrio impossível oferece publicação excecional justificada",()=>{
+  assert.match(placements,/issue\.code==="DISTRIBUICAO_IMPOSSIVEL"/);
+  assert.match(placements,/\/api\/admin\/distribution-proposals\/calculate-exception/);
+  assert.match(placements,/Preparar publicação excecional/);
+  assert.match(placements,/Justificação administrativa \*/);
+  assert.match(placements,/Esta é uma publicação excecional/);
+  assert.match(testMode,/action==="calculate-exception"/);
 });
 
 test("editor lista preferências por ordem e integra o destino final",()=>{
@@ -302,7 +314,7 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
-  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\)\)/);
+  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\)\)/);
   assert.match(scrollLock,/let activeLocks = 0/);
   assert.match(scrollLock,/body\.style\.position = "fixed"/);
   assert.match(scrollLock,/Math\.min\(lockedScrollY, maxScrollY\)/);
