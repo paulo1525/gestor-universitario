@@ -12,6 +12,7 @@ import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { PersonName } from "@/components/person-name";
 import { useModuleEnabled } from "@/components/use-module-enabled";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import { personDisplay } from "@/lib/person-display";
 import styles from "@/components/requests-center.module.css";
@@ -35,6 +36,7 @@ export function RequestsCenter() {
   const [statusFilter, setStatusFilter] = useState("all"); const [responses, setResponses] = useState<Record<string, string>>({}); const [responseVisibility, setResponseVisibility] = useState<Record<string, string>>({}); const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false); const [managingId, setManagingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RequestItem | null>(null); const [deletingId, setDeletingId] = useState<string | null>(null); const [deleteError, setDeleteError] = useState("");
+  useScrollLock(Boolean(deleteTarget));
   const [form, setForm] = useState({ subject: "", message: "", category: "suggestion", unitId: "", anonymous: false, responseVisibility: "private" });
   const load = useCallback(async () => { setLoading(true); try { const response = await fetch(canManage ? "/api/requests?scope=management" : "/api/requests", { cache: "no-store" }); const data = await response.json() as { requests?: Record<string, unknown>[]; units?: Record<string, unknown>[]; curricularUnits?: Record<string, unknown>[]; error?: string }; if (!response.ok) throw new Error(data.error || t("requests.loadError")); const items = (data.requests || []).map(raw => normalise(raw, t("requests.anonymousAuthor"), t("requests.studentAuthor"), t("requests.fallbackSubject"))); setRequests(items); setUnits((data.units || data.curricularUnits || []).map(raw => ({ id: String(raw.id), code: String(raw.code || ""), name: String(raw.name || "") }))); setResponses(Object.fromEntries(items.map(item => [item.id, item.response]))); setResponseVisibility(Object.fromEntries(items.map(item => [item.id, item.responseVisibility]))); } catch (error) { setNotice({ kind: "error", message: error instanceof Error ? error.message : t("requests.loadError") }); } finally { setLoading(false); } }, [canManage, t]);
   // eslint-disable-next-line react-hooks/set-state-in-effect

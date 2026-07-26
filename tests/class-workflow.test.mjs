@@ -17,6 +17,7 @@ const placements=readFileSync(new URL("../components/placement-workbench.tsx",im
 const preflight=readFileSync(new URL("../components/distribution-preflight.tsx",import.meta.url),"utf8");
 const shell=readFileSync(new URL("../components/app-shell.tsx",import.meta.url),"utf8");
 const placementTablePage=readFileSync(new URL("../app/admin/colocacoes/tabela/page.tsx",import.meta.url),"utf8");
+const scrollLock=readFileSync(new URL("../components/use-scroll-lock.ts",import.meta.url),"utf8");
 const styles=readFileSync(new URL("../app/globals.css",import.meta.url),"utf8");
 
 test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
@@ -295,9 +296,13 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
-  assert.match(placements,/classList\.toggle\("placement-scroll-locked",locked\)/);
-  assert.match(placements,/style\.removeProperty\("overflow"\)/);
-  assert.match(styles,/html\.placement-scroll-locked,body\.placement-scroll-locked\{overflow:hidden!important/);
+  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\)\)/);
+  assert.match(scrollLock,/let activeLocks = 0/);
+  assert.match(scrollLock,/body\.style\.position = "fixed"/);
+  assert.match(scrollLock,/window\.scrollTo\(0, lockedScrollY\)/);
+  assert.match(styles,/html\.app-scroll-locked, body\.app-scroll-locked \{ overflow: hidden !important; overscroll-behavior: none !important; \}/);
+  assert.match(styles,/\.nav-list\s*\{[^}]*overscroll-behavior-y:\s*contain/);
+  assert.match(styles,/\.empty-state\s*\{\s*margin:\s*0;\s*padding:\s*30px/);
   assert.match(placements,/placement-drawer__close/);
   assert.match(placements,/publish-confirmation__steps/);
   assert.match(placements,/Aprovar e publicar agora/);

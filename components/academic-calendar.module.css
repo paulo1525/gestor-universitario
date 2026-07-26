@@ -129,8 +129,8 @@
 .emptyState strong { color:#383a34; }
 .emptyState span { font-size:.85rem; }
 
-.modalBackdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:1rem; background:rgba(18,20,17,.48); backdrop-filter:blur(4px); }
-.eventModal { width:min(31rem,100%); max-height:calc(100vh - 2rem); padding:1.35rem; overflow:auto; background:#fff; border:1px solid #e1e2dc; border-radius:1.25rem; box-shadow:0 28px 80px rgba(0,0,0,.22); }
+.modalBackdrop { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; padding:1rem; overflow-y:auto; overscroll-behavior:contain; background:rgba(18,20,17,.48); backdrop-filter:blur(4px); -webkit-overflow-scrolling:touch; }
+.eventModal { width:min(31rem,100%); max-height:calc(100dvh - 2rem); padding:1.35rem; overflow:auto; overscroll-behavior:contain; background:#fff; border:1px solid #e1e2dc; border-radius:1.25rem; box-shadow:0 28px 80px rgba(0,0,0,.22); -webkit-overflow-scrolling:touch; }
 .eventModal header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .eventModal header button { display:grid; place-items:center; width:2.2rem; height:2.2rem; padding:0; color:#5e615a; background:#f2f3ef; border:0; border-radius:.68rem; cursor:pointer; }
 .eventModal header button svg { width:1rem; }
@@ -286,7 +286,7 @@
 
 /* Detalhe amplo e estruturado, com edição integral no mesmo contexto. */
 .modalBackdrop { padding:24px; background:rgba(18,20,17,.54); }
-.eventModal { width:min(760px,100%); max-height:calc(100vh - 48px); display:flex; flex-direction:column; padding:0; overflow:hidden; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 28px 80px rgba(0,0,0,.24); }
+.eventModal { width:min(760px,100%); max-height:calc(100dvh - 48px); display:flex; flex-direction:column; padding:0; overflow:hidden; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 28px 80px rgba(0,0,0,.24); }
 .createModal { width:min(780px,100%); }
 .eventModal .modalHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:22px 24px; border-bottom:1px solid var(--line); background:#fffdf5; }
 .modalHeading { min-width:0; display:grid; gap:7px; }
@@ -300,7 +300,7 @@
 .modalHeader .modalClose { width:38px; padding:0; color:#5e615a; border:1px solid var(--line); background:var(--surface); }
 .modalHeader .modalClose:hover { color:var(--ink); background:#f3f3ef; }
 .modalHeader .modalClose:disabled { cursor:wait; opacity:.55; }
-.modalBody { min-height:0; padding:22px 24px 24px; overflow:auto; }
+.modalBody { min-height:0; padding:22px 24px 24px; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .modalOverview { display:grid; gap:18px; }
 .modalMeta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; padding:0; border:0; }
 .modalMeta p { min-width:0; display:grid; grid-template-columns:38px minmax(0,1fr); align-items:start; gap:11px; padding:14px; border:1px solid var(--line); border-radius:11px; color:#525149; background:#fafaf7; font-size:11px; line-height:1.55; }
@@ -336,7 +336,7 @@
   .dayNumber { margin:0 auto; }
   .creatableDay .daySelect::after { top:4px; right:4px; width:16px; height:16px; border:0; background:transparent; font-size:12px; }
   .modalBackdrop { align-items:end; padding:10px; }
-  .eventModal { width:100%; max-height:calc(100vh - 20px); }
+  .eventModal { width:100%; max-height:calc(100dvh - 20px); }
   .modalHeader { gap:14px; padding:17px 16px; }
   .eventModal .modalHeading h2 { font-size:17px; }
   .modalHeader .modalEdit { width:38px; padding:0; font-size:0; }

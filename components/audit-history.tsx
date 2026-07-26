@@ -10,6 +10,7 @@ import { APP_MODULES } from "@/lib/app-modules";
 import { adminDataLabel } from "@/lib/i18n-admin";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
+import { useScrollLock } from "@/components/use-scroll-lock";
 
 type Action = { id: string | number; action: string; details: string | null; created_at: number; actor_id?: string; actor_name: string; actor_email?: string; actor_student_number?: string; class_id: number | null };
 type DetailRow = { label: string; value: string };
@@ -103,6 +104,7 @@ function detailSearchText(details: string | null, locale: AppLocale, copy: Audit
 export function AuditHistory() {
   const { locale, t } = useI18n();
   const [actions, setActions] = useState<Action[]>([]), [error, setError] = useState(""), [selected, setSelected] = useState<Action | null>(null), [query, setQuery] = useState(""), [page, setPage] = useState(1);
+  useScrollLock(Boolean(selected));
   const auditCopy = useMemo<AuditCopy>(() => ({
     noValue: t("admin.audit.noValue"), noItems: t("admin.audit.noItems"), noData: t("admin.audit.noData"),
     enabled: t("admin.audit.enabled"), disabled: t("admin.audit.disabled"), yes: t("admin.audit.yes"), no: t("admin.audit.no"),

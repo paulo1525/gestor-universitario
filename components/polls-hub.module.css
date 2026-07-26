@@ -107,8 +107,8 @@
 .empty{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;padding:35px;color:#8a877e;text-align:center;background:#fafaf7}
 .empty>svg{width:27px;color:#98740b}.empty strong{color:#44433d;font-size:12px}.empty p{margin:0;font-size:12px;line-height:1.6}
 .spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-.confirmBackdrop{position:fixed;z-index:320;inset:0;display:grid;place-items:center;padding:20px;background:var(--color-overlay);backdrop-filter:blur(5px)}
-.confirmDialog{width:min(560px,calc(100vw - 32px));display:grid;grid-template-columns:42px minmax(0,1fr);gap:14px;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 28px 90px rgba(0,0,0,.26)}
+.confirmBackdrop{position:fixed;z-index:320;inset:0;display:grid;place-items:center;padding:20px;overflow-y:auto;overscroll-behavior:contain;background:var(--color-overlay);backdrop-filter:blur(5px);-webkit-overflow-scrolling:touch}
+.confirmDialog{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);display:grid;grid-template-columns:42px minmax(0,1fr);gap:14px;overflow-y:auto;overscroll-behavior:contain;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 28px 90px rgba(0,0,0,.26);-webkit-overflow-scrolling:touch}
 .confirmIcon{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;color:#a83d34;background:#fff0ee}
 .confirmIcon svg{width:20px}
 .confirmDialog h2{margin:2px 0 7px;font-size:18px}
