@@ -33,6 +33,11 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
 
 test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>{
   assert.match(testMode,/gu-test-mode/);
+  assert.match(testMode,/const TEST_MODE_MODULES=/);
+  assert.match(testMode,/\{key:"requests",enabled:false,effectiveEnabled:false/);
+  assert.match(testMode,/\{key:"dashboard",enabled:false,effectiveEnabled:false/);
+  assert.match(testMode,/resolvedModuleKey:"classes",href:"\/turmas"/);
+  assert.match(testMode,/path\.startsWith\("\/api\/"\).*funcionalidade não está disponível no ambiente de testes/s);
   assert.match(testMode,/Array\.from\(\{length:5\}/);
   assert.match(testMode,/\/api\/admin\/distribution-check/);
   assert.match(testMode,/\/api\/admin\/placements/);

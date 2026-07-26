@@ -60,7 +60,7 @@ export function ModuleManagement() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { synchronize } = useModules();
-  const canManageModules = Boolean(user?.testMode || user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
+  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
   const [modules, setModules] = useState<ManagedModule[]>([]);
   const [home, setHome] = useState<ResolvedModuleHomepage | null>(null);
   const [loading, setLoading] = useState(true);
