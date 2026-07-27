@@ -295,6 +295,18 @@ test("ordem de preferências é explícita e a submissão pode ser editada até 
   assert.match(preferences,/data\.student\.specialStatus !== "none"/);
 });
 
+test("indicadores de colocações distinguem decisões e mostram percentagens",()=>{
+  assert.match(placements,/studentsStaying=students\.filter\(student=>student\.student_decision==="stay"\)\.length/);
+  assert.match(placements,/studentsMoving=students\.filter\(student=>student\.student_decision==="move"\)\.length/);
+  assert.match(placements,/label:"Querem ficar"/);
+  assert.match(placements,/label:"Querem mudar"/);
+  assert.match(placements,/label:"Sem formulário"/);
+  assert.match(placements,/toLocaleString\("pt-PT",\{maximumFractionDigits:1\}\)/);
+  assert.match(placements,/placement-kpi__percentage/);
+  assert.match(styles,/\.placement-kpi__icon\{[^}]*place-items:center/);
+  assert.match(styles,/\.placement-kpi--move \.placement-kpi__percentage/);
+});
+
 test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo",()=>{
   assert.match(placements,/target="_blank"/);
   assert.match(placements,/rel="noopener noreferrer"/);
@@ -309,6 +321,7 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
   assert.match(styles,/\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap,\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden/);
+  assert.match(styles,/\.placement-table-wrap th:nth-child\(1\),\.placement-table-wrap td:nth-child\(1\),\.placement-table-wrap th:nth-child\(2\),\.placement-table-wrap td:nth-child\(2\)\{position:static;left:auto\}/);
   assert.doesNotMatch(styles,/max-height:60dvh/);
   assert.match(styles,/\.placement-table-page>\.placement-sheet\{min-height:0;display:flex;flex:1 1 auto;flex-direction:column\}/);
   assert.match(placements,/selected&&<PlacementEditor/);
