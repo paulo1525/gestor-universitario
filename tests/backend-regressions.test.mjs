@@ -43,7 +43,7 @@ test("a funcionalidade nominal de colegas foi removida das APIs",()=>{
 
 test("editor administrativo limpa preferências e pontos ao manter e valida turmas ativas",()=>{
  assert.match(placements,/reviewStatus=decision==="stay"\?null/);
- assert.match(placements,/validationTypes=decision==="stay"\|\|reviewStatus==="invalid"\?\[\]/);
+ assert.match(placements,/validationTypes=decision==="stay"\|\|reviewStatus==="invalid"\|\|reviewDeferred\?\[\]/);
  assert.match(placements,/decision==="move"\?rawDestinations:\[\]/);
  assert.match(placements,/decision==="move"&&!destinations\.length/);
  assert.match(placements,/activeClasses:classes\.results\.map\(row=>row\.id\)/);
