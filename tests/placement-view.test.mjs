@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {matchesPlacementFilters,placementOrigin,placementOutcome} from "../lib/placement-view.mjs";
+import {matchesPlacementFilters,placementOrigin,placementOutcome,placementValidation} from "../lib/placement-view.mjs";
 
-const student=(patch={})=>({full_name:"Ana Martins",student_number:"202600001",class_id:1,student_decision:"stay",notes:null,exception_points:0,exception_reviewed_at:null,additional_info_validation:null,...patch});
+const student=(patch={})=>({full_name:"Ana Martins",student_number:"202600001",class_id:1,student_decision:"stay",notes:null,exception_points:0,exception_reviewed_at:null,additional_info_validation:null,additional_info_review_status:null,additional_info_review_deferred:0,...patch});
 const empty={query:"",origin:"",destination:"",decision:"",result:"",validation:"",points:"",assignment:""};
 
 test("cores e textos distinguem ficar, preferências e mudança falhada",()=>{
@@ -24,6 +24,13 @@ test("múltiplos filtros acumulam por turma, decisão, resultado, validação, p
  assert.equal(matchesPlacementFilters(row,filters),true);
  assert.equal(matchesPlacementFilters(row,{...filters,destination:"4"}),false);
  assert.equal(matchesPlacementFilters(row,{...filters,decision:"stay"}),false);
+});
+
+test("informação diferida permite distingui-la e filtrá-la da informação por validar",()=>{
+ const deferred=student({notes:"Só muda se a amiga também mudar.",additional_info_review_deferred:1});
+ assert.equal(placementValidation(deferred),"deferred");
+ assert.equal(matchesPlacementFilters({student:deferred,move:null,destinations:[]},{...empty,validation:"deferred"}),true);
+ assert.equal(matchesPlacementFilters({student:deferred,move:null,destinations:[]},{...empty,validation:"pending"}),false);
 });
 
 test("mantém a origem e o resultado corretos depois de aplicar a proposta",()=>{
