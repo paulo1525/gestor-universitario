@@ -33,6 +33,9 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
 });
 
 test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>{
+  assert.match(testMode,/export const TEST_MODE_AVAILABLE=process\.env\.NEXT_PUBLIC_TEST_MODE_AVAILABLE==="1"/);
+  assert.match(testMode,/if\(!TEST_MODE_AVAILABLE\)/);
+  assert.match(admin,/\{TEST_MODE_AVAILABLE && <section className=\{`panel admin-settings test-mode-setting/);
   assert.match(testMode,/gu-test-mode/);
   assert.match(testMode,/const TEST_MODE_MODULES=/);
   assert.match(testMode,/\{key:"requests",enabled:false,effectiveEnabled:false/);
@@ -359,6 +362,9 @@ test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
   assert.match(admin,/data-label=\{t\("admin\.control\.actions"\)\}/);
   assert.match(styles,/\.admin-users \.search-field,[\s\S]*?flex:\s*0 0 auto/);
   assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?display:\s*grid/);
+  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?overflow:\s*visible/);
+  assert.match(styles,/\.admin-table-wrap \.admin-row-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s*44px/);
+  assert.match(styles,/\.admin-table-wrap \.admin-save-user\s*\{[\s\S]*?min-height:\s*44px/);
   assert.match(styles,/content:\s*attr\(data-label\)/);
   assert.match(styles,/html \{[^}]*overscroll-behavior-y:\s*none/);
 });
