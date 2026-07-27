@@ -27,7 +27,7 @@ export function TurmasDashboard() {
   const total = classes.reduce((count, item) => count + item.alunos, 0);
   const submitted = classes.filter((item) => item.estado === "Submetida" || item.estado === "Publicada").length;
   const showDecisions = !preferenceOnly && !placementsPublished;
-  const preferencePanel = !loading && !placementsPublished && !user?.preview ? <StudentPreferencePanel /> : null;
+  const preferencePanel = !loading && !placementsPublished ? <StudentPreferencePanel /> : null;
   const stateLabel = (state: EstadoTurma) => state === "Publicada" ? t("classes.dashboard.published") : state === "Submetida" ? t("classes.dashboard.submitted") : t("classes.dashboard.filling");
   const classOverview = <section className="panel overview-panel">
     <div className="panel__header">
