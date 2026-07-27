@@ -329,14 +329,17 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
-  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\),false\)/);
+  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\)\)/);
   assert.match(placements,/className="placement-drawer__body"/);
+  assert.match(placements,/<\/div>\s*<section className="placement-drawer-actions"/);
   assert.match(scrollLock,/let activeLocks = 0/);
   assert.match(scrollLock,/function lockPageScroll\(fixBody: boolean\)/);
   assert.match(scrollLock,/body\.style\.position = "fixed"/);
   assert.match(scrollLock,/Math\.min\(lockedScrollY, maxScrollY\)/);
   assert.match(scrollLock,/window\.requestAnimationFrame/);
   assert.match(styles,/html\.app-scroll-locked, body\.app-scroll-locked \{ overflow: hidden !important; overscroll-behavior: none !important; \}/);
+  assert.match(styles,/\.placement-drawer-backdrop\{height:auto;min-height:0;touch-action:none\}/);
+  assert.match(styles,/\.placement-drawer>\.placement-drawer-actions\{position:relative;bottom:auto;flex:0 0 auto/);
   assert.match(styles,/\.nav-list\s*\{[^}]*overscroll-behavior-y:\s*contain/);
   assert.match(styles,/\.empty-state\s*\{\s*margin:\s*0;\s*padding:\s*30px/);
   assert.match(placements,/placement-drawer__close/);
