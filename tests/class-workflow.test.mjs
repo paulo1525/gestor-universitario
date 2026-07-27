@@ -303,9 +303,13 @@ test("indicadores de colocações distinguem decisões e mostram percentagens",(
   assert.match(placements,/label:"Querem mudar"/);
   assert.match(placements,/label:"Sem formulário"/);
   assert.match(placements,/toLocaleString\("pt-PT",\{maximumFractionDigits:1\}\)/);
-  assert.match(placements,/placement-kpi__percentage/);
-  assert.match(styles,/\.placement-kpi__icon\{[^}]*place-items:center/);
-  assert.match(styles,/\.placement-kpi--move \.placement-kpi__percentage/);
+  assert.match(placements,/placement-overview__bar/);
+  assert.match(placements,/Panorama das preferências/);
+  assert.match(placements,/placement-overview__signals/);
+  assert.doesNotMatch(placements,/placement-kpis|placement-kpi__/);
+  assert.match(styles,/\.placement-overview__body\s*\{[^}]*grid-template-columns:/);
+  assert.match(styles,/@media \(max-width: 700px\)[\s\S]*?\.placement-overview__body\s*\{[^}]*grid-template-columns: 1fr/);
+  assert.match(styles,/@media \(max-width: 520px\)[\s\S]*?\.placement-overview__legend\s*\{[^}]*grid-template-columns: 1fr/);
 });
 
 test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo",()=>{
