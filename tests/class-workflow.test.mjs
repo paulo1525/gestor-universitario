@@ -308,14 +308,18 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
   assert.match(styles,/\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain/);
+  assert.match(styles,/\.placement-sheet>\.placement-table-wrap,\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden/);
+  assert.doesNotMatch(styles,/max-height:60dvh/);
   assert.match(styles,/\.placement-table-page>\.placement-sheet\{min-height:0;display:flex;flex:1 1 auto;flex-direction:column\}/);
   assert.match(placements,/selected&&<PlacementEditor/);
   assert.match(placementTablePage,/PlacementWorkbench tableOnly/);
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
-  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\)\)/);
+  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\),false\)/);
+  assert.match(placements,/className="placement-drawer__body"/);
   assert.match(scrollLock,/let activeLocks = 0/);
+  assert.match(scrollLock,/function lockPageScroll\(fixBody: boolean\)/);
   assert.match(scrollLock,/body\.style\.position = "fixed"/);
   assert.match(scrollLock,/Math\.min\(lockedScrollY, maxScrollY\)/);
   assert.match(scrollLock,/window\.requestAnimationFrame/);

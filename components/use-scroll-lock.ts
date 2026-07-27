@@ -18,9 +18,10 @@ type InlineStyles = {
 
 let activeLocks = 0;
 let lockedScrollY = 0;
+let lockedWithFixedBody = true;
 let savedStyles: InlineStyles | null = null;
 
-function lockPageScroll() {
+function lockPageScroll(fixBody: boolean) {
   activeLocks += 1;
   if (activeLocks > 1) return;
 
@@ -29,6 +30,7 @@ function lockPageScroll() {
   const scrollbarWidth = Math.max(0, window.innerWidth - html.clientWidth);
 
   lockedScrollY = window.scrollY;
+  lockedWithFixedBody = fixBody;
   savedStyles = {
     htmlOverflow: html.style.overflow,
     htmlOverscrollBehavior: html.style.overscrollBehavior,
@@ -47,11 +49,13 @@ function lockPageScroll() {
   body.classList.add("app-scroll-locked");
   html.style.overflow = "hidden";
   html.style.overscrollBehavior = "none";
-  body.style.position = "fixed";
-  body.style.left = "0";
-  body.style.right = "0";
-  body.style.top = `-${lockedScrollY}px`;
-  body.style.width = "100%";
+  if (fixBody) {
+    body.style.position = "fixed";
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.top = `-${lockedScrollY}px`;
+    body.style.width = "100%";
+  }
   body.style.overflow = "hidden";
   body.style.overscrollBehavior = "none";
   if (scrollbarWidth > 0) {
@@ -89,18 +93,22 @@ function unlockPageScroll() {
     window.scrollTo(0, Math.min(lockedScrollY, maxScrollY));
   };
 
-  restoreScroll();
-  window.requestAnimationFrame(() => {
-    if (activeLocks > 0) return;
+  if (lockedWithFixedBody) {
     restoreScroll();
+    window.requestAnimationFrame(() => {
+      if (activeLocks > 0) return;
+      restoreScroll();
+      html.style.scrollBehavior = restore.htmlScrollBehavior;
+    });
+  } else {
     html.style.scrollBehavior = restore.htmlScrollBehavior;
-  });
+  }
 }
 
-export function useScrollLock(active: boolean) {
+export function useScrollLock(active: boolean, fixBody = true) {
   useEffect(() => {
     if (!active) return;
-    lockPageScroll();
+    lockPageScroll(fixBody);
     return unlockPageScroll;
-  }, [active]);
+  }, [active, fixBody]);
 }
