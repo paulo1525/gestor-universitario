@@ -308,6 +308,8 @@ test("indicadores de colocações distinguem decisões e mostram percentagens",(
   assert.match(placements,/placement-overview__signals/);
   assert.doesNotMatch(placements,/placement-kpis|placement-kpi__/);
   assert.match(styles,/\.placement-overview__body\s*\{[^}]*grid-template-columns:/);
+  assert.match(styles,/\.placement-overview\s*\{[\s\S]*?background: linear-gradient\(135deg, #fff/);
+  assert.doesNotMatch(styles,/background: linear-gradient\(135deg, #171714/);
   assert.match(styles,/@media \(max-width: 700px\)[\s\S]*?\.placement-overview__body\s*\{[^}]*grid-template-columns: 1fr/);
   assert.match(styles,/@media \(max-width: 520px\)[\s\S]*?\.placement-overview__legend\s*\{[^}]*grid-template-columns: 1fr/);
 });
