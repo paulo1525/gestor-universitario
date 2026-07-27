@@ -1,5 +1,9 @@
 import type { StudentSpecialStatus } from "@/lib/student-status";
 
+// Preservado para utilização futura, mas inativo por defeito em produção.
+// Para reativar num build: NEXT_PUBLIC_TEST_MODE_AVAILABLE=1.
+export const TEST_MODE_AVAILABLE=process.env.NEXT_PUBLIC_TEST_MODE_AVAILABLE==="1";
+
 export type TestPersona="admin"|"stay"|"move-a"|"move-b"|"special";
 export const TEST_PERSONAS=[
  {id:"admin" as const,name:"Administrador de teste",role:"admin" as const,classId:null,email:"admin.teste@up.pt"},
@@ -56,9 +60,21 @@ const TEST_MODE_MODULES=[
  {key:"useful_links",enabled:false,effectiveEnabled:false,submodules:[{key:"useful_links.library",enabled:false,effectiveEnabled:false},{key:"useful_links.management",enabled:false,effectiveEnabled:false}]},
 ];
 let installed=false,realFetch:typeof fetch|null=null;
-export function testModeEnabled(){return typeof window!=="undefined"&&localStorage.getItem("gu-test-mode")==="1"}
+export function testModeEnabled(){
+ if(typeof window==="undefined")return false;
+ if(!TEST_MODE_AVAILABLE){
+  localStorage.removeItem("gu-test-mode");
+  localStorage.removeItem("gu-test-persona");
+  return false;
+ }
+ return localStorage.getItem("gu-test-mode")==="1"
+}
 export function testPersona(){return (typeof window!=="undefined"?localStorage.getItem("gu-test-persona"):null) as TestPersona||"admin"}
-export function setTestMode(active:boolean){if(active){localStorage.setItem("gu-test-mode","1");localStorage.setItem("gu-test-persona","admin");if(!localStorage.getItem("gu-test-state"))localStorage.setItem("gu-test-state",JSON.stringify(defaults))}else{localStorage.removeItem("gu-test-mode");localStorage.removeItem("gu-test-persona")}window.dispatchEvent(new Event("gu-test-mode"))}
+export function setTestMode(active:boolean){
+ if(!TEST_MODE_AVAILABLE)active=false;
+ if(active){localStorage.setItem("gu-test-mode","1");localStorage.setItem("gu-test-persona","admin");if(!localStorage.getItem("gu-test-state"))localStorage.setItem("gu-test-state",JSON.stringify(defaults))}else{localStorage.removeItem("gu-test-mode");localStorage.removeItem("gu-test-persona")}
+ window.dispatchEvent(new Event("gu-test-mode"))
+}
 export function setTestPersona(persona:TestPersona){localStorage.setItem("gu-test-persona",persona);window.location.assign("/")}
 function state():TestState{try{const saved=JSON.parse(localStorage.getItem("gu-test-state")||"");return saved.version===defaults.version?{...defaults,...saved}:structuredClone(defaults)}catch{return structuredClone(defaults)}}
 function saveState(next:TestState){localStorage.setItem("gu-test-state",JSON.stringify(next))}
