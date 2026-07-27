@@ -9,6 +9,7 @@ const authGuard=readFileSync(new URL("../components/auth-guard.tsx",import.meta.
 const notFound=readFileSync(new URL("../app/not-found.tsx",import.meta.url),"utf8");
 const resetMigration=readFileSync(new URL("../migrations/0007_password_reset.sql",import.meta.url),"utf8");
 const phasedMigration=readFileSync(new URL("../migrations/0015_cc_rosters_and_group_windows.sql",import.meta.url),"utf8");
+const deferredReviewMigration=readFileSync(new URL("../migrations/0028_additional_info_review_deferred.sql",import.meta.url),"utf8");
 const testMode=readFileSync(new URL("../lib/test-mode.ts",import.meta.url),"utf8");
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
@@ -383,6 +384,18 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.match(styles,/\.topbar-global-search\{[^}]*margin-left:auto;margin-right:0/);
   assert.match(styles,/\.test-mode-control\{position:relative;margin-left:0\}/);
   assert.match(styles,/@media\(max-width:900px\).*\.test-mode-control\{margin-left:auto\}/s);
+});
+
+test("a CC pode adiar a validação sem bloquear a simulação, mas não a publicação",()=>{
+  assert.match(deferredReviewMigration,/additional_info_review_deferred INTEGER NOT NULL DEFAULT 0/);
+  assert.match(placements,/Validar posteriormente/);
+  assert.match(placements,/Permite simular, mas bloqueia a publicação definitiva/);
+  assert.match(worker,/severity:"warning",code:"INFORMACAO_VALIDAR_POSTERIORMENTE"/);
+  assert.match(worker,/action==="publish"[\s\S]*additional_info_review_deferred=1/);
+  assert.match(worker,/action==="approve"[\s\S]*additional_info_review_deferred=1/);
+  assert.match(worker,/reviewDeferred=decision==="move"&&requestedReviewStatus==="deferred"/);
+  assert.match(worker,/additional_info_review_deferred=0/);
+  assert.match(styles,/\.additional-info-review button\.is-deferred/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
