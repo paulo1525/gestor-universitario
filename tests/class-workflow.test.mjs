@@ -369,6 +369,16 @@ test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
   assert.match(styles,/html \{[^}]*overscroll-behavior-y:\s*none/);
 });
 
+test("histórico e altura global ficam contidos no ecrã mobile",()=>{
+  assert.match(styles,/\.app-shell \{ min-height: 100dvh; \}/);
+  assert.doesNotMatch(styles,/\.app-shell \{ min-height: 100vh; \}/);
+  assert.match(styles,/\.audit-row__action > div \{ min-width: 0; \}/);
+  assert.match(styles,/\.audit-row \{ grid-template-columns: minmax\(0, 1fr\) auto; grid-template-rows: auto auto auto;[^}]*overflow: hidden/);
+  assert.match(styles,/\.audit-row__action \{ grid-column: 1 \/ -1; grid-row: 1; \}/);
+  assert.match(styles,/\.audit-row__action strong \{ overflow: visible; white-space: normal; overflow-wrap: anywhere/);
+  assert.match(styles,/\.audit-row__button \{ grid-column: 2; grid-row: 2 \/ span 2; align-self: center; \}/);
+});
+
 test("justificação é condicional, critérios são cumulativos e o aluno recebe histórico",()=>{
   assert.match(placements,/reasonRequired=preferenceChanged\|\|validationChanged\|\|manualDestinationChanged/);
   assert.match(placements,/reasonRequired&&<section/);
