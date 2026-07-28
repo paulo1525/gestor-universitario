@@ -75,6 +75,18 @@ alteração local → testes e build → GitHub main → Cloudflare Workers Buil
 
 O push ou merge em `main` é o único evento autorizado a desencadear a publicação da aplicação. Não criar um segundo fluxo de deploy quando a integração nativa do Cloudflare estiver ativa.
 
+Como `main` está protegido, as publicações devem usar por defeito um fluxo compacto de pull request:
+
+1. Agrupar a alteração, concluir os testes, o lint e o build local.
+2. Fazer push de um ramo curto e criar uma PR com título e descrição concisos.
+3. Ativar imediatamente o auto-merge por squash com `gh pr merge --auto --squash`.
+4. Deixar os checks obrigatórios e o Cloudflare Workers Build concluírem sem polling verboso.
+5. Aguardar de forma silenciosa e consultar apenas o estado final compacto; só apresentar detalhes intermédios ou logs extensos se houver uma falha.
+
+Evitar `gh pr checks --watch` e ciclos que imprimam repetidamente o mesmo estado. Em testes, lint e builds com output longo, conservar o output completo num ficheiro temporário e devolver apenas o resumo em caso de sucesso; em caso de erro, mostrar apenas o trecho relevante para o diagnóstico.
+
+O auto-merge e a eliminação automática do ramo após o merge devem permanecer ativados nas definições do repositório GitHub.
+
 Quando uma versão alterar o esquema da base de dados, aplicar as migrations D1 separadamente e apenas depois de os testes, o build, o commit e o push estarem concluídos.
 
 ## Privacidade e segredos
