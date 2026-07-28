@@ -2287,6 +2287,11 @@ tbody tr.is-selected,
   display: none;
 }
 
+.placement-workflow .preflight-results__summary:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px rgba(47, 128, 237, .55);
+}
+
 .placement-workflow .preflight-results__summary > span:first-child {
   display: grid;
   gap: 2px;
@@ -2346,6 +2351,24 @@ tbody tr.is-selected,
 .placement-workflow .preflight-group > header {
   padding: 8px 18px;
   border-bottom: 1px solid #ece9e2;
+}
+
+.placement-workflow .preflight-group > header > div {
+  min-height: 24px;
+}
+
+.placement-workflow .preflight-group > header span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: currentColor;
+  background: transparent;
+  font-weight: 800;
+  line-height: 1.2;
+  opacity: .72;
 }
 
 .placement-workflow .preflight-group.is-blocker > header {
@@ -2408,6 +2431,36 @@ tbody tr.is-selected,
 
 .placement-sheet .placement-runbar p {
   font-size: 11px;
+}
+
+.placement-sheet .calculate-action__tooltip {
+  top: calc(100% + 10px);
+  bottom: auto;
+  transform: translateY(-5px);
+}
+
+.placement-sheet .calculate-action__tooltip::after {
+  top: -6px;
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid #e6c56d;
+  border-left: 1px solid #e6c56d;
+  transform: rotate(45deg);
+}
+
+.placement-sheet .calculate-action:hover .calculate-action__tooltip,
+.placement-sheet .calculate-action:focus-visible .calculate-action__tooltip,
+.placement-sheet .calculate-action:focus-within .calculate-action__tooltip {
+  transform: translateY(0);
+}
+
+@media (max-width: 560px) {
+  .placement-sheet .calculate-action__tooltip {
+    right: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .placement-sheet {
