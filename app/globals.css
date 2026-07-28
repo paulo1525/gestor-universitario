@@ -2339,6 +2339,8 @@ html body .workspace .main-content table {
     background: var(--color-surface-subtle);
   }
 
+  /* Safari precisa de uma coluna flexível para contabilizar a altura dos
+     controlos ampliados e impedir que as ações invadam o cartão seguinte. */
   .admin-table-wrap tbody tr {
     min-width: 0;
     display: flex;
