@@ -295,6 +295,9 @@ test("mesa de colocações usa uma hierarquia compacta e controlos progressivos"
   assert.match(preflight,/preflight-results__summary-count/);
   assert.match(styles,/\.placement-sheet > \.placement-runbar/);
   assert.match(styles,/\.placement-filter-panel\[open\]/);
+  assert.match(styles,/\.preflight-results__summary:focus-visible/);
+  assert.match(styles,/\.placement-sheet \.calculate-action__tooltip/);
+  assert.match(styles,/\.preflight-group > header span/);
 });
 
 test("ordem de preferências é explícita e a submissão pode ser editada até ao prazo",()=>{
