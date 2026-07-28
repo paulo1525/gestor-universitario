@@ -380,7 +380,7 @@ test("histórico e altura global ficam contidos no ecrã mobile",()=>{
 });
 
 test("justificação é condicional, critérios são cumulativos e o aluno recebe histórico",()=>{
-  assert.match(placements,/reasonRequired=preferenceChanged\|\|validationChanged\|\|manualDestinationChanged/);
+  assert.match(placements,/reasonRequired=preferenceChanged\|\|otherSelected\|\|manualDestinationChanged/);
   assert.match(placements,/reasonRequired&&<section/);
   assert.match(placements,/OBRIGATÓRIO/);
   assert.match(placements,/type="checkbox"/);
@@ -416,8 +416,12 @@ test("a CC pode adiar a validação sem bloquear a simulação, mas não a publi
   assert.match(worker,/action==="publish"[\s\S]*additional_info_review_deferred=1/);
   assert.match(worker,/action==="approve"[\s\S]*additional_info_review_deferred=1/);
   assert.match(worker,/reviewDeferred=decision==="move"&&requestedReviewStatus==="deferred"/);
+  assert.match(placements,/additionalInfoStatus!=="invalid"\?validationTypes:\[\]/);
+  assert.match(placements,/if\(status==="invalid"\)\{setValidationTypes\(\[\]\);setCustomPoints\(0\)\}/);
+  assert.doesNotMatch(worker,/reviewStatus==="invalid"\|\|reviewDeferred\?\[\]/);
   assert.match(worker,/additional_info_review_deferred=0/);
   assert.match(styles,/\.additional-info-review button\.is-deferred/);
+  assert.match(styles,/\.placement-drawer\{[^}]*scrollbar-gutter:auto/);
 });
 
 test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{

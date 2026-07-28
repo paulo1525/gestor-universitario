@@ -43,7 +43,7 @@ test("a funcionalidade nominal de colegas foi removida das APIs",()=>{
 
 test("editor administrativo limpa preferências e pontos ao manter e valida turmas ativas",()=>{
  assert.match(placements,/reviewStatus=decision==="stay"\?null/);
- assert.match(placements,/validationTypes=decision==="stay"\|\|reviewStatus==="invalid"\|\|reviewDeferred\?\[\]/);
+ assert.match(placements,/validationTypes=decision==="stay"\|\|reviewStatus==="invalid"\?\[\]/);
  assert.match(placements,/decision==="move"\?rawDestinations:\[\]/);
  assert.match(placements,/decision==="move"&&!destinations\.length/);
  assert.match(placements,/activeClasses:classes\.results\.map\(row=>row\.id\)/);
@@ -102,6 +102,8 @@ test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálc
 test("informação adicional pode ser revista sem atribuir pontos",()=>{
  assert.match(placements,/reviewed=Boolean\(validationTypes\.length\|\|reviewStatus\)/);
  assert.match(placements,/reviewed\?now:null,reviewed\?actorId:null/);
+ assert.match(placements,/if\(\(preferenceChanged\|\|hasOther\)&&!reason\)/);
+ assert.doesNotMatch(placements,/preferenceChanged\|\|pointsChanged/);
 });
 
 test("override aceita snapshots atuais e legacy, preserva a origem e remove sorteio manual",()=>{
