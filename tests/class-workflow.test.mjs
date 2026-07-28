@@ -287,6 +287,16 @@ test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.doesNotMatch(preflight,/placement-preflight__checks/);
 });
 
+test("mesa de colocações usa uma hierarquia compacta e controlos progressivos",()=>{
+  assert.match(placements,/className="placement-workflow"/);
+  assert.match(placements,/<details className="placement-filter-panel"/);
+  assert.match(placements,/\{!tableOnly&&runbar\}/);
+  assert.match(preflight,/<details className="preflight-results"/);
+  assert.match(preflight,/preflight-results__summary-count/);
+  assert.match(styles,/\.placement-sheet > \.placement-runbar/);
+  assert.match(styles,/\.placement-filter-panel\[open\]/);
+});
+
 test("ordem de preferências é explícita e a submissão pode ser editada até ao prazo",()=>{
   assert.doesNotMatch(placements,/\.join\(" → "\)/);
   assert.match(placements,/placement-preference-order/);
