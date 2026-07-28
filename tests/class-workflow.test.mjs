@@ -374,8 +374,10 @@ test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
   assert.match(admin,/data-label=\{t\("admin\.control\.user"\)\}/);
   assert.match(admin,/data-label=\{t\("admin\.control\.actions"\)\}/);
   assert.match(styles,/\.admin-users \.search-field,[\s\S]*?flex:\s*0 0 auto/);
-  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?display:\s*grid/);
-  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?overflow:\s*visible/);
+  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?height:\s*auto !important[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column/);
+  assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?overflow:\s*hidden/);
+  assert.match(styles,/\.admin-table-wrap tbody td:last-child\s*\{[\s\S]*?min-height:\s*0 !important[\s\S]*?display:\s*flex[\s\S]*?padding-bottom:\s*14px/);
+  assert.match(styles,/\.admin-table-wrap \.admin-row-actions\s*\{[\s\S]*?position:\s*static !important[\s\S]*?min-height:\s*44px/);
   assert.match(styles,/\.admin-table-wrap \.admin-row-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s*44px/);
   assert.match(styles,/\.admin-table-wrap \.admin-save-user\s*\{[\s\S]*?min-height:\s*44px/);
   assert.match(styles,/content:\s*attr\(data-label\)/);
