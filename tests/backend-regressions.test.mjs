@@ -20,7 +20,20 @@ const distributionCheck=section("type DistributionCheckIssue","const DISTRIBUTIO
 const distributionInputs=section("async function distributionInputs","async function handleDistributionProposals");
 const proposals=section("async function handleDistributionProposals","async function handleAdminAudit");
 const placements=section("async function handlePlacementWorkbench","function xlsxXml");
+const adminUsers=section("async function handleAdminUsers","async function handleAdminSettings");
+const login=section("async function handleLogin","function cookieValue");
 const routes=section("async function routeApi","export default");
+
+test("a validação administrativa ativa a conta sem exigir o código institucional",()=>{
+ assert.match(adminUsers,/emailVerifiedAdministratively = status === "active" && target\.email_verified_at <= 0/);
+ assert.match(adminUsers,/email_verified_at = CASE WHEN \? = 1 THEN \? ELSE email_verified_at END/);
+ assert.match(adminUsers,/DELETE FROM pending_registrations WHERE email = \?/);
+ assert.match(adminUsers,/emailVerifiedAdministratively/);
+ assert.match(login,/activeAdministrativeValidation = Boolean\(user && user\.status === "active" && user\.email_verified_at <= 0\)/);
+ assert.match(login,/user\.email_verified_at <= 0 && !activeAdministrativeValidation/);
+ assert.match(login,/emailVerifiedAdministratively = activeAdministrativeValidation/);
+ assert.match(login,/registration_completed_administratively/);
+});
 
 test("tickets desativados não são criados nem bloqueiam o verificador",()=>{
  assert.match(classes,/if\(action==="tickets"\)return json\(\{error:"A funcionalidade de tickets está temporariamente desativada\."\},404\)/);

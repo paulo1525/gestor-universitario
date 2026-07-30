@@ -439,7 +439,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const user = await env.DB.prepare("SELECT * FROM users WHERE lower(replace(email,'@edu.med.up.pt','@up.pt')) = ?").bind(email).first<UserRow>();
   const now = Date.now();
   const accessBlocked = user && user.status !== "active" && !(user.status === "suspended" && user.status_until && user.status_until <= now);
-  if (!user || user.email_verified_at <= 0 || accessBlocked || (user.locked_until && user.locked_until > now)) {
+  const activeAdministrativeValidation = Boolean(user && user.status === "active" && user.email_verified_at <= 0);
+  if (!user || (user.email_verified_at <= 0 && !activeAdministrativeValidation) || accessBlocked || (user.locked_until && user.locked_until > now)) {
     await audit(env, request, "login", false, email, user?.id);
     return json(genericError, 401);
   }
@@ -451,7 +452,12 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     await audit(env, request, "login", false, email, user.id);
     return json(genericError, 401);
   }
-  await env.DB.prepare("UPDATE users SET failed_login_count = 0, locked_until = NULL, status = CASE WHEN status = 'suspended' AND status_until <= ? THEN 'active' ELSE status END, status_reason = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_reason END, status_until = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_until END, last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, now, now, now, user.id).run();
+  const emailVerifiedAdministratively = activeAdministrativeValidation;
+  await env.DB.prepare("UPDATE users SET failed_login_count = 0, locked_until = NULL, status = CASE WHEN status = 'suspended' AND status_until <= ? THEN 'active' ELSE status END, status_reason = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_reason END, status_until = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_until END, email_verified_at = CASE WHEN ? = 1 THEN ? ELSE email_verified_at END, last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, now, emailVerifiedAdministratively ? 1 : 0, now, now, now, user.id).run();
+  if (emailVerifiedAdministratively) {
+    await env.DB.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(user.email).run();
+    await audit(env, request, "registration_completed_administratively", true, email, user.id);
+  }
   await audit(env, request, "login", true, email, user.id);
   return createSessionResponse(env, request, user, body?.rememberMe === true);
 }
@@ -636,7 +642,7 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
   if (commissionPosition && !["principal_admin", "president", "vice_president", "treasurer", "member"].includes(commissionPosition)) return json({ error: "Cargo da Comissão inválido." }, 400);
   if (commissionDepartment && !["management", "studies", "curricular_units", "recreation_image"].includes(commissionDepartment)) return json({ error: "Departamento da Comissão inválido." }, 400);
   if (classRepresentative && (!representedClass || representedClass < 1 || representedClass > 20)) return json({ error: "Selecione uma turma válida entre 1 e 20." }, 400);
-  const target = await env.DB.prepare("SELECT id, email FROM users WHERE id = ?").bind(id).first<{ id: string; email: string }>();
+  const target = await env.DB.prepare("SELECT id, email, status, email_verified_at FROM users WHERE id = ?").bind(id).first<{ id: string; email: string; status: string; email_verified_at: number }>();
   if (!target) return json({ error: "Utilizador não encontrado." }, 404);
   if (adminOverride && !commissionPosition) return json({ error: "Só pode atribuir acesso administrativo a membros da CC com cargo definido." }, 400);
   const isPermanentAdmin = target.email.toLowerCase() === PERMANENT_ADMIN_EMAIL;
@@ -645,10 +651,14 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
     ? "admin"
     : commissionPosition || classRepresentative ? "representative" : "student";
   if (id === admin.id && (role !== "admin" || status !== "active")) return json({ error: "Não pode retirar o seu próprio acesso administrativo." }, 400);
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, admin_override = ?, class_representative = ?, represented_class = ?, status = ?, status_reason = ?, status_until = ?, commission_position = ?, commission_department = ?, updated_at = ? WHERE id = ?").bind(fullName, role, effectiveAdminOverride ? 1 : 0, classRepresentative ? 1 : 0, representedClass, status, reason || null, status === "suspended" ? statusUntil : null, commissionPosition || null, commissionDepartment || null, Date.now(), id),
-    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, adminOverride: effectiveAdminOverride, classRepresentative, representedClass, status, reason: reason || null, statusUntil, commissionPosition: commissionPosition || null, commissionDepartment: commissionDepartment || null }), Date.now()),
-  ]);
+  const now = Date.now();
+  const emailVerifiedAdministratively = status === "active" && target.email_verified_at <= 0;
+  const writes = [
+    env.DB.prepare("UPDATE users SET full_name = ?, role = ?, admin_override = ?, class_representative = ?, represented_class = ?, status = ?, status_reason = ?, status_until = ?, commission_position = ?, commission_department = ?, email_verified_at = CASE WHEN ? = 1 THEN ? ELSE email_verified_at END, updated_at = ? WHERE id = ?").bind(fullName, role, effectiveAdminOverride ? 1 : 0, classRepresentative ? 1 : 0, representedClass, status, reason || null, status === "suspended" ? statusUntil : null, commissionPosition || null, commissionDepartment || null, emailVerifiedAdministratively ? 1 : 0, now, now, id),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id, target_user_id, action, details, created_at) VALUES (?, ?, 'user_updated', ?, ?)").bind(admin.id, id, JSON.stringify({ role, adminOverride: effectiveAdminOverride, classRepresentative, representedClass, status, previousStatus: target.status, reason: reason || null, statusUntil, commissionPosition: commissionPosition || null, commissionDepartment: commissionDepartment || null, emailVerifiedAdministratively }), now),
+  ];
+  if (emailVerifiedAdministratively) writes.push(env.DB.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(target.email));
+  await env.DB.batch(writes);
   if (status !== "active") await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id).run();
   return json({ ok: true });
 }
