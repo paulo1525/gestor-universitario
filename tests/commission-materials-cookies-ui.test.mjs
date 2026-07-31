@@ -27,9 +27,11 @@ test("a biblioteca de materiais tem filtro identificado e estados recuperáveis"
 });
 
 test("a política de cookies mantém o conteúdo e usa tabela semântica responsiva", () => {
-  assert.match(cookies, /O Gestor Universitário utiliza apenas cookies necessários/);
+  assert.match(cookies, /O Gestor Universitário utiliza cookies próprios necessários/);
   assert.match(cookies, /<table>/);
   assert.match(cookies, /<th scope="row"><code>__Host-gu_session<\/code><\/th>/);
+  assert.match(cookies, /<th scope="row"><code>gu-placement-filters-v1<\/code><\/th>/);
+  assert.match(cookies, /Não guarda pesquisas livres, nomes ou números de estudantes/);
   assert.match(cookies, /SameSite=Strict/);
   assert.match(cookieStyles, /@media \(max-width: 420px\)/);
   assert.match(cookieStyles, /\.tableWrap td::before/);
