@@ -310,6 +310,18 @@ test("mesa de colocações usa uma hierarquia compacta e controlos progressivos"
   assert.match(styles,/\.preflight-group > header span/);
 });
 
+test("novo rascunho aparece imediatamente e permanece selecionado durante o refresh",()=>{
+  assert.match(worker,/record:proposalRecord/);
+  assert.match(worker,/result_snapshot:resultSnapshot/);
+  assert.match(placements,/optimisticProposal&&!refreshedProposals\.some/);
+  assert.match(placements,/setProposals\(current=>\[createdProposal,\.\.\.current\.filter/);
+  assert.match(placements,/setSelectedProposalId\(createdProposal\.id\)/);
+  assert.match(placements,/await load\(data\.proposal\?\.id,createdProposal\)/);
+  assert.match(placements,/role="group" aria-label="Escolher rascunho para rever"/);
+  assert.match(placements,/aria-pressed=\{selectedDraft\}/);
+  assert.doesNotMatch(placements,/role="tablist" aria-label="Escolher rascunho para rever"/);
+});
+
 test("colocações usam uma ação principal compacta e a tabela administrativa",()=>{
   assert.match(preflight,/className="panel__header placement-preflight__header"/);
   assert.match(placements,/className={`panel placement-runbar placement-command-center/);
