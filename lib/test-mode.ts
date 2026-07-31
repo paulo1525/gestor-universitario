@@ -61,13 +61,8 @@ const TEST_MODE_MODULES=[
 ];
 let installed=false,realFetch:typeof fetch|null=null;
 export function testModeEnabled(){
- if(typeof window==="undefined")return false;
- if(!TEST_MODE_AVAILABLE){
-  localStorage.removeItem("gu-test-mode");
-  localStorage.removeItem("gu-test-persona");
-  return false;
- }
- return localStorage.getItem("gu-test-mode")==="1"
+ if(typeof window==="undefined"||!TEST_MODE_AVAILABLE)return false;
+ try{return localStorage.getItem("gu-test-mode")==="1"}catch{return false}
 }
 export function testPersona(){return (typeof window!=="undefined"?localStorage.getItem("gu-test-persona"):null) as TestPersona||"admin"}
 export function setTestMode(active:boolean){
@@ -120,4 +115,4 @@ async function mock(input:RequestInfo|URL,init?:RequestInit):Promise<Response|nu
  if(/^\/api\/admin\/distribution-proposals\//.test(path)&&method==="POST"){const action=path.split("/").pop(),calculation=action==="calculate"||action==="calculate-exception";if(!calculation&&!s.proposalStatus)return reply({error:"Calcula primeiro uma proposta."},409);if(action==="apply")s.roster=r.map(row=>row.student_decision==="move"&&s.decisions[row.id]?.[0]?{...row,class_id:s.decisions[row.id][0]}:row);s.proposalStatus=calculation?"draft":action==="approve"?"approved":action==="apply"?"applied":action==="publish"?"published":action==="rollback"?"applied":s.proposalStatus;saveState(s);return reply(calculation?{ok:true,status:"draft",proposal:{id:"test-proposal",maxDifference:action==="calculate-exception"?6:3,finalDifference:action==="calculate-exception"?6:0}}:{ok:true,status:s.proposalStatus,placementsPreserved:action==="rollback"||undefined})}
  if(path.startsWith("/api/"))return reply({error:"Esta funcionalidade não está disponível no ambiente de testes."},404);
  return null}
-export function installTestApi(){if(installed||typeof window==="undefined")return;installed=true;realFetch=window.fetch.bind(window);window.fetch=async(input,init)=>testModeEnabled()?(await mock(input,init))||realFetch!(input,init):realFetch!(input,init)}
+export function installTestApi(){if(!TEST_MODE_AVAILABLE||installed||typeof window==="undefined")return;installed=true;realFetch=window.fetch.bind(window);window.fetch=async(input,init)=>testModeEnabled()?(await mock(input,init))||realFetch!(input,init):realFetch!(input,init)}

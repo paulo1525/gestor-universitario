@@ -36,6 +36,8 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
 test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>{
   assert.match(testMode,/export const TEST_MODE_AVAILABLE=process\.env\.NEXT_PUBLIC_TEST_MODE_AVAILABLE==="1"/);
   assert.match(testMode,/if\(!TEST_MODE_AVAILABLE\)/);
+  assert.match(testMode,/if\(typeof window==="undefined"\|\|!TEST_MODE_AVAILABLE\)return false/);
+  assert.match(testMode,/installTestApi\(\)\{if\(!TEST_MODE_AVAILABLE\|\|installed\|\|typeof window==="undefined"\)return/);
   assert.match(admin,/\{TEST_MODE_AVAILABLE && <section className=\{`panel admin-settings test-mode-setting/);
   assert.match(testMode,/gu-test-mode/);
   assert.match(testMode,/const TEST_MODE_MODULES=/);
@@ -261,7 +263,7 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
 
 test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.match(placements,/DistributionPreflight/);
-  assert.match(placements,/fetch\("\/api\/admin\/distribution-check"/);
+  assert.match(placements,/placementApi\("\/api\/admin\/distribution-check"/);
   assert.match(placements,/!preflight\?\.ready/);
   assert.match(placements,/className={`calculate-action/);
   assert.match(placements,/role="tooltip"/);
@@ -371,6 +373,11 @@ test("colocações mostram só a próxima ação e resumem os pedidos no cabeça
   assert.match(placements,/className="placement-summary-strip"/);
   assert.match(placements,/Pedidos recebidos/);
   assert.match(placements,/Sem resposta/);
+  assert.match(placements,/dataUnavailable=Boolean\(loadError&&!preflight\)/);
+  assert.match(placements,/dataUnavailable\?"Indisponíveis"/);
+  assert.match(placements,/window\.location\.origin/);
+  assert.match(placements,/credentials:"same-origin"/);
+  assert.doesNotMatch(placements,/await fetch\("\/api\/admin/);
   assert.doesNotMatch(placements,/placement-overview__|placement-progress|placement-kpis|placement-kpi__/);
   assert.match(styles,/\.placement-command-center__main\s*\{/);
   assert.doesNotMatch(styles,/background: linear-gradient\(135deg, #171714/);
