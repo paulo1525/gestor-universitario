@@ -178,16 +178,18 @@ test("aprovação confirma e publica automaticamente",()=>{
   assert.match(placements,/Aprovar e publicar as turmas\?/);
   assert.match(placements,/\["approve","apply","publish"\]/);
   assert.match(placements,/Aprovar e publicar agora/);
+  assert.match(placements,/\["draft","approved","applied"\]\.includes\(latest\?\.status\|\|""\)/);
+  assert.doesNotMatch(placements,/preflight\?\.ready&&\["draft","approved","applied"\]/);
 });
 
 test("desequilíbrio inicial usa o melhor equilíbrio possível sem bloquear a prévia privada",()=>{
   assert.match(worker,/code:"MELHOR_EQUILIBRIO_POSSIVEL"/);
   assert.match(worker,/A regra dos três não é atingível com a composição atual/);
   assert.match(worker,/calculateBestEffortDistribution\(input,seed,objective\)/);
-  assert.match(placements,/Maximizar mudanças/);
-  assert.match(placements,/Priorizar preferências/);
-  assert.match(placements,/Calcular prévia privada/);
-  assert.match(placements,/visível apenas aos administradores/);
+  assert.match(placements,/Maximizar o número de mudanças/);
+  assert.match(placements,/Respeitar melhor a ordem das preferências/);
+  assert.match(placements,/Calcular proposta privada/);
+  assert.match(placements,/Nada fica visível aos estudantes nesta fase/);
   assert.match(testMode,/action==="calculate-exception"/);
 });
 
@@ -246,8 +248,7 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
   assert.match(worker,/preferenceSource:decision\?row\.preference_source:"automatic"/);
   assert.match(placements,/Tem amigos noutra turma/);
   assert.match(placements,/Sofre bullying \/ está mal integrado/);
-  assert.match(placements,/statusLabels/);
-  assert.match(placements,/Prévia privada/);
+  assert.match(placements,/Proposta privada/);
   assert.match(placements,/AppToast/);
   assert.doesNotMatch(placements,/setTimeout\(\(\)=>setNotice\(""\),1500\)/);
   assert.match(placements,/admin-preference-ranking/);
@@ -267,7 +268,7 @@ test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.match(placements,/!preflight\?\.ready/);
   assert.match(placements,/className={`calculate-action/);
   assert.match(placements,/role="tooltip"/);
-  assert.match(placements,/apresentados acima/);
+  assert.match(placements,/apresentados abaixo/);
   assert.match(placements,/na página principal de Colocações/);
   assert.match(placements,/disabled=\{calculateBlocked\}/);
   assert.match(preflight,/classes\.preflight\.eyebrow/);
@@ -288,7 +289,7 @@ test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.match(preflight,/classes\.preflight\.firstCasesPage/);
   assert.match(placements,/preflight&&!activeDistribution/);
   assert.match(placements,/A calcular e analisar a nova proposta/);
-  assert.match(placements,/As pautas de colocação estão publicadas/);
+  assert.match(placements,/As pautas estão publicadas/);
   assert.match(placements,/Publicação concluída/);
   assert.match(styles,/placement-operation-status\.is-published/);
   assert.match(placements,/Linhas por página/);
@@ -299,29 +300,32 @@ test("mesa de colocações usa uma hierarquia compacta e controlos progressivos"
   assert.match(placements,/className="placement-workflow"/);
   assert.match(placements,/<details className="placement-filter-panel"/);
   assert.match(placements,/\{!tableOnly&&runbar\}/);
-  assert.match(preflight,/<details className="preflight-results"/);
+  assert.match(placements,/DistributionPreflight compact/);
+  assert.match(placements,/href="#placement-review-first-case"/);
+  assert.match(preflight,/className="preflight-results is-required"/);
+  assert.match(preflight,/hasBlockingState \?/);
+  assert.match(preflight,/placement-review-first-case/);
   assert.match(preflight,/preflight-results__summary-count/);
-  assert.match(styles,/\.placement-sheet > \.placement-runbar/);
+  assert.match(styles,/\.placement-command-center__main/);
   assert.match(styles,/\.placement-filter-panel\[open\]/);
   assert.match(styles,/\.preflight-results__summary:focus-visible/);
-  assert.match(styles,/\.placement-sheet \.calculate-action__tooltip/);
+  assert.match(styles,/\.placement-command-center \.calculate-action > \.button/);
   assert.match(styles,/\.preflight-group > header span/);
 });
 
-test("cartões de colocações e turmas seguem o padrão administrativo sem alterar a leitura global",()=>{
+test("colocações usam uma ação principal compacta e a tabela administrativa",()=>{
   assert.match(preflight,/className="panel__header placement-preflight__header"/);
-  assert.match(placements,/className={`panel__header placement-runbar/);
+  assert.match(placements,/className={`panel placement-runbar placement-command-center/);
   assert.match(preferences,/className={`panel student-preferences/);
   assert.match(preferences,/<header className="panel__header">/);
   assert.match(csvImport,/className={`panel__header \$\{styles\.header\}`}/);
   assert.match(dashboard,/className="stats-grid classes-stats"/);
-  assert.match(styles,/\.placement-workflow \{[\s\S]*?margin: 6px 0 var\(--space-4\)/);
+  assert.match(styles,/\.placement-workflow \{[\s\S]*?margin: 0 0 12px/);
   assert.match(styles,/\.placement-workflow > \.placement-preflight \{[\s\S]*?border-radius: var\(--radius-panel\)/);
   assert.match(styles,/\.placement-sheet \{[\s\S]*?box-shadow: var\(--shadow-panel\)/);
   assert.match(styles,/\.student-preferences \{[^}]*margin-bottom:var\(--space-4\)/);
-  assert.match(styles,/\.placement-workflow > \.placement-overview \{[\s\S]*?overflow: hidden;[\s\S]*?border-radius: var\(--radius-panel\)/);
-  assert.match(styles,/\.placement-workflow \.placement-overview__header \{[\s\S]*?border-radius: 0/);
-  assert.match(styles,/\.placement-workflow \.placement-overview__signals \{[\s\S]*?border-radius: 0/);
+  assert.match(styles,/\.placement-command-center\.is-blocked/);
+  assert.match(styles,/\.placement-preflight\.is-compact/);
   assert.match(styles,/@media \(max-width: 820px\) \{[\s\S]*?\.app-shell,[\s\S]*?\.workspace \{[\s\S]*?min-height: 0/);
 });
 
@@ -348,22 +352,19 @@ test("ordem de preferências é explícita e a submissão pode ser editada até 
   assert.match(preferences,/data\.student\.specialStatus !== "none"/);
 });
 
-test("indicadores de colocações distinguem decisões e mostram percentagens",()=>{
+test("colocações mostram só a próxima ação e resumem os pedidos no cabeçalho",()=>{
   assert.match(placements,/studentsStaying=students\.filter\(student=>student\.student_decision==="stay"\)\.length/);
   assert.match(placements,/studentsMoving=students\.filter\(student=>student\.student_decision==="move"\)\.length/);
-  assert.match(placements,/label:"Querem ficar"/);
-  assert.match(placements,/label:"Querem mudar"/);
-  assert.match(placements,/label:"Sem formulário"/);
-  assert.match(placements,/toLocaleString\("pt-PT",\{maximumFractionDigits:1\}\)/);
-  assert.match(placements,/placement-overview__bar/);
-  assert.match(placements,/Panorama das preferências/);
-  assert.match(placements,/placement-overview__signals/);
-  assert.doesNotMatch(placements,/placement-kpis|placement-kpi__/);
-  assert.match(styles,/\.placement-overview__body\s*\{[^}]*grid-template-columns:/);
-  assert.match(styles,/\.placement-overview\s*\{[\s\S]*?background: linear-gradient\(135deg, #fff/);
+  assert.match(placements,/Próxima ação/);
+  assert.match(placements,/Corrigir os dados que bloqueiam o cálculo/);
+  assert.match(placements,/Calcular uma proposta privada/);
+  assert.match(placements,/Rever e publicar a proposta/);
+  assert.match(placements,/className="placement-summary-strip"/);
+  assert.match(placements,/Pedidos recebidos/);
+  assert.match(placements,/Sem resposta/);
+  assert.doesNotMatch(placements,/placement-overview__|placement-progress|placement-kpis|placement-kpi__/);
+  assert.match(styles,/\.placement-command-center__main\s*\{/);
   assert.doesNotMatch(styles,/background: linear-gradient\(135deg, #171714/);
-  assert.match(styles,/@media \(max-width: 700px\)[\s\S]*?\.placement-overview__body\s*\{[^}]*grid-template-columns: 1fr/);
-  assert.match(styles,/@media \(max-width: 520px\)[\s\S]*?\.placement-overview__legend\s*\{[^}]*grid-template-columns: 1fr/);
 });
 
 test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo",()=>{
@@ -373,9 +374,9 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/tableOnly\?<main className="placement-table-page"/);
   assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{!published&&!activeDistribution&&objectiveAction\}\{calculateAction\}/);
   assert.match(placements,/recalculation\?"button--secondary":"button--primary"/);
-  assert.match(placements,/<Calculator\/>Calcular prévia privada/);
+  assert.match(placements,/<Calculator\/>Calcular proposta privada/);
   assert.match(styles,/\.button:disabled \{[^}]*background: #f1f1ee;[^}]*box-shadow: none/);
-  assert.match(placements,/placement-runbar__actions"><div className="placement-action-tools">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
+  assert.match(placements,/placement-heading__actions" aria-label="Ferramentas da página">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
   assert.match(styles,/\.placement-table-page \.placement-sheet>\.placement-table-wrap\{min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain/);
@@ -385,6 +386,21 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(styles,/\.placement-table-page>\.placement-sheet\{min-height:0;display:flex;flex:1 1 auto;flex-direction:column\}/);
   assert.match(placements,/selected&&<PlacementEditor/);
   assert.match(placementTablePage,/PlacementWorkbench tableOnly/);
+});
+
+test("resultado mostra lotações antes e depois e filtros avançados persistem sem guardar pesquisas",()=>{
+  assert.match(placements,/Resultado · lotação depois da proposta/);
+  assert.match(placements,/Origem · Turma/);
+  assert.match(placements,/Destino · Turma/);
+  assert.match(placements,/originBefore/);
+  assert.match(placements,/destinationBefore/);
+  assert.match(placements,/projectedClassCounts/);
+  assert.match(placements,/gu-placement-filters-v1/);
+  assert.match(placements,/persistentFilterKeys=\["origin","destination","decision","result","validation","points","assignment"\]/);
+  assert.match(placements,/query:""/);
+  assert.match(placements,/SameSite=Strict/);
+  assert.match(placements,/Max-Age=7776000/);
+  assert.match(styles,/\.placement-result-capacity\s*\{/);
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
@@ -452,7 +468,7 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.doesNotMatch(worker,/code:"PONTOS_INCONSISTENTES"/);
   assert.match(worker,/code:"INFORMACAO_VALIDADA_SEM_PONTOS"/);
   assert.match(worker,/additional_info_review_status==="valid"&&Number\(student\.exception_points\|\|0\)===0/);
-  assert.match(preflight,/classDataLabel\(locale,"preflightGroup",code\)/);
+  assert.match(preflight,/classDataLabel\(locale,\s*"preflightGroup",\s*code\)/);
   assert.match(styles,/\.panel__header\s*>\s*\.panel-tools\s*\{[^}]*margin-left:\s*auto/);
   assert.match(styles,/\.topbar-global-search\{[^}]*margin-left:auto;margin-right:0/);
   assert.match(styles,/\.test-mode-control\{position:relative;margin-left:0\}/);
