@@ -312,7 +312,10 @@ test("cartões de colocações e turmas seguem o padrão administrativo sem alte
   assert.match(styles,/\.placement-workflow > \.placement-preflight \{[\s\S]*?border-radius: var\(--radius-panel\)/);
   assert.match(styles,/\.placement-sheet \{[\s\S]*?box-shadow: var\(--shadow-panel\)/);
   assert.match(styles,/\.student-preferences \{[^}]*margin-bottom:var\(--space-4\)/);
-  assert.match(styles,/\.placement-workflow > \.placement-overview \{[\s\S]*?border-radius: 14px/);
+  assert.match(styles,/\.placement-workflow > \.placement-overview \{[\s\S]*?overflow: hidden;[\s\S]*?border-radius: var\(--radius-panel\)/);
+  assert.match(styles,/\.placement-workflow \.placement-overview__header \{[\s\S]*?border-radius: 0/);
+  assert.match(styles,/\.placement-workflow \.placement-overview__signals \{[\s\S]*?border-radius: 0/);
+  assert.match(styles,/@media \(max-width: 820px\) \{[\s\S]*?\.app-shell,[\s\S]*?\.workspace \{[\s\S]*?min-height: 0/);
 });
 
 test("aviso de manutenção usa o editor formatado com sanitização e limite visível",()=>{
