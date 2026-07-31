@@ -16,3 +16,13 @@ test("PDF público inclui apenas identificação e turma final, com paginação 
   assert.doesNotMatch(source,/pontua|justifica|preferência|notes|audit/i);
   assert.match(source,/startxref\n\d+\n%%EOF/);
 });
+
+test("PDF administrativo identifica a prévia privada sem expor critérios",()=>{
+  const pdf=buildPublicClassesPdf({classes:Array.from({length:20},(_,index)=>index+1),students:[{classId:20,fullName:"Pessoa Teste",studentNumber:"202500001"}],publishedAt:"31/07/2026, 16:30",documentLabel:"Prévia administrativa privada",dateLabel:"Gerado em",footer:"Inclui apenas nome, número mecanográfico e turma final proposta."}),source=new TextDecoder("latin1").decode(pdf);
+  assert.match(source,/Prévia administrativa privada/);
+  assert.match(source,/Gerado em 31\/07\/2026, 16:30/);
+  assert.match(source,/Turma 20/);
+  assert.match(source,/Pessoa Teste/);
+  assert.match(source,/Inclui apenas nome, número mecanográfico e turma final proposta/);
+  assert.doesNotMatch(source,/pontua|justifica|preferência|notes|audit/i);
+});

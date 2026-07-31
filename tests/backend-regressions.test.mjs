@@ -103,7 +103,8 @@ test("publicar e retirar publicação usam transições condicionais",()=>{
 
 test("cada cálculo usa e persiste uma seed aleatória para desempates auditáveis",()=>{
  assert.match(proposals,/seed=crypto\.randomUUID\(\)/);
- assert.match(proposals,/calculateDistribution\(input\.students,\{seed,maxDifference:3,classIds:input\.classIds\}\)/);
+ assert.match(proposals,/calculateDistribution\(input\.students,\{seed,maxDifference:3,classIds:input\.classIds,objective\}\)/);
+ assert.match(proposals,/objective:DistributionObjective=calculationBody\?\.objective==="preferences"\?"preferences":"maximize_moves"/);
  assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot,input_hash,engine_version,max_difference,final_difference,imbalance_override_reason,created_by,created_at\)/);
  assert.match(proposals,/JSON\.stringify\(\{proposalId:id,seed,inputHash:input\.hash/);
 });
@@ -115,7 +116,9 @@ test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálc
  assert.match(distributionCheck,/settings\.preferenceWindows\.some/);
  assert.match(distributionCheck,/new Map\(classes\.results\.map\(row=>\[row\.id,0\]\)\)/);
  assert.doesNotMatch(distributionCheck,/code:"REFERENCIA_SEM_PONTO"/);
- assert.match(distributionCheck,/calculateDistribution\(input\.students,\{seed:`preflight:/);
+ assert.match(distributionCheck,/seed=`preflight:\$\{input\.hash\}`/);
+ assert.match(distributionCheck,/objective:"maximize_moves"/);
+ assert.match(distributionCheck,/code:"MELHOR_EQUILIBRIO_POSSIVEL"/);
  assert.match(proposals,/const input=evaluation\.input/);
  assert.match(distributionInputs,/classes:classRows\.results/);
 });
@@ -208,7 +211,7 @@ test("publicação excecional contorna apenas o desequilíbrio e fica integralme
  assert.match(proposals,/action==="calculate-exception"/);
  assert.match(proposals,/reason\.length<10/);
  assert.match(proposals,/nonBalanceBlockers=blockingIssues\.filter\(issue=>issue\.code!=="DISTRIBUICAO_IMPOSSIVEL"\)/);
- assert.match(proposals,/calculateBestEffortDistribution\(input,seed\)/);
+ assert.match(proposals,/calculateBestEffortDistribution\(input,seed,objective\)/);
  assert.match(proposals,/auditAction=exceptional\?"distribution_calculated_exception":"distribution_calculated"/);
  assert.match(proposals,/finalDifference>allowedDifference/);
  assert.match(proposals,/imbalanceOverrideReason:proposal\.imbalance_override_reason/);

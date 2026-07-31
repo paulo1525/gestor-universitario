@@ -2433,6 +2433,31 @@ tbody tr.is-selected,
   font-size: 11px;
 }
 
+.placement-objective {
+  display: grid;
+  gap: 4px;
+  min-width: 178px;
+}
+
+.placement-objective > span {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.placement-objective select {
+  min-height: 36px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 9px;
+  font-weight: 750;
+}
+
 .placement-sheet .calculate-action__tooltip {
   top: calc(100% + 10px);
   bottom: auto;
@@ -2455,6 +2480,10 @@ tbody tr.is-selected,
 }
 
 @media (max-width: 560px) {
+  .placement-objective {
+    width: 100%;
+  }
+
   .placement-sheet .calculate-action__tooltip {
     right: 0;
     left: 0;
