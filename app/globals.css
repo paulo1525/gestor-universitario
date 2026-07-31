@@ -751,7 +751,7 @@ a { color: inherit; }
 
 .main-content { max-width: 1480px; margin: 0 auto; padding: 32px 34px 52px; }
 .main-content--preference { max-width: none; min-height: calc(100vh - 72px); padding: 24px 32px 40px; }
-.main-content--preference > .student-preferences { min-height: 0; margin-bottom: 18px; }
+.main-content--preference > .student-preferences { min-height: 0; margin-bottom: var(--space-4); }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .eyebrow { display: block; margin-bottom: 7px; color: #8a6a00; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 h1, h2, p { margin-top: 0; }
@@ -1114,7 +1114,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .maintenance-card > img { display: block; margin-bottom: 24px; }
 .maintenance-status { width: max-content; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; color: #765800; background: var(--gold-soft); font-size: 9px; font-weight: 800; text-transform: uppercase; }
 .maintenance-card h1 { margin: 18px 0 8px; font-size: 34px; }
-.maintenance-card > p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.maintenance-card > .maintenance-message { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .maintenance-account { display: flex; align-items: center; gap: 10px; margin: 24px 0; padding: 13px; border: 1px solid #cce8d8; border-radius: 10px; color: var(--green); background: var(--green-soft); }
 .maintenance-account strong, .maintenance-account span { display: block; }
 .maintenance-account strong { color: var(--ink); font-size: 11px; }
@@ -1668,8 +1668,8 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 .special-notes small { color:#796a36;font-size:9px;font-weight:500;line-height:1.5; }
 .special-notes textarea { width:100%;min-height:100px;padding:11px 12px;border:1px solid #d8cfad;border-radius:9px;background:#fff;resize:vertical; }
 .special-notes-panel>.button { justify-self:end; }
-.student-preferences { display:flex;overflow:hidden;flex-direction:column;margin-bottom:18px;border:1px solid #dedbd1;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(24,24,19,.055); }
-.student-preferences>header { min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border-bottom:1px solid #ebe9e2;background:linear-gradient(135deg,#fffdf6,#fff); }
+.student-preferences { display:flex;overflow:hidden;flex-direction:column;margin-bottom:var(--space-4);border-color:var(--color-border);border-radius:var(--radius-panel);background:var(--color-surface);box-shadow:var(--shadow-panel); }
+.student-preferences>header { min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 20px;border-bottom:1px solid var(--color-border);background:var(--color-surface); }
 .student-preferences h2 { margin:3px 0 4px;font-size:17px; }
 .student-preferences header p { margin:0;color:var(--muted);font-size:10px; }
 .student-preferences__header-actions { display:flex;align-items:center;gap:10px; }
@@ -2120,7 +2120,7 @@ tbody tr.is-selected,
 
 /* Colocações: uma única superfície de trabalho, com controlos progressivos e menos cartões. */
 .placement-workflow {
-  margin: 6px 0 24px;
+  margin: 6px 0 var(--space-4);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -2231,12 +2231,12 @@ tbody tr.is-selected,
 }
 
 .placement-workflow > .placement-preflight {
-  margin-top: 14px;
+  margin-top: var(--space-4);
   overflow: visible;
-  border: 1px solid #dcd9d0;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 6px 20px rgba(38, 36, 28, .035);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
 .placement-workflow .placement-preflight__header {
@@ -2244,8 +2244,8 @@ tbody tr.is-selected,
   gap: 12px;
   padding: 14px 18px;
   border-bottom: 0;
-  border-radius: 14px 14px 0 0;
-  background: #fff;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  background: var(--color-surface);
 }
 
 .placement-workflow .placement-preflight__status {
@@ -2410,7 +2410,7 @@ tbody tr.is-selected,
   border: 0;
   border-bottom: 1px solid #dedbd3;
   border-radius: 10px 10px 0 0;
-  background: #fbfaf6;
+  background: var(--color-surface);
   box-shadow: none;
 }
 
@@ -2464,9 +2464,13 @@ tbody tr.is-selected,
 }
 
 .placement-sheet {
-  border-color: #dcd9d0;
-  border-radius: 10px;
-  box-shadow: none;
+  border-color: var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.classes-stats {
+  margin-bottom: var(--space-4);
 }
 
 .placement-toolbar.placement-toolbar--advanced {

@@ -13,6 +13,7 @@ const deferredReviewMigration=readFileSync(new URL("../migrations/0028_additiona
 const testMode=readFileSync(new URL("../lib/test-mode.ts",import.meta.url),"utf8");
 const preferences=readFileSync(new URL("../components/student-preference-panel.tsx",import.meta.url),"utf8");
 const admin=readFileSync(new URL("../components/admin-control.tsx",import.meta.url),"utf8");
+const maintenancePage=readFileSync(new URL("../app/manutencao/page.tsx",import.meta.url),"utf8");
 const csvImport=readFileSync(new URL("../components/class-roster-import.tsx",import.meta.url),"utf8");
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
 const preflight=readFileSync(new URL("../components/distribution-preflight.tsx",import.meta.url),"utf8");
@@ -298,6 +299,31 @@ test("mesa de colocações usa uma hierarquia compacta e controlos progressivos"
   assert.match(styles,/\.preflight-results__summary:focus-visible/);
   assert.match(styles,/\.placement-sheet \.calculate-action__tooltip/);
   assert.match(styles,/\.preflight-group > header span/);
+});
+
+test("cartões de colocações e turmas seguem o padrão administrativo sem alterar a leitura global",()=>{
+  assert.match(preflight,/className="panel__header placement-preflight__header"/);
+  assert.match(placements,/className={`panel__header placement-runbar/);
+  assert.match(preferences,/className={`panel student-preferences/);
+  assert.match(preferences,/<header className="panel__header">/);
+  assert.match(csvImport,/className={`panel__header \$\{styles\.header\}`}/);
+  assert.match(dashboard,/className="stats-grid classes-stats"/);
+  assert.match(styles,/\.placement-workflow \{[\s\S]*?margin: 6px 0 var\(--space-4\)/);
+  assert.match(styles,/\.placement-workflow > \.placement-preflight \{[\s\S]*?border-radius: var\(--radius-panel\)/);
+  assert.match(styles,/\.placement-sheet \{[\s\S]*?box-shadow: var\(--shadow-panel\)/);
+  assert.match(styles,/\.student-preferences \{[^}]*margin-bottom:var\(--space-4\)/);
+  assert.match(styles,/\.placement-workflow > \.placement-overview \{[\s\S]*?border-radius: 14px/);
+});
+
+test("aviso de manutenção usa o editor formatado com sanitização e limite visível",()=>{
+  assert.match(admin,/import \{ RichTextEditor \}/);
+  assert.match(admin,/richTextPlainText\(message\)\.length/);
+  assert.match(admin,/<RichTextEditor value=\{message\}/);
+  assert.match(admin,/maxLength=\{500\}/);
+  assert.match(maintenancePage,/<RichTextContent value=\{message\} className="maintenance-message" \/>/);
+  assert.match(worker,/sanitizeAnnouncementHtml\(typeof body\?\.maintenanceMessage/);
+  assert.match(worker,/const plainMessage = announcementPlainText\(message\)/);
+  assert.match(worker,/plainMessage\.length > 500/);
 });
 
 test("ordem de preferências é explícita e a submissão pode ser editada até ao prazo",()=>{

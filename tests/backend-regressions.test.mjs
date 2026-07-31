@@ -21,6 +21,7 @@ const distributionInputs=section("async function distributionInputs","async func
 const proposals=section("async function handleDistributionProposals","async function handleAdminAudit");
 const placements=section("async function handlePlacementWorkbench","function xlsxXml");
 const adminUsers=section("async function handleAdminUsers","async function handleAdminSettings");
+const adminSettings=section("async function handleAdminSettings","async function handleLogout");
 const login=section("async function handleLogin","function cookieValue");
 const routes=section("async function routeApi","export default");
 
@@ -33,6 +34,13 @@ test("a validação administrativa ativa a conta sem exigir o código institucio
  assert.match(login,/user\.email_verified_at <= 0 && !activeAdministrativeValidation/);
  assert.match(login,/emailVerifiedAdministratively = activeAdministrativeValidation/);
  assert.match(login,/registration_completed_administratively/);
+});
+
+test("a mensagem de manutenção aceita apenas HTML seguro dentro do limite visível",()=>{
+ assert.match(adminSettings,/sanitizeAnnouncementHtml/);
+ assert.match(adminSettings,/announcementPlainText\(message\)/);
+ assert.match(adminSettings,/plainMessage\.length > 500/);
+ assert.doesNotMatch(adminSettings,/maintenanceMessage\.trim\(\)\.slice\(0, 500\)/);
 });
 
 test("tickets desativados não são criados nem bloqueiam o verificador",()=>{
