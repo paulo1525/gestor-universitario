@@ -671,8 +671,10 @@ async function handleAdminSettings(request: Request, env: Env, admin: { id: stri
   const now = Date.now();
   if (section === 'maintenance') {
     const enabled = body?.maintenanceMode === true;
-    const message = typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim().slice(0, 500) : "";
-    if (!message) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+    const message = sanitizeAnnouncementHtml(typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim() : "");
+    const plainMessage = announcementPlainText(message);
+    if (!plainMessage) return json({ error: "Indique uma mensagem de manutenção." }, 400);
+    if (plainMessage.length > 500) return json({ error: "A mensagem de manutenção não pode exceder 500 caracteres." }, 400);
     await env.DB.batch([
       env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_mode', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(String(enabled), now, admin.id),
       env.DB.prepare("INSERT INTO app_settings (key, value, updated_at, updated_by) VALUES ('maintenance_message', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at, updated_by=excluded.updated_by").bind(message, now, admin.id),

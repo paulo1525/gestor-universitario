@@ -63,8 +63,8 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
   return <>
     {notice && <AppToast key={`${noticeError ? "error" : "success"}:${notice}`} kind={noticeError ? "error" : "success"} message={notice} onDismiss={() => setNotice("")} />}
     <section className={`panel ${styles.panel}`}>
-      <header className={styles.header}>
-        <span className={styles.icon}><Upload /></span>
+      <header className={`panel__header ${styles.header}`}>
+        <span className={`admin-settings__icon ${styles.icon}`}><Upload /></span>
         <div className={styles.headerCopy}><span className="eyebrow">{t("classes.import.eyebrow")}</span><h2>{t("classes.import.title")}</h2><p>{t("classes.import.description")}</p></div>
         <button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><Sparkles />{t("classes.import.aiHelpAction")}</button>
       </header>
