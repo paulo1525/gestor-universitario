@@ -847,6 +847,10 @@ html[data-theme="forum"] .placement-preflight__simulation {
   background: #edf7fb;
 }
 
+html[data-theme="forum"] .placement-sheet > .placement-runbar {
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+}
+
 html[data-theme="forum"] .preflight-check,
 html[data-theme="forum"] .preflight-group,
 html[data-theme="forum"] .ticket-admin-card {
