@@ -174,22 +174,23 @@ test("propostas protegem ordem, versão, revisão e publicação",()=>{
   assert.match(detail,/classes\.detail\.composeDescription/);
 });
 
-test("aprovação confirma e publica automaticamente",()=>{
-  assert.match(placements,/Aprovar e publicar as turmas\?/);
-  assert.match(placements,/\["approve","apply","publish"\]/);
-  assert.match(placements,/Aprovar e publicar agora/);
-  assert.match(placements,/\["draft","approved","applied"\]\.includes\(latest\?\.status\|\|""\)/);
-  assert.doesNotMatch(placements,/preflight\?\.ready&&\["draft","approved","applied"\]/);
+test("escolha do rascunho definitivo é separada da publicação",()=>{
+  assert.match(placements,/Tornar o Rascunho \{latest\.draft_number\?\?1\} definitivo\?/);
+  assert.match(placements,/Esta escolha fecha a comparação, mas ainda não publica nada/);
+  assert.match(placements,/"\/api\/admin\/distribution-proposals\/approve"/);
+  assert.match(placements,/const steps=latest\.status==="approved"\?\["apply","publish"\]:\["publish"\]/);
+  assert.match(placements,/Aplicar e publicar agora/);
+  assert.doesNotMatch(placements,/\["approve","apply","publish"\]/);
 });
 
 test("desequilíbrio inicial usa o melhor equilíbrio possível sem bloquear a prévia privada",()=>{
   assert.match(worker,/code:"MELHOR_EQUILIBRIO_POSSIVEL"/);
   assert.match(worker,/A regra dos três não é atingível com a composição atual/);
   assert.match(worker,/calculateBestEffortDistribution\(input,seed,objective\)/);
-  assert.match(placements,/Maximizar o número de mudanças/);
-  assert.match(placements,/Respeitar melhor a ordem das preferências/);
-  assert.match(placements,/Calcular proposta privada/);
-  assert.match(placements,/Nada fica visível aos estudantes nesta fase/);
+  assert.match(placements,/minimiza primeiro a diferença entre turmas/);
+  assert.match(placements,/objective:"maximize_moves"/);
+  assert.doesNotMatch(placements,/Objetivo do cálculo/);
+  assert.match(placements,/Nenhum estudante vê resultados nesta fase/);
   assert.match(testMode,/action==="calculate-exception"/);
 });
 
@@ -248,18 +249,14 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
   assert.match(worker,/preferenceSource:decision\?row\.preference_source:"automatic"/);
   assert.match(placements,/Tem amigos noutra turma/);
   assert.match(placements,/Sofre bullying \/ está mal integrado/);
-  assert.match(placements,/Proposta privada/);
+  assert.match(placements,/Cenários privados/);
   assert.match(placements,/AppToast/);
   assert.doesNotMatch(placements,/setTimeout\(\(\)=>setNotice\(""\),1500\)/);
   assert.match(placements,/admin-preference-ranking/);
   assert.match(placements,/ArrowUp/);
-  assert.match(placements,/Justificação administrativa/);
-  assert.match(placements,/aria-invalid/);
-  assert.match(placements,/reasonRef\.current\?\.focus\(\)/);
-  assert.match(placements,/reasonRef\.current\?\.select\(\)/);
-  const editor=placements.slice(placements.indexOf("function PlacementEditor"));
-  const saveBlock=editor.slice(editor.indexOf("const save=async"));
-  assert.ok(saveBlock.indexOf("reasonRequired&&!trimmedReason")<saveBlock.indexOf('fetch("/api/admin/placements"'),"a justificação condicional deve bloquear antes do pedido");
+  assert.match(placements,/Nota administrativa/);
+  assert.match(placements,/Este campo é opcional/);
+  assert.doesNotMatch(placements,/justificação administrativa é obrigatória para esta alteração/i);
 });
 
 test("verificador é uma pré-validação integrada e acionável",()=>{
@@ -288,7 +285,7 @@ test("verificador é uma pré-validação integrada e acionável",()=>{
   assert.match(preflight,/classes\.preflight\.priorityAria/);
   assert.match(preflight,/classes\.preflight\.firstCasesPage/);
   assert.match(placements,/preflight&&!activeDistribution/);
-  assert.match(placements,/A calcular e analisar a nova proposta/);
+  assert.match(placements,/A calcular um novo rascunho equilibrado/);
   assert.match(placements,/As pautas estão publicadas/);
   assert.match(placements,/Publicação concluída/);
   assert.match(styles,/placement-operation-status\.is-published/);
@@ -357,8 +354,8 @@ test("colocações mostram só a próxima ação e resumem os pedidos no cabeça
   assert.match(placements,/studentsMoving=students\.filter\(student=>student\.student_decision==="move"\)\.length/);
   assert.match(placements,/Próxima ação/);
   assert.match(placements,/Corrigir os dados que bloqueiam o cálculo/);
-  assert.match(placements,/Calcular uma proposta privada/);
-  assert.match(placements,/Rever e publicar a proposta/);
+  assert.match(placements,/Criar o primeiro rascunho/);
+  assert.match(placements,/Compara e escolhe o rascunho definitivo/);
   assert.match(placements,/className="placement-summary-strip"/);
   assert.match(placements,/Pedidos recebidos/);
   assert.match(placements,/Sem resposta/);
@@ -372,9 +369,9 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/rel="noopener noreferrer"/);
   assert.match(placements,/Abrir tabela em ecrã inteiro/);
   assert.match(placements,/tableOnly\?<main className="placement-table-page"/);
-  assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{!published&&!activeDistribution&&objectiveAction\}\{calculateAction\}/);
+  assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{calculateAction\}/);
   assert.match(placements,/recalculation\?"button--secondary":"button--primary"/);
-  assert.match(placements,/<Calculator\/>Calcular proposta privada/);
+  assert.match(placements,/<Calculator\/>Criar primeiro rascunho/);
   assert.match(styles,/\.button:disabled \{[^}]*background: #f1f1ee;[^}]*box-shadow: none/);
   assert.match(placements,/placement-heading__actions" aria-label="Ferramentas da página">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
@@ -404,7 +401,7 @@ test("resultado mostra lotações antes e depois e filtros avançados persistem 
 });
 
 test("editor bloqueia o fundo e a confirmação de publicação é estruturada",()=>{
-  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\)\)/);
+  assert.match(placements,/useScrollLock\(Boolean\(selectedId\|\|confirmDefinitive\|\|confirmPublish\|\|confirmRollback\|\|confirmImbalance\)\)/);
   assert.match(placements,/className="placement-drawer__body"/);
   assert.match(placements,/<\/div>\s*<section className="placement-drawer-actions"/);
   assert.match(scrollLock,/let activeLocks = 0/);
@@ -419,7 +416,7 @@ test("editor bloqueia o fundo e a confirmação de publicação é estruturada",
   assert.match(styles,/\.empty-state\s*\{\s*margin:\s*0;\s*padding:\s*30px/);
   assert.match(placements,/placement-drawer__close/);
   assert.match(placements,/publish-confirmation__steps/);
-  assert.match(placements,/Aprovar e publicar agora/);
+  assert.match(placements,/Aplicar e publicar agora/);
 });
 
 test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
@@ -446,10 +443,14 @@ test("histórico e altura global ficam contidos no ecrã mobile",()=>{
   assert.match(styles,/\.audit-row__button \{ grid-column: 2; grid-row: 2 \/ span 2; align-self: center; \}/);
 });
 
-test("justificação é condicional, critérios são cumulativos e o aluno recebe histórico",()=>{
-  assert.match(placements,/reasonRequired=preferenceChanged\|\|otherSelected\|\|manualDestinationChanged/);
-  assert.match(placements,/reasonRequired&&<section/);
-  assert.match(placements,/OBRIGATÓRIO/);
+test("notas são opcionais, a exceção de equilíbrio é justificada e o aluno recebe histórico",()=>{
+  assert.match(placements,/detailsReasonRequired=preferenceChanged\|\|otherSelected/);
+  assert.match(placements,/detailsReasonRequired&&<section/);
+  assert.match(placements,/OPCIONAL/);
+  assert.doesNotMatch(placements,/manualChanged&&!trimmedOverrideReason/);
+  assert.match(placements,/manualRequiresImbalanceException&&trimmedOverrideReason\.length<10/);
+  assert.match(placements,/allowImbalance:manualRequiresImbalanceException&&imbalanceConfirmed/);
+  assert.match(placements,/OBRIGATÓRIA/);
   assert.match(placements,/type="checkbox"/);
   assert.match(placements,/Podes selecionar mais do que um critério/);
   assert.match(worker,/student_admin_placement_updated/);
