@@ -82,7 +82,7 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/handleValidationExport/);
   assert.match(worker,/\/api\/admin\/export-validation/);
   assert.match(worker,/application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
-  assert.match(worker,/layout==="classes"\?"pautas-colocacao-por-turma":"auditoria-pautas-colocacao"/);
+  assert.match(worker,/layout==="simple"\?"pautas-simples-turmas-1-20":layout==="classes"\?"pautas-colocacao-por-turma":"auditoria-pautas-colocacao"/);
   assert.match(worker,/new Set\(exportRows\.map\(row=>row\.classId\)\)/);
   assert.match(worker,/name:`Turma \$\{classId\}`/);
   assert.match(worker,/worksheets\/sheet\$\{index\+1\}\.xml/);
@@ -94,9 +94,14 @@ test("o validador oferece um Excel completo e formatado",()=>{
   assert.match(worker,/Hash dos dados de entrada/);
   assert.match(worker,/Alteração manual do destino/);
   assert.match(placements,/\/api\/admin\/export-validation\?layout=\$\{layout\}/);
-  assert.match(placements,/Exportar Excel/);
-  assert.match(placements,/Lista geral/);
-  assert.match(placements,/Por turma final/);
+  assert.match(placements,/Exportar pautas/);
+  assert.match(placements,/Excel simples · Turmas 1–20/);
+  assert.match(placements,/PDF simples · Turmas 1–20/);
+  assert.match(worker,/Array\.from\(\{length:20\},\(_,index\)=>index\+1\)/);
+  assert.match(worker,/simpleHeaders=\["Número mecanográfico","Nome completo"\]/);
+  assert.match(worker,/\/api\/admin\/export-placements-pdf/);
+  assert.match(placements,/Auditoria completa/);
+  assert.match(placements,/Auditoria por turma/);
 });
 
 test("composição é guardada diretamente e exige todos os campos",()=>{
@@ -175,12 +180,14 @@ test("aprovação confirma e publica automaticamente",()=>{
   assert.match(placements,/Aprovar e publicar agora/);
 });
 
-test("desequilíbrio impossível oferece publicação excecional justificada",()=>{
-  assert.match(placements,/issue\.code==="DISTRIBUICAO_IMPOSSIVEL"/);
-  assert.match(placements,/\/api\/admin\/distribution-proposals\/calculate-exception/);
-  assert.match(placements,/Preparar publicação excecional/);
-  assert.match(placements,/Justificação administrativa \*/);
-  assert.match(placements,/Esta é uma publicação excecional/);
+test("desequilíbrio inicial usa o melhor equilíbrio possível sem bloquear a prévia privada",()=>{
+  assert.match(worker,/code:"MELHOR_EQUILIBRIO_POSSIVEL"/);
+  assert.match(worker,/A regra dos três não é atingível com a composição atual/);
+  assert.match(worker,/calculateBestEffortDistribution\(input,seed,objective\)/);
+  assert.match(placements,/Maximizar mudanças/);
+  assert.match(placements,/Priorizar preferências/);
+  assert.match(placements,/Calcular prévia privada/);
+  assert.match(placements,/visível apenas aos administradores/);
   assert.match(testMode,/action==="calculate-exception"/);
 });
 
@@ -240,7 +247,7 @@ test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
   assert.match(placements,/Tem amigos noutra turma/);
   assert.match(placements,/Sofre bullying \/ está mal integrado/);
   assert.match(placements,/statusLabels/);
-  assert.match(placements,/Rascunho/);
+  assert.match(placements,/Prévia privada/);
   assert.match(placements,/AppToast/);
   assert.doesNotMatch(placements,/setTimeout\(\(\)=>setNotice\(""\),1500\)/);
   assert.match(placements,/admin-preference-ranking/);
@@ -364,9 +371,9 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/rel="noopener noreferrer"/);
   assert.match(placements,/Abrir tabela em ecrã inteiro/);
   assert.match(placements,/tableOnly\?<main className="placement-table-page"/);
-  assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{calculateAction\}/);
+  assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{!published&&!activeDistribution&&objectiveAction\}\{calculateAction\}/);
   assert.match(placements,/recalculation\?"button--secondary":"button--primary"/);
-  assert.match(placements,/<Calculator\/>Calcular nova proposta/);
+  assert.match(placements,/<Calculator\/>Calcular prévia privada/);
   assert.match(styles,/\.button:disabled \{[^}]*background: #f1f1ee;[^}]*box-shadow: none/);
   assert.match(placements,/placement-runbar__actions"><div className="placement-action-tools">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);

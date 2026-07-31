@@ -81,3 +81,25 @@ test("otimização global encontra uma solução que o percurso guloso perdia",(
  assert.ok(Math.max(...counts.values())-Math.min(...counts.values())<=3);
  assert.equal(result.length,rows.length);
 });
+
+test("modo de máximo movimento prefere mudar mais estudantes mesmo com uma preferência posterior",()=>{
+ const rows=[
+  student("fixed-1",1),student("fixed-2",2),student("fixed-3",3),student("fixed-4",4),
+  student("candidate-a",1,[2]),student("candidate-b",4,[2,3])
+ ];
+ const result=calculateDistribution(rows,{seed:"maximo-movimento",classIds:[1,2,3,4],maxDifference:1,objective:"maximize_moves"});
+ assert.equal(result.filter(row=>row.status==="moved").length,2);
+ assert.equal(result.find(row=>row.studentId==="candidate-a").destinationClass,2);
+ assert.equal(result.find(row=>row.studentId==="candidate-b").destinationClass,3);
+});
+
+test("modo de máximo movimento desempata pela menor diferença entre turmas",()=>{
+ const rows=[
+  student("one-a",1),student("one-b",1),student("one-c",1),
+  student("two-a",2),student("three-a",3),student("three-b",3),
+  student("candidate",1,[3,2])
+ ];
+ const result=calculateDistribution(rows,{seed:"menor-diferenca",classIds:[1,2,3],maxDifference:3,objective:"maximize_moves"}),counts=result.reduce((all,row)=>all.set(row.destinationClass,(all.get(row.destinationClass)||0)+1),new Map());
+ assert.equal(result.find(row=>row.studentId==="candidate").destinationClass,2);
+ assert.equal(Math.max(...counts.values())-Math.min(...counts.values()),1);
+});
