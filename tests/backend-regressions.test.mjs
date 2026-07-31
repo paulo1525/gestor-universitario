@@ -6,6 +6,7 @@ const worker=readFileSync(new URL("../worker/index.ts",import.meta.url),"utf8");
 const activeDistributionMigration=readFileSync(new URL("../migrations/0019_single_active_distribution.sql",import.meta.url),"utf8");
 const specialStatusMigration=readFileSync(new URL("../migrations/0025_special_student_status.sql",import.meta.url),"utf8");
 const imbalanceOverrideMigration=readFileSync(new URL("../migrations/0027_distribution_imbalance_override.sql",import.meta.url),"utf8");
+const proposalDraftsMigration=readFileSync(new URL("../migrations/0029_distribution_proposal_drafts.sql",import.meta.url),"utf8");
 
 function section(start,end){
  const from=worker.indexOf(start),to=worker.indexOf(end,from+start.length);
@@ -53,7 +54,7 @@ test("preferências só mudam fora de uma distribuição ativa e invalidam propo
  assert.match(ownDestinations,/student\.status==="published"/);
  assert.match(ownDestinations,/status='published' OR \(status='applied' AND published_at IS NULL\)/);
  assert.match(ownDestinations,/status IN \('draft','approved'\)/);
- assert.match(proposals,/if\(action==="calculate"\|\|action==="calculate-exception"\).*status='published' OR \(status='applied' AND published_at IS NULL\)/s);
+ assert.match(proposals,/if\(action==="calculate"\|\|action==="calculate-exception"\).*status IN \('approved','published'\) OR \(status='applied' AND published_at IS NULL\)/s);
  assert.match(proposals,/status='applied' AND published_at IS NOT NULL/);
 });
 
@@ -105,8 +106,8 @@ test("cada cálculo usa e persiste uma seed aleatória para desempates auditáve
  assert.match(proposals,/seed=crypto\.randomUUID\(\)/);
  assert.match(proposals,/calculateDistribution\(input\.students,\{seed,maxDifference:3,classIds:input\.classIds,objective\}\)/);
  assert.match(proposals,/objective:DistributionObjective=calculationBody\?\.objective==="preferences"\?"preferences":"maximize_moves"/);
- assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot,input_hash,engine_version,max_difference,final_difference,imbalance_override_reason,created_by,created_at\)/);
- assert.match(proposals,/JSON\.stringify\(\{proposalId:id,seed,inputHash:input\.hash/);
+ assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot,input_hash,engine_version,max_difference,final_difference,imbalance_override_reason,cycle_id,draft_number,created_by,created_at\)/);
+ assert.match(proposals,/JSON\.stringify\(\{proposalId:id,cycleId:input\.hash,draftNumber,seed,inputHash:input\.hash/);
 });
 
 test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálculo",()=>{
@@ -126,15 +127,22 @@ test("pré-validação inclui turmas vazias e dry-run no mesmo snapshot do cálc
 test("informação adicional pode ser revista sem atribuir pontos",()=>{
  assert.match(placements,/reviewed=Boolean\(validationTypes\.length\|\|reviewStatus\)/);
  assert.match(placements,/reviewed\?now:null,reviewed\?actorId:null/);
- assert.match(placements,/if\(\(preferenceChanged\|\|hasOther\)&&!reason\)/);
+ assert.doesNotMatch(placements,/if\(\(preferenceChanged\|\|hasOther\)&&!reason\)/);
+ assert.match(placements,/preferenceReason=preferenceChanged\?\(reason\|\|null\)/);
  assert.doesNotMatch(placements,/preferenceChanged\|\|pointsChanged/);
 });
 
 test("override aceita snapshots atuais e legacy, preserva a origem e remove sorteio manual",()=>{
  assert.match(proposals,/classes\?:Array<\{id:number\}>;classIds\?:number\[\]/);
  assert.match(proposals,/parsedInput\.classIds\?\.length\?parsedInput\.classIds:\(parsedInput\.classes\|\|\[\]\)/);
- assert.match(proposals,/result\.randomized=false/);
+ assert.match(proposals,/previewDistributionOverride/);
  assert.match(proposals,/previous_class=distribution_manual_overrides\.previous_class/);
+ assert.match(proposals,/IMBALANCE_CONFIRMATION_REQUIRED/);
+ assert.match(proposals,/expectedResultSnapshot/);
+ assert.match(proposals,/result_snapshot=\?/);
+ assert.match(proposals,/storedReason=reason\|\|"Alteração manual de destino sem nota adicional\."/);
+ assert.doesNotMatch(proposals,/if\(action==="override"&&!String\(body\?\.reason/);
+ assert.match(proposals,/preview\.requiresImbalanceException&&reason\.length<10/);
 });
 
 test("aprovação e aplicação são idempotentes e validam o snapshot integral",()=>{
@@ -193,6 +201,19 @@ test("a D1 impede duas distribuições ativas em concorrência",()=>{
  assert.match(activeDistributionMigration,/CREATE UNIQUE INDEX idx_distribution_single_active/);
  assert.match(activeDistributionMigration,/invalidated_at IS NULL/);
  assert.match(activeDistributionMigration,/status IN \('applied', 'published'\)/);
+});
+
+test("rascunhos têm numeração estável e apenas um cenário definitivo",()=>{
+ assert.match(proposalDraftsMigration,/ADD COLUMN cycle_id TEXT/);
+ assert.match(proposalDraftsMigration,/ADD COLUMN draft_number INTEGER/);
+ assert.match(proposalDraftsMigration,/CREATE UNIQUE INDEX idx_distribution_draft_number/);
+ assert.match(proposalDraftsMigration,/CREATE UNIQUE INDEX idx_distribution_single_definitive/);
+ assert.match(proposalDraftsMigration,/status = 'approved'/);
+ assert.match(proposals,/SELECT COALESCE\(MAX\(draft_number\),0\)\+1 draft_number/);
+ assert.match(proposals,/cycle_id,draft_number,created_by,created_at/);
+ assert.match(proposals,/distribution_draft_finalized/);
+ assert.match(proposals,/SET archived_at=\?,archived_by=\?/);
+ assert.match(proposals,/status IN \('approved','published'\)/);
 });
 
 test("correções de pautas publicadas preservam IDs canónicos e rejeitam snapshots inválidos",()=>{

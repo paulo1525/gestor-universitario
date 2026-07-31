@@ -72,17 +72,17 @@ function assignmentQuality(student,destination,classCount){
 function bruteForceBest(students,classIds,maxDifference){
  const movers=students.filter(student=>student.studentDecision==="move"),fixed=students.filter(student=>student.studentDecision!=="move"),counts=new Map(classIds.map(classId=>[classId,0]));
  for(const student of fixed)counts.set(student.classId,counts.get(student.classId)+1);
- let best=Infinity;
- function visit(index,cost){
-  if(index===movers.length){const sizes=[...counts.values()];if(Math.max(...sizes)-Math.min(...sizes)<=maxDifference)best=Math.min(best,cost);return}
+ let best=null;
+ function visit(index,cost,moved){
+  if(index===movers.length){const sizes=[...counts.values()],difference=Math.max(...sizes)-Math.min(...sizes);if(difference>maxDifference)return;const candidate={difference,moved,cost};if(!best||candidate.difference<best.difference||(candidate.difference===best.difference&&(candidate.moved>best.moved||(candidate.moved===best.moved&&candidate.cost<best.cost))))best=candidate;return}
   const student=movers[index],choices=[...new Set([...student.destinations,student.classId])];
   for(const destination of choices){
    counts.set(destination,counts.get(destination)+1);
-   visit(index+1,cost+assignmentQuality(student,destination,classIds.length));
+   visit(index+1,cost+assignmentQuality(student,destination,classIds.length),moved+Number(destination!==student.classId));
    counts.set(destination,counts.get(destination)-1);
   }
  }
- visit(0,0);return best;
+ visit(0,0,0);return best;
 }
 
 test("o resultado global coincide com um oráculo exaustivo em 250 problemas pequenos",()=>{
@@ -94,32 +94,25 @@ test("o resultado global coincide com um oráculo exaustivo em 250 problemas peq
   }
   const maxDifference=1+(seed%2),result=calculateDistribution(students,{seed:`oracle-${seed}`,classIds,maxDifference});
   verifyInvariants(students,result,classIds,maxDifference);
-  const input=new Map(students.map(student=>[student.id,student])),actual=result.filter(row=>input.get(row.studentId).studentDecision==="move").reduce((total,row)=>total+assignmentQuality(input.get(row.studentId),row.destinationClass,classIds.length),0);
-  assert.equal(actual,bruteForceBest(students,classIds,maxDifference),`Ótimo global incorreto no cenário ${seed}`);
+  const input=new Map(students.map(student=>[student.id,student])),counts=result.reduce((all,row)=>all.set(row.destinationClass,(all.get(row.destinationClass)||0)+1),new Map(classIds.map(classId=>[classId,0]))),sizes=[...counts.values()],movers=result.filter(row=>input.get(row.studentId).studentDecision==="move"),actual={difference:Math.max(...sizes)-Math.min(...sizes),moved:movers.filter(row=>row.destinationClass!==row.originClass).length,cost:movers.reduce((total,row)=>total+assignmentQuality(input.get(row.studentId),row.destinationClass,classIds.length),0)};
+  assert.deepEqual(actual,bruteForceBest(students,classIds,maxDifference),`Ótimo global incorreto no cenário ${seed}`);
  }
 });
 
-test("num choque da primeira preferência, a maior pontuação vence mesmo tendo uma alternativa",()=>{
+test("maximiza mudanças antes de usar pontos para desempatar preferências",()=>{
  const fixture=points=>[
-  {id:"fixed-1",classId:1,destinations:[],studentDecision:"stay"},
-  ...Array.from({length:3},(_,index)=>({id:`fixed-2-${index}`,classId:2,destinations:[],studentDecision:"stay"})),
-  {id:"fixed-3",classId:3,destinations:[],studentDecision:"stay"},
+  ...Array.from({length:2},(_,index)=>({id:`fixed-1-${index}`,classId:1,destinations:[],studentDecision:"stay"})),
+  ...Array.from({length:2},(_,index)=>({id:`fixed-2-${index}`,classId:2,destinations:[],studentDecision:"stay"})),
+  ...Array.from({length:2},(_,index)=>({id:`fixed-3-${index}`,classId:3,destinations:[],studentDecision:"stay"})),
   {id:"high",classId:1,destinations:[2,3],studentDecision:"move",basePoints:points},
   {id:"low",classId:3,destinations:[2],studentDecision:"move",basePoints:0}
  ];
  for(let seed=0;seed<100;seed+=1){
   const result=calculateDistribution(fixture(5),{seed:`collision-score-${seed}`,classIds:[1,2,3],maxDifference:3});
-  assert.equal(result.find(row=>row.studentId==="high").destinationClass,2);
-  assert.equal(result.find(row=>row.studentId==="low").destinationClass,3);
+  assert.equal(result.find(row=>row.studentId==="high").destinationClass,3);
+  assert.equal(result.find(row=>row.studentId==="low").destinationClass,2);
+  assert.equal(result.filter(row=>["high","low"].includes(row.studentId)&&row.status==="moved").length,2);
  }
- const winners=new Set();
- for(let seed=0;seed<250;seed+=1){
-  const result=calculateDistribution(fixture(0),{seed:`collision-tie-${seed}`,classIds:[1,2,3],maxDifference:3});
-  winners.add(result.find(row=>row.destinationClass===2&&["high","low"].includes(row.studentId)).studentId);
-  assert.equal(result.find(row=>row.studentId==="high").randomized,true);
-  assert.equal(result.find(row=>row.studentId==="low").randomized,true);
- }
- assert.deepEqual([...winners].sort(),["high","low"]);
 });
 
 test("pontuação só decide candidatos na mesma preferência e empate exato usa uma seed reproduzível",()=>{
