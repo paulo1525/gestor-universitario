@@ -337,11 +337,25 @@ test("cartões de turma abrem a lista com todos os estudantes da lotação final
   assert.match(styles,/\.placement-class-filter-notice/);
 });
 
+test("todas as turmas empatadas recebem os indicadores de lotação mínima e máxima",()=>{
+  assert.match(placements,/isMaximum=item\.after===classAfterMaximum/);
+  assert.match(placements,/isMinimum=item\.after===classAfterMinimum/);
+  assert.match(placements,/\{isMinimum&&<b className="is-minimum">Mín\.<\/b>\}/);
+  assert.match(placements,/\{isMaximum&&<b className="is-maximum">Máx\.<\/b>\}/);
+  assert.doesNotMatch(placements,/classAfterMinimumIndex|classAfterMaximumIndex/);
+  assert.match(styles,/\.placement-class-balance__card-extremes b\.is-minimum/);
+  assert.match(styles,/\.placement-class-balance__card-extremes b\.is-maximum/);
+});
+
 test("ações das colocações ficam compactas em computador e telemóvel",()=>{
   assert.match(placements,/placement-action-label--desktop/);
   assert.match(placements,/placement-action-label--mobile/);
   assert.match(styles,/\.placement-heading__actions \{[\s\S]*?grid-auto-flow: column/);
   assert.match(styles,/@media \(max-width: 700px\) \{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(styles,/\.placement-table-page__actions \.placement-action-tools \{[\s\S]*?display: contents/);
+  assert.match(styles,/\.placement-draft-workspace\.is-table-only > header/);
+  assert.match(styles,/\.placement-class-balance\.is-table-only > header/);
+  assert.match(styles,/\.placement-class-filter-notice\.is-table-only/);
 });
 
 test("colocações usam uma ação principal compacta e a tabela administrativa",()=>{
