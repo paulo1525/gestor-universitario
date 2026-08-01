@@ -211,6 +211,8 @@ test("rascunhos têm numeração estável e apenas um cenário definitivo",()=>{
  assert.match(proposalDraftsMigration,/status = 'approved'/);
  assert.match(proposals,/SELECT COALESCE\(MAX\(draft_number\),0\)\+1 draft_number/);
  assert.match(proposals,/cycle_id,draft_number,created_by,created_at/);
+ assert.match(proposals,/INSERT INTO distribution_proposals \(id,seed,status,input_snapshot,result_snapshot/);
+ assert.match(proposals,/storage:"database"/);
  assert.match(proposals,/distribution_draft_finalized/);
  assert.match(proposals,/SET archived_at=\?,archived_by=\?/);
  assert.match(proposals,/status IN \('approved','published'\)/);
