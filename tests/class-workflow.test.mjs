@@ -315,6 +315,8 @@ test("mesa de colocações usa uma hierarquia compacta e controlos progressivos"
 test("novo rascunho aparece imediatamente e permanece selecionado durante o refresh",()=>{
   assert.match(worker,/record:proposalRecord/);
   assert.match(worker,/result_snapshot:resultSnapshot/);
+  assert.match(worker,/storage:"database"/);
+  assert.match(placements,/Guardado na base de dados/);
   assert.match(placements,/optimisticProposal&&!refreshedProposals\.some/);
   assert.match(placements,/setProposals\(current=>\[createdProposal,\.\.\.current\.filter/);
   assert.match(placements,/setSelectedProposalId\(createdProposal\.id\)/);
@@ -322,6 +324,24 @@ test("novo rascunho aparece imediatamente e permanece selecionado durante o refr
   assert.match(placements,/role="group" aria-label="Escolher rascunho para rever"/);
   assert.match(placements,/aria-pressed=\{selectedDraft\}/);
   assert.doesNotMatch(placements,/role="tablist" aria-label="Escolher rascunho para rever"/);
+});
+
+test("cartões de turma abrem a lista com todos os estudantes da lotação final",()=>{
+  assert.match(placements,/const showClassStudents=\(classId:number\)=>\{setFilters\(\{\.\.\.emptyFilters,destination:String\(classId\)\}\)/);
+  assert.match(placements,/scrollIntoView\(\{behavior:"smooth",block:"start"\}\)/);
+  assert.match(placements,/aria-pressed=\{selectedClass\}/);
+  assert.match(placements,/Ver estudantes/);
+  assert.match(placements,/A lista inclui quem permanece nesta turma e quem entra nela/);
+  assert.match(placements,/id="placement-students"/);
+  assert.match(styles,/\.placement-class-balance__card\.is-selected/);
+  assert.match(styles,/\.placement-class-filter-notice/);
+});
+
+test("ações das colocações ficam compactas em computador e telemóvel",()=>{
+  assert.match(placements,/placement-action-label--desktop/);
+  assert.match(placements,/placement-action-label--mobile/);
+  assert.match(styles,/\.placement-heading__actions \{[\s\S]*?grid-auto-flow: column/);
+  assert.match(styles,/@media \(max-width: 700px\) \{[\s\S]*?grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
 });
 
 test("colocações usam uma ação principal compacta e a tabela administrativa",()=>{
