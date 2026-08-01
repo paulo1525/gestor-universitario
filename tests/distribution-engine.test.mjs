@@ -165,3 +165,15 @@ test("randomized identifies global equal-cost alternatives across different rank
  assert.ok(first.filter(row=>row.studentId.startsWith("candidate-")).every(row=>row.randomized));
  assert.ok(second.filter(row=>row.studentId.startsWith("candidate-")).every(row=>row.randomized));
 });
+
+test("turmas de um ano completo ficam dentro do orçamento de CPU",{timeout:5_000},()=>{
+ const classIds=Array.from({length:20},(_,index)=>index+1),rows=[];
+ for(const classId of classIds)for(let index=0;index<50;index+=1){
+  const moving=index<40,destinations=moving?[classId%20+1,(classId+1)%20+1,(classId+2)%20+1,(classId+3)%20+1]:[];
+  rows.push({...student(`load-${classId}-${index}`,classId,destinations),studentDecision:moving?"move":"stay",basePoints:index%6});
+ }
+ const result=calculateDistribution(rows,{seed:"full-year-load",classIds,maxDifference:3,objective:"maximize_moves"}),counts=classIds.map(classId=>result.filter(row=>row.destinationClass===classId).length);
+ assert.equal(result.length,1_000);
+ assert.equal(result.filter(row=>row.status==="moved").length,800);
+ assert.ok(Math.max(...counts)-Math.min(...counts)<=3);
+});
