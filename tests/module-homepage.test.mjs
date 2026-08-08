@@ -43,10 +43,15 @@ test("all-disabled state opens module management only for its administrator", ()
   assert.equal(resolveModuleHomepage(null, disabledStates).mode, "unavailable");
 });
 
-test("classes homepage respects the role-specific landing submodule", () => {
+test("retired classes homepage is never available", () => {
   const states = { ...disabledStates, classes: true, "classes.rosters": true, "classes.preferences": false };
-  assert.equal(resolveModuleHomepage("classes", states).href, "/turmas");
+  assert.equal(resolveModuleHomepage("classes", states).href, null);
   assert.equal(resolveModuleHomepage("classes", states, { preferenceOnly: true }).href, null);
+});
+
+test("quizzes can be selected as the homepage", () => {
+  const states = { ...disabledStates, quizzes: true, "quizzes.practice": true };
+  assert.equal(resolveModuleHomepage("quizzes", states).href, "/testes");
 });
 
 test("root resolver, canonical Dashboard and settings endpoint remain wired", async () => {

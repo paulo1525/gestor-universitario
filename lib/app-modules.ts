@@ -4,6 +4,10 @@ export type AppModuleKey =
   | "classes.preferences"
   | "classes.placements"
   | "classes.special_statuses"
+  | "quizzes"
+  | "quizzes.practice"
+  | "quizzes.progress"
+  | "quizzes.management"
   | "announcements"
   | "announcements.feed"
   | "announcements.publishing"
@@ -51,14 +55,19 @@ export type AppModuleDefinition = {
   description: string;
   parentKey: AppModuleKey | null;
   defaultEnabled: boolean;
+  retired?: boolean;
 };
 
 export const APP_MODULES: readonly AppModuleDefinition[] = [
-  { key: "classes", label: "Gestão de turmas", description: "Composição, preferências e distribuição das turmas.", parentKey: null, defaultEnabled: true },
-  { key: "classes.rosters", label: "Listas e composição", description: "Consulta, composição e submissão das listas de turma.", parentKey: "classes", defaultEnabled: true },
-  { key: "classes.preferences", label: "Preferências dos estudantes", description: "Recolha das decisões de permanência ou mudança de turma.", parentKey: "classes", defaultEnabled: true },
-  { key: "classes.placements", label: "Colocações", description: "Validação, cálculo, revisão e publicação das colocações.", parentKey: "classes", defaultEnabled: true },
-  { key: "classes.special_statuses", label: "Estatutos especiais", description: "Identificação de Trabalhadores-Estudantes, Atletas e outros estatutos especiais.", parentKey: "classes", defaultEnabled: false },
+  { key: "classes", label: "Gestão de turmas", description: "Composição, preferências e distribuição das turmas.", parentKey: null, defaultEnabled: false, retired: true },
+  { key: "classes.rosters", label: "Listas e composição", description: "Consulta, composição e submissão das listas de turma.", parentKey: "classes", defaultEnabled: false, retired: true },
+  { key: "classes.preferences", label: "Preferências dos estudantes", description: "Recolha das decisões de permanência ou mudança de turma.", parentKey: "classes", defaultEnabled: false, retired: true },
+  { key: "classes.placements", label: "Colocações", description: "Validação, cálculo, revisão e publicação das colocações.", parentKey: "classes", defaultEnabled: false, retired: true },
+  { key: "classes.special_statuses", label: "Estatutos especiais", description: "Identificação de Trabalhadores-Estudantes, Atletas e outros estatutos especiais.", parentKey: "classes", defaultEnabled: false, retired: true },
+  { key: "quizzes", label: "Testes de escolha múltipla", description: "Treino interativo organizado por unidade curricular e tema.", parentKey: null, defaultEnabled: true },
+  { key: "quizzes.practice", label: "Treino e simulados", description: "Testes rápidos, temáticos, não vistos, erros e simulados cronometrados.", parentKey: "quizzes", defaultEnabled: true },
+  { key: "quizzes.progress", label: "Progresso pessoal", description: "Histórico, taxa de acerto e revisão das perguntas com maior dificuldade.", parentKey: "quizzes", defaultEnabled: true },
+  { key: "quizzes.management", label: "Gestão do banco de perguntas", description: "Importação CSV e publicação de temas e perguntas pelos administradores.", parentKey: "quizzes", defaultEnabled: true },
   { key: "announcements", label: "Avisos e comunicados", description: "Comunicação institucional da Comissão de Curso.", parentKey: null, defaultEnabled: true },
   { key: "announcements.feed", label: "Consulta de avisos", description: "Apresentação dos avisos publicados aos utilizadores.", parentKey: "announcements", defaultEnabled: true },
   { key: "announcements.publishing", label: "Publicação por membros CC", description: "Editor de comunicados para membros com cargo na Comissão.", parentKey: "announcements", defaultEnabled: true },
@@ -108,6 +117,8 @@ export function moduleParentKey(key: string): AppModuleKey | null {
 }
 
 export function moduleEffectiveEnabled(key: string, states: Record<string, boolean>): boolean {
+  const definition = APP_MODULES.find((module) => module.key === key);
+  if (definition?.retired) return false;
   if (states[key] === false) return false;
   const parentKey = moduleParentKey(key);
   return parentKey ? states[parentKey] !== false : true;

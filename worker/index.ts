@@ -8,6 +8,7 @@ import { moduleHomepageAvailable, moduleHomepageTarget, resolveModuleHomepage } 
 import { announcementDisplayHtml, announcementPlainText, sanitizeAnnouncementHtml } from "@/lib/announcement-content";
 import { isStudentSpecialStatus, studentStatusFromCode, type StudentSpecialStatus } from "@/lib/student-status";
 import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
+import { handleQuizRoute, isQuizPath } from "./quizzes";
 
 export interface Env {
   DB: D1Database;
@@ -539,7 +540,7 @@ function homepageProfile(user: CurrentUser) {
 }
 
 function moduleSnapshot(states: Record<string, boolean>, configuredHomeKey: string | null = null) {
-  return APP_MODULES.filter((module) => module.parentKey === null).map((module) => ({
+  return APP_MODULES.filter((module) => module.parentKey === null && !module.retired).map((module) => ({
     key: module.key,
     label: module.label,
     description: module.description,
@@ -547,7 +548,7 @@ function moduleSnapshot(states: Record<string, boolean>, configuredHomeKey: stri
     effectiveEnabled: moduleEffectiveEnabled(module.key, states),
     homepageEligible: moduleHomepageAvailable(module.key, states),
     isHomepage: configuredHomeKey === module.key && moduleHomepageAvailable(module.key, states),
-    submodules: APP_MODULES.filter((candidate) => candidate.parentKey === module.key).map((submodule) => ({
+    submodules: APP_MODULES.filter((candidate) => candidate.parentKey === module.key && !candidate.retired).map((submodule) => ({
       key: submodule.key,
       label: submodule.label,
       description: submodule.description,
@@ -574,6 +575,7 @@ async function handleAdminModules(request: Request, env: Env, user: CurrentUser)
   const enabled = body?.enabled;
   const target = APP_MODULES.find((module) => module.key === targetKey);
   if (!APP_MODULE_KEYS.has(targetKey) || !target || typeof enabled !== "boolean") return json({ error: "Módulo ou estado inválido." }, 400);
+  if (target.retired) return json({ error: "Este módulo foi descontinuado e não pode ser reativado." }, 409);
   if (submoduleKey && target.parentKey !== moduleKey) return json({ error: "O submódulo não pertence ao módulo indicado." }, 400);
   const [states, configuredHomeKey] = await Promise.all([moduleStates(env), configuredHomeModuleKey(env)]);
   const nextStates = { ...states, [targetKey]: enabled };
@@ -1408,32 +1410,56 @@ async function handleAnnouncements(request: Request, env: Env, user: CurrentUser
   return json({ error: "Operação não suportada." }, 405);
 }
 
-type CurricularUnitInput = { code: string; name: string; ects: number; year: number; semester: number; representativeUserId: string };
+type CurricularUnitInput = { code: string; name: string; ects: number; year: number; semester: number; representativeUserIds: string[]; invalidRepresentatives: boolean };
 function curricularUnitInput(body: Record<string, unknown> | null): CurricularUnitInput {
+  const arrayProvided = body && Object.prototype.hasOwnProperty.call(body, "representativeUserIds");
+  const rawIds = arrayProvided ? body?.representativeUserIds : body?.representativeUserId;
+  const candidateIds = Array.isArray(rawIds) ? rawIds : rawIds === undefined || rawIds === null || rawIds === "" ? [] : [rawIds];
+  const representativeUserIds = candidateIds.map((id) => typeof id === "string" ? id.trim() : "");
+  const invalidRepresentatives = Boolean(arrayProvided && !Array.isArray(rawIds)) || representativeUserIds.some((id) => !id) || representativeUserIds.length > 2 || new Set(representativeUserIds).size !== representativeUserIds.length;
   return {
     code: String(body?.code || "").trim().toUpperCase().replace(/\s+/g, "").slice(0, 20),
     name: String(body?.name || "").trim().replace(/\s+/g, " ").slice(0, 160),
     ects: Number(body?.ects),
     year: Number(body?.year),
     semester: Number(body?.semester),
-    representativeUserId: String(body?.representativeUserId || ""),
+    representativeUserIds,
+    invalidRepresentatives,
   };
 }
 
 function validCurricularUnit(input: CurricularUnitInput): boolean {
-  return /^[A-Z0-9._-]{2,20}$/.test(input.code) && input.name.length >= 3 && Number.isFinite(input.ects) && input.ects > 0 && input.ects <= 60 && Number.isInteger(input.year) && input.year >= 1 && input.year <= 6 && [1, 2].includes(input.semester) && Boolean(input.representativeUserId);
+  return /^[A-Z0-9._-]{2,20}$/.test(input.code) && input.name.length >= 3 && Number.isFinite(input.ects) && input.ects > 0 && input.ects <= 60 && Number.isInteger(input.year) && input.year >= 1 && input.year <= 6 && [1, 2].includes(input.semester) && !input.invalidRepresentatives;
+}
+
+async function validCurricularUnitRepresentatives(env: Env, ids: string[]): Promise<boolean> {
+  if (!ids.length) return true;
+  const placeholders = ids.map(() => "?").join(",");
+  const result = await env.DB.prepare(`SELECT id FROM users WHERE status='active' AND commission_position IS NOT NULL AND id IN (${placeholders})`).bind(...ids).all();
+  return result.results.length === ids.length;
 }
 
 async function handleCurricularUnits(request: Request, env: Env, user: CurrentUser): Promise<Response> {
   if (!isManagementCore(user)) return json({ error: "Acesso reservado ao Núcleo de Gestão." }, 403);
   if (!await isModuleEnabled(env, request.method === "GET" ? "curricular_units.catalog" : "curricular_units.management")) return moduleDisabled();
   if (request.method === "GET") {
-    const [units, representatives] = await Promise.all([
-      env.DB.prepare("SELECT cu.id,cu.code,cu.name,cu.ects,cu.study_year,cu.semester,cu.representative_user_id,u.full_name AS representative_name,p.label AS representative_position,cu.created_at,cu.updated_at FROM curricular_units cu JOIN users u ON u.id=cu.representative_user_id LEFT JOIN commission_positions p ON p.code=u.commission_position WHERE cu.active=1 ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE").all<{ id:string;code:string;name:string;ects:number;study_year:number;semester:number;representative_user_id:string;representative_name:string;representative_position:string|null;created_at:number;updated_at:number }>(),
+    const [units, assignments, representatives] = await Promise.all([
+      env.DB.prepare("SELECT id,code,name,ects,study_year,semester,created_at,updated_at FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE").all<{ id:string;code:string;name:string;ects:number;study_year:number;semester:number;created_at:number;updated_at:number }>(),
+      env.DB.prepare("SELECT cur.curricular_unit_id,cur.user_id,cur.position,u.full_name,u.email,p.label AS position_label,d.label AS department_label FROM curricular_unit_representatives cur JOIN users u ON u.id=cur.user_id LEFT JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department JOIN curricular_units cu ON cu.id=cur.curricular_unit_id WHERE cu.active=1 ORDER BY cur.curricular_unit_id,cur.position").all(),
       env.DB.prepare("SELECT u.id,u.full_name AS name,u.email,p.label AS position_label,d.label AS department_label FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' ORDER BY p.rank,u.full_name COLLATE NOCASE").all(),
     ]);
+    const assignedByUnit = new Map<string, Array<{ id:string;fullName:string;email:string;position:string|null;department:string|null }>>();
+    for (const item of assignments.results) {
+      const assignment = item as { curricular_unit_id:string;user_id:string;full_name:string;email:string;position_label:string|null;department_label:string|null };
+      const list = assignedByUnit.get(assignment.curricular_unit_id) || [];
+      list.push({ id: assignment.user_id, fullName: assignment.full_name, email: assignment.email, position: assignment.position_label, department: assignment.department_label });
+      assignedByUnit.set(assignment.curricular_unit_id, list);
+    }
     return json({
-      units: units.results.map((unit) => ({ id: unit.id, code: unit.code, name: unit.name, ects: unit.ects, year: unit.study_year, semester: unit.semester, representativeUserId: unit.representative_user_id, representativeName: unit.representative_name, representativePosition: unit.representative_position, createdAt: unit.created_at, updatedAt: unit.updated_at })),
+      units: units.results.map((unit) => {
+        const unitRepresentatives = assignedByUnit.get(unit.id) || [], primary = unitRepresentatives[0] || null;
+        return { id: unit.id, code: unit.code, name: unit.name, ects: unit.ects, year: unit.study_year, semester: unit.semester, representativeUserIds: unitRepresentatives.map((representative) => representative.id), representatives: unitRepresentatives, representativeUserId: primary?.id || null, representativeName: primary?.fullName || null, representativeEmail: primary?.email || null, representativePosition: primary?.position || null, representative: primary, createdAt: unit.created_at, updatedAt: unit.updated_at };
+      }),
       representatives: representatives.results.map((representative) => {
         const row = representative as { id:string;name:string;email:string;position_label:string|null;department_label:string|null };
         return { id: row.id, fullName: row.name, email: row.email, commissionPosition: row.position_label, department: row.department_label };
@@ -1450,15 +1476,15 @@ async function handleCurricularUnits(request: Request, env: Env, user: CurrentUs
     return json({ ok: true });
   }
   const input = curricularUnitInput(body);
-  if (!validCurricularUnit(input)) return json({ error: "Preencha código, nome, ECTS, ano, semestre e representante válidos." }, 400);
-  const representative = await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active' AND commission_position IS NOT NULL").bind(input.representativeUserId).first();
-  if (!representative) return json({ error: "Selecione um membro ativo da Comissão de Curso." }, 400);
+  if (!validCurricularUnit(input)) return json({ error: "Preencha código, nome, ECTS, ano, semestre e até dois representantes válidos." }, 400);
+  if (!await validCurricularUnitRepresentatives(env, input.representativeUserIds)) return json({ error: "Selecione até dois membros ativos da Comissão de Curso, sem repetição." }, 400);
   if (request.method === "POST") {
     const id = crypto.randomUUID();
     try {
       await env.DB.batch([
-        env.DB.prepare("INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?,?)").bind(id, input.code, input.name, input.ects, input.year, input.semester, input.representativeUserId, actorId, actorId, now, now),
-        env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_created',?,?)").bind(actorId, JSON.stringify({ id, ...input }), now),
+        env.DB.prepare("INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,?,?,?,?)").bind(id, input.code, input.name, input.ects, input.year, input.semester, input.representativeUserIds[0] || null, actorId, actorId, now, now),
+        ...input.representativeUserIds.map((representativeUserId, index) => env.DB.prepare("INSERT INTO curricular_unit_representatives (curricular_unit_id,user_id,position,created_by,created_at,updated_by,updated_at) VALUES (?,?,?,?,?,?,?)").bind(id, representativeUserId, index + 1, actorId, now, actorId, now)),
+        env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_created',?,?)").bind(actorId, JSON.stringify({ id, ...input, representativeUserId: input.representativeUserIds[0] || null }), now),
       ]);
     } catch { return json({ error: "Já existe uma unidade curricular com esse código." }, 409); }
     return json({ ok: true, id }, 201);
@@ -1467,9 +1493,14 @@ async function handleCurricularUnits(request: Request, env: Env, user: CurrentUs
     const id = String(body?.id || "");
     if (!id) return json({ error: "Unidade curricular inválida." }, 400);
     try {
-      const result = await env.DB.prepare("UPDATE curricular_units SET code=?,name=?,ects=?,study_year=?,semester=?,representative_user_id=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(input.code, input.name, input.ects, input.year, input.semester, input.representativeUserId, actorId, now, id).run();
-      if (!result.meta.changes) return json({ error: "Unidade curricular não encontrada." }, 404);
-      await env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_updated',?,?)").bind(actorId, JSON.stringify({ id, ...input }), now).run();
+      const existing = await env.DB.prepare("SELECT id FROM curricular_units WHERE id=? AND active=1").bind(id).first();
+      if (!existing) return json({ error: "Unidade curricular não encontrada." }, 404);
+      await env.DB.batch([
+        env.DB.prepare("UPDATE curricular_units SET code=?,name=?,ects=?,study_year=?,semester=?,representative_user_id=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(input.code, input.name, input.ects, input.year, input.semester, input.representativeUserIds[0] || null, actorId, now, id),
+        env.DB.prepare("DELETE FROM curricular_unit_representatives WHERE curricular_unit_id=?").bind(id),
+        ...input.representativeUserIds.map((representativeUserId, index) => env.DB.prepare("INSERT INTO curricular_unit_representatives (curricular_unit_id,user_id,position,created_by,created_at,updated_by,updated_at) VALUES (?,?,?,?,?,?,?)").bind(id, representativeUserId, index + 1, actorId, now, actorId, now)),
+        env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'curricular_unit_updated',?,?)").bind(actorId, JSON.stringify({ id, ...input, representativeUserId: input.representativeUserIds[0] || null }), now),
+      ]);
     } catch { return json({ error: "Já existe uma unidade curricular com esse código." }, 409); }
     return json({ ok: true });
   }
@@ -1520,6 +1551,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (pathname === "/api/admin/curricular-units" && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
     const user = await currentUser(request, env);
     return user ? handleCurricularUnits(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (isQuizPath(pathname)) {
+    const user = await currentUser(request, env);
+    return handleQuizRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
   }
   if (isAcademicHubPath(pathname)) {
     const user = await currentUser(request, env);

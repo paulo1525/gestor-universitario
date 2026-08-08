@@ -97,3 +97,11 @@ Quando uma versão alterar o esquema da base de dados, aplicar as migrations D1 
 - Operações administrativas relevantes devem permanecer auditáveis.
 - Materiais submetidos devem passar por moderação antes da publicação.
 - Tokens, palavras-passe e segredos devem existir apenas nos mecanismos próprios de variáveis de ambiente.
+
+## Identidade visual obrigatória
+
+- Antes de criar ou alterar UI, ler integralmente `docs/AI-UI-DESIGN-GUIDE.md`.
+- Usar `/admin/`, `components/admin-control.tsx`, `components/turmas-dashboard.tsx` e os tokens de `app/globals.css` como referências canónicas.
+- Não inventar um tema próprio para cada módulo: não criar heroes escuros, gradientes decorativos, cartões promocionais, paletas, sombras ou raios novos sem pedido explícito do utilizador.
+- Reutilizar os padrões globais de cabeçalho, cartões de estatística, painéis, botões, formulários e tabelas antes de criar CSS local.
+- Validar visualmente no Chrome em desktop e mobile e comparar diretamente com as páginas de referência antes de considerar a alteração concluída.

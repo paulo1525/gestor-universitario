@@ -235,12 +235,13 @@ test("tickets ficam ocultos e desativados temporariamente",()=>{
   assert.doesNotMatch(shell,/href="\/admin\/pedidos"/);
 });
 
-test("menu administrativo segue o fluxo de trabalho",()=>{
-  assert.match(shell,/Turmas<\/span>.*Lista de turmas.*Colocações/s);
-  assert.match(shell,/Validar, calcular e publicar/);
+test("menu administrativo oculta turmas e apresenta a gestão de testes",()=>{
+  assert.doesNotMatch(shell,/href="\/turmas|href="\/admin\/colocacoes|href="\/admin\/turmas/);
+  assert.match(shell,/href="\/testes"/);
+  assert.match(shell,/href="\/admin\/testes"/);
   assert.doesNotMatch(shell,/href="\/admin\/verificacao"/);
-  assert.match(shell,/Utilizadores e calendário/);
-  assert.match(shell,/Ações administrativas/);
+  assert.match(shell,/href="\/admin"/);
+  assert.match(shell,/href="\/admin\/historico"/);
 });
 
 test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{

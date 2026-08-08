@@ -19,6 +19,8 @@ type ApiUnit = {
   studyYear?: number;
   study_year?: number;
   semester?: number;
+  representativeUserIds?: string[] | null;
+  representative_user_ids?: string[] | null;
   representativeUserId?: string | null;
   representative_user_id?: string | null;
 };
@@ -39,7 +41,7 @@ type CurricularUnit = {
   ects: number;
   year: number;
   semester: number;
-  representativeUserId: string;
+  representativeUserIds: string[];
 };
 
 type Representative = {
@@ -53,7 +55,7 @@ type UnitForm = Omit<CurricularUnit, "id">;
 type FieldErrors = Partial<Record<keyof UnitForm, string>>;
 type Notice = { kind: "success" | "error"; message: string } | null;
 
-const emptyForm: UnitForm = { code: "", name: "", ects: 6, year: 1, semester: 1, representativeUserId: "" };
+const emptyForm: UnitForm = { code: "", name: "", ects: 6, year: 1, semester: 1, representativeUserIds: [] };
 
 function normaliseUnit(unit: ApiUnit): CurricularUnit {
   return {
@@ -63,7 +65,7 @@ function normaliseUnit(unit: ApiUnit): CurricularUnit {
     ects: Number(unit.ects ?? unit.credits ?? 0),
     year: Number(unit.year ?? unit.studyYear ?? unit.study_year ?? 1),
     semester: Number(unit.semester || 1),
-    representativeUserId: String(unit.representativeUserId ?? unit.representative_user_id ?? ""),
+    representativeUserIds: Array.from(new Set((unit.representativeUserIds ?? unit.representative_user_ids ?? [unit.representativeUserId ?? unit.representative_user_id]).filter((value): value is string => typeof value === "string" && Boolean(value)).slice(0, 2))),
   };
 }
 
@@ -87,7 +89,6 @@ function validate(form: UnitForm, t: Translator): FieldErrors {
   if (!Number.isFinite(form.ects) || form.ects < 0.5 || form.ects > 60) errors.ects = t("classes.units.validationEcts");
   if (!Number.isInteger(form.year) || form.year < 1 || form.year > 6) errors.year = t("classes.units.validationYear");
   if (form.semester !== 1 && form.semester !== 2) errors.semester = t("classes.units.validationSemester");
-  if (!form.representativeUserId) errors.representativeUserId = t("classes.units.validationRepresentative");
   return errors;
 }
 
@@ -159,7 +160,9 @@ export function CurricularUnitsManagement() {
       ects: form.ects,
       year: form.year,
       semester: form.semester,
-      representativeUserId: form.representativeUserId,
+      representativeUserIds: form.representativeUserIds,
+      // Mantém o alias para instalações que ainda leem apenas o primeiro representante.
+      representativeUserId: form.representativeUserIds[0] || null,
     };
     try {
       const response = await fetch("/api/admin/curricular-units", {
@@ -184,7 +187,7 @@ export function CurricularUnitsManagement() {
 
   const beginEdit = (unit: CurricularUnit) => {
     setEditingId(unit.id);
-    setEditForm({ code: unit.code, name: unit.name, ects: unit.ects, year: unit.year, semester: unit.semester, representativeUserId: unit.representativeUserId });
+    setEditForm({ code: unit.code, name: unit.name, ects: unit.ects, year: unit.year, semester: unit.semester, representativeUserIds: unit.representativeUserIds });
     setEditErrors({});
     setNotice(null);
   };
@@ -194,15 +197,15 @@ export function CurricularUnitsManagement() {
   }
 
   return <AppShell active="curricular_units_management" breadcrumb={t("classes.units.breadcrumb")}>
-    <header className={styles.heading}>
+    <header className={`admin-heading ${styles.heading}`}>
       <div><span className="eyebrow">{t("classes.units.eyebrow")}</span><h1>{t("classes.units.title")}</h1><p>{t("classes.units.description")}</p></div>
-      <button className="button button--primary" type="button" onClick={() => { setShowCreate(true); setNotice(null); }} disabled={showCreate}><Plus />{t("classes.units.add")}</button>
+      <button className="button button--primary" type="button" onClick={() => { setShowCreate(true); setNotice(null); }} disabled={showCreate || loading}><Plus />{t("classes.units.add")}</button>
     </header>
 
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
     {showCreate && <section className={`panel ${styles.editor}`} aria-labelledby="nova-unidade">
-      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><h2 id="nova-unidade">{t("classes.units.new")}</h2><p>{t("classes.units.required")}</p></div></div><button type="button" className={styles.closeButton} onClick={() => { setShowCreate(false); setCreateErrors({}); }} aria-label={t("classes.units.cancelCreate")}><X /></button></div>
+      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><h2 id="nova-unidade">{t("classes.units.new")}</h2><p>{t("classes.units.required")} Pode associar até dois representantes da Comissão de Curso.</p></div></div><button type="button" className={styles.closeButton} onClick={() => { setShowCreate(false); setCreateErrors({}); }} aria-label={t("classes.units.cancelCreate")}><X /></button></div>
       <UnitEditor form={createForm} setForm={setCreateForm} errors={createErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.create")} onSubmit={event => void save("create", event)} onCancel={() => { setShowCreate(false); setCreateErrors({}); }} />
     </section>}
 
@@ -215,7 +218,7 @@ export function CurricularUnitsManagement() {
           <div className={styles.identity}><span className={styles.code}>{unit.code}</span><h3>{unit.name}</h3></div>
           <div className={styles.metric}><span>{t("classes.units.credits")}</span><strong>{unit.ects.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} <small>ECTS</small></strong></div>
           <div className={styles.metric}><span>{t("classes.units.period")}</span><strong>{t("classes.units.yearValue", { year: unit.year })} <small>· {t("classes.units.semesterValue", { semester: unit.semester })}</small></strong></div>
-          <div className={styles.representative}><span>{t("classes.units.representative")}</span>{representativesById.get(unit.representativeUserId) ? <><strong>{representativesById.get(unit.representativeUserId)?.fullName}</strong><small>{representativesById.get(unit.representativeUserId)?.email}</small></> : <strong className={styles.missingRepresentative}>{t("classes.units.noRepresentative")}</strong>}</div>
+          <div className={styles.representative}><span>{t("classes.units.representative")}</span>{unit.representativeUserIds.length ? unit.representativeUserIds.map((representativeId) => { const representative = representativesById.get(representativeId); return representative ? <span className={styles.representativePerson} key={representative.id}><strong>{representative.fullName}</strong><small>{representative.email}</small></span> : null; }) : <strong className={styles.missingRepresentative}>Sem representante atribuído</strong>}</div>
           <button className={styles.editButton} type="button" onClick={() => beginEdit(unit)} aria-label={t("classes.units.editAria", { name: unit.name })}><Pencil />{t("classes.units.edit")}</button>
         </article>}</div>)}</div>}
     </section>
@@ -234,6 +237,11 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
 }) {
   const { t } = useI18n();
   const field = <Key extends keyof UnitForm>(key: Key, value: UnitForm[Key]) => setForm({ ...form, [key]: value });
+  const representativeField = (index: number, value: string) => {
+    const next = [...form.representativeUserIds];
+    if (value) next[index] = value; else next.splice(index, 1);
+    setForm({ ...form, representativeUserIds: Array.from(new Set(next.filter(Boolean))).slice(0, 2) });
+  };
   return <form className={styles.form} onSubmit={onSubmit} noValidate>
     <div className={styles.formGrid}>
       <label className={styles.codeField}><FormLabel icon={Hash}>{t("classes.units.code")}</FormLabel><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder={t("classes.units.codePlaceholder")} aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
@@ -241,7 +249,23 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
       <label><FormLabel icon={Award}>{t("classes.units.ects")}</FormLabel><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
       <label><FormLabel icon={GraduationCap}>{t("classes.units.year")}</FormLabel><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{t("classes.units.yearValue", { year })}</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
       <label><FormLabel icon={CalendarRange}>{t("classes.units.semester")}</FormLabel><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>{t("classes.units.semesterValue", { semester: 1 })}</option><option value={2}>{t("classes.units.semesterValue", { semester: 2 })}</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
-      <label className={styles.representativeField}><FormLabel icon={UserRound}>{t("classes.units.committeeRepresentative")}</FormLabel><select value={form.representativeUserId} onChange={event => field("representativeUserId", event.target.value)} aria-invalid={Boolean(errors.representativeUserId)}><option value="">{t("classes.units.selectRepresentative")}</option>{representatives.map(representative => <option value={representative.id} key={representative.id}>{representative.fullName} · {representative.email}</option>)}</select>{errors.representativeUserId && <small>{errors.representativeUserId}</small>}{!representatives.length && <small className={styles.hint}>{t("classes.units.noEligibleRepresentative")}</small>}</label>
+      <div className={styles.representativeField}>
+        <FormLabel icon={UserRound} optional>{t("classes.units.committeeRepresentatives")}</FormLabel>
+        <div className={styles.representativeSelectors}>
+          {[0, 1].map((index) => {
+            const selected = form.representativeUserIds[index] || "";
+            const otherSelected = form.representativeUserIds[index === 0 ? 1 : 0];
+            return <label key={index}>
+              <span>{t("classes.units.representativeNumber", { number: index + 1 })}</span>
+              <select value={selected} onChange={event => representativeField(index, event.target.value)}>
+                <option value="">{t("classes.units.noRepresentativeOption")}</option>
+                {representatives.map(representative => <option value={representative.id} key={representative.id} disabled={representative.id === otherSelected}>{representative.fullName} · {representative.email}</option>)}
+              </select>
+            </label>;
+          })}
+        </div>
+        {!representatives.length && <small className={styles.hint}>{t("classes.units.noEligibleRepresentativeOptional")}</small>}
+      </div>
     </div>
     <div className={styles.formActions}><button className="button button--secondary button--compact" type="button" onClick={onCancel} disabled={saving}>{t("classes.common.cancel")}</button><button className="button button--primary button--compact" type="submit" disabled={saving}>{saving ? <><LoaderCircle className={styles.spin} />{t("classes.common.saving")}</> : <><Save />{submitLabel}</>}</button></div>
   </form>;

@@ -1,0 +1,808 @@
+"use client";
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @next/next/no-img-element */
+
+import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  CircleHelp,
+  Clock3,
+  EyeOff,
+  Flag,
+  Lightbulb,
+  LoaderCircle,
+  MessageCircle,
+  Play,
+  RotateCcw,
+  Send,
+  Sparkles,
+  TimerReset,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { AppToast, ToastKind } from "@/components/app-toast";
+import { AuthGuard } from "@/components/auth-guard";
+import { ModuleGuard } from "@/components/module-guard";
+import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
+import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import styles from "@/components/quiz-hub.module.css";
+
+type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic";
+type Screen = "catalogue" | "attempt" | "results";
+type Notice = { kind: ToastKind; message: string } | null;
+
+type ApiOption = { id: string | number; text?: string; label?: string; content?: string };
+type ApiQuestion = {
+  id: string | number;
+  text?: string;
+  prompt?: string;
+  question?: string;
+  statement?: string;
+  imageUrl?: string | null;
+  image_url?: string | null;
+  imageAlt?: string | null;
+  image_alt?: string | null;
+  topicId?: string | number | null;
+  topic_id?: string | number | null;
+  topic?: string | { id?: string | number; name?: string; title?: string } | null;
+  options?: ApiOption[];
+  correctOptionId?: string | number | null;
+  correct_option_id?: string | number | null;
+  selectedOptionId?: string | number | null;
+  selected_option_id?: string | number | null;
+  correct?: boolean | null;
+  explanation?: string | null;
+};
+type Question = {
+  id: string;
+  text: string;
+  imageUrl: string | null;
+  imageAlt: string;
+  topicId: string | null;
+  topic: string;
+  options: Array<{ id: string; text: string }>;
+  correctOptionId: string | null;
+  explanation: string | null;
+};
+type ApiTopic = { id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number };
+type Topic = { id: string; unitId: string; name: string; questionCount: number };
+type ApiUnit = { id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; topics?: ApiTopic[] };
+type Unit = { id: string; name: string; code: string; questionCount: number; topics: Topic[] };
+type Answer = { questionId: string; selectedOptionId: string; correct: boolean | null };
+type Attempt = {
+  id: string;
+  unitId: string;
+  mode: Mode;
+  status: "active" | "finished";
+  quizId: string;
+  title: string;
+  startedAt: string | null;
+  endsAt: string | null;
+  durationSeconds: number | null;
+  questions: Question[];
+  answers: Answer[];
+  score: number | null;
+  totalCorrect: number | null;
+};
+type ApiComment = { id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
+type Comment = { id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
+
+type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number };
+type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
+const QUIZ_PREFERENCES_COOKIE = "gu-quiz-preferences";
+const QUIZ_PROGRESS_COOKIE = "gu-quiz-progress";
+const EMPTY_TOPICS: Topic[] = [];
+
+const modeCards: Array<{ id: Mode; title: string; description: string; icon: typeof Play }> = [
+  { id: "topic", title: "Temático", description: "Foca um tema específico da unidade curricular.", icon: BookOpen },
+  { id: "unseen", title: "Não vistas", description: "Descobre perguntas que ainda não respondeste.", icon: EyeOff },
+  { id: "quick", title: "Teste aleatório", description: "Pratica com uma seleção aleatória de todo o banco.", icon: Play },
+];
+
+function modeTitle(mode: Mode) {
+  return mode === "topic" ? "Temático" : mode === "unseen" ? "Não vistas" : mode === "mistakes" ? "Rever erros" : mode === "exam" ? "Simulado" : "Teste aleatório";
+}
+
+function questionLabel(count: number) {
+  return `${count} ${count === 1 ? "pergunta" : "perguntas"}`;
+}
+
+function isoDate(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const timestamp = typeof value === "number" || /^\d+$/.test(value) ? Number(value) : Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function readQuizPreferences(): QuizPreferences {
+  if (typeof document === "undefined") return {};
+  const encoded = document.cookie.split(";").map((value) => value.trim()).find((value) => value.startsWith(`${QUIZ_PREFERENCES_COOKIE}=`))?.slice(QUIZ_PREFERENCES_COOKIE.length + 1);
+  if (!encoded) return {};
+  try {
+    const saved = JSON.parse(decodeURIComponent(encoded)) as Record<string, unknown>;
+    const mode = typeof saved.mode === "string" && ["quick", "unseen", "topic", "mistakes"].includes(saved.mode) ? saved.mode as Mode : undefined;
+    const questionCount = typeof saved.questionCount === "number" && Number.isInteger(saved.questionCount) && saved.questionCount >= 10 && saved.questionCount <= 50 ? saved.questionCount : undefined;
+    return { unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount };
+  } catch { return {}; }
+}
+
+function saveQuizPreferences(preferences: QuizPreferences) {
+  if (typeof document === "undefined") return;
+  const safe = { unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: Math.min(50, Math.max(10, preferences.questionCount ?? 10)) };
+  document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+}
+
+function readQuizProgress(): QuizProgress | null {
+  if (typeof document === "undefined") return null;
+  const encoded = document.cookie.split(";").map((item) => item.trim()).find((item) => item.startsWith(`${QUIZ_PROGRESS_COOKIE}=`))?.slice(QUIZ_PROGRESS_COOKIE.length + 1);
+  if (!encoded) return null;
+  try {
+    const saved = JSON.parse(decodeURIComponent(encoded)) as Record<string, unknown>;
+    const expiresAt = isoDate(saved.expiresAt);
+    if (typeof saved.attemptId !== "string" || !saved.attemptId || !expiresAt || new Date(expiresAt).getTime() <= Date.now()) return null;
+    return { attemptId: saved.attemptId.slice(0, 120), currentIndex: Math.max(0, Math.floor(Number(saved.currentIndex) || 0)), expiresAt, updatedAt: typeof saved.updatedAt === "string" ? saved.updatedAt : new Date().toISOString() };
+  } catch { return null; }
+}
+
+function saveQuizProgress(attempt: Attempt, currentIndex: number) {
+  if (typeof document === "undefined" || !attempt.id || attempt.status !== "active") return;
+  const expiresAt = attempt.endsAt ?? new Date(Date.now() + (attempt.durationSeconds ?? attempt.questions.length * 60) * 1000).toISOString();
+  const safe: QuizProgress = { attemptId: attempt.id.slice(0, 120), currentIndex: Math.max(0, Math.min(currentIndex, Math.max(0, attempt.questions.length - 1))), expiresAt, updatedAt: new Date().toISOString() };
+  const maxAge = Math.max(60, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
+  document.cookie = `${QUIZ_PROGRESS_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=${maxAge}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+}
+
+function clearQuizProgress() {
+  if (typeof document === "undefined") return;
+  document.cookie = `${QUIZ_PROGRESS_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+}
+
+function value<T>(raw: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) if (raw[key] !== undefined && raw[key] !== null) return raw[key] as T;
+  return undefined;
+}
+
+function normalizeTopic(item: ApiTopic): Topic {
+  return { id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0) };
+}
+
+function normalizeQuestion(item: ApiQuestion): Question {
+  const rawTopic = item.topic;
+  const objectTopic = rawTopic && typeof rawTopic === "object" ? rawTopic : null;
+  return {
+    id: String(item.id),
+    text: item.text ?? item.prompt ?? item.question ?? item.statement ?? "Pergunta sem enunciado.",
+    imageUrl: item.imageUrl ?? item.image_url ?? null,
+    imageAlt: item.imageAlt ?? item.image_alt ?? "Imagem de apoio à pergunta",
+    topicId: item.topicId !== undefined || item.topic_id !== undefined ? String(item.topicId ?? item.topic_id) : objectTopic?.id !== undefined ? String(objectTopic.id) : null,
+    topic: typeof rawTopic === "string" ? rawTopic : objectTopic?.name ?? objectTopic?.title ?? "Tema geral",
+    options: (item.options ?? []).slice(0, 4).map((option) => ({ id: String(option.id), text: option.text ?? option.label ?? option.content ?? "Opção sem texto" })),
+    correctOptionId: item.correctOptionId !== undefined || item.correct_option_id !== undefined ? String(item.correctOptionId ?? item.correct_option_id) : null,
+    explanation: item.explanation ?? null,
+  };
+}
+
+function normalizeAnswer(item: Record<string, unknown>): Answer {
+  return {
+    questionId: String(value<string | number>(item, "questionId", "question_id") ?? ""),
+    selectedOptionId: String(value<string | number>(item, "selectedOptionId", "selected_option_id", "optionId", "option_id") ?? ""),
+    correct: typeof value<unknown>(item, "correct", "isCorrect", "is_correct") === "boolean" ? Boolean(value<unknown>(item, "correct", "isCorrect", "is_correct")) : null,
+  };
+}
+
+function normalizeAttempt(raw: Record<string, unknown>, fallbackMode: Mode = "quick"): Attempt {
+  const attempt = (raw.attempt && typeof raw.attempt === "object" ? raw.attempt : raw) as Record<string, unknown>;
+  const questions = (value<ApiQuestion[]>(attempt, "questions") ?? value<ApiQuestion[]>(raw, "questions") ?? []).map(normalizeQuestion);
+  const responseAnswers = (value<Record<string, unknown>[]>(attempt, "answers") ?? value<Record<string, unknown>[]>(raw, "answers") ?? []).map(normalizeAnswer).filter((answer) => answer.questionId);
+  const answers = responseAnswers.length ? responseAnswers : questions.map((question, index) => {
+    const source = (value<ApiQuestion[]>(attempt, "questions") ?? value<ApiQuestion[]>(raw, "questions") ?? [])[index];
+    const selected = source?.selectedOptionId ?? source?.selected_option_id;
+    return selected === null || selected === undefined ? null : { questionId: question.id, selectedOptionId: String(selected), correct: typeof source?.correct === "boolean" ? source.correct : null };
+  }).filter((answer): answer is Answer => Boolean(answer));
+  const rawMode = String(value<string>(attempt, "mode") ?? fallbackMode);
+  const rawStartedAt = value<string | number>(attempt, "startedAt", "started_at");
+  const rawEndsAt = value<string | number>(attempt, "endsAt", "ends_at", "expiresAt", "expires_at");
+  return {
+    id: String(value<string | number>(attempt, "id", "attemptId", "attempt_id") ?? ""),
+    unitId: String(value<string | number>(attempt, "unitId", "unit_id", "curricularUnitId", "curricular_unit_id") ?? ""),
+    mode: (["quick", "unseen", "topic", "mistakes", "exam"].includes(rawMode) ? rawMode : fallbackMode) as Mode,
+    status: ["finished", "completed", "abandoned", "expired"].includes(String(value<string>(attempt, "status") ?? "active")) ? "finished" : "active",
+    quizId: String(value<string | number>(attempt, "quizId", "quiz_id") ?? ""),
+    title: String(value<string>(attempt, "quizTitle", "quiz_title", "title") ?? "Teste"),
+    startedAt: isoDate(rawStartedAt),
+    endsAt: isoDate(rawEndsAt),
+    durationSeconds: Number(value<number>(attempt, "durationSeconds", "duration_seconds") ?? 0) || (questions.length ? questions.length * 60 : null),
+    questions,
+    answers,
+    score: Number(value<number>(attempt, "score", "scorePercent", "score_percent") ?? NaN),
+    totalCorrect: Number(value<number>(attempt, "totalCorrect", "total_correct", "correctAnswers", "correct_answers", "correctCount", "correct_count") ?? NaN),
+  };
+}
+
+function normalizeComment(item: ApiComment): Comment {
+  const parentCommentId = item.parentCommentId ?? item.parent_comment_id;
+  return { id: String(item.id), body: item.body ?? item.text ?? "", authorName: item.authorName ?? item.author_name ?? "Estudante", authorRole: item.authorRole ?? item.author_role, isAdmin: item.isAdmin ?? item.is_admin, parentCommentId: parentCommentId === null || parentCommentId === undefined ? undefined : String(parentCommentId), replyToName: item.replyTo?.authorName ?? item.replyTo?.author_name, createdAt: item.createdAt ? String(item.createdAt) : item.created_at ? String(item.created_at) : null, status: item.status ?? "published" };
+}
+
+function formatClock(seconds: number) {
+  const safe = Math.max(0, seconds);
+  return `${String(Math.floor(safe / 60)).padStart(2, "0")}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function humanDate(value: string | null) {
+  if (!value) return "agora";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "agora" : new Intl.DateTimeFormat("pt-PT", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function apiError(data: Record<string, unknown>, fallback: string) {
+  return typeof data.error === "string" ? data.error : fallback;
+}
+
+export function QuizHub() {
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState(() => readQuizPreferences().unitId ?? "");
+  const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
+  const [selectedMode, setSelectedMode] = useState<Mode>(() => readQuizPreferences().mode ?? "quick");
+  const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? 10);
+  const [screen, setScreen] = useState<Screen>("catalogue");
+  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [catalogueLoading, setCatalogueLoading] = useState(true);
+  const [loadingAttempt, setLoadingAttempt] = useState(false);
+  const [savingQuestionIds, setSavingQuestionIds] = useState<string[]>([]);
+  const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<Notice>(null);
+  const [availability, setAvailability] = useState<{ code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [sendingComment, setSendingComment] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const attemptRef = useRef<Attempt | null>(null);
+  const pendingAnswerSaves = useRef(new Map<string, Promise<void>>());
+
+  const selectedUnit = units.find((unit) => unit.id === selectedUnitId) ?? null;
+  const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
+  const availableQuestionCount = useMemo(() => {
+    if (!selectedUnit) return 0;
+    if (selectedMode === "topic" && selectedTopicIds.length) return topics.filter((topic) => selectedTopicIds.includes(topic.id)).reduce((total, topic) => total + topic.questionCount, 0);
+    return selectedUnit.questionCount;
+  }, [selectedMode, selectedTopicIds, selectedUnit, topics]);
+  const question = attempt?.questions[currentIndex] ?? null;
+  const answers = useMemo(() => new Map((attempt?.answers ?? []).map((answer) => [answer.questionId, answer])), [attempt?.answers]);
+  const currentAnswer = question ? answers.get(question.id) ?? null : null;
+  const answering = question ? savingQuestionIds.includes(question.id) : false;
+  const isExam = attempt?.mode === "exam";
+  const completedCount = attempt?.answers.filter((answer) => Boolean(answer.selectedOptionId)).length ?? 0;
+  const progress = attempt?.questions.length ? Math.round((completedCount / attempt.questions.length) * 100) : 0;
+  const correctCount = attempt?.answers.filter((answer) => answer.correct === true).length ?? 0;
+  const recommendation = useMemo(() => {
+    const incorrect = attempt?.questions.filter((item) => answers.get(item.id)?.correct === false) ?? [];
+    const topic = incorrect[0]?.topic;
+    return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "Mantém o ritmo: alterna testes temáticos e aleatórios para consolidar a matéria.";
+  }, [answers, attempt?.questions]);
+
+  useEffect(() => { attemptRef.current = attempt; }, [attempt]);
+
+  const loadCatalogue = useCallback(async () => {
+    setCatalogueLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/quizzes", { cache: "no-store" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível carregar os testes."));
+      const apiTopics = (value<ApiTopic[]>(data, "topics", "themes") ?? []).map(normalizeTopic);
+      const apiUnits = (value<ApiUnit[]>(data, "units", "curricularUnits", "curricular_units") ?? []).map((item) => ({
+        id: String(item.id),
+        name: item.name ?? item.title ?? "Unidade curricular",
+        code: item.code ?? "UC",
+        questionCount: Number(item.questionCount ?? item.question_count ?? 0),
+        topics: (item.topics ?? []).map(normalizeTopic).concat(apiTopics.filter((topic) => topic.unitId === String(item.id))),
+      }));
+      const nextUnits = apiUnits;
+      setUnits(nextUnits);
+      setSelectedUnitId((current) => current && nextUnits.some((unit) => unit.id === current) ? current : nextUnits[0]?.id ?? "");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Não foi possível carregar os testes.");
+    } finally {
+      setCatalogueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadCatalogue(); }, [loadCatalogue]);
+  useEffect(() => {
+    if (!selectedUnit) return;
+    setSelectedTopicIds((current) => {
+      const valid = current.filter((id) => selectedUnit.topics.some((topic) => topic.id === id));
+      return valid.length === current.length ? current : valid;
+    });
+  }, [selectedUnit]);
+  useEffect(() => {
+    if (!availableQuestionCount) return;
+    setQuestionCount((current) => availableQuestionCount < 10 ? 10 : Math.min(Math.min(50, availableQuestionCount), Math.max(10, current)));
+  }, [availableQuestionCount]);
+  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount }); }, [questionCount, selectedMode, selectedTopicIds, selectedUnitId]);
+
+  const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
+    const next = normalizeAttempt(raw, fallbackMode);
+    if (!next.id && attemptRef.current) next.id = attemptRef.current.id;
+    if (!next.questions.length && attemptRef.current) next.questions = attemptRef.current.questions;
+    if (!next.answers.length && attemptRef.current) next.answers = attemptRef.current.answers;
+    setAttempt(next);
+    attemptRef.current = next;
+    return next;
+  }, []);
+
+  useEffect(() => {
+    const saved = readQuizProgress();
+    if (!saved) { clearQuizProgress(); return; }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(saved.attemptId)}`, { cache: "no-store" });
+        if (!response.ok) { clearQuizProgress(); return; }
+        const data = await response.json() as Record<string, unknown>;
+        const restored = normalizeAttempt(data);
+        if (cancelled || restored.status !== "active" || !restored.questions.length || (restored.endsAt && new Date(restored.endsAt).getTime() <= Date.now())) { clearQuizProgress(); return; }
+        setAttempt(restored);
+        attemptRef.current = restored;
+        setCurrentIndex(Math.min(saved.currentIndex, restored.questions.length - 1));
+        if (restored.unitId) setSelectedUnitId(restored.unitId);
+      } catch { clearQuizProgress(); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const startAttempt = useCallback(async () => {
+    if (!selectedUnit?.id) {
+      setNotice({ kind: "warning", message: "Seleciona uma unidade curricular com perguntas disponíveis." });
+      return;
+    }
+    if (selectedMode === "topic" && !selectedTopicIds.length) {
+      setNotice({ kind: "warning", message: "Seleciona pelo menos um tema antes de iniciar o treino temático." });
+      return;
+    }
+    if (availableQuestionCount < 10) {
+      setNotice({ kind: "warning", message: "São necessárias pelo menos 10 perguntas disponíveis para iniciar um teste." });
+      return;
+    }
+    setLoadingAttempt(true);
+    setAvailability(null);
+    try {
+      const activeTopicIds = selectedMode === "topic" ? selectedTopicIds : [];
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: questionCount * 60 }) });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) {
+        const code = data.code;
+        if (code === "not_enough_mistakes" || code === "all_questions_seen" || code === "not_enough_questions") {
+          setAvailability({ code, available: Number(data.available ?? 0), required: Number(data.required ?? 10), total: Number(data.total ?? 0) });
+          return;
+        }
+        throw new Error(apiError(data, "Não foi possível iniciar o teste."));
+      }
+      const next = updateAttempt(data, selectedMode);
+      if (!next.questions.length) throw new Error("Este teste ainda não tem perguntas disponíveis para este modo.");
+      setCurrentIndex(0);
+      saveQuizProgress(next, 0);
+      setRemaining(next.endsAt ? Math.max(0, Math.ceil((new Date(next.endsAt).getTime() - Date.now()) / 1000)) : next.durationSeconds);
+      setShowExplanation(false);
+      setCommentsOpen(false);
+      setReplyTo(null);
+      setScreen("attempt");
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível iniciar o teste." });
+    } finally {
+      setLoadingAttempt(false);
+    }
+  }, [availableQuestionCount, questionCount, selectedMode, selectedTopicIds, selectedUnit, updateAttempt]);
+
+  const finishAttempt = useCallback(async () => {
+    const requestedAttempt = attemptRef.current;
+    if (!requestedAttempt || finishing) return;
+    setFinishing(true);
+    try {
+      if (pendingAnswerSaves.current.size) await Promise.allSettled([...pendingAnswerSaves.current.values()]);
+      const active = attemptRef.current;
+      if (!active || active.id !== requestedAttempt.id) return;
+      const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/finish`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível concluir o teste."));
+      const next = updateAttempt(data, active.mode);
+      clearQuizProgress();
+      setRemaining(0);
+      setScreen("results");
+      if (next.status !== "finished") setNotice({ kind: "success", message: "Teste concluído. Consulta o resultado e as explicações." });
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível concluir o teste." });
+    } finally {
+      setFinishing(false);
+    }
+  }, [finishing, updateAttempt]);
+
+  const resumeAttempt = useCallback(() => {
+    const active = attemptRef.current;
+    if (!active || active.status !== "active" || !active.questions.length) return;
+    const firstUnanswered = active.questions.findIndex((item) => !active.answers.some((answer) => answer.questionId === item.id && answer.selectedOptionId));
+    const saved = readQuizProgress();
+    const restoredIndex = saved?.attemptId === active.id && saved.currentIndex >= 0 && saved.currentIndex < active.questions.length ? saved.currentIndex : null;
+    const nextIndex = restoredIndex ?? (firstUnanswered >= 0 ? firstUnanswered : Math.max(0, active.questions.length - 1));
+    setCurrentIndex(nextIndex);
+    saveQuizProgress(active, nextIndex);
+    setRemaining(active.endsAt ? Math.max(0, Math.ceil((new Date(active.endsAt).getTime() - Date.now()) / 1000)) : active.durationSeconds ?? active.questions.length * 60);
+    setShowExplanation(false);
+    setCommentsOpen(false);
+    setReplyTo(null);
+    setScreen("attempt");
+  }, []);
+
+  const abandonAttempt = useCallback(async () => {
+    const active = attemptRef.current;
+    if (!active || finishing) return;
+    const confirmed = window.confirm("Desistir deste teste? O progresso desta tentativa será encerrado e não poderás retomá-la.");
+    if (!confirmed) return;
+    setFinishing(true);
+    try {
+      const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/abandon`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível desistir do teste."));
+      setAttempt(null);
+      attemptRef.current = null;
+      clearQuizProgress();
+      setCurrentIndex(0);
+      setRemaining(null);
+      setScreen("catalogue");
+      setNotice({ kind: "success", message: "Teste encerrado. Podes iniciar uma nova tentativa quando quiseres." });
+      void loadCatalogue();
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível desistir do teste." });
+    } finally {
+      setFinishing(false);
+    }
+  }, [finishing, loadCatalogue]);
+
+  useEffect(() => {
+    if (screen !== "attempt" || remaining === null) return;
+    if (remaining <= 0) { void finishAttempt(); return; }
+    const timer = window.setInterval(() => setRemaining((current) => current === null ? null : Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [finishAttempt, remaining, screen]);
+
+  const answerQuestion = useCallback((optionId: string) => {
+    const active = attemptRef.current;
+    const current = active?.questions[currentIndex];
+    if (!active || !current || pendingAnswerSaves.current.has(current.id) || active.status === "finished") return;
+    const saved = active.answers.find((answer) => answer.questionId === current.id);
+    if (!isExam && saved && saved.correct !== null) return;
+
+    const optimistic: Answer = {
+      questionId: current.id,
+      selectedOptionId: optionId,
+      correct: !isExam && current.correctOptionId ? optionId === current.correctOptionId : null,
+    };
+    setAttempt((previous) => {
+      if (!previous) return previous;
+      const next = { ...previous, answers: [...previous.answers.filter((answer) => answer.questionId !== current.id), optimistic] };
+      attemptRef.current = next;
+      return next;
+    });
+    if (!isExam && current.correctOptionId) setShowExplanation(true);
+    setSavingQuestionIds((ids) => ids.includes(current.id) ? ids : [...ids, current.id]);
+
+    const save = (async () => {
+      try {
+        const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/answers`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ questionId: current.id, optionId }) });
+        const data = await response.json() as Record<string, unknown>;
+        if (!response.ok) throw new Error(apiError(data, "Não foi possível guardar a resposta."));
+        const returned = data.answer && typeof data.answer === "object" ? normalizeAnswer(data.answer as Record<string, unknown>) : optimistic;
+        const questionFeedback = data.question && typeof data.question === "object" ? normalizeQuestion(data.question as ApiQuestion) : null;
+        setAttempt((previous) => {
+          if (!previous) return previous;
+          const nextAnswers = [...previous.answers.filter((answer) => answer.questionId !== current.id), returned];
+          const nextQuestions = questionFeedback ? previous.questions.map((item) => item.id === current.id ? { ...item, correctOptionId: questionFeedback.correctOptionId, explanation: questionFeedback.explanation } : item) : previous.questions;
+          const next = { ...previous, answers: nextAnswers, questions: nextQuestions };
+          attemptRef.current = next;
+          return next;
+        });
+        if (!isExam) setShowExplanation(true);
+      } catch (reason) {
+        setAttempt((previous) => {
+          if (!previous) return previous;
+          const remainingAnswers = previous.answers.filter((answer) => answer.questionId !== current.id);
+          const next = { ...previous, answers: saved ? [...remainingAnswers, saved] : remainingAnswers };
+          attemptRef.current = next;
+          return next;
+        });
+        setNotice({ kind: "error", message: `${reason instanceof Error ? reason.message : "Não foi possível guardar a resposta."} Tenta selecionar novamente.` });
+      } finally {
+        pendingAnswerSaves.current.delete(current.id);
+        setSavingQuestionIds((ids) => ids.filter((id) => id !== current.id));
+      }
+    })();
+    pendingAnswerSaves.current.set(current.id, save);
+  }, [currentIndex, isExam]);
+
+  const goToQuestion = useCallback((index: number) => {
+    if (!attempt || index < 0 || index >= attempt.questions.length) return;
+    setCurrentIndex(index);
+    saveQuizProgress(attempt, index);
+    setShowExplanation(false);
+    setCommentsOpen(false);
+    setReplyTo(null);
+  }, [attempt]);
+
+  const loadComments = useCallback(async (questionId: string) => {
+    setCommentsLoading(true);
+    try {
+      const response = await fetch(`/api/quiz-comments?questionId=${encodeURIComponent(questionId)}`, { cache: "no-store" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível carregar os comentários."));
+    setComments((value<ApiComment[]>(data, "comments") ?? []).map(normalizeComment));
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível carregar os comentários." });
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (commentsOpen && question) void loadComments(question.id);
+  }, [commentsOpen, loadComments, question]);
+
+  async function sendComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = sanitizeRichTextHtml(commentText);
+    const plainLength = richTextPlainText(text).length;
+    if (!question || plainLength < 2 || plainLength > 1200 || sendingComment) return;
+    const reply = replyTo;
+    setSendingComment(true);
+    try {
+      const response = await fetch("/api/quiz-comments", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ questionId: question.id, attemptId: attempt?.id ?? null, parentCommentId: reply?.id ?? null, body: text }) });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível enviar o comentário."));
+      const fromApi = data.comment && typeof data.comment === "object" ? normalizeComment(data.comment as ApiComment) : { id: crypto.randomUUID(), body: text, authorName: "Tu", createdAt: new Date().toISOString(), status: "published" };
+      const created: Comment = { ...fromApi, body: sanitizeRichTextHtml(fromApi.body || text), authorName: fromApi.authorName === "Estudante" ? "Tu" : fromApi.authorName, status: "published", parentCommentId: reply?.id, replyToName: reply?.authorName, isLocal: true };
+      setComments((current) => {
+        if (!created.parentCommentId) return [created, ...current];
+        const parentIndex = current.findIndex((comment) => comment.id === created.parentCommentId);
+        return parentIndex < 0 ? [created, ...current] : [...current.slice(0, parentIndex + 1), created, ...current.slice(parentIndex + 1)];
+      });
+      setCommentText("");
+      setReplyTo(null);
+      setNotice({ kind: "success", message: "Comentário publicado." });
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível enviar o comentário." });
+    } finally {
+      setSendingComment(false);
+    }
+  }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (screen !== "attempt" || !question || target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      const number = Number(event.key);
+      if (number >= 1 && number <= question.options.length) {
+        event.preventDefault();
+        void answerQuestion(question.options[number - 1].id);
+      }
+      if (event.key === "ArrowRight") { event.preventDefault(); goToQuestion(currentIndex + 1); }
+      if (event.key === "ArrowLeft") { event.preventDefault(); goToQuestion(currentIndex - 1); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [answerQuestion, currentIndex, goToQuestion, question, screen]);
+
+  const score = attempt?.score;
+  const resultPercent = typeof score === "number" && Number.isFinite(score) ? Math.round(score) : attempt?.questions.length ? Math.round((correctCount / attempt.questions.length) * 100) : 0;
+
+  return <AuthGuard>
+    <ModuleGuard moduleKey="quizzes.practice">
+      <AppShell active="quizzes" breadcrumb="Testes">
+        <div className={styles.page}>
+          {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
+          {screen === "catalogue" && <Catalogue
+            loading={catalogueLoading}
+            error={error}
+            units={units}
+            selectedUnitId={selectedUnitId}
+            selectedUnit={selectedUnit}
+            selectedMode={selectedMode}
+            selectedTopicIds={selectedTopicIds}
+            topics={topics}
+            questionCount={questionCount}
+            availableQuestionCount={availableQuestionCount}
+            loadingAttempt={loadingAttempt}
+            resumeAttempt={attempt?.status === "active" ? attempt : null}
+            availability={availability}
+            onUnit={(unitId) => { setAvailability(null); setSelectedUnitId(unitId); }}
+            onMode={(mode) => { setAvailability(null); setSelectedMode(mode); }}
+            onTopics={(topicIds) => { setAvailability(null); setSelectedTopicIds(topicIds); }}
+            onQuestionCount={(count) => { setAvailability(null); setQuestionCount(Math.min(Math.min(50, Math.max(10, availableQuestionCount)), Math.max(10, count))); }}
+            onStart={() => void startAttempt()}
+            onResume={resumeAttempt}
+            onRetry={() => void loadCatalogue()}
+            onNormal={() => { setAvailability(null); setSelectedMode("quick"); }}
+            onMistakes={() => { setAvailability(null); setSelectedMode("mistakes"); }}
+          />}
+          {screen === "attempt" && attempt && question && <AttemptView
+            attempt={attempt}
+            unit={selectedUnit}
+            question={question}
+            currentIndex={currentIndex}
+            currentAnswer={currentAnswer}
+            answering={answering}
+            remaining={remaining}
+            progress={progress}
+            showExplanation={showExplanation}
+            commentsOpen={commentsOpen}
+            comments={comments}
+            commentsLoading={commentsLoading}
+            commentText={commentText}
+            sendingComment={sendingComment}
+            onSelect={(optionId) => void answerQuestion(optionId)}
+            onNext={() => currentIndex === attempt.questions.length - 1 ? void finishAttempt() : goToQuestion(currentIndex + 1)}
+            onPrevious={() => goToQuestion(currentIndex - 1)}
+            onQuestion={goToQuestion}
+            onPause={() => { saveQuizProgress(attempt, currentIndex); setScreen("catalogue"); }}
+            onQuit={() => void abandonAttempt()}
+            onExplain={() => setShowExplanation((current) => !current)}
+            onComments={() => setCommentsOpen((current) => !current)}
+            onCommentText={setCommentText}
+            onComment={sendComment}
+            replyTo={replyTo}
+            onReply={(comment) => setReplyTo(comment)}
+            onCancelReply={() => setReplyTo(null)}
+            onDoubleClick={() => currentAnswer && (currentIndex === attempt.questions.length - 1 ? void finishAttempt() : goToQuestion(currentIndex + 1))}
+            finishing={finishing}
+          />}
+          {screen === "results" && attempt && <ResultsView attempt={attempt} correctCount={correctCount} percent={resultPercent} recommendation={recommendation} onRestart={() => { setAttempt(null); attemptRef.current = null; setScreen("catalogue"); setCurrentIndex(0); }} />}
+        </div>
+      </AppShell>
+    </ModuleGuard>
+  </AuthGuard>;
+}
+
+function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onStart, onResume, onRetry, onNormal, onMistakes }: {
+  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; availableQuestionCount: number; loadingAttempt: boolean;
+  resumeAttempt: Attempt | null;
+  availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
+  onUnit: (id: string) => void; onMode: (id: Mode) => void; onTopics: (ids: string[]) => void; onQuestionCount: (count: number) => void; onStart: () => void; onResume: () => void; onRetry: () => void; onNormal: () => void; onMistakes: () => void;
+}) {
+  const effectiveMaximum = Math.min(50, availableQuestionCount);
+  const insufficientBank = Boolean(selectedUnit && availableQuestionCount < 10);
+  const needsTopics = selectedMode === "topic" && !selectedTopicIds.length;
+  const canStart = Boolean(selectedUnit && !insufficientBank && !needsTopics && !availability && !loadingAttempt);
+  const shortageAvailable = availability?.code === "not_enough_questions" ? availability.available : availableQuestionCount;
+  const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : 10;
+  const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
+  const countOptions = effectiveMaximum >= 10 ? Array.from({ length: effectiveMaximum - 9 }, (_, index) => index + 10) : [10];
+  return <>
+    <header className={`page-heading page-heading--simple ${styles.hero}`}>
+      <div><span className="eyebrow">Testes</span><h1>Novo teste</h1></div>
+    </header>
+    {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar teste</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
+    {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar os teus testes" text="A carregar unidades curriculares e perguntas disponíveis." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar os testes" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há testes disponíveis" text="Quando forem publicadas perguntas para uma unidade curricular, poderás iniciar um teste aqui." /> : <div className={styles.builder}>
+      <section className={styles.setup} aria-labelledby="quiz-setup-title">
+        <h2 id="quiz-setup-title" className="sr-only">Configurar teste</h2>
+
+        <section className={styles.configBlock}>
+          <div className={styles.configHeading}><span>1</span><strong>Unidade curricular</strong></div>
+          <label className={styles.unitPicker} htmlFor="quiz-unit">
+            <select id="quiz-unit" aria-label="Unidade curricular" value={selectedUnitId} onChange={(event) => onUnit(event.target.value)}>
+              {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}
+            </select>
+            <ChevronDown aria-hidden="true" />
+          </label>
+        </section>
+
+        {selectedUnit && <>
+          <section className={styles.configBlock}>
+            <div className={styles.configHeading}><span>2</span><strong>Tipo de teste</strong></div>
+            <div className={styles.modeStack}>
+              <div className={styles.modeGrid} role="radiogroup" aria-label="Tipo de teste">
+                {modeCards.map((mode) => { const Icon = mode.icon; const selected = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={selected} aria-label={`${mode.title}. ${mode.description}`} title={mode.description} className={`${styles.modeCard} ${selected ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}</strong>{selected && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}
+              </div>
+              {selectedMode === "topic" && <div className={styles.topicPicker} role="group" aria-labelledby="quiz-topics-label"><span id="quiz-topics-label" className={styles.topicTitle}>Temas</span><div className={styles.topicChoices}>{topics.map((topic) => { const checked = selectedTopicIds.includes(topic.id); return <label key={topic.id} className={checked ? styles.topicChecked : ""}><input type="checkbox" checked={checked} onChange={() => onTopics(checked ? selectedTopicIds.filter((id) => id !== topic.id) : [...selectedTopicIds, topic.id])} /><span className={styles.topicName}>{topic.name}</span>{topic.questionCount > 0 && <small>{topic.questionCount}</small>}<span className={styles.topicIndicator}>{checked && <Check />}</span></label>; })}</div>{!topics.length && <small>Esta UC ainda não tem temas publicados.</small>}</div>}
+            </div>
+          </section>
+
+          <section className={styles.configBlock}>
+            <div className={styles.configHeading}><span>3</span><strong>Perguntas</strong></div>
+            <label className={styles.countControl} htmlFor="quiz-question-count"><span className={styles.selectWrap}><select id="quiz-question-count" aria-label="Número de perguntas" value={questionCount} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.map((count) => <option key={count} value={count}>{count} perguntas · {count} min</option>)}</select><ChevronDown aria-hidden="true" /></span><span className={styles.timeRule}><Clock3 />1 min/pergunta</span></label>
+          </section>
+
+          {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}. Faz primeiro um teste normal.</p></div><button type="button" onClick={onNormal}>Teste aleatório</button></aside>}
+          {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir um teste aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Teste aleatório</button><button type="button" onClick={onMistakes}>Rever erros</button></span></aside>}
+          {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>Há {shortageAvailable} perguntas disponíveis para esta seleção; pediste {shortageRequired}.</p></div></aside>}
+        </>}
+      </section>
+
+      {selectedUnit && <aside className={styles.setupSummary} aria-label="Resumo do teste">
+        <span className={`${styles.summaryStatus} ${canStart ? styles.summaryReady : ""}`}>{canStart ? <CheckCircle2 /> : <CircleHelp />}{canStart ? "Pronto a iniciar" : needsTopics ? "Escolhe um tema" : availability ? "Ajusta a seleção" : "Configuração incompleta"}</span>
+        <div className={styles.summaryUnit}><span className={styles.unitCode}>{selectedUnit.code}</span><div><strong>{selectedUnit.name}</strong><small>{availableQuestionCount} perguntas elegíveis</small></div></div>
+        <dl className={styles.summaryList}><div><dt>Tipo</dt><dd>{modeTitle(selectedMode)}</dd></div><div><dt>Perguntas</dt><dd>{questionCount}</dd></div><div><dt>Tempo</dt><dd>{questionCount} min</dd></div></dl>
+        <button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Iniciar teste"}</button>
+        <button type="button" className={`${styles.personalPractice} ${selectedMode === "mistakes" ? styles.selected : ""}`} onClick={onMistakes} aria-pressed={selectedMode === "mistakes"} title="Criar um teste apenas com perguntas que erraste"><RotateCcw /><strong>Rever os meus erros</strong></button>
+      </aside>}
+    </div>}
+  </>;
+}
+
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, progress, showExplanation, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing }: {
+  attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; progress: number; showExplanation: boolean; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
+  replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean;
+}) {
+  const isExam = attempt.mode === "exam";
+  const answered = Boolean(currentAnswer?.selectedOptionId);
+  const feedback = !isExam && currentAnswer?.correct !== null && currentAnswer?.correct !== undefined;
+  return <>
+    <section className={styles.sessionBar} aria-label="Progresso do teste">
+      <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}</small></span></div>
+      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${remaining < 300 ? styles.lowTime : ""}`} aria-label={`Tempo restante: ${formatClock(remaining)}`}><Clock3 /><strong>{formatClock(remaining)}</strong></span>}</div>
+      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing}>Desistir</button></div>
+      <div className={styles.progressTrack} aria-label={`${progress}% respondido`}><span style={{ width: `${progress}%` }} /></div>
+    </section>
+    <div className={styles.attemptLayout}>
+      <aside className={styles.navigator} aria-label="Navegação pelas perguntas"><header><strong>Perguntas</strong><small>{progress}%</small></header><div className={styles.questionGrid}>{attempt.questions.map((item, index) => { const answer = attempt.answers.find((entry) => entry.questionId === item.id); const state = !answer ? "não respondida" : isExam || answer.correct === null ? "respondida" : answer.correct ? "certa" : "errada"; return <button key={item.id} type="button" className={`${styles.questionNumber} ${index === currentIndex ? styles.current : ""} ${statusClass(answer)}`} onClick={() => onQuestion(index)} aria-current={index === currentIndex ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${state}`}>{index + 1}</button>; })}</div></aside>
+      <section className={styles.questionPanel} aria-labelledby="question-title">
+        <header className={styles.questionHeader}><span className={styles.topicLabel}>{question.topic}</span><small>{currentIndex + 1} / {attempt.questions.length}</small></header>
+        <div className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
+          {question.imageUrl && <figure className={styles.questionImage}><img src={question.imageUrl} alt={question.imageAlt} /></figure>}
+          <div className={styles.questionContent}>
+            <h1 id="question-title">{question.text}</h1>
+            <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
+              {question.options.map((option, index) => {
+                const selected = currentAnswer?.selectedOptionId === option.id;
+                const correct = feedback && option.id === question.correctOptionId;
+                const wrong = feedback && selected && currentAnswer?.correct === false;
+                return <button key={option.id} type="button" role="radio" aria-checked={selected} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
+              })}
+            </div>
+            {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><p>{question.explanation ?? "Consulta a explicação para consolidar este conceito."}</p></div></section>}
+            {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><p>{question.explanation}</p></div></section>}
+          </div>
+        </div>
+        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} disabled={!answered && isExam}><Lightbulb /> {showExplanation ? "Ocultar explicação" : "Explicação"}</button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /> Comentários</button></div><div><button type="button" className={styles.secondaryButton} onClick={onPrevious} disabled={currentIndex === 0}><ArrowLeft /> Anterior</button><button type="button" className={styles.primaryButton} onClick={onNext} disabled={!answered}>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}<ArrowRight /></button></div></footer>
+        {commentsOpen && <Comments comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
+      </section>
+    </div>
+  </>;
+}
+
+function ResultsView({ attempt, correctCount, percent, recommendation, onRestart }: { attempt: Attempt; correctCount: number; percent: number; recommendation: string; onRestart: () => void }) {
+  const total = attempt.questions.length;
+  const displayedCorrect = attempt.totalCorrect !== null && Number.isFinite(attempt.totalCorrect) ? attempt.totalCorrect : correctCount;
+  return <>
+    <header className={styles.resultsHero}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong><small>acerto</small></div><div><span className={styles.eyebrow}>Teste concluído</span><h1>O teu resultado</h1><p>Respondeste corretamente a <strong>{displayedCorrect}</strong> de <strong>{total}</strong> perguntas. Revê os pontos abaixo e volta quando te sentires preparado.</p></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></header>
+    <section className={styles.resultStats}><span><CheckCircle2 /><b>{displayedCorrect}</b><small>{displayedCorrect === 1 ? "certa" : "certas"}</small></span><span><XCircle /><b>{Math.max(0, total - displayedCorrect)}</b><small>a rever</small></span><span><TimerReset /><b>{modeTitle(attempt.mode)}</b><small>modo concluído</small></span></section>
+    <section className={styles.recommendation}><span><Sparkles /></span><div><strong>Próximo passo recomendado</strong><p>{recommendation}</p></div><button type="button" onClick={onRestart}>Praticar agora <ArrowRight /></button></section>
+    <section className={styles.review} aria-labelledby="review-title"><header><div><h2 id="review-title">Revisão das respostas</h2><p>Consulta a resposta correta e a explicação de cada pergunta.</p></div><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>Pergunta {index + 1} · {question.topic}</small><h3>{question.text}</h3><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Resposta correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <p className={styles.reviewExplanation}><Lightbulb />{question.explanation}</p>}</div></article>; })}</div></section>
+  </>;
+}
+
+function Comments({ comments, loading, text, sending, replyTo, onText, onSubmit, onReply, onCancelReply }: { comments: Comment[]; loading: boolean; text: string; sending: boolean; replyTo: Comment | null; onText: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void }) {
+  const plainLength = richTextPlainText(text).length;
+  return <section className={styles.comments} aria-labelledby="comments-title">
+    <header><MessageCircle /><h2 id="comments-title">Comentários</h2><span className={styles.commentCount}>{comments.length}</span></header>
+    <form onSubmit={onSubmit}>
+      {replyTo && <aside className={styles.replyingTo}><span>Em resposta a <strong>{replyTo.authorName}</strong></span><button type="button" onClick={onCancelReply}>Cancelar</button></aside>}
+      <div className={styles.commentComposer}><RichTextEditor value={text} onChange={onText} ariaLabel={replyTo ? `Resposta a ${replyTo.authorName}` : "Novo comentário sobre a pergunta"} placeholder={replyTo ? `Responder a ${replyTo.authorName}…` : "Escreve uma dúvida ou comentário…"} maxLength={1200} minHeight="minimal" /></div>
+      <footer><small>Publicação imediata</small><button className={styles.primaryButton} type="submit" disabled={sending || plainLength < 2 || plainLength > 1200}>{sending ? <LoaderCircle className={styles.spin} /> : <Send />}{sending ? "A enviar…" : replyTo ? "Responder" : "Publicar"}</button></footer>
+    </form>
+    <div className={styles.commentList}>{loading ? <span className={styles.saving}><LoaderCircle className={styles.spin} /> A carregar comentários…</span> : comments.length ? comments.map((comment) => <article key={comment.id} className={comment.parentCommentId ? styles.commentReply : ""}><span>{comment.authorName.slice(0, 1).toUpperCase()}</span><div className={styles.commentBubble}><header><span><strong>{comment.authorName}</strong>{(comment.isAdmin || comment.authorRole === "admin") && <b className={styles.roleBadge}>Administrador</b>}<small>{humanDate(comment.createdAt)}</small></span><button type="button" onClick={() => onReply(comment)}>Responder</button></header>{comment.replyToName && <p className={styles.replyContext}>Em resposta a {comment.replyToName}</p>}<RichTextContent value={comment.body} className={styles.commentBody} /></div></article>) : <p className={styles.noComments}>Ainda não há comentários.</p>}</div>
+  </section>;
+}
+
+function State({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) { return <section className={styles.state}>{icon}<strong>{title}</strong><p>{text}</p>{action}</section>; }
+
+function statusClass(answer: Answer | undefined) { return !answer ? styles.unanswered : answer.correct === true ? styles.correct : answer.correct === false ? styles.incorrect : styles.answered; }

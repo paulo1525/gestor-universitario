@@ -53,8 +53,43 @@ const users = [
   ]),
 ];
 
+const localQuizTopics = [
+  ["local-quiz-topic-osteology", "Osteologia fictícia", "Perguntas fictícias para validar o módulo de testes."],
+  ["local-quiz-topic-neuro", "Neuroanatomia fictícia", "Segundo tema fictício para filtros e recomendações."],
+];
+
+const localQuizQuestions = [
+  ["local-quiz-question-1", "local-quiz-topic-osteology", "Qual das estruturas seguintes é usada apenas neste ambiente local?", "easy", "A etiqueta de teste", ["A etiqueta de teste", "Um nome de estudante real"], 0],
+  ["local-quiz-question-2", "local-quiz-topic-osteology", "Quantas opções pode ter uma pergunta de escolha múltipla neste módulo?", "easy", "O módulo aceita entre duas e quatro opções.", ["Uma", "Duas a quatro", "Cinco"], 1],
+  ["local-quiz-question-3", "local-quiz-topic-osteology", "Que campo permite associar uma pergunta a uma cadeira?", "medium", "A unidade curricular é uma relação própria da pergunta.", ["O título do comentário", "A unidade curricular", "A hora da tentativa", "O nome do administrador"], 1],
+  ["local-quiz-question-4", "local-quiz-topic-neuro", "Quanto tempo é atribuído por pergunta em qualquer teste?", "medium", "Cada pergunta acrescenta um minuto ao cronómetro da tentativa.", ["Trinta segundos", "Um minuto", "Cinco minutos", "Não existe limite"], 1],
+  ["local-quiz-question-5", "local-quiz-topic-neuro", "Qual destes valores é uma dificuldade editorial válida?", "hard", "As dificuldades disponíveis são fácil, média e difícil.", ["Urgente", "Difícil", "Arquivada"], 1],
+  ["local-quiz-question-6", "local-quiz-topic-neuro", "Que acontece aos comentários enviados por estudantes?", "hard", "Os comentários são publicados imediatamente e podem receber respostas na conversa da pergunta.", ["São publicados imediatamente e podem receber respostas", "Ficam pendentes de moderação"], 0],
+  ...Array.from({ length: 44 }, (_, offset) => {
+    const number = offset + 7;
+    const correctIndex = number % 3;
+    const labels = ["Opção A", "Opção B", "Opção C"];
+    return [
+      `local-quiz-question-${number}`,
+      number % 2 === 0 ? "local-quiz-topic-osteology" : "local-quiz-topic-neuro",
+      `Pergunta fictícia de validação n.º ${number}: qual opção está assinalada como correta?`,
+      number % 3 === 0 ? "hard" : number % 3 === 1 ? "easy" : "medium",
+      `Nesta pergunta exclusivamente local, a resposta correta é ${labels[correctIndex]}.`,
+      labels,
+      correctIndex,
+    ];
+  }),
+];
+
 const statements = [
   "PRAGMA foreign_keys = OFF",
+  "DELETE FROM quiz_comments",
+  "DELETE FROM quiz_attempt_questions",
+  "DELETE FROM quiz_attempts",
+  "DELETE FROM quiz_question_options",
+  "DELETE FROM quiz_questions",
+  "DELETE FROM quiz_topics",
+  "DELETE FROM quiz_imports",
   "DELETE FROM poll_votes",
   "DELETE FROM poll_participations",
   "DELETE FROM poll_options",
@@ -67,8 +102,9 @@ const statements = [
   "DELETE FROM academic_events",
   "DELETE FROM announcement_curricular_units",
   "DELETE FROM announcements",
+  "DELETE FROM curricular_unit_representatives",
   "DELETE FROM curricular_units",
-  "UPDATE app_module_settings SET enabled=1,updated_by=NULL,updated_at=" + now,
+  "UPDATE app_module_settings SET enabled=CASE WHEN module_key LIKE 'classes%' THEN 0 ELSE 1 END,updated_by=NULL,updated_at=" + now,
   "DELETE FROM student_destinations",
   "DELETE FROM distribution_proposals",
   "DELETE FROM class_drafts",
@@ -92,6 +128,17 @@ for (const [id, email, name, role, adminOverride, representedClass] of users) {
 }
 statements.push(`INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at) VALUES ('local-announcement','Bem-vindos ao ambiente local','Este aviso urgente contém apenas informação fictícia para validar o destaque global dos comunicados.','urgent','published','local-primary-admin','Administrador Principal Local','principal_admin','Administrador Principal',${now},NULL,${now},${now})`);
 statements.push(`INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES ('local-unit-anat2','ANAT2','Anatomia II',7.5,2,1,'local-primary-admin',1,'local-primary-admin','local-primary-admin',${now},${now})`);
+statements.push(`INSERT INTO curricular_unit_representatives (curricular_unit_id,user_id,position,created_by,created_at,updated_by,updated_at) VALUES ('local-unit-anat2','local-primary-admin',1,'local-primary-admin',${now},'local-primary-admin',${now})`);
+statements.push(`INSERT INTO curricular_unit_representatives (curricular_unit_id,user_id,position,created_by,created_at,updated_by,updated_at) VALUES ('local-unit-anat2','local-admin',2,'local-primary-admin',${now},'local-primary-admin',${now})`);
+for (const [id, title, description] of localQuizTopics) {
+  statements.push(`INSERT INTO quiz_topics (id,curricular_unit_id,title,description,status,sort_order,published_at,published_by,created_by,updated_by,created_at,updated_at) VALUES (${sql(id)},'local-unit-anat2',${sql(title)},${sql(description)},'published',0,${now},'local-primary-admin','local-primary-admin','local-primary-admin',${now},${now})`);
+}
+for (const [id, topicId, prompt, difficulty, explanation, options, correctIndex] of localQuizQuestions) {
+  statements.push(`INSERT INTO quiz_questions (id,curricular_unit_id,topic_id,prompt,image_url,explanation,difficulty,status,published_at,published_by,created_by,updated_by,created_at,updated_at) VALUES (${sql(id)},'local-unit-anat2',${sql(topicId)},${sql(prompt)},NULL,${sql(explanation)},${sql(difficulty)},'published',${now},'local-primary-admin','local-primary-admin','local-primary-admin',${now},${now})`);
+  options.forEach((option, index) => statements.push(`INSERT INTO quiz_question_options (id,question_id,option_text,position,is_correct) VALUES (${sql(`${id}-option-${index + 1}`)},${sql(id)},${sql(option)},${index + 1},${index === correctIndex ? 1 : 0})`));
+}
+statements.push(`INSERT INTO quiz_comments (id,question_id,parent_comment_id,author_user_id,body,status,created_at,updated_at) VALUES ('local-quiz-comment-student','local-quiz-question-1',NULL,'local-student-user',${sql("<p>Na vista lateral, a <strong>sutura coronal</strong> é a linha mais anterior da calvária?</p>")},'published',${now - 3600000},${now - 3600000})`);
+statements.push(`INSERT INTO quiz_comments (id,question_id,parent_comment_id,author_user_id,body,status,created_at,updated_at) VALUES ('local-quiz-comment-admin','local-quiz-question-1','local-quiz-comment-student','local-primary-admin',${sql("<p>Sim. Nesta perspetiva, procura esta sequência:</p><ol><li>sutura coronal;</li><li>sutura escamosa;</li><li>sutura lambdoide.</li></ol><p>A posição relativa ajuda mais do que decorar a forma isolada.</p>")},'published',${now - 1800000},${now - 1800000})`);
 statements.push(`INSERT INTO announcement_curricular_units (announcement_id,curricular_unit_id) VALUES ('local-announcement','local-unit-anat2')`);
 statements.push(`INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,visibility,status,created_by,updated_by,created_at,updated_at) VALUES ('local-event-anat2','Frequência de Anatomia II','Evento fictício para validar o calendário e a área da unidade curricular.','assessment','local-unit-anat2',${now + 86400000},${now + 93600000},'Sala de testes','students','scheduled','local-primary-admin','local-primary-admin',${now},${now})`);
 statements.push(`INSERT INTO academic_documents (id,title,description,document_type,curricular_unit_id,content,visibility,status,published_at,created_by,updated_by,created_at,updated_at) VALUES ('local-document-minutes','Ata fictícia da Comissão','Documento de teste sem dados reais.','minutes','local-unit-anat2','Conteúdo exclusivamente fictício para o ambiente local.','students','published',${now},'local-primary-admin','local-primary-admin',${now},${now})`);
