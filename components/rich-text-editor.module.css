@@ -9,6 +9,11 @@
 .toolbar svg { width:14px; height:14px; }
 .editable { min-height:142px; padding:13px 14px; outline:0; color:var(--ink); background:var(--surface); font-size:11px; font-weight:500; line-height:1.65; overflow-wrap:anywhere; }
 .compact .editable { min-height:96px; }
+.minimal { position:relative; }
+.minimal .toolbar { min-height:34px; padding:2px 6px; }
+.minimal .toolbar button { width:28px; height:28px; }
+.minimal .editable { min-height:64px; padding:10px 12px 22px; }
+.minimal .counter { position:absolute; right:5px; bottom:3px; padding:2px 5px; border:0; background:transparent; }
 .editable:empty::before { content:attr(data-placeholder); color:#96948c; pointer-events:none; }
 .editable p { margin:0 0 8px; }.editable p:last-child { margin-bottom:0; }
 .editable ul,.editable ol { margin:7px 0; padding-left:21px; }

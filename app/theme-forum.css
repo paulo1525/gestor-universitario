@@ -105,6 +105,17 @@ html[data-theme="forum"] .brand__context {
   color: #91bfd5;
 }
 
+html[data-theme="forum"] .sidebar__collapse {
+  border-color: var(--sidebar-border);
+  color: var(--sidebar-text);
+  background: #193a58;
+}
+
+html[data-theme="forum"] .sidebar__collapse:hover {
+  color: var(--sidebar-text-strong);
+  background: #214766;
+}
+
 html[data-theme="forum"] .nav-list {
   gap: 12px;
   padding-top: 16px;

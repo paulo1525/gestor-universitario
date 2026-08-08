@@ -77,10 +77,9 @@ test("dashboard feedback and icon-only affordances retain accessible semantics",
   assert.match(emptyState, /role="status"/);
   assert.match(emptyState, /className=\{styles\.stateIcon\} aria-hidden="true"/);
   assert.match(dashboard, /className=\{styles\.summaryCard\}[^>]*aria-label=/);
-  assert.match(dashboard, /className=\{styles\.panel\}[^>]*aria-labelledby="dashboard-class-title"/);
+  assert.doesNotMatch(dashboard, /dashboard-class-title|href=\{?[^\n]*\/turmas/);
   assert.match(dashboardStyles, /\.viewAll:focus-visible/);
   assert.match(dashboardStyles, /\.item:focus-visible/);
-  assert.match(dashboardStyles, /\.classActions a:focus-visible/);
 });
 
 test("calendar subscription has one setup region and a separate connection manager", () => {

@@ -11,6 +11,7 @@ export type HomeModuleKey = Extract<AppModuleKey,
   | "documents"
   | "materials"
   | "useful_links"
+  | "quizzes"
   | "classes"
   | "directory"
   | "search"
@@ -45,6 +46,7 @@ export const MODULE_HOMEPAGES: readonly ModuleHomepageTarget[] = [
   { moduleKey: "documents", href: "/documentos", landingKeys: ["documents.library"] },
   { moduleKey: "materials", href: "/materiais", landingKeys: ["materials.library", "materials.submission"] },
   { moduleKey: "useful_links", href: "/links-uteis", landingKeys: ["useful_links.library"] },
+  { moduleKey: "quizzes", href: "/testes", landingKeys: ["quizzes.practice"] },
   { moduleKey: "classes", href: "/turmas", landingKeys: ["classes.rosters", "classes.preferences"] },
   { moduleKey: "directory", href: "/comissao", landingKeys: ["directory.members"] },
   { moduleKey: "search", href: "/pesquisa", landingKeys: ["search.global"] },

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 const worker = readFileSync(new URL("../worker/index.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../migrations/0020_modules_announcements_curricular_units.sql", import.meta.url), "utf8");
+const representativesMigration = readFileSync(new URL("../migrations/0031_curricular_unit_representatives.sql", import.meta.url), "utf8");
 const specialStatusModuleMigration = readFileSync(new URL("../migrations/0026_special_status_module.sql", import.meta.url), "utf8");
 const definitions = readFileSync(new URL("../lib/app-modules.ts", import.meta.url), "utf8");
 const moduleUi = readFileSync(new URL("../components/module-management.tsx", import.meta.url), "utf8");
@@ -53,7 +54,9 @@ test("rotas existentes são bloqueadas no backend quando o respetivo submódulo 
   assert.match(routes, /isModuleEnabled\(env,"classes\.rosters"\)/);
   assert.match(routes, /isModuleEnabled\(env,"classes\.placements"\)/);
   assert.match(routes, /moduleDisabled\(\)/);
-  assert.match(shell, /moduleAccess\["classes\.placements"\]/);
+  assert.doesNotMatch(shell, /moduleAccess\["classes\.(?:rosters|preferences|placements)"\]/);
+  assert.match(shell, /moduleAccess\["quizzes\.practice"\]/);
+  assert.match(shell, /href="\/testes"/);
   assert.match(shell, /hasCommunication&&<div className="nav-section"/);
   assert.match(shell, /hasAcademicLife&&<div className="nav-section"/);
   assert.match(shell, /hasCommunity&&<div className="nav-section"/);
@@ -84,7 +87,7 @@ test("qualquer membro com cargo CC pode publicar e o cargo fica registado no avi
 });
 
 test("comunicados lideram a navegação, têm editor isolado e um urgente global descartável", () => {
-  assert.ok(shell.indexOf('nav-label">Comunicação') < shell.indexOf('nav-label">Turmas'));
+  assert.doesNotMatch(shell, /<span className="nav-label">\{t\("nav\.classes"\)\}<\/span>/);
   assert.match(shell, /UrgentAnnouncementBanner/);
   assert.match(shell, /active !== "announcements"/);
   assert.match(urgentBanner, /dismissed-urgent-announcement/);
@@ -121,14 +124,19 @@ test("a pesquisa global ocupa a barra superior e o diretório apresenta responsa
   assert.match(directoryUi, /mailto:/);
 });
 
-test("unidades curriculares são geridas apenas pelo Núcleo e validam o representante CC", () => {
+test("unidades curriculares são geridas apenas pelo Núcleo e aceitam zero a dois representantes CC", () => {
   assert.match(curricularUnits, /if \(!isManagementCore\(user\)\)/);
-  assert.match(curricularUnits, /commission_position IS NOT NULL/);
+  assert.match(curricularUnits, /representativeUserIds/);
+  assert.match(curricularUnits, /JOIN commission_positions p ON p\.code=u\.commission_position/);
   assert.match(curricularUnits, /curricular_unit_created/);
   assert.match(curricularUnits, /curricular_unit_updated/);
   assert.match(migration, /ects REAL NOT NULL CHECK \(ects > 0 AND ects <= 60\)/);
   assert.match(migration, /representative_user_id TEXT NOT NULL REFERENCES users\(id\)/);
+  assert.match(representativesMigration, /CREATE TABLE curricular_unit_representatives/);
+  assert.match(representativesMigration, /position INTEGER NOT NULL CHECK \(position IN \(1, 2\)\)/);
+  assert.match(representativesMigration, /ADD COLUMN representative_user_id TEXT REFERENCES users\(id\) ON DELETE SET NULL/);
   assert.match(curricularUi, /styles\.unitEntry/);
+  assert.match(curricularUi, /\[0, 1\]\.map/);
   assert.match(curricularUi, /<AppToast/);
   assert.match(moduleUi, /<AppToast/);
   assert.match(shell, /href="\/admin\/modulos"/);

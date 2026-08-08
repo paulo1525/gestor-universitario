@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bell, BookOpen, CalendarDays, Check, ChevronDown, ContactRound, ExternalLink, Files, House, LayoutDashboard, Library, LoaderCircle, Megaphone, MessageSquareText, RefreshCw, Search, UsersRound, Vote, type LucideIcon } from "lucide-react";
+import { AlertCircle, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ContactRound, ExternalLink, Files, House, LayoutDashboard, Library, LoaderCircle, Megaphone, MessageSquareText, RefreshCw, Search, UsersRound, Vote, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/auth-context";
 import { AppToast } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
@@ -14,6 +14,7 @@ const MODULE_MANAGER_EMAIL = "up202507850@up.pt";
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   classes: UsersRound,
+  quizzes: BrainCircuit,
   announcements: Megaphone,
   curricular_units: BookOpen,
   calendar: CalendarDays,
@@ -70,7 +71,7 @@ export function ModuleManagement() {
   const [savedTarget, setSavedTarget] = useState("");
   const [savingTargets, setSavingTargets] = useState<Set<string>>(() => new Set());
   const [savingHome, setSavingHome] = useState(false);
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set(["classes"]));
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(() => new Set(["quizzes"]));
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ModuleFilter>("all");
 

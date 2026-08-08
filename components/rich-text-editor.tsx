@@ -13,7 +13,7 @@ type RichTextEditorProps = {
   placeholder?: string;
   maxLength?: number;
   disabled?: boolean;
-  minHeight?: "compact" | "regular";
+  minHeight?: "minimal" | "compact" | "regular";
   onInvalidLink?: () => void;
 };
 

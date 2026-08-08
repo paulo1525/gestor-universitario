@@ -13,6 +13,7 @@ import {
   LoaderCircle,
   Mail,
   Megaphone,
+  Plus,
   Search,
   UserRound,
   X,
@@ -20,10 +21,20 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { useAuth } from "@/components/auth-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
-import styles from "@/components/community-suite.module.css";
+import styles from "@/components/curricular-unit-catalog.module.css";
 
+type ApiRepresentative = {
+  id?: string | number;
+  name?: string;
+  fullName?: string;
+  full_name?: string;
+  email?: string;
+  position?: string;
+  commissionPositionLabel?: string;
+};
 type ApiUnit = {
   id: string | number;
   code?: string;
@@ -35,19 +46,14 @@ type ApiUnit = {
   studyYear?: number;
   study_year?: number;
   semester?: number;
-  representative?: {
-    id?: string | number;
-    fullName?: string;
-    full_name?: string;
-    email?: string;
-    position?: string;
-    commissionPositionLabel?: string;
-  };
+  representative?: ApiRepresentative | null;
+  representatives?: ApiRepresentative[] | null;
   representativeName?: string;
   representative_name?: string;
   representativeEmail?: string;
   representative_email?: string;
 };
+type Representative = { id: string; name: string; email: string; position: string };
 type Unit = {
   id: string;
   code: string;
@@ -56,7 +62,7 @@ type Unit = {
   ects: number;
   year: number;
   semester: number;
-  representative: { name: string; email: string; position: string } | null;
+  representatives: Representative[];
 };
 type Detail = {
   unit: Unit;
@@ -78,12 +84,19 @@ type Detail = {
   }>;
 };
 function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string): Unit {
-  const representative = item.representative;
-  const name =
-    representative?.fullName ??
-    representative?.full_name ??
-    item.representativeName ??
-    item.representative_name;
+  const legacyRepresentative = item.representative ?? (item.representativeName || item.representative_name ? {
+    name: item.representativeName ?? item.representative_name,
+    email: item.representativeEmail ?? item.representative_email,
+  } : null);
+  const representatives = (item.representatives?.length ? item.representatives : legacyRepresentative ? [legacyRepresentative] : [])
+    .map((representative, index) => ({
+      id: String(representative.id ?? `representative-${index + 1}`),
+      name: representative.name ?? representative.fullName ?? representative.full_name ?? "",
+      email: representative.email ?? "",
+      position: representative.position ?? representative.commissionPositionLabel ?? defaultRepresentative,
+    }))
+    .filter((representative) => representative.name)
+    .slice(0, 2);
   return {
     id: String(item.id),
     code: item.code ?? "UC",
@@ -92,20 +105,7 @@ function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string)
     ects: Number(item.ects ?? item.credits ?? 0),
     year: Number(item.year ?? item.studyYear ?? item.study_year ?? 1),
     semester: Number(item.semester ?? 1),
-    representative: name
-      ? {
-          name,
-          email:
-            representative?.email ??
-            item.representativeEmail ??
-            item.representative_email ??
-            "",
-          position:
-            representative?.position ??
-            representative?.commissionPositionLabel ??
-            defaultRepresentative,
-        }
-      : null,
+    representatives,
   };
 }
 async function readUnits(defaultUnit: string, defaultRepresentative: string, loadError: string) {
@@ -131,6 +131,7 @@ function date(value: string, locale: string) {
 
 export function CurricularUnitCatalog() {
   const { locale, t } = useI18n();
+  const { user } = useAuth();
   const [units, setUnits] = useState<Unit[]>([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -160,7 +161,7 @@ export function CurricularUnitCatalog() {
       (item) =>
         (year === "all" || item.year === Number(year)) &&
         (!term ||
-          `${item.code} ${item.name} ${item.representative?.name ?? ""}`
+          `${item.code} ${item.name} ${item.representatives.map((representative) => representative.name).join(" ")}`
             .toLocaleLowerCase(locale)
             .includes(term)),
     );
@@ -168,22 +169,21 @@ export function CurricularUnitCatalog() {
   const filtersActive = Boolean(query.trim() || year !== "all");
   const activeFilterCount = [query.trim(), year !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setYear("all"); };
+  const canManageUnits = user?.role === "admin" && (user.commissionDepartment === "management" || user.email.toLowerCase() === "up202507850@up.pt");
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="curricular_units.catalog">
         <AppShell active="curricular_units" breadcrumb={t("community.units.breadcrumb")}>
           <div className={styles.page}>
-            <header className={styles.hero}>
+            <header className={`page-heading page-heading--simple ${styles.hero}`}>
               <div className={styles.heroCopy}>
-                <span className={styles.heroIcon}>
-                  <BookOpen />
-                </span>
                 <div>
                   <span className="eyebrow">{t("community.units.eyebrow")}</span>
                   <h1>{t("community.units.title")}</h1>
                   <p>{t("community.units.description")}</p>
                 </div>
               </div>
+              {canManageUnits && <Link className={`button button--primary ${styles.manageCta}`} href="/admin/unidades-curriculares"><Plus />Gerir e adicionar UCs</Link>}
             </header>
             {error && (
               <AppToast
@@ -193,7 +193,7 @@ export function CurricularUnitCatalog() {
                 onDismiss={() => setError("")}
               />
             )}
-            <section className={styles.panel}>
+            <section className={`${styles.panel} ${styles.catalogPanel}`}>
               <div className={styles.panelHeader}>
                 <div>
                   <h2>{t("community.units.catalog")}</h2>
@@ -231,16 +231,16 @@ export function CurricularUnitCatalog() {
                   <strong>{t("community.units.loading")}</strong>
                 </div>
               ) : visible.length === 0 ? (
-                <div className={styles.state}>
+                <div className={`${styles.state} ${styles.emptyState}`}>
                   <Search />
                   <strong>{t("community.units.empty")}</strong>
-                  {filtersActive && <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></>}
+                  {filtersActive ? <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></> : <><p>Quando existirem unidades curriculares, poderá consultá-las por ano, tema ou representante.</p>{canManageUnits && <Link className="button button--secondary button--compact" href="/admin/unidades-curriculares"><Plus />Adicionar a primeira UC</Link>}</>}
                 </div>
               ) : (
-                <div className={styles.grid}>
+                <div className={`${styles.grid} ${styles.catalogGrid}`}>
                   {visible.map((item) => (
                     <Link
-                      className={styles.card}
+                      className={`${styles.card} ${styles.catalogCard}`}
                       href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}
                       key={item.id}
                     >
@@ -270,13 +270,10 @@ export function CurricularUnitCatalog() {
                           <strong>{item.semester}.º</strong>
                         </div>
                       </div>
-                      <div className={styles.metaRow}>
+                      {item.representatives.length > 0 && <div className={styles.metaRow}>
                         <UserRound />
-                        <span>
-                          {item.representative?.name ??
-                            t("community.units.unassignedRepresentative")}
-                        </span>
-                      </div>
+                        <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
+                      </div>}
                       <span className={styles.linkHint}>
                         {t("community.units.openArea")} <ArrowRight />
                       </span>
@@ -488,44 +485,26 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       </DetailSection>
                     </div>
                     <div className={styles.page}>
-                      <section className={styles.panel}>
+                      {data.unit.representatives.length > 0 && <section className={styles.panel}>
                         <div className={styles.panelHeader}>
                           <div>
                             <h2>{t("community.units.representative")}</h2>
                             <p>{t("community.units.representativeDescription")}</p>
                           </div>
                         </div>
-                        <div className={styles.sectionBody}>
-                          {data.unit.representative ? (
-                            <>
-                              <div className={styles.cardTop}>
-                                <span className={styles.avatar}>
-                                  {data.unit.representative.name
-                                    .split(/\s+/)
-                                    .slice(0, 2)
-                                    .map((part) => part[0])
-                                    .join("")}
-                                </span>
-                                <span className={styles.tag}>
-                                  {data.unit.representative.position}
-                                </span>
-                              </div>
-                              <h3>{data.unit.representative.name}</h3>
-                              {data.unit.representative.email && (
-                                <div className={styles.metaRow}>
-                                  <Mail />
-                                  <span>{data.unit.representative.email}</span>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className={styles.state}>
-                              <GraduationCap />
-                              <strong>{t("community.units.unassignedRepresentative")}</strong>
+                        <div className={`${styles.sectionBody} ${styles.representativeList}`}>
+                          {data.unit.representatives.map((representative) => <article className={styles.representativeCard} key={representative.id}>
+                            <div className={styles.cardTop}>
+                              <span className={styles.avatar}>
+                                {representative.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}
+                              </span>
+                              <span className={styles.tag}>{representative.position}</span>
                             </div>
-                          )}
+                            <h3>{representative.name}</h3>
+                            {representative.email && <div className={styles.metaRow}><Mail /><span>{representative.email}</span></div>}
+                          </article>)}
                         </div>
-                      </section>
+                      </section>}
                       <DetailSection
                         title={t("community.units.documents")}
                         description={t("community.units.documentsDescription")}
