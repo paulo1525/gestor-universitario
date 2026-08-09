@@ -75,11 +75,11 @@
 }
 
 .form { min-width: 0; display: grid; align-content: start; gap: 12px; padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
-.formHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.formHeading > div { display: grid; gap: 3px; }
+.formHeading { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #dfe8e2; border-radius: 9px; background: #f6faf7; }
+.formHeading > div { grid-column: 2; display: grid; gap: 3px; }
 .formHeading strong { font-size: 12px; }
 .formHeading span { color: var(--muted); font-size: 9px; line-height: 1.45; }
-.formHeading > svg { width: 19px; color: #4b6d56; }
+.formHeading > svg { grid-column: 1; grid-row: 1; width: 34px; height: 34px; padding: 8px; border-radius: 9px; color: #3f7050; background: #e4f0e8; }
 
 .customise {
   overflow: hidden;

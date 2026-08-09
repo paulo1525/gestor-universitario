@@ -454,6 +454,19 @@ html[data-theme="forum"] [data-platform-surface="metric"] {
   box-shadow: var(--shadow-panel);
 }
 
+@media (min-width: 821px) {
+  html[data-theme="forum"] .sidebar.sidebar--collapsed .brand__logo-frame {
+    width: 40px;
+    height: 40px;
+    padding: 2px;
+    border-radius: 10px;
+  }
+
+  html[data-theme="forum"] .sidebar.sidebar--collapsed .nav-list {
+    gap: 10px;
+  }
+}
+
 /* Autonomous cards keep their own anatomy, but the blue theme always gives
    their upper edge the same functional accent used by section headers. */
 html[data-theme="forum"] .workspace .stat-card,

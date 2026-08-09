@@ -31,6 +31,7 @@ test("administrative navigation uses real routes and hierarchical groups", () =>
 test("collapsed and mobile navigation keep usable links", () => {
   assert.match(styles, /@media \(min-width: 821px\)/);
   assert.match(styles, /:global\(\.sidebar--collapsed\) \.groupItemsClosed\s*\{[^}]*display: grid/s);
+  assert.match(styles, /:global\(\.sidebar--collapsed\) \.groupItemsClosed\s*\{[^}]*margin-left: 0[^}]*border-left: 0/s);
   assert.match(styles, /min-height: 42px/);
   assert.match(styles, /max-height: 420px/);
   assert.match(styles, /\.groupItemsClosed\s*\{[^}]*max-height: 0[^}]*visibility: hidden/s);
