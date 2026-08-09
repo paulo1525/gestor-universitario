@@ -90,6 +90,30 @@
 
 .statisticsButton svg { width: 15px; }
 
+.statisticsActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statisticsDangerButton {
+  color: var(--color-danger, #a23a34);
+  border-color: color-mix(in srgb, var(--color-danger, #a23a34) 42%, var(--line));
+  background: color-mix(in srgb, var(--color-danger, #a23a34) 6%, var(--surface));
+}
+
+.statisticsDangerButton:hover,
+.statisticsDangerButton:focus-visible {
+  color: #8d2f2a;
+  border-color: #bf5c55;
+  background: #fff3f1;
+}
+
+.statisticsButton:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
 .statisticsLead {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
@@ -504,6 +528,69 @@
   color: var(--color-accent-text);
 }
 
+.answerFormatStack,
+.shortModePicker {
+  display: grid;
+  gap: 8px;
+}
+
+.answerFormatGrid,
+.shortModeChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shortModeChoices button {
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shortModeChoices button:hover,
+.shortModeChoices button:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-subtle);
+}
+
+.shortModeChoices button.selected {
+  border-color: color-mix(in srgb, var(--gold) 70%, var(--line));
+  background: color-mix(in srgb, var(--gold-soft) 62%, var(--surface));
+}
+
+.shortModeChoices button > svg {
+  width: 16px;
+  color: var(--color-accent-text);
+  justify-self: center;
+}
+
+.shortModeChoices button > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.shortModeChoices strong {
+  font-size: 10px;
+}
+
+.shortModeChoices small {
+  color: var(--muted);
+  font-size: 8.5px;
+  line-height: 1.35;
+}
+
 .topicPicker {
   display: grid;
   gap: 7px;
@@ -834,6 +921,38 @@
 
 .setupSummary > .primaryButton {
   width: 100%;
+}
+
+.ankiButton {
+  width: 100%;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--color-accent-text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.ankiButton:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.ankiButton svg {
+  width: 16px;
+}
+
+.ankiButton:disabled {
+  opacity: .48;
+  cursor: not-allowed;
 }
 
 .personalPractice {
@@ -1293,6 +1412,174 @@
 
 .option:disabled {
   cursor: default;
+}
+
+.shortAnswer {
+  display: grid;
+  gap: 10px;
+}
+
+.shortAnswerForm {
+  display: grid;
+  gap: 7px;
+}
+
+.shortAnswerForm label {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.shortAnswerComposer {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.shortAnswerComposer:focus-within {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-link) 12%, transparent);
+}
+
+.shortAnswerForm textarea {
+  width: 100%;
+  min-height: 62px;
+  padding: 12px 14px 8px;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.shortAnswerForm textarea:focus-visible {
+  outline: 0;
+}
+
+.shortAnswerComposer footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 9px 8px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--color-surface-subtle);
+}
+
+.shortAnswerComposer footer small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.shortAnswerForm button,
+.revealAnswerButton,
+.selfAssessmentActions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.shortAnswerForm button {
+  min-width: 88px;
+  color: var(--color-accent-contrast);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.shortAnswerForm button:disabled,
+.revealAnswerButton:disabled,
+.selfAssessmentActions button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.revealAnswerButton {
+  width: max-content;
+}
+
+.revealAnswerButton svg,
+.selfAssessmentActions svg {
+  width: 16px;
+}
+
+.shortAnswerReveal {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+}
+
+.shortAnswerReveal > span {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.shortAnswerReveal > strong {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shortAnswerReveal > p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.shortAnswerReveal > p svg {
+  width: 16px;
+}
+
+.proposalCorrect {
+  color: var(--green);
+}
+
+.proposalIncorrect {
+  color: var(--red);
+}
+
+.selfAssessmentActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 3px;
+}
+
+.selfAssessmentCorrect {
+  color: var(--green) !important;
+  border-color: #b5dcc4 !important;
+  background: var(--green-soft) !important;
+}
+
+.selfAssessmentIncorrect {
+  color: var(--red) !important;
+  border-color: #e1b5ad !important;
+  background: var(--red-soft) !important;
 }
 
 .saving {
@@ -1893,7 +2180,7 @@
 
   .summaryList {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .summaryList > div {
@@ -1902,8 +2189,13 @@
   }
 
   .setupSummary > .primaryButton,
+  .setupSummary > .ankiButton,
   .personalPractice {
     width: 100%;
+  }
+
+  .personalPractice {
+    grid-column: 1 / -1;
   }
 
   .sessionBar {
@@ -1920,7 +2212,9 @@
     margin-bottom: 14px;
   }
 
-  .hero > .statisticsButton { width: 100%; margin-top: 10px; }
+  .hero > .statisticsButton,
+  .hero > .statisticsActions { width: 100%; margin-top: 10px; }
+  .statisticsActions > button { flex: 1; }
   .statisticsGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .readinessCard { grid-template-columns: 1fr; gap: 14px; text-align: center; }
   .timeCard dl { margin-top: 16px; }
@@ -1950,6 +2244,22 @@
   .modeGrid {
     grid-template-columns: 1fr;
   }
+
+  .answerFormatGrid,
+  .shortModeChoices {
+    grid-template-columns: 1fr;
+  }
+
+  .shortAnswerComposer footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .revealAnswerButton {
+    width: 100%;
+  }
+
+  .shortAnswerForm button { width: 100%; }
 
   .countControl {
     align-items: stretch;

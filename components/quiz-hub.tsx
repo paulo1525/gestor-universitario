@@ -13,16 +13,20 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
+  Download,
+  Eye,
   EyeOff,
   Flag,
   Lightbulb,
   LoaderCircle,
+  Keyboard,
   MessageCircle,
   Play,
   RotateCcw,
   Send,
   Sparkles,
   TimerReset,
+  Trash2,
   Trophy,
   TriangleAlert,
   XCircle,
@@ -34,11 +38,14 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { ModuleGuard } from "@/components/module-guard";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import type { QuizExportPayload } from "@/lib/anki";
 import styles from "@/components/quiz-hub.module.css";
 
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic";
 type Screen = "catalogue" | "statistics" | "attempt" | "results";
 type Notice = { kind: ToastKind; message: string } | null;
+type AnswerFormat = "multiple_choice" | "short_answer";
+type ShortAnswerMode = "type_and_check" | "reveal_and_self_assess";
 
 type ApiOption = { id: string | number; text?: string; label?: string; content?: string };
 type ApiQuestion = {
@@ -96,7 +103,9 @@ type Attempt = {
 type ApiComment = { id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
 type Comment = { id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
-type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number };
+type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
+const QUIZ_QUESTION_COUNTS: readonly number[] = [15, 30, 50];
+const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
 type QuizStatistics = {
   summary: {
@@ -132,6 +141,35 @@ function questionLabel(count: number) {
   return `${count} ${count === 1 ? "pergunta" : "perguntas"}`;
 }
 
+function normalizeShortAnswer(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-PT").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function shortAnswerDistance(left: string, right: string) {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[right.length];
+}
+
+function isShortAnswerMatch(value: string, expected: string) {
+  const normalizedValue = normalizeShortAnswer(value);
+  const normalizedExpected = normalizeShortAnswer(expected);
+  if (!normalizedValue || !normalizedExpected) return false;
+  if (normalizedValue === normalizedExpected) return true;
+  const tolerance = Math.max(1, Math.floor(normalizedExpected.length * .12));
+  return shortAnswerDistance(normalizedValue, normalizedExpected) <= tolerance;
+}
+
 function isoDate(value: unknown): string | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const timestamp = typeof value === "number" || /^\d+$/.test(value) ? Number(value) : Date.parse(value);
@@ -145,14 +183,17 @@ function readQuizPreferences(): QuizPreferences {
   try {
     const saved = JSON.parse(decodeURIComponent(encoded)) as Record<string, unknown>;
     const mode = typeof saved.mode === "string" && ["quick", "unseen", "topic", "mistakes"].includes(saved.mode) ? saved.mode as Mode : undefined;
-    const questionCount = typeof saved.questionCount === "number" && Number.isInteger(saved.questionCount) && saved.questionCount >= 10 && saved.questionCount <= 50 ? saved.questionCount : undefined;
-    return { unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount };
+    const questionCount = typeof saved.questionCount === "number" && QUIZ_QUESTION_COUNTS.includes(saved.questionCount) ? saved.questionCount : undefined;
+    const answerFormat = saved.answerFormat === "short_answer" ? "short_answer" : saved.answerFormat === "multiple_choice" ? "multiple_choice" : undefined;
+    const shortAnswerMode = saved.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : saved.shortAnswerMode === "type_and_check" ? "type_and_check" : undefined;
+    return { unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
   } catch { return {}; }
 }
 
 function saveQuizPreferences(preferences: QuizPreferences) {
   if (typeof document === "undefined") return;
-  const safe = { unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: Math.min(50, Math.max(10, preferences.questionCount ?? 10)) };
+  const preferredQuestionCount = preferences.questionCount ?? DEFAULT_QUESTION_COUNT;
+  const safe = { unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
   document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
@@ -299,7 +340,10 @@ export function QuizHub() {
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
   const [selectedMode, setSelectedMode] = useState<Mode>(() => readQuizPreferences().mode ?? "quick");
   const [abandonConfirmation, setAbandonConfirmation] = useState(false);
-  const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? 10);
+  const [clearStatisticsConfirmation, setClearStatisticsConfirmation] = useState(false);
+  const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
+  const [answerFormat, setAnswerFormat] = useState<AnswerFormat>(() => readQuizPreferences().answerFormat ?? "multiple_choice");
+  const [shortAnswerMode, setShortAnswerMode] = useState<ShortAnswerMode>(() => readQuizPreferences().shortAnswerMode ?? "type_and_check");
   const [screen, setScreen] = useState<Screen>("catalogue");
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -321,6 +365,8 @@ export function QuizHub() {
   const [statistics, setStatistics] = useState<QuizStatistics | null>(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [statisticsError, setStatisticsError] = useState("");
+  const [clearingStatistics, setClearingStatistics] = useState(false);
+  const [exportingAnki, setExportingAnki] = useState(false);
   const attemptRef = useRef<Attempt | null>(null);
   const pendingAnswerSaves = useRef(new Map<string, Promise<void>>());
 
@@ -387,6 +433,23 @@ export function QuizHub() {
     }
   }, []);
 
+  const clearStatistics = useCallback(async () => {
+    if (clearingStatistics) return;
+    setClearingStatistics(true);
+    try {
+      const response = await fetch("/api/quizzes/progress", { method: "DELETE" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível limpar as tuas estatísticas."));
+      setClearStatisticsConfirmation(false);
+      setNotice({ kind: "success", message: "As tuas estatísticas foram limpas." });
+      await Promise.all([loadStatistics(), loadCatalogue()]);
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível limpar as tuas estatísticas." });
+    } finally {
+      setClearingStatistics(false);
+    }
+  }, [clearingStatistics, loadCatalogue, loadStatistics]);
+
   useEffect(() => { void loadCatalogue(); }, [loadCatalogue]);
   useEffect(() => {
     if (!selectedUnit) return;
@@ -396,10 +459,10 @@ export function QuizHub() {
     });
   }, [selectedUnit]);
   useEffect(() => {
-    if (!availableQuestionCount) return;
-    setQuestionCount((current) => availableQuestionCount < 10 ? 10 : Math.min(Math.min(50, availableQuestionCount), Math.max(10, current)));
+    const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
+    setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
   }, [availableQuestionCount]);
-  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount }); }, [questionCount, selectedMode, selectedTopicIds, selectedUnitId]);
+  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode }); }, [answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -440,8 +503,8 @@ export function QuizHub() {
       setNotice({ kind: "warning", message: "Seleciona pelo menos um tema antes de iniciar o treino temático." });
       return;
     }
-    if (availableQuestionCount < 10) {
-      setNotice({ kind: "warning", message: "São necessárias pelo menos 10 perguntas disponíveis para iniciar um teste." });
+    if (availableQuestionCount < DEFAULT_QUESTION_COUNT) {
+      setNotice({ kind: "warning", message: "São necessárias pelo menos 15 perguntas disponíveis para iniciar um teste." });
       return;
     }
     setLoadingAttempt(true);
@@ -453,7 +516,7 @@ export function QuizHub() {
       if (!response.ok) {
         const code = data.code;
         if (code === "not_enough_mistakes" || code === "all_questions_seen" || code === "not_enough_questions") {
-          setAvailability({ code, available: Number(data.available ?? 0), required: Number(data.required ?? 10), total: Number(data.total ?? 0) });
+          setAvailability({ code, available: Number(data.available ?? 0), required: Number(data.required ?? DEFAULT_QUESTION_COUNT), total: Number(data.total ?? 0) });
           return;
         }
         throw new Error(apiError(data, "Não foi possível iniciar o teste."));
@@ -473,6 +536,39 @@ export function QuizHub() {
       setLoadingAttempt(false);
     }
   }, [availableQuestionCount, questionCount, selectedMode, selectedTopicIds, selectedUnit, updateAttempt]);
+
+  const exportToAnki = useCallback(async () => {
+    if (!selectedUnit?.id || exportingAnki) return;
+    if (selectedMode === "topic" && !selectedTopicIds.length) {
+      setNotice({ kind: "warning", message: "Seleciona pelo menos um tema antes de exportar para o Anki." });
+      return;
+    }
+    if (availableQuestionCount < DEFAULT_QUESTION_COUNT) {
+      setNotice({ kind: "warning", message: "São necessárias pelo menos 15 perguntas para criar o baralho Anki." });
+      return;
+    }
+    setExportingAnki(true);
+    try {
+      const params = new URLSearchParams({ unitId: selectedUnit.id, mode: selectedMode, count: String(questionCount) });
+      if (selectedMode === "topic") params.set("topicIds", selectedTopicIds.join(","));
+      const response = await fetch(`/api/quizzes/export?${params.toString()}`, { cache: "no-store" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível preparar o ficheiro Anki."));
+      const { apkgBlob, buildQuizExportApkg } = await import("@/lib/anki");
+      const result = await buildQuizExportApkg(data as QuizExportPayload);
+      const downloadUrl = URL.createObjectURL(apkgBlob(result));
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = result.fileName;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      setNotice({ kind: "success", message: `Baralho Anki criado com ${result.cardCount} perguntas${result.mediaCount ? ` e ${result.mediaCount} ${result.mediaCount === 1 ? "imagem" : "imagens"}` : ""}.` });
+    } catch (reason) {
+      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível preparar o ficheiro Anki." });
+    } finally {
+      setExportingAnki(false);
+    }
+  }, [availableQuestionCount, exportingAnki, questionCount, selectedMode, selectedTopicIds, selectedUnit]);
 
   const finishAttempt = useCallback(async () => {
     const requestedAttempt = attemptRef.current;
@@ -659,7 +755,7 @@ export function QuizHub() {
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (screen !== "attempt" || !question || target?.matches("input, textarea, select, [contenteditable='true']")) return;
       const number = Number(event.key);
-      if (number >= 1 && number <= question.options.length) {
+      if (answerFormat === "multiple_choice" && number >= 1 && number <= question.options.length) {
         event.preventDefault();
         void answerQuestion(question.options[number - 1].id);
       }
@@ -668,7 +764,7 @@ export function QuizHub() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [answerQuestion, currentIndex, goToQuestion, question, screen]);
+  }, [answerFormat, answerQuestion, currentIndex, goToQuestion, question, screen]);
 
   const score = attempt?.score;
   const resultPercent = typeof score === "number" && Number.isFinite(score) ? Math.round(score) : attempt?.questions.length ? Math.round((correctCount / attempt.questions.length) * 100) : 0;
@@ -688,6 +784,8 @@ export function QuizHub() {
             selectedTopicIds={selectedTopicIds}
             topics={topics}
             questionCount={questionCount}
+            answerFormat={answerFormat}
+            shortAnswerMode={shortAnswerMode}
             availableQuestionCount={availableQuestionCount}
             loadingAttempt={loadingAttempt}
             resumeAttempt={attempt?.status === "active" ? attempt : null}
@@ -695,15 +793,19 @@ export function QuizHub() {
             onUnit={(unitId) => { setAvailability(null); setSelectedUnitId(unitId); }}
             onMode={(mode) => { setAvailability(null); setSelectedMode(mode); }}
             onTopics={(topicIds) => { setAvailability(null); setSelectedTopicIds(topicIds); }}
-            onQuestionCount={(count) => { setAvailability(null); setQuestionCount(Math.min(Math.min(50, Math.max(10, availableQuestionCount)), Math.max(10, count))); }}
+            onQuestionCount={(count) => { if (QUIZ_QUESTION_COUNTS.includes(count)) { setAvailability(null); setQuestionCount(count); } }}
+            onAnswerFormat={setAnswerFormat}
+            onShortAnswerMode={setShortAnswerMode}
             onStart={() => void startAttempt()}
             onResume={resumeAttempt}
             onRetry={() => void loadCatalogue()}
             onNormal={() => { setAvailability(null); setSelectedMode("quick"); }}
             onMistakes={() => { setAvailability(null); setSelectedMode("mistakes"); }}
             onStatistics={() => { setScreen("statistics"); void loadStatistics(); }}
+            exportingAnki={exportingAnki}
+            onExportAnki={() => void exportToAnki()}
           />}
-          {screen === "statistics" && <StatisticsView statistics={statistics} loading={statisticsLoading} error={statisticsError} totalAvailableQuestions={units.reduce((total, unit) => total + unit.questionCount, 0)} onBack={() => setScreen("catalogue")} onRetry={() => void loadStatistics()} />}
+          {screen === "statistics" && <StatisticsView statistics={statistics} loading={statisticsLoading} error={statisticsError} totalAvailableQuestions={units.reduce((total, unit) => total + unit.questionCount, 0)} clearing={clearingStatistics} onBack={() => setScreen("catalogue")} onRetry={() => void loadStatistics()} onClear={() => setClearStatisticsConfirmation(true)} />}
           {screen === "attempt" && attempt && question && <AttemptView
             attempt={attempt}
             unit={selectedUnit}
@@ -714,6 +816,8 @@ export function QuizHub() {
             remaining={remaining}
             progress={progress}
             showExplanation={showExplanation}
+            answerFormat={answerFormat}
+            shortAnswerMode={shortAnswerMode}
             commentsOpen={commentsOpen}
             comments={comments}
             commentsLoading={commentsLoading}
@@ -737,27 +841,29 @@ export function QuizHub() {
           />}
           {screen === "results" && attempt && <ResultsView attempt={attempt} correctCount={correctCount} percent={resultPercent} recommendation={recommendation} onRestart={() => { setAttempt(null); attemptRef.current = null; setScreen("catalogue"); setCurrentIndex(0); }} />}
         </div>
-        <ConfirmationDialog open={abandonConfirmation} eyebrow="Tentativa em curso" title="Desistir deste teste?" description="O progresso desta tentativa será encerrado e não poderás retomá-la." subject={attempt?.title} subjectLabel="Teste atual" warning="As respostas dadas nesta tentativa deixam de poder ser alteradas." confirmLabel={finishing ? "A desistir…" : "Desistir do teste"} busy={finishing} icon={<TriangleAlert />} onClose={() => setAbandonConfirmation(false)} onConfirm={() => void abandonAttempt()} />
+        <ConfirmationDialog open={abandonConfirmation} eyebrow="" title="Queres desistir do teste?" description="" confirmLabel={finishing ? "A desistir…" : "Desistir"} busy={finishing} icon={<TriangleAlert />} onClose={() => setAbandonConfirmation(false)} onConfirm={() => void abandonAttempt()} />
+        <ConfirmationDialog open={clearStatisticsConfirmation} eyebrow="Histórico de testes" title="Limpar as estatísticas?" description="As tentativas concluídas ou abandonadas e as respetivas respostas serão apagadas. Um teste em curso será mantido." warning="Esta ação não pode ser anulada." confirmLabel={clearingStatistics ? "A limpar…" : "Limpar estatísticas"} busy={clearingStatistics} icon={<Trash2 />} onClose={() => setClearStatisticsConfirmation(false)} onConfirm={() => void clearStatistics()} />
       </AppShell>
     </ModuleGuard>
   </AuthGuard>;
 }
 
-function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics }: {
-  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; availableQuestionCount: number; loadingAttempt: boolean;
+function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
+  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
+  exportingAnki: boolean;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
-  onUnit: (id: string) => void; onMode: (id: Mode) => void; onTopics: (ids: string[]) => void; onQuestionCount: (count: number) => void; onStart: () => void; onResume: () => void; onRetry: () => void; onNormal: () => void; onMistakes: () => void;
+  onUnit: (id: string) => void; onMode: (id: Mode) => void; onTopics: (ids: string[]) => void; onQuestionCount: (count: number) => void; onAnswerFormat: (format: AnswerFormat) => void; onShortAnswerMode: (mode: ShortAnswerMode) => void; onStart: () => void; onResume: () => void; onRetry: () => void; onNormal: () => void; onMistakes: () => void;
   onStatistics: () => void;
+  onExportAnki: () => void;
 }) {
-  const effectiveMaximum = Math.min(50, availableQuestionCount);
-  const insufficientBank = Boolean(selectedUnit && availableQuestionCount < 10);
+  const insufficientBank = Boolean(selectedUnit && availableQuestionCount < DEFAULT_QUESTION_COUNT);
   const needsTopics = selectedMode === "topic" && !selectedTopicIds.length;
   const canStart = Boolean(selectedUnit && !insufficientBank && !needsTopics && !availability && !loadingAttempt);
   const shortageAvailable = availability?.code === "not_enough_questions" ? availability.available : availableQuestionCount;
-  const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : 10;
+  const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : DEFAULT_QUESTION_COUNT;
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
-  const countOptions = effectiveMaximum >= 10 ? Array.from({ length: effectiveMaximum - 9 }, (_, index) => index + 10) : [10];
+  const countOptions = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
   return <>
     <header className={`page-heading page-heading--simple ${styles.hero}`}>
       <div><span className="eyebrow">Testes</span><h1>Novo teste</h1></div>
@@ -791,27 +897,42 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
 
           <section className={styles.configBlock}>
             <div className={styles.configHeading}><span>3</span><strong>Perguntas</strong></div>
-            <label className={styles.countControl} htmlFor="quiz-question-count"><span className={styles.selectWrap}><select id="quiz-question-count" aria-label="Número de perguntas" value={questionCount} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.map((count) => <option key={count} value={count}>{count} perguntas · {count} min</option>)}</select><ChevronDown aria-hidden="true" /></span><span className={styles.timeRule}><Clock3 />1 min/pergunta</span></label>
+            <label className={styles.countControl} htmlFor="quiz-question-count"><span className={styles.selectWrap}><select id="quiz-question-count" aria-label="Número de perguntas" value={countOptions.includes(questionCount) ? questionCount : ""} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.length ? countOptions.map((count) => <option key={count} value={count}>{count} perguntas · {count} min</option>) : <option value="">Menos de 15 perguntas disponíveis</option>}</select><ChevronDown aria-hidden="true" /></span><span className={styles.timeRule}><Clock3 />1 min/pergunta</span></label>
+          </section>
+
+          <section className={styles.configBlock}>
+            <div className={styles.configHeading}><span>4</span><strong>Formato de resposta</strong></div>
+            <div className={styles.answerFormatStack}>
+              <div className={styles.answerFormatGrid} role="radiogroup" aria-label="Formato de resposta">
+                <button type="button" role="radio" aria-checked={answerFormat === "multiple_choice"} className={`${styles.modeCard} ${answerFormat === "multiple_choice" ? styles.selected : ""}`} onClick={() => onAnswerFormat("multiple_choice")}><span className={styles.modeIcon}><CheckCircle2 /></span><strong>Escolha múltipla</strong>{answerFormat === "multiple_choice" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>
+                <button type="button" role="radio" aria-checked={answerFormat === "short_answer"} className={`${styles.modeCard} ${answerFormat === "short_answer" ? styles.selected : ""}`} onClick={() => onAnswerFormat("short_answer")}><span className={styles.modeIcon}><Keyboard /></span><strong>Resposta curta</strong>{answerFormat === "short_answer" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>
+              </div>
+              {answerFormat === "short_answer" && <div className={styles.shortModePicker}><span className={styles.topicTitle}>Como responder</span><div className={styles.shortModeChoices} role="radiogroup" aria-label="Modo de resposta curta">
+                <button type="button" role="radio" aria-checked={shortAnswerMode === "type_and_check"} className={shortAnswerMode === "type_and_check" ? styles.selected : ""} onClick={() => onShortAnswerMode("type_and_check")}><Keyboard /><span><strong>Escrever e verificar</strong><small>Compara o texto e confirma o resultado.</small></span></button>
+                <button type="button" role="radio" aria-checked={shortAnswerMode === "reveal_and_self_assess"} className={shortAnswerMode === "reveal_and_self_assess" ? styles.selected : ""} onClick={() => onShortAnswerMode("reveal_and_self_assess")}><Eye /><span><strong>Revelar e autoavaliar</strong><small>Vê a resposta e indica se acertaste.</small></span></button>
+              </div></div>}
+            </div>
           </section>
 
           {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}. Faz primeiro um teste normal.</p></div><button type="button" onClick={onNormal}>Teste aleatório</button></aside>}
           {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir um teste aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Teste aleatório</button><button type="button" onClick={onMistakes}>Rever erros</button></span></aside>}
-          {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>Há {shortageAvailable} perguntas disponíveis para esta seleção; pediste {shortageRequired}.</p></div></aside>}
+          {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; o teste escolhido requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 15 para iniciar um teste.</>}</p></div></aside>}
         </>}
       </section>
 
       {selectedUnit && <aside className={styles.setupSummary} aria-label="Resumo do teste">
         <span className={`${styles.summaryStatus} ${canStart ? styles.summaryReady : ""}`}>{canStart ? <CheckCircle2 /> : <CircleHelp />}{canStart ? "Pronto a iniciar" : needsTopics ? "Escolhe um tema" : availability ? "Ajusta a seleção" : "Configuração incompleta"}</span>
         <div className={styles.summaryUnit}><span className={styles.unitCode}>{selectedUnit.code}</span><div><strong>{selectedUnit.name}</strong><small>{availableQuestionCount} perguntas elegíveis</small></div></div>
-        <dl className={styles.summaryList}><div><dt>Tipo</dt><dd>{modeTitle(selectedMode)}</dd></div><div><dt>Perguntas</dt><dd>{questionCount}</dd></div><div><dt>Tempo</dt><dd>{questionCount} min</dd></div></dl>
-        <button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Iniciar teste"}</button>
+        <dl className={styles.summaryList}><div><dt>Tipo</dt><dd>{modeTitle(selectedMode)}</dd></div><div><dt>Perguntas</dt><dd>{questionCount}</dd></div><div><dt>Formato</dt><dd>{answerFormat === "multiple_choice" ? "Escolha múltipla" : shortAnswerMode === "type_and_check" ? "Escrever" : "Autoavaliar"}</dd></div><div><dt>Tempo</dt><dd>{questionCount} min</dd></div></dl>
+        <button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Iniciar teste"}</button>
+        <button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar APKG…" : "Baixar para Anki (.apkg)"}</button>
         <button type="button" className={`${styles.personalPractice} ${selectedMode === "mistakes" ? styles.selected : ""}`} onClick={onMistakes} aria-pressed={selectedMode === "mistakes"} title="Criar um teste apenas com perguntas que erraste"><RotateCcw /><strong>Rever os meus erros</strong></button>
       </aside>}
     </div>}
   </>;
 }
 
-function StatisticsView({ statistics, loading, error, totalAvailableQuestions, onBack, onRetry }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; onBack: () => void; onRetry: () => void }) {
+function StatisticsView({ statistics, loading, error, totalAvailableQuestions, clearing, onBack, onRetry, onClear }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; clearing: boolean; onBack: () => void; onRetry: () => void; onClear: () => void }) {
   if (loading) return <><header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
   if (error || !statistics) return <><header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
   const { summary } = statistics;
@@ -827,7 +948,7 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, o
     { label: "Últimos 10 testes", percent: recentAccuracy, value: `${statistics.recentAttempts.length} concluídos` },
   ];
   return <>
-    <header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header>
+    <header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><div className={styles.statisticsActions}><button className={`${styles.statisticsButton} ${styles.statisticsDangerButton}`} type="button" onClick={onClear} disabled={clearing}><Trash2 />Limpar estatísticas</button><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></div></header>
     <section className={styles.statisticsLead}>
       <article className={styles.readinessCard}><div><span className={styles.statisticsKicker}><BarChart3 />Preparação global</span><div className={styles.statisticsRing} style={{ "--score": `${accuracy}%` } as CSSProperties}><strong>{accuracy}%</strong><small>acerto</small></div></div><div><h2>{summary.completedCount ? `${summary.completedCount} ${summary.completedCount === 1 ? "teste concluído" : "testes concluídos"}` : "Começa a construir o teu histórico"}</h2><p>{readiness}</p></div></article>
       <article className={styles.timeCard}><span className={styles.statisticsKicker}><Clock3 />Tempo de testes</span><dl><div><dt>Tempo total</dt><dd>{humanDuration(summary.totalDurationSeconds)}</dd></div><div><dt>Média por teste</dt><dd>{humanDuration(summary.averageDurationSeconds)}</dd></div></dl></article>
@@ -842,13 +963,27 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, o
   </>;
 }
 
-function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, progress, showExplanation, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing }: {
-  attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; progress: number; showExplanation: boolean; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, progress, showExplanation, answerFormat, shortAnswerMode, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing }: {
+  attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; progress: number; showExplanation: boolean; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
   replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean;
 }) {
   const isExam = attempt.mode === "exam";
   const answered = Boolean(currentAnswer?.selectedOptionId);
   const feedback = !isExam && currentAnswer?.correct !== null && currentAnswer?.correct !== undefined;
+  const [shortDrafts, setShortDrafts] = useState<Record<string, { value: string; revealed: boolean; proposal: boolean | null }>>({});
+  const shortDraft = shortDrafts[question.id] ?? { value: "", revealed: false, proposal: null };
+  const correctOption = question.options.find((option) => option.id === question.correctOptionId) ?? null;
+  const incorrectOption = question.options.find((option) => option.id !== question.correctOptionId) ?? null;
+  const updateShortDraft = (next: Partial<typeof shortDraft>) => setShortDrafts((current) => ({ ...current, [question.id]: { ...shortDraft, ...next } }));
+  const assessShortAnswer = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!correctOption || !shortDraft.value.trim()) return;
+    updateShortDraft({ revealed: true, proposal: isShortAnswerMatch(shortDraft.value, correctOption.text) });
+  };
+  const submitSelfAssessment = (correct: boolean) => {
+    const option = correct ? correctOption : incorrectOption;
+    if (!answered && !answering && option) onSelect(option.id);
+  };
   return <>
     <section className={styles.sessionBar} aria-label="Progresso do teste">
       <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}</small></span></div>
@@ -864,14 +999,18 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
           {question.imageUrl && <figure className={styles.questionImage}><img src={question.imageUrl} alt={question.imageAlt} /></figure>}
           <div className={styles.questionContent}>
             <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
-            <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
+            {answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
               {question.options.map((option, index) => {
                 const selected = currentAnswer?.selectedOptionId === option.id;
                 const correct = feedback && option.id === question.correctOptionId;
                 const wrong = feedback && selected && currentAnswer?.correct === false;
                 return <button key={option.id} type="button" role="radio" aria-checked={selected} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
               })}
-            </div>
+            </div> : <section className={styles.shortAnswer} aria-label="Resposta curta">
+              {shortAnswerMode === "type_and_check" && !shortDraft.revealed && !answered && <form className={styles.shortAnswerForm} onSubmit={assessShortAnswer}><label htmlFor={`short-answer-${question.id}`}>A tua resposta</label><div className={styles.shortAnswerComposer}><textarea id={`short-answer-${question.id}`} value={shortDraft.value} onChange={(event) => updateShortDraft({ value: event.target.value, proposal: null })} placeholder="Escreve a resposta por palavras tuas…" rows={2} disabled={answering} /><footer><small>Podes corrigir a avaliação depois de veres a resposta.</small><button type="submit" disabled={!shortDraft.value.trim() || !correctOption}>Verificar</button></footer></div></form>}
+              {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Ver resposta</button>}
+              {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}><span>Resposta correta</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong>{shortAnswerMode === "type_and_check" && shortDraft.proposal !== null && !answered && <p className={shortDraft.proposal ? styles.proposalCorrect : styles.proposalIncorrect}>{shortDraft.proposal ? <CheckCircle2 /> : <XCircle />}O sistema considera {shortDraft.proposal ? "certo" : "errado"}.</p>}{!answered && <div className={styles.selfAssessmentActions} aria-label="Confirmar autoavaliação"><button type="button" className={styles.selfAssessmentCorrect} onClick={() => submitSelfAssessment(true)} disabled={answering || !correctOption}><CheckCircle2 />Acertei</button><button type="button" className={styles.selfAssessmentIncorrect} onClick={() => submitSelfAssessment(false)} disabled={answering || !incorrectOption}><XCircle />Errei</button></div>}</div>}
+            </section>}
             {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><RichTextContent value={question.explanation ?? "Consulta a explicação para consolidar este conceito."} className={styles.answerExplanation} /></div></section>}
             {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
           </div>

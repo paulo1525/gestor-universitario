@@ -4,11 +4,18 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const sourcePath = join(root, "data", "quizzes", "neuro-aula-1.json");
-const outputPath = join(root, "migrations", "0035_seed_neuro_aula1_quiz.sql");
+const outputName = process.argv[2] ?? "0035_seed_neuro_aula1_quiz.sql";
+if (!/^\d{4}_[a-z0-9_]+\.sql$/.test(outputName)) throw new Error("Nome de migration invÃ¡lido.");
+const outputPath = join(root, "migrations", outputName);
+const migrationVersion = outputName.slice(0, 4);
+const importId = migrationVersion === "0035" ? "quiz-import-neuro-a1-v1" : `quiz-import-neuro-a1-${migrationVersion}`;
 const bank = JSON.parse(await readFile(sourcePath, "utf8"));
-const questions = bank.questions;
+const allQuestions = bank.questions;
+const partition = process.argv[3] ?? "all";
+const questions = partition === "first" ? allQuestions.slice(0, 25) : partition === "second" ? allQuestions.slice(25) : allQuestions;
 
-if (!Array.isArray(questions) || questions.length !== 50) throw new Error("O banco tem de conter exatamente 50 perguntas.");
+if (!Array.isArray(allQuestions) || allQuestions.length !== 50) throw new Error("O banco tem de conter exatamente 50 perguntas.");
+if (!new Set(["all", "first", "second"]).has(partition)) throw new Error("PartiÃ§Ã£o invÃ¡lida.");
 const assets = new Map((bank.imageAssets ?? []).map((asset) => [asset.id, asset]));
 const sql = (value) => value === null || value === undefined ? "NULL" : `'${String(value).replaceAll("'", "''")}'`;
 const questionId = (question) => `quiz-${question.id.toLocaleLowerCase("pt-PT")}`;
@@ -48,8 +55,8 @@ for (const question of questions) {
 }
 
 lines.push(
-  "INSERT INTO quiz_imports (id,filename,curricular_unit_id,row_count,topics_created,questions_created,imported_by,created_at) SELECT 'quiz-import-neuro-a1-v1','neuro-aula-1-50-perguntas.json',unit_id,50,1,50,actor_id,unixepoch()*1000 FROM _seed_neuro_a1_context WHERE true ON CONFLICT(id) DO NOTHING;",
-  "INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) SELECT actor_id,'quiz_questions_seeded','{\"unitCode\":\"NEURO\",\"theme\":\"Aula 1\",\"count\":50,\"published\":true}',unixepoch()*1000 FROM _seed_neuro_a1_context;",
+  `INSERT INTO quiz_imports (id,filename,curricular_unit_id,row_count,topics_created,questions_created,imported_by,created_at) SELECT ${sql(importId)},'neuro-aula-1-50-perguntas.json',unit_id,${questions.length},1,${questions.length},actor_id,unixepoch()*1000 FROM _seed_neuro_a1_context WHERE true ON CONFLICT(id) DO NOTHING;`,
+  `INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) SELECT actor_id,'quiz_questions_seeded',${sql(JSON.stringify({ unitCode: bank.unitCode, theme: bank.theme, count: questions.length, published: true, migration: migrationVersion }))},unixepoch()*1000 FROM _seed_neuro_a1_context;`,
   "DROP TABLE _seed_neuro_a1_context;",
   "DROP TABLE _seed_neuro_a1_actor;",
   "",

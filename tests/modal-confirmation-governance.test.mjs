@@ -35,7 +35,7 @@ test("the shared confirmation dialog exposes modal semantics and keyboard focus 
   assert.match(dialog, /role="dialog"/);
   assert.match(dialog, /aria-modal="true"/);
   assert.match(dialog, /aria-labelledby=\{titleId\}/);
-  assert.match(dialog, /aria-describedby=\{descriptionId\}/);
+  assert.match(dialog, /aria-describedby=\{description \? descriptionId : undefined\}/);
   assert.match(dialog, /event\.key !== "Tab"/);
   assert.match(dialog, /previousFocus\?\.focus\(\)/);
   assert.match(dialog, /useEscapeKey\(open, dismiss\)/);

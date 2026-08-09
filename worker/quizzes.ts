@@ -23,8 +23,8 @@ type PublicQuizCommentThread = PublicQuizComment & { replies: PublicQuizCommentT
 
 const MAX_IMPORT_ROWS = 100;
 const MAX_IMAGE_BYTES = 1024 * 1024;
-const MIN_TEST_QUESTIONS = 10;
-const MAX_TEST_QUESTIONS = 50;
+const TEST_QUESTION_COUNTS = new Set([15, 30, 50]);
+const DEFAULT_TEST_QUESTION_COUNT = 15;
 const ADMIN_QUESTION_PAGE_SIZES = new Set([10, 25, 50]);
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
 
@@ -64,7 +64,7 @@ function has(object: Row, key: string): boolean { return Object.prototype.hasOwn
 function optionalDifficulty(value: unknown): Difficulty | null {
   const normalized = text(value, 20).toLocaleLowerCase("pt-PT");
   if (["easy", "fácil", "facil"].includes(normalized)) return "easy";
-  if (["medium", "média", "media", "médio", "medio"].includes(normalized)) return "medium";
+  if (["medium", "média", "media", "médio", "medio", "normal", "normais"].includes(normalized)) return "medium";
   if (["hard", "dificil", "difícil"].includes(normalized)) return "hard";
   return null;
 }
@@ -126,7 +126,7 @@ function questionInput(source: Row): { prompt: string; explanation: string; diff
 
 function validateQuestion(input: ReturnType<typeof questionInput>, requireOptions = true): string | null {
   if (richTextPlainText(input.prompt).length < 3) return "A pergunta deve ter pelo menos 3 caracteres.";
-  if (!input.difficulty) return "A dificuldade deve ser fácil, média ou difícil.";
+  if (!input.difficulty) return "A dificuldade deve ser fácil, normal ou difícil.";
   if ("error" in input.image) return input.image.error;
   if (requireOptions) {
     if (!input.options || input.options.length < 2 || input.options.length > 4 || input.options.some((option) => option.text.length === 0)) return "Cada pergunta deve ter entre 2 e 4 opções preenchidas.";
@@ -209,6 +209,59 @@ async function catalog(request: Request, env: QuizEnv, user: QuizUser | null, en
   return json({ units, topics, themes: topics, recommendedTopic: recommendation ? { id: recommendation.id, title: recommendation.title, unitId: recommendation.curricular_unit_id, unitCode: recommendation.unit_code, unitName: recommendation.unit_name, attemptedCount: recommendation.attempted_count, correctCount: recommendation.correct_count } : null });
 }
 
+async function exportQuiz(env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("quizzes.practice")) return disabled();
+  const { mode, difficulty } = modeFrom(url.searchParams.get("mode") || "quick", url.searchParams.get("difficulty"));
+  const unitId = text(url.searchParams.get("unitId"), 100);
+  const requestedCount = Number(url.searchParams.get("count") || DEFAULT_TEST_QUESTION_COUNT);
+  const topicIds = [...new Set([
+    ...url.searchParams.getAll("topicId"),
+    ...(url.searchParams.get("topicIds") || "").split(","),
+  ].map((id) => text(id, 100)).filter(Boolean))].slice(0, 30);
+  if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) return json({ error: "Escolha 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
+  if (!unitId || !await activeUnit(env, unitId)) return json({ error: "Escolha uma unidade curricular válida." }, 400);
+  if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para exportar." }, 400);
+  const selectedTopics = await Promise.all(topicIds.map((id) => activeTopic(env, id)));
+  if (selectedTopics.some((topic) => !topic || topic.curricular_unit_id !== unitId)) return json({ error: "Um ou mais temas são inválidos para a unidade curricular selecionada." }, 400);
+
+  const topicClause = topicIds.length ? ` AND q.topic_id IN (${topicIds.map(() => "?").join(",")})` : "";
+  const baseSql = " FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL AND cu.active=1 AND q.curricular_unit_id=?" + topicClause + " AND (?='' OR q.difficulty=?)";
+  const baseBinds: unknown[] = [unitId, ...topicIds, difficulty || "", difficulty || ""];
+  const selectionSql = mode === "unseen"
+    ? " AND NOT EXISTS (SELECT 1 FROM quiz_attempt_questions seen JOIN quiz_attempts seen_attempt ON seen_attempt.id=seen.attempt_id WHERE seen_attempt.user_id=? AND seen.question_id=q.id AND seen.selected_option_id IS NOT NULL)"
+    : mode === "mistakes"
+      ? " AND (SELECT COUNT(*) FROM quiz_attempt_questions mistaken JOIN quiz_attempts mistaken_attempt ON mistaken_attempt.id=mistaken.attempt_id WHERE mistaken_attempt.user_id=? AND mistaken.question_id=q.id AND mistaken.is_correct=0) > (SELECT COUNT(*) FROM quiz_attempt_questions corrected JOIN quiz_attempts corrected_attempt ON corrected_attempt.id=corrected.attempt_id WHERE corrected_attempt.user_id=? AND corrected.question_id=q.id AND corrected.is_correct=1)"
+      : "";
+  const selectionBinds: unknown[] = mode === "unseen" ? [user.id] : mode === "mistakes" ? [user.id, user.id] : [];
+  const candidates = await env.DB.prepare("SELECT q.*,t.title AS topic_title,cu.code AS unit_code,cu.name AS unit_name" + baseSql + selectionSql + " ORDER BY RANDOM() LIMIT ?")
+    .bind(...baseBinds, ...selectionBinds, requestedCount).all();
+  if (candidates.results.length < requestedCount) return json({ error: "Não existem perguntas suficientes para criar este ficheiro Anki.", code: "not_enough_questions", available: candidates.results.length, required: requestedCount }, 409);
+  const optionMap = await optionsForQuestions(env, candidates.results.map((item) => String(item.id)));
+  const questions = candidates.results.map((item) => {
+    const options = optionMap.get(String(item.id)) || [];
+    const correct = options.find((option) => option.isCorrect);
+    return {
+      id: item.id,
+      unitId: item.curricular_unit_id,
+      topicId: item.topic_id,
+      topicTitle: item.topic_title,
+      prompt: item.prompt,
+      imageUrl: item.image_url,
+      explanation: item.explanation,
+      difficulty: item.difficulty,
+      options: options.map((option) => ({ id: option.id, text: option.text, position: option.position })),
+      correctOptionId: correct?.id || null,
+    };
+  }).filter((question) => question.options.length >= 2 && question.options.length <= 4 && question.correctOptionId);
+  if (questions.length < requestedCount) return json({ error: "Algumas perguntas não têm opções válidas para exportação.", code: "invalid_questions", available: questions.length, required: requestedCount }, 409);
+  const first = candidates.results[0];
+  return json({
+    deck: { name: `${first.unit_code} · ${first.unit_name}`, unitId, unitCode: first.unit_code, unitName: first.unit_name, mode, questionCount: requestedCount },
+    questions,
+  });
+}
+
 async function publicQuestion(env: QuizEnv, user: QuizUser | null, id: string, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("quizzes.practice")) return disabled();
@@ -284,9 +337,9 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const singleTopicId = text(body.topicId ?? body.themeId, 100);
   const topicIds = [...new Set([...requestedTopicIds, ...(singleTopicId ? [singleTopicId] : [])])];
   const topicId = topicIds.length === 1 ? topicIds[0] : null;
-  const requestedCount = Number(body.questionCount ?? body.count ?? MIN_TEST_QUESTIONS);
-  if (!mode || !Number.isInteger(requestedCount) || requestedCount < MIN_TEST_QUESTIONS || requestedCount > MAX_TEST_QUESTIONS) {
-    return json({ error: `O teste deve ter entre ${MIN_TEST_QUESTIONS} e ${MAX_TEST_QUESTIONS} perguntas.`, code: "invalid_question_count", minimum: MIN_TEST_QUESTIONS, maximum: MAX_TEST_QUESTIONS }, 400);
+  const requestedCount = Number(body.questionCount ?? body.count ?? DEFAULT_TEST_QUESTION_COUNT);
+  if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) {
+    return json({ error: "Escolha 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
   }
   const durationSeconds = requestedCount * 60;
   if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para o teste temático." }, 400);
@@ -435,6 +488,18 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
   const recentAnswered = recentAttempts.reduce((total, attempt) => total + attempt.answeredCount, 0);
   const recentCorrect = recentAttempts.reduce((total, attempt) => total + attempt.correctCount, 0);
   return json({ summary: { attemptCount: summary?.attempt_count || 0, completedCount: summary?.completed_count || 0, answeredCount: totalAnswered, correctCount: totalCorrect, accuracy: totalAnswered ? totalCorrect / totalAnswered : null, uniqueQuestionCount: Number(summary?.unique_question_count || 0), totalDurationSeconds: Number(summary?.total_duration_seconds || 0), averageDurationSeconds: summary?.average_duration_seconds === null || summary?.average_duration_seconds === undefined ? null : Math.round(Number(summary.average_duration_seconds)), passedCount: Number(summary?.passed_count || 0), recentAccuracy: recentAnswered ? recentCorrect / recentAnswered : null }, recentAttempts, topics: topics.results.map((item) => ({ topicId: item.topic_id, title: item.title, unitId: item.curricular_unit_id, unitCode: item.unit_code, answeredCount: item.answered_count, correctCount: item.correct_count, accuracy: Number(item.answered_count) ? Number(item.correct_count) / Number(item.answered_count) : null })), mistakes: mistakes.results.map((item) => ({ id: item.id, prompt: item.prompt, imageUrl: item.image_url, difficulty: item.difficulty, topicId: item.topic_id, topicTitle: item.topic_title, unitId: item.unit_id, unitCode: item.unit_code, lastAnsweredAt: item.last_answered_at })) });
+}
+
+async function clearProgress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("quizzes.progress")) return disabled();
+  const results = await env.DB.batch([
+    env.DB.prepare("DELETE FROM quiz_attempt_questions WHERE attempt_id IN (SELECT id FROM quiz_attempts WHERE user_id=? AND status<>'active')").bind(user.id),
+    env.DB.prepare("DELETE FROM quiz_attempts WHERE user_id=? AND status<>'active'").bind(user.id),
+  ]);
+  const deletedAttempts = Number(results[1]?.meta.changes || 0);
+  await audit(env, user, "quiz_progress_cleared", { deletedAttempts });
+  return json({ ok: true, deletedAttempts });
 }
 
 async function publicComments(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker, pathQuestionId?: string): Promise<Response> {
@@ -731,7 +796,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return path === "/api/quizzes" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
+  return path === "/api/quizzes" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
 export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -752,7 +817,12 @@ export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, 
   }
   if (path === "/api/admin/quiz-comments" || path === "/api/admin/quizzes/comments") return adminCommentsDisabled(user);
   if (path === "/api/quizzes" && request.method === "GET") return catalog(request, env, user, enabled);
-  if (path === "/api/quiz-progress" || path === "/api/quizzes/progress") return request.method === "GET" ? progress(env, user, enabled) : json({ error: "Operação não suportada." }, 405);
+  if (path === "/api/quizzes/export") return request.method === "GET" ? exportQuiz(env, url, user, enabled) : json({ error: "Operação não suportada." }, 405);
+  if (path === "/api/quiz-progress" || path === "/api/quizzes/progress") {
+    if (request.method === "GET") return progress(env, user, enabled);
+    if (request.method === "DELETE") return clearProgress(env, user, enabled);
+    return json({ error: "Operação não suportada." }, 405);
+  }
   if (path === "/api/quiz-attempts") {
     if (request.method === "POST") return createAttempt(request, env, user, enabled);
     if (request.method === "GET") return getAttempts(env, user, enabled);
