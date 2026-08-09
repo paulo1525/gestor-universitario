@@ -1,0 +1,943 @@
+{
+  "schemaVersion": 1,
+  "unitCode": "NEURO",
+  "theme": "Aula 1 - Introdução ao estudo de Neuroanatomia",
+  "status": "published",
+  "source": {
+    "file": "Neuroanatomia - Bernardo Sousa Pinto .pdf",
+    "chapter": "Descrição geral do sistema nervoso central",
+    "pdfPages": [
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "boundaryEvidence": "O índice inicia este capítulo na página 4 e o capítulo seguinte, Desenvolvimento do sistema nervoso, começa na página 9. A inspeção visual confirma o cabeçalho do novo capítulo na página 9."
+  },
+  "platformContract": {
+    "options": 4,
+    "correctOption": "índice de base zero (0-3)",
+    "difficultyValues": [
+      "easy",
+      "medium",
+      "hard"
+    ],
+    "imagePolicy": "JPEG, PNG ou WebP; data URL até 1 MiB ou caminho interno iniciado por /; URLs externas não são aceites",
+    "importColumns": [
+      "unit_code",
+      "theme",
+      "question",
+      "option_1",
+      "option_2",
+      "option_3",
+      "option_4",
+      "correct_option",
+      "explanation",
+      "difficulty",
+      "image_url"
+    ]
+  },
+  "validation": {
+    "questionCount": 50,
+    "uniqueQuestionIds": 50,
+    "duplicateQuestions": 0,
+    "optionsPerQuestion": 4,
+    "questionsWithImages": 11,
+    "imageAssetCount": 8,
+    "correctOptionDistribution": {
+      "A": 13,
+      "B": 13,
+      "C": 12,
+      "D": 12
+    },
+    "difficultyDistribution": {
+      "easy": 29,
+      "medium": 13,
+      "hard": 8
+    },
+    "sourcePageDistribution": {
+      "4": 9,
+      "5": 13,
+      "6": 13,
+      "7": 9,
+      "8": 6
+    },
+    "platformCsvValidation": "50 linhas válidas; 0 erros",
+    "reviewNotes": "Enunciados revistos para evitar negações capciosas, opções mutuamente exclusivas e duplicação semântica. As explicações identificam o fundamento da resposta correta sem introduzir matéria posterior à primeira aula."
+  },
+  "imageAssets": [
+    {
+      "id": "neuro-a1-p4-snc",
+      "file": "public/quiz-images/neuro/aula-1/page-004-figure-2.jpeg",
+      "pdfPage": 4,
+      "figure": 2,
+      "pdfRegion": [
+        242.4,
+        106.5,
+        515.2,
+        324.75
+      ],
+      "content": "Vista lateral e posterior do encéfalo e da espinal medula.",
+      "cropInstruction": "Usar a figura completa; manter os rótulos Brain e Spinal cord como apoio de orientação.",
+      "alt": "Encéfalo e espinal medula vistos de perfil e posteriormente"
+    },
+    {
+      "id": "neuro-a1-p4-colunas",
+      "file": "public/quiz-images/neuro/aula-1/page-004-figure-1.jpeg",
+      "pdfPage": 4,
+      "figure": 1,
+      "pdfRegion": [
+        86.55,
+        597.797,
+        511.75,
+        767.187
+      ],
+      "content": "Organização das colunas longitudinais na espinal medula e no tronco cerebral.",
+      "cropInstruction": "Usar a figura completa com a legenda cromática e as designações das colunas.",
+      "alt": "Esquema das colunas motoras e sensitivas no tubo neural"
+    },
+    {
+      "id": "neuro-a1-p5-arco-espinhal",
+      "file": "public/quiz-images/neuro/aula-1/page-005-figure-1.jpeg",
+      "pdfPage": 5,
+      "figure": 1,
+      "pdfRegion": [
+        216,
+        372,
+        519,
+        605.25
+      ],
+      "content": "Corte da espinal medula com raiz dorsal, gânglio da raiz dorsal, raiz ventral e trajetos aferente/eferente.",
+      "cropInstruction": "Usar a figura completa; não cortar os rótulos laterais nem o gânglio da raiz dorsal.",
+      "alt": "Corte transversal da espinal medula e raízes de um nervo espinhal"
+    },
+    {
+      "id": "neuro-a1-p6-corte-medula",
+      "file": "public/quiz-images/neuro/aula-1/page-006-figure-1.jpeg",
+      "pdfPage": 6,
+      "figure": 1,
+      "pdfRegion": [
+        86.25,
+        78.75,
+        273,
+        275.25
+      ],
+      "content": "Corte histológico da espinal medula com substância branca, substância cinzenta, corno dorsal e corno ventral.",
+      "cropInstruction": "Usar a figura completa e preservar os quatro rótulos em português.",
+      "alt": "Corte histológico transversal da espinal medula"
+    },
+    {
+      "id": "neuro-a1-p6-encefalo-sagital",
+      "file": "public/quiz-images/neuro/aula-1/page-006-figure-2.jpeg",
+      "pdfPage": 6,
+      "figure": 2,
+      "pdfRegion": [
+        212.25,
+        546.75,
+        524.25,
+        761.25
+      ],
+      "content": "Esquema sagital do encéfalo com tronco cerebral, cerebelo, tálamo, hipotálamo e corpo caloso.",
+      "cropInstruction": "Usar a figura completa; manter a chave cromática do tronco cerebral.",
+      "alt": "Esquema sagital das principais regiões do encéfalo"
+    },
+    {
+      "id": "neuro-a1-p7-hierarquia",
+      "file": "public/quiz-images/neuro/aula-1/page-007-figure-1.png",
+      "pdfPage": 7,
+      "figure": 1,
+      "pdfRegion": [
+        86.55,
+        137,
+        511.75,
+        396
+      ],
+      "content": "Árvore hierárquica das subdivisões do encéfalo.",
+      "cropInstruction": "Usar a figura completa, incluindo a chaveta verde que delimita o tronco cerebral.",
+      "alt": "Árvore das subdivisões embriológicas do encéfalo"
+    },
+    {
+      "id": "neuro-a1-p7-cerebro-mediano",
+      "file": "public/quiz-images/neuro/aula-1/page-007-figure-2.jpeg",
+      "pdfPage": 7,
+      "figure": 2,
+      "pdfRegion": [
+        90,
+        520.3,
+        395.25,
+        683.8
+      ],
+      "content": "Peça anatómica em corte mediano do encéfalo com corpo caloso, tálamo, ventrículos e tronco cerebral.",
+      "cropInstruction": "Usar a figura completa e não remover as linhas de chamada das estruturas.",
+      "alt": "Corte mediano do encéfalo humano"
+    },
+    {
+      "id": "neuro-a1-p8-ventriculos",
+      "file": "public/quiz-images/neuro/aula-1/page-008-figure-1.jpeg",
+      "pdfPage": 8,
+      "figure": 1,
+      "pdfRegion": [
+        226.5,
+        77.7,
+        514.5,
+        265.45
+      ],
+      "content": "Sistema ventricular com ventrículos laterais, terceiro e quarto ventrículos, aqueduto cerebral e plexos coroideus.",
+      "cropInstruction": "Usar a figura completa; manter as legendas do aqueduto e dos plexos coroideus.",
+      "alt": "Esquema do sistema ventricular do encéfalo"
+    }
+  ],
+  "questions": [
+    {
+      "id": "NEURO-A1-001",
+      "question": "Observando a imagem, que duas estruturas constituem o sistema nervoso central?",
+      "options": [
+        "Encéfalo e espinal medula",
+        "Encéfalo e nervos cranianos",
+        "Espinal medula e nervos espinhais",
+        "Nervos cranianos e nervos espinhais"
+      ],
+      "correctOption": 0,
+      "explanation": "O sistema nervoso central é constituído pelo encéfalo e pela espinal medula. Os nervos cranianos e espinhais estabelecem a comunicação destas estruturas com a periferia.",
+      "difficulty": "easy",
+      "sourcePage": 4,
+      "imageAssetId": "neuro-a1-p4-snc"
+    },
+    {
+      "id": "NEURO-A1-002",
+      "question": "No sistema nervoso central, a designação núcleo refere-se a:",
+      "options": [
+        "Um feixe de axónios mielinizados que cruza a linha média",
+        "Uma pequena agregação de corpos celulares neuronais com papel funcional comum",
+        "Uma cavidade preenchida por fluido cefalorraquidiano",
+        "Uma camada periférica de tecido conjuntivo"
+      ],
+      "correctOption": 1,
+      "explanation": "A substância cinzenta contém corpos celulares neuronais; quando uma pequena agregação desses corpos celulares partilha habitualmente uma função, é designada por núcleo.",
+      "difficulty": "easy",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-003",
+      "question": "Que componentes se encontram sobretudo confinados à substância cinzenta?",
+      "options": [
+        "Axónios mielinizados e plexos coroideus",
+        "Raízes dorsais e ventrais",
+        "Dendrites e interações sinápticas",
+        "Fibras pré-ganglionares eferentes exclusivamente"
+      ],
+      "correctOption": 2,
+      "explanation": "O texto destaca que as dendrites neuronais e as interações sinápticas se localizam sobretudo na substância cinzenta, juntamente com os corpos celulares dos neurónios.",
+      "difficulty": "easy",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-004",
+      "question": "Por que motivo a substância branca apresenta uma cor mais pálida?",
+      "options": [
+        "Porque contém sobretudo líquido cefalorraquidiano",
+        "Porque é pouco irrigada",
+        "Porque é formada apenas por dendrites",
+        "Porque muitos dos seus axónios estão revestidos por mielina"
+      ],
+      "correctOption": 3,
+      "explanation": "Os axónios tendem a agrupar-se na substância branca e encontram-se frequentemente revestidos por mielina, que lhe confere a tonalidade mais pálida.",
+      "difficulty": "easy",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-005",
+      "question": "Qual é uma consequência funcional do cruzamento de axónios pela linha média?",
+      "options": [
+        "Uma metade do corpo pode ser controlada pelo lado oposto do cérebro",
+        "Cada hemisfério comunica apenas com o mesmo lado do corpo",
+        "A substância branca passa a conter corpos celulares",
+        "Os nervos espinhais deixam de ter fibras aferentes"
+      ],
+      "correctOption": 0,
+      "explanation": "O cruzamento de vias pela linha média ajuda a explicar a organização contralateral: informação de uma metade do corpo pode chegar ao lado oposto do cérebro, que também a pode controlar.",
+      "difficulty": "hard",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-006",
+      "question": "Como se podem organizar os neurónios de colunas longitudinais que desempenham funções semelhantes?",
+      "options": [
+        "Apenas em gânglios periféricos",
+        "Em núcleos discretos ou em feixes longitudinais mais ou menos contínuos",
+        "Exclusivamente no córtex cerebral",
+        "Apenas em comissuras que cruzam a linha média"
+      ],
+      "correctOption": 1,
+      "explanation": "No tronco cerebral, os neurónios podem concentrar-se em núcleos discretos e descontínuos; na maior parte da espinal medula podem formar feixes longitudinais mais ou menos contínuos.",
+      "difficulty": "medium",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-007",
+      "question": "No esquema das colunas longitudinais, qual coluna motora inerva músculos derivados dos sómitos da cabeça?",
+      "options": [
+        "Coluna motora branquial",
+        "Coluna motora visceral",
+        "Coluna motora somática",
+        "Coluna sensitiva visceral geral"
+      ],
+      "correctOption": 2,
+      "explanation": "Os axónios da coluna motora somática inervam músculos derivados dos sómitos da cabeça. A coluna branquial relaciona-se com derivados da parede da faringe embrionária.",
+      "difficulty": "medium",
+      "sourcePage": 4,
+      "imageAssetId": "neuro-a1-p4-colunas"
+    },
+    {
+      "id": "NEURO-A1-008",
+      "question": "A coluna motora branquial inerva músculos derivados de que estrutura embrionária?",
+      "options": [
+        "Sómitos da cabeça",
+        "Tubo neural",
+        "Crista neural exclusivamente",
+        "Parede da faringe embrionária"
+      ],
+      "correctOption": 3,
+      "explanation": "Os neurónios da coluna motora branquial inervam músculos derivados da parede da faringe embrionária.",
+      "difficulty": "medium",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-009",
+      "question": "Que fibras contém a coluna motora visceral descrita na primeira aula?",
+      "options": [
+        "Fibras pré-ganglionares parassimpáticas para glândulas e músculo liso",
+        "Fibras aferentes vestibulares e auditivas",
+        "Fibras sensitivas gerais da cabeça",
+        "Fibras motoras para músculos derivados dos sómitos da cabeça"
+      ],
+      "correctOption": 0,
+      "explanation": "A coluna motora visceral contém fibras pré-ganglionares parassimpáticas destinadas a glândulas e músculo liso.",
+      "difficulty": "medium",
+      "sourcePage": 4,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-010",
+      "question": "A coluna sensitiva somática geral recebe sobretudo:",
+      "options": [
+        "Informação vestibular e auditiva",
+        "Informação sensitiva geral da cabeça",
+        "Informação gustativa",
+        "Instruções motoras para glândulas"
+      ],
+      "correctOption": 1,
+      "explanation": "A coluna sensitiva somática geral está sobretudo encarregada da sensibilidade geral da cabeça.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-011",
+      "question": "Que modalidades chegam aos neurónios sensitivos somáticos especiais?",
+      "options": [
+        "Paladar e sensibilidade visceral geral",
+        "Motricidade somática e branquial",
+        "Informação vestibular e auditiva",
+        "Visão e olfato exclusivamente"
+      ],
+      "correctOption": 2,
+      "explanation": "Segundo o texto, os neurónios sensitivos somáticos especiais relacionam-se com sentidos especiais, recebendo informação vestibular e auditiva.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-012",
+      "question": "Os neurónios sensitivos viscerais gerais recebem informação proveniente de:",
+      "options": [
+        "Músculos derivados dos sómitos da cabeça",
+        "Córtex cerebral",
+        "Plexos coroideus",
+        "Terminais sensitivos viscerais"
+      ],
+      "correctOption": 3,
+      "explanation": "A coluna sensitiva visceral geral recebe informação de vários terminais sensitivos viscerais.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-013",
+      "question": "Qual das colunas sensitivas está relacionada com o paladar?",
+      "options": [
+        "Sensitiva visceral especial",
+        "Sensitiva somática geral",
+        "Motora visceral",
+        "Motora somática"
+      ],
+      "correctOption": 0,
+      "explanation": "Os neurónios sensitivos viscerais especiais estão relacionados com a receção da informação gustativa.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-014",
+      "question": "Através de que nervos comunicam, respetivamente, o encéfalo e a espinal medula com o resto do corpo?",
+      "options": [
+        "Nervos espinhais e nervos cranianos",
+        "Nervos cranianos e nervos espinhais",
+        "Nervos autónomos e nervos cranianos",
+        "Nervos aferentes e nervos eferentes"
+      ],
+      "correctOption": 1,
+      "explanation": "O encéfalo comunica sobretudo através dos nervos cranianos, enquanto a espinal medula comunica através dos nervos espinhais.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-015",
+      "question": "Qual afirmação distingue corretamente fibras aferentes de fibras eferentes?",
+      "options": [
+        "As aferentes saem do SNC e as eferentes entram no SNC",
+        "Ambas transportam apenas informação motora",
+        "As aferentes levam informação sensitiva ao SNC; as eferentes levam instruções do SNC aos efetores",
+        "Ambas transportam apenas informação sensitiva"
+      ],
+      "correctOption": 2,
+      "explanation": "As fibras aferentes conduzem informação proveniente de recetores sensitivos para o sistema nervoso central; as fibras eferentes conduzem instruções centrais até aos órgãos efetores periféricos.",
+      "difficulty": "hard",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-016",
+      "question": "Que função é atribuída à barreira hematoencefálica nesta introdução?",
+      "options": [
+        "Produzir todos os neurotransmissores do encéfalo",
+        "Unir as raízes dorsais e ventrais",
+        "Ligar diretamente os dois hemisférios cerebrais",
+        "Controlar o ambiente neuronal, restringindo a passagem de substâncias do sangue para o tecido nervoso"
+      ],
+      "correctOption": 3,
+      "explanation": "A barreira hematoencefálica controla o ambiente neuronal e limita os tipos de substâncias que podem passar da corrente sanguínea para o tecido nervoso.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-017",
+      "question": "Onde se localiza a espinal medula segundo o texto?",
+      "options": [
+        "Nos dois terços superiores do canal vertebral",
+        "Em toda a extensão do canal vertebral até ao cóccix",
+        "Na fossa craniana posterior",
+        "No interior de cada hemisfério cerebral"
+      ],
+      "correctOption": 0,
+      "explanation": "A espinal medula encontra-se na coluna vertebral, ocupando os dois terços superiores do canal vertebral, e é contínua superiormente com o bolbo raquidiano.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-018",
+      "question": "Na imagem do nervo espinhal, onde se localiza o corpo celular do neurónio aferente representado a azul?",
+      "options": [
+        "No corno ventral da espinal medula",
+        "No gânglio da raiz dorsal",
+        "No canal central da espinal medula",
+        "Na raiz ventral do nervo espinhal"
+      ],
+      "correctOption": 1,
+      "explanation": "O corpo celular do neurónio aferente encontra-se no gânglio da raiz dorsal. O seu prolongamento periférico recebe informação sensitiva e o prolongamento central entra na espinal medula pela raiz dorsal.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": "neuro-a1-p5-arco-espinhal"
+    },
+    {
+      "id": "NEURO-A1-019",
+      "question": "Que estruturas se combinam para formar um nervo espinhal?",
+      "options": [
+        "Corno dorsal e corno ventral",
+        "Tálamo e hipotálamo",
+        "Raiz dorsal e raiz ventral",
+        "Substância cinzenta e córtex cerebral"
+      ],
+      "correctOption": 2,
+      "explanation": "Grupos de pequenos ramos formam as raízes dorsal e ventral, que se unem para constituir o nervo espinhal propriamente dito.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-020",
+      "question": "Que tipo de fibras transporta sobretudo a raiz dorsal de um nervo espinhal?",
+      "options": [
+        "Fibras eferentes",
+        "Fibras comissurais",
+        "Fibras parassimpáticas pré-ganglionares exclusivamente",
+        "Fibras aferentes"
+      ],
+      "correctOption": 3,
+      "explanation": "A raiz dorsal transporta sobretudo fibras aferentes. Os corpos celulares desses neurónios localizam-se no gânglio da raiz dorsal.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": "neuro-a1-p5-arco-espinhal"
+    },
+    {
+      "id": "NEURO-A1-021",
+      "question": "De onde partem as fibras eferentes transportadas pela raiz ventral?",
+      "options": [
+        "De corpos celulares na substância cinzenta da espinal medula",
+        "De corpos celulares no gânglio da raiz dorsal",
+        "Dos plexos coroideus",
+        "Do corpo caloso"
+      ],
+      "correctOption": 0,
+      "explanation": "As raízes ventrais transportam fibras eferentes cujos corpos celulares se encontram na substância cinzenta da espinal medula.",
+      "difficulty": "hard",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-022",
+      "question": "Como se distribuem a substância cinzenta e a substância branca num corte da espinal medula?",
+      "options": [
+        "A substância branca forma um H central, rodeado por substância cinzenta",
+        "A substância cinzenta forma um núcleo central em H, rodeado por substância branca",
+        "Ambas formam camadas concêntricas alternadas",
+        "A substância cinzenta existe apenas nas raízes dorsais"
+      ],
+      "correctOption": 1,
+      "explanation": "Na espinal medula, a substância cinzenta ocupa a região central e tem forma de H; a substância branca dispõe-se perifericamente em seu redor.",
+      "difficulty": "easy",
+      "sourcePage": 5,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-023",
+      "question": "No corte histológico apresentado, que associação funcional está correta?",
+      "options": [
+        "Corno dorsal - funções motoras; corno ventral - funções sensitivas",
+        "Ambos os cornos - produção de fluido cefalorraquidiano",
+        "Corno dorsal - funções sensitivas; corno ventral - funções motoras",
+        "Ambos os cornos - ligação entre hemisférios cerebrais"
+      ],
+      "correctOption": 2,
+      "explanation": "Os neurónios do corno dorsal relacionam-se sobretudo com funções sensitivas, enquanto os do corno ventral se associam principalmente a funções motoras.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": "neuro-a1-p6-corte-medula"
+    },
+    {
+      "id": "NEURO-A1-024",
+      "question": "Que população neuronal é assinalada pela presença de um corno lateral na espinal medula?",
+      "options": [
+        "Neurónios sensitivos somáticos especiais",
+        "Neurónios motores branquiais",
+        "Neurónios dos gânglios da base",
+        "Neurónios simpáticos pré-ganglionares"
+      ],
+      "correctOption": 3,
+      "explanation": "Em certos níveis medulares, o corno lateral marca a localização dos corpos celulares dos neurónios simpáticos pré-ganglionares.",
+      "difficulty": "hard",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-025",
+      "question": "O canal central da espinal medula é descrito como:",
+      "options": [
+        "Um componente vestigial do sistema ventricular no centro da substância cinzenta",
+        "Um feixe motor no centro da substância branca",
+        "Uma extensão do espaço epidural",
+        "Uma comissura que une os hemisférios"
+      ],
+      "correctOption": 0,
+      "explanation": "O canal central percorre a espinal medula no centro da substância cinzenta e representa um componente vestigial do sistema ventricular.",
+      "difficulty": "medium",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-026",
+      "question": "Qual é a função geral dos feixes da substância branca da espinal medula?",
+      "options": [
+        "Produzir fluido cefalorraquidiano",
+        "Ligar segmentos medulares entre si e a espinal medula ao cérebro",
+        "Conter exclusivamente corpos celulares sensitivos",
+        "Formar os gânglios da raiz dorsal"
+      ],
+      "correctOption": 1,
+      "explanation": "A substância branca medular contém feixes ascendentes e descendentes que ligam níveis da espinal medula entre si e estabelecem ligações com o cérebro.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-027",
+      "question": "Quantos pares de nervos cranianos são apresentados como vias de comunicação do encéfalo?",
+      "options": [
+        "31",
+        "8",
+        "12",
+        "24"
+      ],
+      "correctOption": 2,
+      "explanation": "O encéfalo apresenta doze pares de nervos cranianos, através dos quais comunica sobretudo com estruturas da cabeça e do pescoço.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-028",
+      "question": "Qual é a ordem ascendente das três grandes regiões do encéfalo?",
+      "options": [
+        "Prosencéfalo, mesencéfalo, rombencéfalo",
+        "Mesencéfalo, rombencéfalo, prosencéfalo",
+        "Rombencéfalo, prosencéfalo, mesencéfalo",
+        "Rombencéfalo, mesencéfalo, prosencéfalo"
+      ],
+      "correctOption": 3,
+      "explanation": "Em sentido ascendente, o encéfalo divide-se em rombencéfalo, mesencéfalo e prosencéfalo.",
+      "difficulty": "hard",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-029",
+      "question": "Quais são as subdivisões do rombencéfalo?",
+      "options": [
+        "Mielencéfalo, metencéfalo e cerebelo",
+        "Diencéfalo, telencéfalo e cerebelo",
+        "Mesencéfalo, tálamo e hipotálamo",
+        "Ponte, telencéfalo e subtálamo"
+      ],
+      "correctOption": 0,
+      "explanation": "O rombencéfalo subdivide-se em mielencéfalo, correspondente ao bolbo raquidiano, metencéfalo, correspondente à ponte cerebral, e cerebelo.",
+      "difficulty": "medium",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-030",
+      "question": "Que conjunto constitui o tronco cerebral?",
+      "options": [
+        "Cerebelo, tálamo e hipotálamo",
+        "Bolbo raquidiano, ponte cerebral e mesencéfalo",
+        "Telencéfalo, diencéfalo e cerebelo",
+        "Bolbo raquidiano, cerebelo e telencéfalo"
+      ],
+      "correctOption": 1,
+      "explanation": "O tronco cerebral é formado pelo bolbo raquidiano, pela ponte cerebral e pelo mesencéfalo. O cerebelo não integra o tronco cerebral.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-031",
+      "question": "No esquema sagital, qual estrutura é a porção mais caudal do tronco cerebral e continua inferiormente com a espinal medula?",
+      "options": [
+        "Ponte cerebral",
+        "Mesencéfalo",
+        "Bolbo raquidiano",
+        "Cerebelo"
+      ],
+      "correctOption": 2,
+      "explanation": "O bolbo raquidiano é a porção mais caudal do tronco cerebral e torna-se contínuo com a espinal medula inferiormente, ao nível do buraco magno.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": "neuro-a1-p6-encefalo-sagital"
+    },
+    {
+      "id": "NEURO-A1-032",
+      "question": "Qual característica permite distinguir a ponte cerebral na descrição anatómica introdutória?",
+      "options": [
+        "A presença dos gânglios da base",
+        "A formação do corpo caloso",
+        "A produção do fluido cefalorraquidiano",
+        "Uma massa de fibras nervosas transversas que a liga ao cerebelo"
+      ],
+      "correctOption": 3,
+      "explanation": "A ponte situa-se rostralmente ao bolbo e distingue-se por uma massa de fibras nervosas transversas que estabelece ligação com o cerebelo.",
+      "difficulty": "medium",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-033",
+      "question": "Onde se situa o mesencéfalo relativamente à ponte cerebral?",
+      "options": [
+        "Rostralmente",
+        "Caudalmente",
+        "Lateralmente, no hemisfério cerebral",
+        "No interior do quarto ventrículo"
+      ],
+      "correctOption": 0,
+      "explanation": "O mesencéfalo é um pequeno segmento do tronco cerebral situado rostralmente à ponte.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-034",
+      "question": "Qual descrição do cerebelo está correta?",
+      "options": [
+        "É uma parte do diencéfalo situada na fossa craniana anterior",
+        "Tem dois hemisférios unidos por um verme mediano e situa-se dorsalmente ao tronco cerebral",
+        "É a porção mais caudal do tronco cerebral",
+        "É formado apenas por substância branca e não tem hemisférios"
+      ],
+      "correctOption": 1,
+      "explanation": "O cerebelo consiste num par de hemisférios unidos por um verme mediano, localiza-se na fossa craniana posterior e fica dorsalmente à ponte, ao bolbo e ao mesencéfalo caudal.",
+      "difficulty": "medium",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-035",
+      "question": "Em que duas grandes divisões se subdivide o prosencéfalo?",
+      "options": [
+        "Mielencéfalo e metencéfalo",
+        "Ponte e cerebelo",
+        "Diencéfalo e telencéfalo",
+        "Mesencéfalo e rombencéfalo"
+      ],
+      "correctOption": 2,
+      "explanation": "O prosencéfalo subdivide-se no diencéfalo e no telencéfalo.",
+      "difficulty": "easy",
+      "sourcePage": 6,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-036",
+      "question": "Que estruturas integram principalmente o diencéfalo?",
+      "options": [
+        "Bolbo raquidiano, ponte e cerebelo",
+        "Córtex cerebral e corpo caloso apenas",
+        "Raízes dorsais e ventrais",
+        "Tálamo e hipotálamo, incluindo ainda epitálamo e subtálamo"
+      ],
+      "correctOption": 3,
+      "explanation": "O diencéfalo engloba sobretudo o tálamo e o hipotálamo, além de porções menores como o epitálamo e o subtálamo.",
+      "difficulty": "medium",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-037",
+      "question": "Na árvore das subdivisões do encéfalo, qual estrutura pertence ao rombencéfalo, mas não ao tronco cerebral?",
+      "options": [
+        "Cerebelo",
+        "Bolbo raquidiano",
+        "Ponte cerebral",
+        "Mesencéfalo"
+      ],
+      "correctOption": 0,
+      "explanation": "O cerebelo integra o rombencéfalo, mas a chaveta do esquema mostra que o tronco cerebral é constituído por bolbo raquidiano, ponte e mesencéfalo.",
+      "difficulty": "hard",
+      "sourcePage": 7,
+      "imageAssetId": "neuro-a1-p7-hierarquia"
+    },
+    {
+      "id": "NEURO-A1-038",
+      "question": "O telencéfalo é constituído sobretudo por:",
+      "options": [
+        "Tálamo e hipotálamo",
+        "Dois hemisférios cerebrais",
+        "Ponte cerebral e cerebelo",
+        "Bolbo raquidiano e mesencéfalo"
+      ],
+      "correctOption": 1,
+      "explanation": "O telencéfalo corresponde sobretudo aos dois hemisférios cerebrais, isto é, ao cérebro propriamente dito.",
+      "difficulty": "easy",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-039",
+      "question": "Que combinação descreve corretamente a superfície de cada hemisfério cerebral?",
+      "options": [
+        "Colunas motoras separadas por raízes dorsais",
+        "Plexos coroideus separados pelo canal central",
+        "Cristas chamadas circunvoluções separadas por sulcos",
+        "Núcleos cranianos separados pelo quarto ventrículo"
+      ],
+      "correctOption": 2,
+      "explanation": "A superfície de cada hemisfério apresenta um padrão complexo de cristas, as circunvoluções, e depressões, os sulcos.",
+      "difficulty": "easy",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-040",
+      "question": "Como se organizam a substância cinzenta e a substância branca num hemisfério cerebral?",
+      "options": [
+        "A substância branca é externa e o córtex cinzento é central",
+        "Ambas existem apenas nos gânglios da base",
+        "A substância cinzenta forma apenas o corpo caloso",
+        "O córtex de substância cinzenta é externo e a substância branca situa-se profundamente"
+      ],
+      "correctOption": 3,
+      "explanation": "Cada hemisfério apresenta externamente o córtex cerebral, uma camada de substância cinzenta, e profundamente uma espessa massa de substância branca.",
+      "difficulty": "easy",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-041",
+      "question": "Qual é a função geral atribuída à cápsula interna?",
+      "options": [
+        "Conduzir fibras para e desde o córtex cerebral e níveis inferiores",
+        "Produzir fluido cefalorraquidiano",
+        "Unir as raízes dorsal e ventral",
+        "Alojar os corpos celulares dos neurónios sensitivos periféricos"
+      ],
+      "correctOption": 0,
+      "explanation": "A cápsula interna é um importante componente da substância branca cerebral e contém fibras que passam para o córtex e dele seguem para níveis inferiores.",
+      "difficulty": "medium",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-042",
+      "question": "Os gânglios da base são descritos como:",
+      "options": [
+        "Feixes de substância branca na espinal medula",
+        "Grandes núcleos de substância cinzenta parcialmente envolvidos por substância branca subcortical",
+        "Cavidades do sistema ventricular",
+        "Plexos vasculares do quarto ventrículo"
+      ],
+      "correctOption": 1,
+      "explanation": "Os gânglios da base correspondem a grandes núcleos de substância cinzenta, parcialmente envolvidos pela substância branca subcortical.",
+      "difficulty": "medium",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-043",
+      "question": "Na imagem em corte mediano, qual é a maior comissura que liga regiões correspondentes dos dois hemisférios cerebrais?",
+      "options": [
+        "Cápsula interna",
+        "Aqueduto cerebral",
+        "Corpo caloso",
+        "Canal central"
+      ],
+      "correctOption": 2,
+      "explanation": "O corpo caloso é a maior comissura do encéfalo e liga regiões correspondentes dos hemisférios cerebrais direito e esquerdo.",
+      "difficulty": "easy",
+      "sourcePage": 7,
+      "imageAssetId": "neuro-a1-p7-cerebro-mediano"
+    },
+    {
+      "id": "NEURO-A1-044",
+      "question": "Que destinos tem o lúmen do tubo neural na espinal medula e no encéfalo?",
+      "options": [
+        "Origina as raízes dorsais e os nervos cranianos",
+        "Origina o córtex cerebral e a cápsula interna",
+        "Desaparece completamente em ambos",
+        "Origina o canal central na espinal medula e o sistema ventricular no encéfalo"
+      ],
+      "correctOption": 3,
+      "explanation": "O lúmen do tubo neural não é completamente obliterado: torna-se o canal central na espinal medula e expande-se no encéfalo para formar cavidades interligadas, o sistema ventricular.",
+      "difficulty": "hard",
+      "sourcePage": 7,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-045",
+      "question": "Que estruturas segregam o fluido cefalorraquidiano que preenche os ventrículos?",
+      "options": [
+        "Plexos coroideus",
+        "Gânglios da base",
+        "Raízes dorsais",
+        "Comissuras cerebrais"
+      ],
+      "correctOption": 0,
+      "explanation": "Os plexos coroideus são folhetos de tecido secretor altamente vascularizado que segregam o fluido cefalorraquidiano.",
+      "difficulty": "easy",
+      "sourcePage": 8,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-046",
+      "question": "No esquema ventricular, onde se localiza o quarto ventrículo?",
+      "options": [
+        "Dentro de cada hemisfério cerebral",
+        "Dorsalmente à ponte e à metade superior do bolbo raquidiano",
+        "Na linha média entre os hemisférios, acima do corpo caloso",
+        "No interior da espinal medula lombar"
+      ],
+      "correctOption": 1,
+      "explanation": "A cavidade do rombencéfalo expande-se para formar o quarto ventrículo, situado dorsalmente à ponte e à metade superior do bolbo raquidiano.",
+      "difficulty": "medium",
+      "sourcePage": 8,
+      "imageAssetId": "neuro-a1-p8-ventriculos"
+    },
+    {
+      "id": "NEURO-A1-047",
+      "question": "Com que estrutura é contínuo caudalmente o quarto ventrículo?",
+      "options": [
+        "Diretamente com cada ventrículo lateral",
+        "Com a cápsula interna",
+        "Com um canal no bolbo caudal que continua com o canal central da espinal medula",
+        "Com o gânglio da raiz dorsal"
+      ],
+      "correctOption": 2,
+      "explanation": "Caudalmente, o quarto ventrículo continua-se por um canal na porção caudal do bolbo raquidiano e, através dele, com o canal central da espinal medula.",
+      "difficulty": "hard",
+      "sourcePage": 8,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-048",
+      "question": "Que canal estreito liga rostralmente o quarto ventrículo ao terceiro ventrículo?",
+      "options": [
+        "Canal central",
+        "Forame interventricular",
+        "Canal vertebral",
+        "Aqueduto cerebral"
+      ],
+      "correctOption": 3,
+      "explanation": "O aqueduto cerebral atravessa o mesencéfalo e liga a extensão rostral do quarto ventrículo ao terceiro ventrículo.",
+      "difficulty": "easy",
+      "sourcePage": 8,
+      "imageAssetId": "neuro-a1-p8-ventriculos"
+    },
+    {
+      "id": "NEURO-A1-049",
+      "question": "Qual descrição do terceiro ventrículo está correta?",
+      "options": [
+        "É uma cavidade estreita na linha média, ladeada lateralmente pelo diencéfalo",
+        "É uma cavidade par dentro de cada hemisfério",
+        "Situa-se dorsalmente à ponte",
+        "Percorre longitudinalmente a espinal medula"
+      ],
+      "correctOption": 0,
+      "explanation": "O terceiro ventrículo é uma cavidade estreita mediana, situada entre as duas metades do diencéfalo.",
+      "difficulty": "medium",
+      "sourcePage": 8,
+      "imageAssetId": null
+    },
+    {
+      "id": "NEURO-A1-050",
+      "question": "No esquema do sistema ventricular, onde se encontra cada ventrículo lateral?",
+      "options": [
+        "Na porção caudal do bolbo raquidiano",
+        "Dentro de cada hemisfério cerebral",
+        "No centro da substância cinzenta da espinal medula",
+        "Dorsalmente à ponte e ao bolbo"
+      ],
+      "correctOption": 1,
+      "explanation": "Existe um grande ventrículo lateral no interior de cada hemisfério cerebral; cada um comunica com a extremidade rostral do terceiro ventrículo através de uma pequena abertura.",
+      "difficulty": "easy",
+      "sourcePage": 8,
+      "imageAssetId": "neuro-a1-p8-ventriculos"
+    }
+  ]
+}

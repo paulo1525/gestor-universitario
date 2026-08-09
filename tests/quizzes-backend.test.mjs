@@ -7,6 +7,8 @@ const router = await readFile(new URL("../worker/index.ts", import.meta.url), "u
 const migration = await readFile(new URL("../migrations/0030_quizzes.sql", import.meta.url), "utf8");
 const commentThreadsMigration = await readFile(new URL("../migrations/0032_quiz_comment_threads.sql", import.meta.url), "utf8");
 const seed = await readFile(new URL("../scripts/setup-local-test.mjs", import.meta.url), "utf8");
+const quizHub = await readFile(new URL("../components/quiz-hub.tsx", import.meta.url), "utf8");
+const quizHubStyles = await readFile(new URL("../components/quiz-hub.module.css", import.meta.url), "utf8");
 
 test("quiz schema preserves the former classes data while disabling its modules", () => {
   assert.match(migration, /UPDATE app_module_settings[\s\S]*'classes\.special_statuses'/);
@@ -56,6 +58,30 @@ test("quiz selection, universal timing and abandonment are enforced server side"
   assert.match(worker, /attempt_expired/);
   assert.doesNotMatch(worker, /difficult: "quick"/);
   assert.doesNotMatch(worker, /hard: "quick"/);
+});
+
+test("quiz progress adds private completed-attempt statistics without breaking its existing contract", () => {
+  assert.match(worker, /async function progress\(env: QuizEnv, user: QuizUser \| null/);
+  assert.match(worker, /WHERE completed\.user_id=\? AND completed\.status='completed'/);
+  assert.match(worker, /WHERE a\.user_id=\? AND a\.status='completed'/);
+  assert.match(worker, /COUNT\(DISTINCT aq\.question_id\).*unique_question_count/s);
+  assert.match(worker, /correct_count\*2>=question_count/);
+  assert.match(worker, /ORDER BY a\.completed_at DESC,a\.started_at DESC\s+LIMIT 10/);
+  for (const field of ["uniqueQuestionCount", "totalDurationSeconds", "averageDurationSeconds", "passedCount", "recentAccuracy", "recentAttempts"]) assert.match(worker, new RegExp(`\\b${field}\\b`));
+  for (const field of ["id", "unitId", "unitCode", "mode", "questionCount", "answeredCount", "correctCount", "accuracy", "startedAt", "completedAt", "durationSeconds"]) assert.match(worker, new RegExp(`\\b${field}:`));
+  assert.match(worker, /attemptCount: summary\?\.attempt_count/);
+  assert.match(worker, /topics: topics\.results/);
+  assert.match(worker, /mistakes: mistakes\.results/);
+});
+
+test("students can open a responsive personal statistics dashboard from the quiz catalogue", () => {
+  assert.match(quizHub, /As minhas estatísticas/);
+  assert.match(quizHub, /fetch\("\/api\/quizzes\/progress"/);
+  assert.match(quizHub, /function StatisticsView/);
+  for (const label of ["Perguntas vistas", "Respostas certas", "Testes com ≥50%", "Últimos 10 testes", "Desempenho por tema", "Tempo de testes"]) assert.match(quizHub, new RegExp(label));
+  assert.match(quizHubStyles, /\.statisticsGrid\s*\{[^}]*grid-template-columns:\s*repeat\(4,/s);
+  assert.match(quizHubStyles, /\.readinessCard,[\s\S]*border-top:\s*var\(--surface-header-accent-size\) solid var\(--surface-header-accent\)/);
+  assert.match(quizHubStyles, /@media \(max-width: 720px\)[\s\S]*\.statisticsGrid\s*\{[^}]*grid-template-columns:\s*1fr 1fr/s);
 });
 
 test("quiz comments are immediately public, threaded and keep a stable author contract", () => {

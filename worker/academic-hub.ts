@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 
 export type HubUser = {
   id: string;
@@ -81,7 +81,7 @@ async function unitChoices(env: HubEnv): Promise<Array<Record<string, unknown>>>
 }
 
 function eventDto(row: Record<string, unknown>) {
-  return { id: row.id, title: row.title, description: row.description, type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 async function calendar(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -121,13 +121,13 @@ async function calendar(request: Request, env: HubEnv, url: URL, user: HubUser |
   }
   if (!["POST", "PUT"].includes(request.method)) return json({ error: "Operação não suportada." }, 405);
   const id = request.method === "PUT" ? text(body.id, 80) : crypto.randomUUID();
-  const title = text(body.title, 160), description = longText(body.description, 5000);
+  const title = text(body.title, 160), description = sanitizeRichTextHtml(longText(body.description, 12000));
   const type = text(body.type ?? body.eventType, 30) || "event";
   const unitId = text(body.unitId ?? body.curricularUnitId, 80);
   const startsAt = timestamp(body.startsAt), endsAt = timestamp(body.endsAt) ?? startsAt;
   const location = text(body.location, 200), visibility = text(body.visibility, 20) || "students";
   const status = text(body.status, 20) || "scheduled";
-  if (title.length < 3 || !["assessment", "exam", "deadline", "academic", "meeting", "event", "evaluation"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !["public", "students", "cc"].includes(visibility) || !["scheduled", "cancelled"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
+  if (title.length < 3 || richTextPlainText(description).length > 2000 || !["assessment", "exam", "deadline", "academic", "meeting", "event", "evaluation"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !["public", "students", "cc"].includes(visibility) || !["scheduled", "cancelled"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
   const now = Date.now();
   if (request.method === "POST") {
     await env.DB.prepare("INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -732,7 +732,7 @@ async function calendarFeed(env: HubEnv, url: URL, enabled: ModuleChecker): Prom
   await env.DB.prepare("UPDATE calendar_subscription_tokens SET last_used_at=? WHERE id=? AND revoked_at IS NULL").bind(Date.now(), subscription.id).run();
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Gestor Universitario//Calendario Academico//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Gestor Universitario"];
   for (const item of events.results) {
-    const row = rowObject(item), description = [row.description, row.unit_code ? `${row.unit_code} - ${row.unit_name}` : ""].filter(Boolean).join("\\n");
+    const row = rowObject(item), description = [richTextPlainText(String(row.description ?? "")), row.unit_code ? `${row.unit_code} - ${row.unit_name}` : ""].filter(Boolean).join("\\n");
     lines.push("BEGIN:VEVENT", `UID:${icsText(row.id)}@gestoruniversitario.cc`, `DTSTAMP:${icsDate(row.updated_at)}`, `DTSTART:${icsDate(row.starts_at)}`, `DTEND:${icsDate(row.ends_at)}`, `SUMMARY:${icsText(row.title)}`, `DESCRIPTION:${icsText(description)}`);
     if (row.location) lines.push(`LOCATION:${icsText(row.location)}`);
     lines.push("END:VEVENT");

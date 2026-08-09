@@ -123,3 +123,16 @@ test("calendar supports optimistic drag-and-drop rescheduling with an accessible
   assert.match(calendar, /type="date"/);
   assert.match(calendar, /community\.calendar\.reverted/);
 });
+
+test("calendar descriptions use the shared rich text contract end to end", () => {
+  assert.match(calendar, /RichTextEditor/);
+  assert.match(calendar, /RichTextContent/);
+  assert.match(calendar, /richTextPlainText\(form\.description\)/);
+  assert.match(backend, /sanitizeRichTextHtml\(longText\(body\.description, 12000\)\)/);
+  assert.match(backend, /richTextPlainText\(description\)\.length > 2000/);
+});
+
+test("class representative details follow the retired classes module", () => {
+  assert.match(directory, /useModuleEnabled\("classes"\)/);
+  assert.match(directory, /classesEnabled && member\.representedClass/);
+});

@@ -153,7 +153,6 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
       <div className={styles.summaryCopy}>
         <h2>{t("calendar.subscription.title")}</h2>
         <p>{t("calendar.subscription.description")}</p>
-        <span><RefreshCw />{t("calendar.subscription.autoSync")}</span>
       </div>
       <button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="calendar-subscription-panel">
         {open ? <X aria-hidden="true" /> : <Settings2 aria-hidden="true" />}
@@ -163,18 +162,6 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
 
     {open && <div className={styles.body} id="calendar-subscription-panel">
       <div className={styles.setup}>
-        <div className={styles.explainer} aria-label={t("calendar.subscription.howTitle")}>
-          <div className={styles.explainerHeading}>
-            <strong>{t("calendar.subscription.howTitle")}</strong>
-            <span>{t("calendar.subscription.howDescription")}</span>
-          </div>
-          <ol>
-            <li><span>1</span><div><strong>{t("calendar.subscription.stepLink")}</strong><small>{t("calendar.subscription.stepLinkHelp")}</small></div></li>
-            <li><span>2</span><div><strong>{t("calendar.subscription.stepApp")}</strong><small>{t("calendar.subscription.stepAppHelp")}</small></div></li>
-            <li><span>3</span><div><strong>{t("calendar.subscription.stepSync")}</strong><small>{t("calendar.subscription.stepSyncHelp")}</small></div></li>
-          </ol>
-        </div>
-
         {!created ? <form className={styles.form} onSubmit={create}>
         <div className={styles.formHeading}>
           <div><strong>{t("calendar.subscription.createTitle")}</strong><span>{t("calendar.subscription.createHelp")}</span></div>
@@ -226,7 +213,6 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
             <button type="button" onClick={() => void copy()}>{copied ? <Check /> : <Clipboard />}{t(copied ? "calendar.subscription.copied" : "calendar.subscription.copy")}</button>
           </div>
         </details>
-        <p className={styles.syncNote}><RefreshCw />{t("calendar.subscription.syncNote")}</p>
       </div>}
       </div>
 

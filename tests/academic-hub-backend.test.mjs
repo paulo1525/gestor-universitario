@@ -47,3 +47,9 @@ test("calendar rescheduling updates only dates and reports assessment conflicts"
   assert.match(worker, /endsAt < startsAt/);
   assert.match(worker, /academic_event_rescheduled[\s\S]*conflicts:/);
 });
+
+test("calendar event descriptions are sanitised and plain-text limited", () => {
+  assert.match(worker, /description = sanitizeRichTextHtml\(longText\(body\.description, 12000\)\)/);
+  assert.match(worker, /richTextPlainText\(description\)\.length > 2000/);
+  assert.match(worker, /description: sanitizeRichTextHtml\(String\(row\.description/);
+});

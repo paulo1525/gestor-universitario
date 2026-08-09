@@ -81,9 +81,13 @@ test("long public collections use bordered rows inside one shared panel", () => 
 });
 
 test("the new request composer stays compact and poll choice icons are optically centred", () => {
-  assert.match(files.requestsCss, /\.form\s*\{[^}]*width:min\(860px,100%\)/s);
+  assert.match(files.requestsCss, /\.form\s*\{[^}]*width:min\(1200px,100%\)/s);
   assert.match(files.requests, /minHeight="minimal"/);
   assert.match(files.pollsCss, /\.choiceMark svg\{[^}]*display:block[^}]*translateY\(-1\.5px\)/s);
+});
+
+test("the blue theme colours the upper edge of autonomous cards", () => {
+  assert.match(files.forumTheme, /Autonomous cards[\s\S]*border-top-color:\s*var\(--surface-header-accent\)/);
 });
 
 test("administration cards stay on the shared primitives and equal-height grid", () => {
@@ -110,6 +114,12 @@ test("quiz and curricular-unit headers do not introduce dark promotional heroes"
 
 test("page width remains stable when vertical overflow changes", () => {
   assert.match(files.globals, /html\s*\{[^}]*scrollbar-gutter:\s*stable/s);
+});
+
+test("quiz and curricular-unit pages use the same workspace alignment", () => {
+  assert.match(files.quizHub, /^\.page\s*\{[^}]*width:\s*100%/s);
+  assert.doesNotMatch(files.quizHub, /^\.page\s*\{[^}]*margin:\s*0 auto/s);
+  assert.doesNotMatch(files.quizHub, /^\.page\s*\{[^}]*1320px/s);
 });
 
 test("new feature cards use the shared light surfaces and borders", () => {

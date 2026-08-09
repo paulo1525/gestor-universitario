@@ -1,6 +1,5 @@
 .page {
-  width: min(1320px, 100%);
-  margin: 0 auto;
+  width: 100%;
 }
 
 .hero {
@@ -65,6 +64,205 @@
   font-weight: 800;
   cursor: pointer;
 }
+
+.statisticsButton {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.statisticsButton:hover,
+.statisticsButton:focus-visible {
+  border-color: var(--color-focus);
+  background: var(--color-surface-subtle);
+}
+
+.statisticsButton svg { width: 15px; }
+
+.statisticsLead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
+  gap: 14px;
+}
+
+.readinessCard,
+.timeCard,
+.statisticsMetric,
+.statisticsPanel {
+  border: 1px solid var(--surface-card-border);
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
+  border-radius: var(--surface-card-radius);
+  background: var(--surface);
+  box-shadow: var(--surface-card-shadow);
+}
+
+.readinessCard {
+  min-height: 174px;
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 18px 22px;
+}
+
+.readinessCard > div:first-child {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.statisticsKicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-text);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.statisticsKicker svg { width: 14px; }
+
+.statisticsRing {
+  --score: 0%;
+  width: 94px;
+  height: 94px;
+  display: grid;
+  place-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, var(--surface) 61%, transparent 62%), conic-gradient(var(--color-accent) var(--score), var(--color-surface-subtle) 0);
+  text-align: center;
+}
+
+.statisticsRing strong,
+.statisticsRing small { display: block; }
+.statisticsRing strong { color: var(--ink); font-size: 20px; }
+.statisticsRing small { color: var(--muted); font-size: 8px; }
+
+.readinessCard h2,
+.timeCard h2,
+.statisticsPanel h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.readinessCard p {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.timeCard {
+  min-height: 174px;
+  padding: 18px;
+}
+
+.timeCard dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 25px 0 0;
+}
+
+.timeCard dl > div {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+}
+
+.timeCard dt { color: var(--muted); font-size: 8px; font-weight: 750; }
+.timeCard dd { margin: 4px 0 0; color: var(--ink); font-size: 14px; font-weight: 850; }
+
+.statisticsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.statisticsMetric {
+  min-height: 180px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 16px;
+}
+
+.statisticsMetric h2 { margin: 0; color: var(--ink); font-size: 11px; }
+.statisticsMetric .statisticsRing { width: 84px; height: 84px; }
+.statisticsMetric .statisticsRing strong { font-size: 17px; }
+.statisticsMetric p { margin: 0; color: var(--muted); font-size: 9px; font-weight: 750; }
+
+.statisticsDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.statisticsPanel { overflow: hidden; }
+.statisticsPanel > header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-header-background); }
+.statisticsPanel > header h2 { margin-top: 4px; font-size: 13px; }
+
+.topicStatistics,
+.recentAttempts { display: grid; }
+
+.topicStatistics > div {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(100px, .65fr) 38px;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 9px 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.topicStatistics > div:last-child,
+.recentAttempts article:last-child { border-bottom: 0; }
+.topicStatistics > div > div:first-child { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 3px 7px; }
+.topicStatistics strong { overflow: hidden; color: var(--ink); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.topicStatistics small { grid-column: 2; color: var(--muted); font-size: 7.5px; }
+.topicStatistics > div > b { color: var(--ink); font-size: 10px; text-align: right; }
+
+.topicBar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--color-surface-subtle); }
+.topicBar span { height: 100%; display: block; border-radius: inherit; background: var(--color-accent); }
+
+.recentAttempts article {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.recentAttempts article > div { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 3px 7px; }
+.recentAttempts article strong { overflow: hidden; color: var(--ink); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.recentAttempts article small { grid-column: 2; color: var(--muted); font-size: 7.5px; }
+.recentAttempts article > span { min-width: 64px; display: grid; justify-items: end; gap: 2px; }
+.recentAttempts article > span b { font-size: 12px; }
+.recentAttempts article > span small { grid-column: auto; }
+.passedAttempt b { color: var(--green); }
+.reviewAttempt b { color: var(--color-accent-text); }
+.statisticsEmpty { margin: 0; padding: 30px 16px; color: var(--muted); font-size: 9px; text-align: center; }
 
 .resumeCard {
   display: grid;
@@ -1664,6 +1862,8 @@
 }
 
 @media (max-width: 1100px) {
+  .statisticsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
   .builder {
     grid-template-columns: minmax(0, 1fr) 280px;
   }
@@ -1678,6 +1878,9 @@
 }
 
 @media (max-width: 900px) {
+  .statisticsLead,
+  .statisticsDetailGrid { grid-template-columns: 1fr; }
+
   .builder {
     grid-template-columns: 1fr;
   }
@@ -1716,6 +1919,14 @@
   .hero {
     margin-bottom: 14px;
   }
+
+  .hero > .statisticsButton { width: 100%; margin-top: 10px; }
+  .statisticsGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .readinessCard { grid-template-columns: 1fr; gap: 14px; text-align: center; }
+  .timeCard dl { margin-top: 16px; }
+  .statisticsMetric { min-height: 155px; }
+  .topicStatistics > div { grid-template-columns: minmax(0, 1fr) 38px; }
+  .topicBar { grid-column: 1 / -1; grid-row: 2; }
 
   .resumeCard {
     grid-template-columns: 38px minmax(0, 1fr);

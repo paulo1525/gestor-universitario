@@ -16,7 +16,7 @@ import {
   LoaderCircle,
   MapPin,
   PencilLine,
-  Tag,
+  Shapes,
   Trash2,
   X,
 } from "lucide-react";
@@ -29,8 +29,10 @@ import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import { CalendarSubscription } from "@/components/calendar-subscription";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { useScrollLock } from "@/components/use-scroll-lock";
+import { richTextPlainText } from "@/lib/announcement-content";
 import styles from "@/components/academic-calendar.module.css";
 
 type DateInput = string | number;
@@ -256,6 +258,7 @@ export function AcademicCalendar() {
     return date && date >= today;
   }).slice(0, 5), [filtered, today]);
   const activeFilterCount = Number(typeFilter !== "all") + Number(unitFilter !== "all");
+  const descriptionLength = richTextPlainText(form.description).length;
 
   const selectDay = (date: Date) => {
     setSelectedDate(dateKey(date));
@@ -424,12 +427,12 @@ export function AcademicCalendar() {
 
   const renderEventFields = (mode: "create" | "edit") => <div className={styles.formGrid}>
     <label className={styles.wide}><span className={styles.fieldLabel}><PencilLine />{t("community.calendar.title")}</span><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={t("community.calendar.titlePlaceholder")} /></label>
-    <label><span className={styles.fieldLabel}><Tag />{t("community.calendar.type")}</span><select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value }))}>{Object.entries(eventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</select></label>
+    <label><span className={styles.fieldLabel}><Shapes />{t("community.calendar.type")}</span><select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value }))}>{Object.entries(eventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</select></label>
     <label><span className={styles.fieldLabel}><BookOpen />{t("community.calendar.unit")}</span><select value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">{t("community.calendar.general")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
     <label><span className={styles.fieldLabel}><Clock3 />{t("community.calendar.start")}</span><input required type="datetime-local" value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
     <label><span className={styles.fieldLabel}><CalendarClock />{t("community.calendar.end")} <small>({t("community.common.optional")})</small></span><input type="datetime-local" min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
     <label className={styles.wide}><span className={styles.fieldLabel}><MapPin />{t("community.calendar.locationOptional")} <small>({t("community.common.optional")})</small></span><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
-    <label className={styles.full}><span className={styles.fieldLabel}><FileText />{t("community.calendar.descriptionLabel")} <small>({t("community.common.optional")})</small></span><textarea rows={4} maxLength={2000} value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} /></label>
+    <div className={`${styles.full} ${styles.richTextField}`}><span className={styles.fieldLabel}><FileText />{t("community.calendar.descriptionLabel")} <small>({t("community.common.optional")})</small></span><RichTextEditor value={form.description} onChange={description => setForm(current => ({ ...current, description }))} ariaLabel={t("community.calendar.descriptionLabel")} maxLength={2000} minHeight="compact" onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por http://, https:// ou mailto:." })} /></div>
   </div>;
 
   return <AuthGuard><ModuleGuard moduleKey="calendar.events"><AppShell active="calendar" breadcrumb={t("community.calendar.breadcrumb")}>
@@ -510,7 +513,7 @@ export function AcademicCalendar() {
       </div> : filtered.length === 0 ? <div className={styles.emptyState}><CalendarDays /><strong>{t("community.calendar.noFilteredEvents")}</strong><span>{t("community.calendar.changeFilters")}</span></div> : <div className={styles.agendaList}>
         {filtered.map(item => { const starts = validDate(item.startsAt); return <article key={item.id} className={styles.agendaItem} data-event-type={item.type}>
           <time dateTime={starts?.toISOString()}><strong>{starts?.getDate() ?? "—"}</strong><span>{starts ? new Intl.DateTimeFormat(locale, { month: "short" }).format(starts) : t("community.calendar.dateFallback")}</span></time>
-          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && <span className={styles.unitBadge}>{item.unitName}</span>}</div><h3>{item.title}</h3><p><Clock3 />{formatEventDate(item.startsAt)}{item.endsAt && ` — ${formatEventDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{item.location}</p>}{item.description && <div className={styles.description}>{item.description}</div>}</div>
+          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && <span className={styles.unitBadge}>{item.unitName}</span>}</div><h3>{item.title}</h3><p><Clock3 />{formatEventDate(item.startsAt)}{item.endsAt && ` — ${formatEventDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{item.location}</p>}{item.description && <RichTextContent value={item.description} className={styles.description} />}</div>
           {canManage && <button type="button" className={styles.deleteButton} onClick={() => setDeleteTarget(item)} aria-label={t("community.calendar.deleteNamed", { title: item.title })}><Trash2 /></button>}
         </article>; })}
       </div>}
@@ -529,7 +532,7 @@ export function AcademicCalendar() {
         <div className={styles.modalBody}>
           <form className={styles.modalEditForm} onSubmit={save}>
             {renderEventFields("create")}
-            <div className={styles.modalEditActions}><button type="button" className="button button--secondary" disabled={saving} onClick={closeEditor}><X />Cancelar</button><button className="button button--primary" disabled={saving}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar evento"}</button></div>
+            <div className={styles.modalEditActions}><button type="button" className="button button--secondary" disabled={saving} onClick={closeEditor}><X />Cancelar</button><button className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar evento"}</button></div>
           </form>
         </div>
       </article>
@@ -550,20 +553,19 @@ export function AcademicCalendar() {
         </header>
 
         <div className={styles.modalBody}>
-          {editingEvent && canManage ? <form className={styles.modalEditForm} onSubmit={update}>
+          {editingEvent && canManage ? <form id="calendar-event-edit-form" className={styles.modalEditForm} onSubmit={update}>
             {renderEventFields("edit")}
-            <div className={styles.modalEditActions}><button type="button" className="button button--secondary" disabled={saving} onClick={() => { setEditingEvent(false); setForm(emptyEventForm); }}><X />Cancelar</button><button className="button button--primary" disabled={saving}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar alterações"}</button></div>
           </form> : <div className={styles.modalOverview}>
             <section className={styles.modalMeta} aria-label="Informação do evento">
               <p><Clock3 /><span><strong>Data e hora</strong>{formatDate(selectedEvent.startsAt)}{selectedEvent.endsAt && ` — ${formatDate(selectedEvent.endsAt)}`}</span></p>
               <p><MapPin /><span><strong>Local</strong>{selectedEvent.location || "Não indicado"}</span></p>
             </section>
-            <section className={styles.modalDescriptionSection}><span>Descrição</span><p className={styles.modalDescription}>{selectedEvent.description || "Este evento não tem uma descrição adicional."}</p></section>
+            <section className={styles.modalDescriptionSection}><span>Descrição</span>{selectedEvent.description ? <RichTextContent value={selectedEvent.description} className={styles.modalDescription} /> : <p className={styles.modalDescription}>Este evento não tem uma descrição adicional.</p>}</section>
             {canManage && <section className={styles.quickReschedule}><div><CalendarClock /><span><strong>Reagendamento rápido</strong><small>Mantém a hora e a duração atuais.</small></span></div><div className={styles.rescheduleControl}><label className={styles.srOnly} htmlFor="event-reschedule-date">Nova data</label><input id="event-reschedule-date" type="date" value={rescheduleDate} onChange={event => setRescheduleDate(event.target.value)} /><button type="button" disabled={!rescheduleDate || movingEventId === selectedEvent.id} onClick={() => { const target = new Date(`${rescheduleDate}T12:00:00`); if (!Number.isNaN(target.getTime())) void reschedule(selectedEvent, target); }}>{movingEventId === selectedEvent.id ? "A guardar…" : "Alterar data"}</button></div></section>}
           </div>}
         </div>
 
-        {canManage && <footer className={styles.modalFooter}><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button></footer>}
+        {canManage && <footer className={styles.modalFooter}>{editingEvent ? <><button type="button" className={styles.modalDelete} disabled={saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button><div className={styles.modalFooterActions}><button type="button" className="button button--secondary" disabled={saving} onClick={() => { setEditingEvent(false); setForm(emptyEventForm); }}><X />Cancelar</button><button type="submit" form="calendar-event-edit-form" className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar alterações"}</button></div></> : <><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button></>}</footer>}
       </article>
     </div>}
     <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow="Agenda partilhada" title="Eliminar este evento?" description={t("community.calendar.deleteConfirm")} subject={deleteTarget?.title} subjectLabel="Evento selecionado" warning="O evento deixa de estar visível para todos os utilizadores e esta ação não pode ser revertida." confirmLabel={deleting ? "A eliminar…" : "Eliminar evento"} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void remove()} />

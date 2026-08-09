@@ -33,7 +33,7 @@
 }
 
 .stickyForm { position: static; }
-.form { display: grid; width:min(860px,100%); margin-inline:auto; }
+.form { display: grid; width:min(1200px,100%); margin-inline:auto; }
 .formHeading { display:flex;align-items:center;gap:12px;min-height:var(--surface-header-min-height);padding:var(--surface-header-padding-block) var(--surface-header-padding-inline);border-top:var(--surface-header-accent-size) solid var(--surface-header-accent);border-bottom:1px solid var(--surface-card-border);background:var(--surface-header-background); }
 .formHeading > div { min-width:0; }
 .formHeadingIcon { width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:10px;color:var(--color-accent-text);background:var(--color-accent-soft); }
