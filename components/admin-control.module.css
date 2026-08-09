@@ -47,17 +47,68 @@
   min-height: 0;
 }
 
-.userToolbar {
-  justify-content: flex-end;
+.userSection .userToolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(190px, .32fr);
+  align-items: end;
+  gap: 12px;
+  padding-block: 14px;
 }
 
 .userSearch {
-  flex: 1 1 320px;
-  max-width: 460px;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
 }
 
-.userSearch input {
+.filterLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 850;
+}
+
+.filterLabel svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-info);
+}
+
+.searchControl {
+  position: relative;
+  display: block;
+}
+
+.searchControl > svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.searchControl input {
   width: 100%;
+  min-height: var(--control-height);
+  padding: 0 12px 0 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+
+.statusField {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
 }
 
 .statusFilter {
@@ -75,6 +126,11 @@
 .statusFilter:focus-visible {
   outline: 0;
   box-shadow: var(--focus-ring);
+}
+
+.searchControl:focus-within input,
+.statusFilter:focus-visible {
+  border-color: var(--color-focus);
 }
 
 .loadingState {
@@ -148,8 +204,13 @@
     padding-inline: var(--space-4);
   }
 
+  .userSection .userToolbar {
+    grid-template-columns: 1fr;
+  }
+
   .sectionFooter :global(.button),
   .userSearch,
+  .statusField,
   .statusFilter {
     width: 100%;
     max-width: none;

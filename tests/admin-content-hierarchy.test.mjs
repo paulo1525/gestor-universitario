@@ -29,4 +29,6 @@ test("curricular-unit administration does not mix list and editor views", () => 
 test("administrative subnavigation reuses the shared light surface", () => {
   assert.match(quizStyles, /\.sectionNav\s*\{[^}]*border:\s*1px solid var\(--line\)[^}]*background:\s*var\(--surface\)/s);
   assert.doesNotMatch(quizStyles, /\.sectionNav\s*\{[^}]*linear-gradient/s);
+  assert.match(quizStyles, /\.sectionNav\s*\{[^}]*overflow-y:\s*hidden[^}]*scrollbar-width:\s*none/s);
+  assert.match(quizStyles, /\.sectionHeading\s*\{[^}]*border-top:\s*var\(--surface-header-accent-size\) solid var\(--surface-header-accent\)/s);
 });

@@ -89,6 +89,7 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
   assert.match(unitCatalog, /community\.units\.upcoming/);
   assert.match(unitCatalog, /community\.units\.documents/);
   assert.match(unitCatalog, /data\.unit\.representatives\.length > 0/);
+  assert.doesNotMatch(unitCatalog, /href="\/admin\/unidades-curriculares"/);
 });
 
 test("calendário, dashboard e pesquisa têm contratos funcionais e ligações reais", () => {
