@@ -1144,18 +1144,18 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   .sidebar__collapse {
     position: absolute;
     z-index: 2;
-    top: 70px;
-    right: -22px;
-    width: 22px;
-    height: 48px;
+    top: 72px;
+    right: -14px;
+    width: 28px;
+    height: 36px;
     display: grid;
     place-items: center;
     padding: 0;
     border: 1px solid var(--sidebar-border);
-    border-left: 0;
-    border-radius: 0 8px 8px 0;
+    border-radius: 10px;
     color: var(--sidebar-text);
     background: var(--sidebar-bg);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .18);
     cursor: pointer;
   }
 
@@ -1176,12 +1176,12 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   }
 
   .sidebar.sidebar--collapsed {
-    width: 72px;
-    padding-inline: 10px;
+    width: 76px;
+    padding-inline: 8px;
   }
 
   .app-shell--sidebar-collapsed .workspace {
-    margin-left: 72px;
+    margin-left: 76px;
   }
 
   .sidebar.sidebar--collapsed .brand {
@@ -1203,7 +1203,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   }
 
   .sidebar.sidebar--collapsed .nav-list {
-    gap: 8px;
+    gap: 10px;
     padding: 14px 0 8px;
     scrollbar-width: none;
   }
@@ -1218,8 +1218,8 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
 
   .sidebar.sidebar--collapsed .nav-list a,
   .sidebar.sidebar--collapsed .nav-list a.is-active {
-    width: 48px;
-    min-height: 44px;
+    width: 44px;
+    min-height: 42px;
     justify-content: center;
     align-self: center;
     gap: 0;
@@ -1245,20 +1245,23 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   .sidebar.sidebar--collapsed .sidebar__footer {
     display: flex;
     justify-content: center;
+    padding-top: 8px;
+    border-top: 1px solid var(--sidebar-border);
   }
 
   .sidebar.sidebar--collapsed .profile-menu-shell {
-    width: 48px;
+    width: 44px;
   }
 
   .sidebar.sidebar--collapsed .profile {
-    width: 48px;
-    min-height: 48px;
+    width: 44px;
+    min-height: 44px;
     display: grid;
     grid-template-columns: 1fr;
     place-items: center;
     gap: 0;
-    padding: 7px;
+    padding: 5px;
+    border-top: 0;
   }
 
   .sidebar.sidebar--collapsed .profile > span:nth-child(2),

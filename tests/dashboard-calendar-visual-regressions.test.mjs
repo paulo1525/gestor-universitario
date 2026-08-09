@@ -5,6 +5,7 @@ import test from "node:test";
 const dashboard = await readFile(new URL("../components/personal-dashboard.tsx", import.meta.url), "utf8");
 const dashboardStyles = await readFile(new URL("../components/personal-dashboard.module.css", import.meta.url), "utf8");
 const subscription = await readFile(new URL("../components/calendar-subscription.tsx", import.meta.url), "utf8");
+const subscriptionStyles = await readFile(new URL("../components/calendar-subscription.module.css", import.meta.url), "utf8");
 const calendarStyles = await readFile(new URL("../components/academic-calendar.module.css", import.meta.url), "utf8");
 const forumTheme = await readFile(new URL("../app/theme-forum.css", import.meta.url), "utf8");
 
@@ -88,6 +89,10 @@ test("calendar subscription has one setup region and a separate connection manag
   assert.match(subscription, /className=\{styles\.actionRow\}/);
   assert.match(subscription, /className=\{styles\.management\}/);
   assert.doesNotMatch(subscription, /className=\{styles\.explainer\}/);
+  const formHeading = cssRule(subscriptionStyles, ".formHeading");
+  assert.match(formHeading, /grid-template-columns:\s*34px minmax\(0, 1fr\)/);
+  assert.match(formHeading, /border-radius:\s*9px/);
+  assert.match(formHeading, /background:\s*#f6faf7/);
 });
 
 test("today control shares the calendar toolbar control geometry and keyboard state", () => {
