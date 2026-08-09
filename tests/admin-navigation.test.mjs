@@ -38,4 +38,5 @@ test("collapsed and mobile navigation keep usable links", () => {
   assert.doesNotMatch(styles, /\.profileAdminLink\s*\{[^}]*background: var\(--color-accent-soft\)/s);
   assert.match(styles, /\.adminSidebar :global\(\.icon-button\.sidebar__close\)\s*\{[^}]*display: inline-grid !important/s);
   assert.match(styles, /prefers-reduced-motion: reduce/);
+  assert.match(styles, /\.navigation > \.groups:first-child\s*\{[^}]*border-top: 0/s);
 });

@@ -55,7 +55,7 @@
 }
 
 .editor {
-  padding: 18px 20px;
+  padding: 0;
 }
 
 .editorHeading,
@@ -64,6 +64,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+.editorHeading {
+  min-height: var(--surface-header-min-height);
+  padding: var(--surface-header-padding-block) var(--surface-header-padding-inline);
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
+  border-bottom: 1px solid var(--surface-card-border);
+  background: var(--surface-header-background);
 }
 
 .editorHeading > div,
@@ -103,14 +111,15 @@
 .editorIcon svg { width: 18px; height: 18px; }
 
 .form {
-  margin-top: 16px;
+  margin: 0;
+  padding: 20px;
 }
 
 .formGrid {
   display: grid;
-  grid-template-columns: minmax(110px, .55fr) minmax(220px, 2fr) repeat(3, minmax(110px, .65fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: start;
-  gap: 12px;
+  gap: 16px;
 }
 
 .formGrid label,
@@ -155,9 +164,20 @@
   line-height: 1.4;
 }
 
-.codeField { grid-column: span 1; }
-.nameField { grid-column: span 4; }
+.codeField { grid-column: span 3; }
+.nameField { grid-column: span 9; }
+.ectsField { grid-column: span 3; }
+.yearField { grid-column: span 5; }
+.semesterField { grid-column: span 4; }
 .representativeField { grid-column: 1 / -1; }
+
+.representativeField {
+  margin-top: 2px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+}
 
 .representativeSelectors {
   display: grid;
@@ -408,7 +428,10 @@
   .formGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nameField,
   .representativeField { grid-column: 1 / -1; }
-  .codeField { grid-column: auto; }
+  .codeField,
+  .ectsField,
+  .yearField,
+  .semesterField { grid-column: auto; }
   .unitTableHeader { display: none; }
   .unitCard,
   .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(220px, 1.4fr) minmax(90px, .5fr) minmax(140px, .7fr) auto; }
@@ -418,7 +441,8 @@
 @media (max-width: 720px) {
   .heading { align-items: stretch; flex-direction: column; gap: 12px; }
   .heading button { width: 100%; }
-  .editor { padding: 14px; }
+  .editorHeading { padding-inline: 14px; }
+  .form { padding: 14px; }
   .unitSearch { width: 100%; min-width: 0; }
   .unitCard,
   .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 14px; }
@@ -430,7 +454,11 @@
   .formGrid,
   .representativeSelectors { grid-template-columns: 1fr; }
   .nameField,
-  .representativeField { grid-column: auto; }
+  .representativeField,
+  .codeField,
+  .ectsField,
+  .yearField,
+  .semesterField { grid-column: auto; }
   .formActions { flex-direction: column-reverse; }
   .formActions button { width: 100%; }
 }

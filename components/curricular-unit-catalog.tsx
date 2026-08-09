@@ -13,7 +13,6 @@ import {
   LoaderCircle,
   Mail,
   Megaphone,
-  Plus,
   Search,
   UserRound,
   X,
@@ -21,7 +20,6 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
-import { useAuth } from "@/components/auth-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/curricular-unit-catalog.module.css";
@@ -131,7 +129,6 @@ function date(value: string, locale: string) {
 
 export function CurricularUnitCatalog() {
   const { locale, t } = useI18n();
-  const { user } = useAuth();
   const [units, setUnits] = useState<Unit[]>([]),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -169,7 +166,6 @@ export function CurricularUnitCatalog() {
   const filtersActive = Boolean(query.trim() || year !== "all");
   const activeFilterCount = [query.trim(), year !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setYear("all"); };
-  const canManageUnits = user?.role === "admin" && (user.commissionDepartment === "management" || user.email.toLowerCase() === "up202507850@up.pt");
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="curricular_units.catalog">
@@ -183,7 +179,6 @@ export function CurricularUnitCatalog() {
                   <p>{t("community.units.description")}</p>
                 </div>
               </div>
-              {canManageUnits && <Link className={`button button--primary ${styles.manageCta}`} href="/admin/unidades-curriculares"><Plus />Gerir e adicionar UCs</Link>}
             </header>
             {error && (
               <AppToast
@@ -234,7 +229,7 @@ export function CurricularUnitCatalog() {
                 <div className={`${styles.state} ${styles.emptyState}`}>
                   <Search />
                   <strong>{t("community.units.empty")}</strong>
-                  {filtersActive ? <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></> : <><p>Quando existirem unidades curriculares, poderá consultá-las por ano, tema ou representante.</p>{canManageUnits && <Link className="button button--secondary button--compact" href="/admin/unidades-curriculares"><Plus />Adicionar a primeira UC</Link>}</>}
+                  {filtersActive ? <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></> : <p>{t("community.units.emptyDescription")}</p>}
                 </div>
               ) : (
                 <div className={`${styles.grid} ${styles.catalogGrid}`}>

@@ -23,5 +23,6 @@ test("the legacy control workspace is exposed as two focused views", () => {
   assert.match(control, /AdminSection/);
   assert.match(styles, /\.settingsStack/);
   assert.match(styles, /\.userToolbar/);
+  assert.match(styles, /\.userSection \.userToolbar\s*\{[^}]*display:\s*grid/s);
   assert.doesNotMatch(control, /preferenceWindows|preference_windows|class-deadline-settings/);
 });
