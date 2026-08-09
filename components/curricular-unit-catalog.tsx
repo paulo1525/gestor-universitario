@@ -8,7 +8,6 @@ import {
   BookOpen,
   CalendarDays,
   FileText,
-  Filter,
   GraduationCap,
   LoaderCircle,
   Mail,
@@ -164,7 +163,6 @@ export function CurricularUnitCatalog() {
     );
   }, [locale, units, query, year]);
   const filtersActive = Boolean(query.trim() || year !== "all");
-  const activeFilterCount = [query.trim(), year !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setYear("all"); };
   return (
     <AuthGuard>
@@ -176,7 +174,6 @@ export function CurricularUnitCatalog() {
                 <div>
                   <span className="eyebrow">{t("community.units.eyebrow")}</span>
                   <h1>{t("community.units.title")}</h1>
-                  <p>{t("community.units.description")}</p>
                 </div>
               </div>
             </header>
@@ -190,9 +187,9 @@ export function CurricularUnitCatalog() {
             )}
             <section className={`${styles.panel} ${styles.catalogPanel}`}>
               <div className={styles.panelHeader}>
-                <div>
+                <div className={styles.panelTitle}>
+                  <span className={styles.panelIcon} aria-hidden="true"><BookOpen /></span>
                   <h2>{t("community.units.catalog")}</h2>
-                  <p>{t("community.units.organized")}</p>
                 </div>
                 {!loading && (
                   <span className={styles.count}>
@@ -201,12 +198,7 @@ export function CurricularUnitCatalog() {
                   </span>
                 )}
               </div>
-              <div className={styles.catalogToolbar} aria-label={t("community.units.filters")}>
-                <div className={styles.filterHeading}>
-                  <div className={styles.filterTitle}><span><Filter /></span><div><strong>{t("community.units.filters")}</strong><small>{t("community.units.filtersHint")}</small></div></div>
-                  <div className={styles.filterActions}>{filtersActive && <span className={styles.activeFilters}>{activeFilterCount} {t(activeFilterCount === 1 ? "community.units.activeFilter" : "community.units.activeFilters")}</span>}{filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}</div>
-                </div>
-                <div className={styles.catalogFilterGrid}>
+              {units.length > 0 && <div className={styles.catalogToolbar} aria-label={t("community.units.filters")}>
                   <label className={`${styles.filterField} ${styles.catalogSearch}`}>
                     <span><Search />{t("community.units.search")}</span>
                     <div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("community.units.searchPlaceholder")} /></div>
@@ -218,8 +210,8 @@ export function CurricularUnitCatalog() {
                       {[1, 2, 3, 4, 5, 6].map((value) => <option value={value} key={value}>{t("community.units.yearOption", { year: value })}</option>)}
                     </select>
                   </label>
-                </div>
-              </div>
+                  {filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}
+              </div>}
               {loading ? (
                 <div className={styles.state}>
                   <LoaderCircle className={styles.spin} />
@@ -227,9 +219,9 @@ export function CurricularUnitCatalog() {
                 </div>
               ) : visible.length === 0 ? (
                 <div className={`${styles.state} ${styles.emptyState}`}>
-                  <Search />
-                  <strong>{t("community.units.empty")}</strong>
-                  {filtersActive ? <><p>{t("community.units.emptyHint")}</p><button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button></> : <p>{t("community.units.emptyDescription")}</p>}
+                  {filtersActive ? <Search /> : <BookOpen />}
+                  <strong>{t(filtersActive ? "community.units.empty" : "community.units.emptyInitial")}</strong>
+                  {filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}
                 </div>
               ) : (
                 <div className={`${styles.grid} ${styles.catalogGrid}`}>

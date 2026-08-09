@@ -92,6 +92,14 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
   assert.doesNotMatch(unitCatalog, /href="\/admin\/unidades-curriculares"/);
 });
 
+test("o catálogo público de UCs mantém o estado vazio curto e sem filtros inúteis", () => {
+  assert.match(unitCatalog, /styles\.panelIcon/);
+  assert.match(unitCatalog, /units\.length > 0 && <div className=\{styles\.catalogToolbar\}/);
+  assert.match(unitCatalog, /community\.units\.emptyInitial/);
+  assert.doesNotMatch(unitCatalog, /community\.units\.emptyDescription/);
+  assert.doesNotMatch(unitCatalog, /community\.units\.filtersHint/);
+});
+
 test("calendário, dashboard e pesquisa têm contratos funcionais e ligações reais", () => {
   assert.match(backend, /function timestamp/);
   assert.match(backend, /conflicts:/);

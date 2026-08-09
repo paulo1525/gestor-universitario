@@ -54,6 +54,7 @@ export const COMMUNITY_MESSAGES = {
     "community.units.yearOption": "{year}.º ano",
     "community.units.loading": "A carregar plano curricular…",
     "community.units.empty": "Não encontrámos unidades curriculares.",
+    "community.units.emptyInitial": "Sem unidades curriculares.",
     "community.units.emptyDescription": "As unidades curriculares serão apresentadas aqui depois de serem adicionadas pela administração.",
     "community.units.emptyHint": "Experimenta limpar os filtros ou pesquisar outros termos.",
     "community.units.credits": "Créditos",
@@ -259,6 +260,7 @@ export const COMMUNITY_MESSAGES = {
     "community.calendar.deleted": "Evento eliminado."
   },
   en: {
+    "community.units.emptyInitial": "No curricular units yet.",
     "community.units.filters": "Search and filter",
     "community.units.filtersHint": "Refine the catalogue by name, code, representative or study year.",
     "community.units.activeFilter": "active filter",
