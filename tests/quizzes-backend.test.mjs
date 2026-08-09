@@ -45,11 +45,13 @@ test("practice feedback is immediate while exam answers stay hidden until comple
   assert.match(worker, /answer_locked/);
 });
 
-test("quiz selection, universal timing and abandonment are enforced server side", () => {
+test("quiz selection, fixed lengths, universal timing and abandonment are enforced server side", () => {
   assert.match(worker, /not_enough_mistakes/);
   assert.match(worker, /all_questions_seen/);
-  assert.match(worker, /MIN_TEST_QUESTIONS = 10/);
-  assert.match(worker, /MAX_TEST_QUESTIONS = 50/);
+  assert.match(worker, /TEST_QUESTION_COUNTS = new Set\(\[15, 30, 50\]\)/);
+  assert.match(worker, /DEFAULT_TEST_QUESTION_COUNT = 15/);
+  assert.match(worker, /!TEST_QUESTION_COUNTS\.has\(requestedCount\)/);
+  assert.match(worker, /Escolha 15, 30 ou 50 perguntas/);
   assert.match(worker, /const durationSeconds = requestedCount \* 60/);
   assert.match(worker, /code: "not_enough_questions"/);
   assert.match(worker, /status='abandoned'/);
@@ -58,6 +60,17 @@ test("quiz selection, universal timing and abandonment are enforced server side"
   assert.match(worker, /attempt_expired/);
   assert.doesNotMatch(worker, /difficult: "quick"/);
   assert.doesNotMatch(worker, /hard: "quick"/);
+});
+
+test("authenticated students can export the current quiz selection for Anki", () => {
+  assert.match(worker, /path === "\/api\/quizzes\/export"/);
+  assert.match(worker, /async function exportQuiz\(env: QuizEnv, url: URL, user: QuizUser \| null/);
+  assert.match(worker, /if \(!user\) return unauthenticated\(\)/);
+  assert.match(worker, /enabled\("quizzes\.practice"\)/);
+  assert.match(worker, /ORDER BY RANDOM\(\) LIMIT \?/);
+  assert.match(worker, /correctOptionId: correct\?\.id \|\| null/);
+  for (const field of ["prompt", "imageUrl", "explanation", "difficulty", "options", "topicTitle"]) assert.match(worker, new RegExp(`\\b${field}:`));
+  assert.match(worker, /Não existem perguntas suficientes para criar este ficheiro Anki/);
 });
 
 test("quiz progress adds private completed-attempt statistics without breaking its existing contract", () => {
@@ -72,6 +85,23 @@ test("quiz progress adds private completed-attempt statistics without breaking i
   assert.match(worker, /attemptCount: summary\?\.attempt_count/);
   assert.match(worker, /topics: topics\.results/);
   assert.match(worker, /mistakes: mistakes\.results/);
+});
+
+test("students can clear only their finished quiz statistics while preserving an active test", () => {
+  assert.match(worker, /async function clearProgress\(env: QuizEnv, user: QuizUser \| null/);
+  assert.match(worker, /DELETE FROM quiz_attempt_questions WHERE attempt_id IN \(SELECT id FROM quiz_attempts WHERE user_id=\? AND status<>'active'\)/);
+  assert.match(worker, /DELETE FROM quiz_attempts WHERE user_id=\? AND status<>'active'/);
+  assert.match(worker, /quiz_progress_cleared/);
+  assert.match(worker, /request\.method === "DELETE"/);
+  assert.match(quizHub, /fetch\("\/api\/quizzes\/progress", \{ method: "DELETE" \}\)/);
+  assert.match(quizHub, /Limpar estatísticas/);
+  assert.match(quizHub, /Um teste em curso será mantido/);
+});
+
+test("abandoning a quiz asks only the direct confirmation question", () => {
+  assert.match(quizHub, /title="Queres desistir do teste\?" description=""/);
+  assert.doesNotMatch(quizHub, /O progresso desta tentativa será encerrado/);
+  assert.doesNotMatch(quizHub, /As respostas dadas nesta tentativa deixam de poder ser alteradas/);
 });
 
 test("students can open a responsive personal statistics dashboard from the quiz catalogue", () => {

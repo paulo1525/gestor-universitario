@@ -45,16 +45,17 @@ export function ConfirmationDialog({ open, title, description, subject, subjectL
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
+  const compact = !eyebrow && !description && !subject && !warning;
   if (!open) return null;
   return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) dismiss(); }}>
-    <section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
+    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
       <header className={styles.header}>
         <span className={`${styles.icon} ${tone === "primary" ? styles.primaryIcon : ""}`} aria-hidden="true">{icon ?? <Trash2 />}</span>
-        <div className={styles.copy}><span className={styles.eyebrow}>{eyebrow}</span><h2 id={titleId}>{title}</h2><p id={descriptionId}>{description}</p></div>
+        <div className={styles.copy}>{eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}<h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div>
         <button ref={closeRef} className={styles.close} type="button" disabled={busy} onClick={dismiss} aria-label="Fechar confirmação"><X /></button>
       </header>
       {(subject || warning) && <div className={styles.body}>{subject && <div className={styles.subject}><span>{subjectLabel}</span><strong>{subject}</strong></div>}{warning && <div className={styles.warning}><TriangleAlert aria-hidden="true" /><p>{warning}</p></div>}</div>}
-      <footer className={styles.footer}><button className={styles.cancel} type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button><button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} type="button" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className={styles.spin} /> : (icon ?? <Trash2 />)}{confirmLabel}</button></footer>
+      <footer className={styles.footer}>{!compact && <button className={styles.cancel} type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button>}<button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} type="button" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className={styles.spin} /> : (icon ?? <Trash2 />)}{confirmLabel}</button></footer>
     </section>
   </div>;
 }
