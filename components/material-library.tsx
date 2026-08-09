@@ -716,145 +716,104 @@ export function MaterialLibrary() {
                   </div>
                 </div>
                 <form className={styles.form} onSubmit={submit}>
-                  <div className={styles.formGrid}>
-                    <label className={styles.field}>
-                      <span>{t("community.materials.field.title")}</span>
-                      <input
-                        value={title}
-                        onChange={(event) => setTitle(event.target.value)}
-                        maxLength={180}
-                        placeholder={t("community.materials.titlePlaceholder")}
-                        required
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>{t("community.materials.field.type")}</span>
-                      <select
-                        value={category}
-                        onChange={(event) =>
-                          setCategory(event.target.value as Category)
-                        }
-                      >
-                        {Object.entries(categoryLabelKeys).map(
-                          ([value, key]) => (
-                            <option value={value} key={value}>
-                              {t(key)}
-                            </option>
-                          ),
-                        )}
-                      </select>
-                    </label>
-                    <label className={styles.field}>
-                      <span>
-                        {t("community.materials.field.unit")} <small>({t("community.common.optional")})</small>
-                      </span>
-                      <select
-                        value={unitId}
-                        onChange={(event) => setUnitId(event.target.value)}
-                      >
-                        <option value="">{t("community.materials.noUnit")}</option>
-                        {units.map((item) => (
-                          <option value={item.id} key={item.id}>
-                            {item.code} · {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className={`${styles.field} ${styles.fieldFull}`}>
-                      <span>
-                        {t("community.materials.field.description")} <small>({t("community.common.optional")})</small>
-                      </span>
-                      <RichTextEditor
-                        value={description}
-                        onChange={setDescription}
-                        ariaLabel={t("community.materials.descriptionAria")}
-                        maxLength={1200}
-                        minHeight="compact"
-                        placeholder={t("community.materials.descriptionPlaceholder")}
-                        onInvalidLink={() => setNotice({ kind: "warning", message: t("community.materials.invalidLink") })}
-                      />
-                    </div>
-                  </div>
-                  <div className={styles.legacyUpload} aria-hidden="true">
-                  {file ? (
-                    <div className={styles.preview}>
-                      {file.type.startsWith("image/") ? (
-                        <img
-                          src={fileData}
-                          alt={t("community.materials.filePreview")}
+                  <div className={styles.formWorkspace}>
+                    <div className={styles.formGrid}>
+                      <label className={`${styles.field} ${styles.fieldTitle}`}>
+                        <span>{t("community.materials.field.title")}</span>
+                        <input
+                          value={title}
+                          onChange={(event) => setTitle(event.target.value)}
+                          maxLength={180}
+                          placeholder={t("community.materials.titlePlaceholder")}
+                          required
                         />
-                      ) : (
-                        <span className={styles.filePreview}>
-                          <FileText />
+                      </label>
+                      <label className={styles.field}>
+                        <span>{t("community.materials.field.type")}</span>
+                        <select
+                          value={category}
+                          onChange={(event) =>
+                            setCategory(event.target.value as Category)
+                          }
+                        >
+                          {Object.entries(categoryLabelKeys).map(
+                            ([value, key]) => (
+                              <option value={value} key={value}>
+                                {t(key)}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <label className={styles.field}>
+                        <span>
+                          {t("community.materials.field.unit")} <small>({t("community.common.optional")})</small>
                         </span>
-                      )}
-                      <span>
-                        <strong>{file.name}</strong>
-                        <small>
-                          {file.type} · {size(file.size, locale)}
-                        </small>
-                      </span>
-                      <button
-                        className={styles.iconButton}
-                        type="button"
-                        onClick={() => {
-                          setFile(null);
-                          setFileData("");
-                        }}
-                        aria-label={t("community.materials.removeFile")}
-                      >
-                        <X />
-                      </button>
+                        <select
+                          value={unitId}
+                          onChange={(event) => setUnitId(event.target.value)}
+                        >
+                          <option value="">{t("community.materials.noUnit")}</option>
+                          {units.map((item) => (
+                            <option value={item.id} key={item.id}>
+                              {item.code} · {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className={`${styles.field} ${styles.fieldFull}`}>
+                        <span>
+                          {t("community.materials.field.description")} <small>({t("community.common.optional")})</small>
+                        </span>
+                        <RichTextEditor
+                          value={description}
+                          onChange={setDescription}
+                          ariaLabel={t("community.materials.descriptionAria")}
+                          maxLength={1200}
+                          minHeight="compact"
+                          placeholder={t("community.materials.descriptionPlaceholder")}
+                          onInvalidLink={() => setNotice({ kind: "warning", message: t("community.materials.invalidLink") })}
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <label className={styles.dropzone}>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf"
-                        onChange={(event) => void pick(event)}
-                        disabled
-                      />
-                      <Upload />
-                      <strong>{t("community.materials.fileEmpty")}</strong>
-                      <small>{t("community.materials.fileHelp")}</small>
-                    </label>
-                  )}
+                    <aside className={styles.formAside}>
+                      {category === "exam" ? <>
+                        <div className={styles.privateNotice} role="note">
+                          <ShieldCheck />
+                          <span><strong>{t("community.materials.privateTitle")}</strong><small>{t("community.materials.privateNotice")}</small></span>
+                        </div>
+                        <MultiFileUploadField
+                          accept="image/jpeg,image/png,image/webp"
+                          emptyLabel={t("community.materials.selectExamPhotos")}
+                          files={examFiles}
+                          help={t("community.materials.photoHelp", { count: MAX_PHOTOS })}
+                          label={t("community.materials.privatePhotos")}
+                          maxFiles={MAX_PHOTOS}
+                          onChange={(event) => void pickExamPhotos(event)}
+                          onRemove={(index) => setExamFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        />
+                      </> : <FileUploadField
+                          accept="image/jpeg,image/png,image/webp,application/pdf"
+                          emptyLabel={t("community.materials.fileEmpty")}
+                          file={file}
+                          help={t("community.materials.fileHelp")}
+                          onChange={(event) => void pick(event)}
+                          onRemove={() => { setFile(null); setFileData(""); }}
+                          previewUrl={fileData}
+                        />}
+                      <label className={styles.checkField}>
+                        <input
+                          type="checkbox"
+                          checked={anonymous}
+                          onChange={(event) => setAnonymous(event.target.checked)}
+                        />
+                        <span>
+                          <strong>{t("community.materials.anonymous")}</strong>
+                          <small>{t("community.materials.anonymousHint")}</small>
+                        </span>
+                      </label>
+                    </aside>
                   </div>
-                  {category === "exam" ? <>
-                    <div className={styles.privateNotice} role="note">
-                      <ShieldCheck />
-                      <span><strong>{t("community.materials.privateTitle")}</strong><small>{t("community.materials.privateNotice")}</small></span>
-                    </div>
-                    <MultiFileUploadField
-                      accept="image/jpeg,image/png,image/webp"
-                      emptyLabel={t("community.materials.selectExamPhotos")}
-                      files={examFiles}
-                      help={t("community.materials.photoHelp", { count: MAX_PHOTOS })}
-                      label={t("community.materials.privatePhotos")}
-                      maxFiles={MAX_PHOTOS}
-                      onChange={(event) => void pickExamPhotos(event)}
-                      onRemove={(index) => setExamFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                    />
-                  </> : <FileUploadField
-                      accept="image/jpeg,image/png,image/webp,application/pdf"
-                      emptyLabel={t("community.materials.fileEmpty")}
-                      file={file}
-                      help={t("community.materials.fileHelp")}
-                      onChange={(event) => void pick(event)}
-                      onRemove={() => { setFile(null); setFileData(""); }}
-                      previewUrl={fileData}
-                    />}
-                  <label className={styles.checkField}>
-                    <input
-                      type="checkbox"
-                      checked={anonymous}
-                      onChange={(event) => setAnonymous(event.target.checked)}
-                    />
-                    <span>
-                      <strong>{t("community.materials.anonymous")}</strong>
-                      <small>{t("community.materials.anonymousHint")}</small>
-                    </span>
-                  </label>
                   <div className={styles.formActions}>
                     <button
                       className="button button--secondary"
@@ -879,7 +838,7 @@ export function MaterialLibrary() {
                 </form>
               </section>
             )}
-            <section className={styles.panel}>
+            {!editor && <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div className={styles.panelHeading}>
                   <span className={styles.panelIcon} aria-hidden="true"><FolderOpen /></span>
@@ -944,26 +903,26 @@ export function MaterialLibrary() {
                     <article className={styles.material} key={item.id}>
                       <MaterialThumbnail key={`${item.id}-${item.fileUrl}`} fileType={item.fileType} src={item.fileUrl} title={item.title} />
                       <div className={styles.materialBody}>
-                        <div className={styles.cardTop}>
-                          <span className={styles.tag}>
-                            {t(categoryLabelKeys[item.category])}
-                          </span>
-                          <span
-                            className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : item.status === "archived" ? styles.statusArchived : styles.statusPending}`}
-                          >
-                            {t(statusLabelKeys[item.status])}
-                          </span>
-                        </div>
-                        <div>
-                          <h3>{item.title}</h3>
-                          {item.description && <RichTextContent value={item.description} className={styles.materialDescription} />}
-                        </div>
-                        {item.unit && (
-                          <span className={styles.unitCode}>
-                            {item.unit.code}
-                          </span>
-                        )}
-                        {versioningEnabled && <span className={styles.versionBadge}>{t("community.materials.version", { number: item.version })}</span>}
+                        <header className={styles.materialHeader}>
+                          <div className={styles.cardTop}>
+                            <span className={styles.tag}>
+                              {t(categoryLabelKeys[item.category])}
+                            </span>
+                            <span
+                              className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : item.status === "archived" ? styles.statusArchived : styles.statusPending}`}
+                            >
+                              {t(statusLabelKeys[item.status])}
+                            </span>
+                          </div>
+                          <div className={styles.materialCopy}>
+                            <h3>{item.title}</h3>
+                            {item.description && <RichTextContent value={item.description} className={styles.materialDescription} />}
+                          </div>
+                          <div className={styles.materialBadges}>
+                            {item.unit && <span className={styles.unitCode}>{item.unit.code}</span>}
+                            {versioningEnabled && <span className={styles.versionBadge}>{t("community.materials.version", { number: item.version })}</span>}
+                          </div>
+                        </header>
                         <div className={styles.meta}>
                           <span className={styles.metaRow}>
                             {item.anonymous ? <ShieldCheck /> : <ImageIcon />}
@@ -974,8 +933,8 @@ export function MaterialLibrary() {
                             <span>{item.fileName}</span>
                           </span>
                         </div>
-                        {item.status === "approved" && (favoritesEnabled || feedbackEnabled) && (
-                          <div className={styles.feedbackActions}>
+                        <div className={styles.cardActions}>
+                          {item.status === "approved" && (favoritesEnabled || feedbackEnabled) && <div className={styles.feedbackActions}>
                             {favoritesEnabled && <button className={`${styles.feedbackButton} ${item.favorite ? styles.isActive : ""}`} type="button" onClick={() => void toggleFavorite(item)} disabled={feedbackBusy === `favorite-${item.id}`} aria-pressed={item.favorite} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}>
                               {feedbackBusy === `favorite-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Star />}
                               <span>{t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}</span>
@@ -988,14 +947,29 @@ export function MaterialLibrary() {
                               {feedbackBusy === `outdated-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Flag />}
                               <span>{t(item.reportedOutdated ? "community.materials.outdatedMarked" : "community.materials.outdated")}</span>{item.outdatedCount > 0 && <b>{item.outdatedCount}</b>}
                             </button>}
-                          </div>
-                        )}
-                        {versioningEnabled && item.status === "approved" && (
-                          <div className={styles.versionArea}>
-                            <div className={styles.versionActions}>
-                              <button type="button" onClick={() => void toggleVersions(item)} disabled={versionsLoading === item.id}>{versionsLoading === item.id ? <LoaderCircle className={styles.spin} /> : <History />}{t(versionsLoading === item.id ? "community.materials.loadingVersions" : versionsOpen === item.id ? "community.materials.hideVersions" : "community.materials.versions")}</button>
-                              {canModerate && <button type="button" onClick={() => { if (versionEditor === item.id) closeVersionEditor(); else { closeVersionEditor(); setVersionEditor(item.id); } }}><UploadCloud />{t(versionEditor === item.id ? "community.materials.closeVersion" : "community.materials.publishVersion")}</button>}
+                          </div>}
+                          {versioningEnabled && item.status === "approved" && <div className={styles.versionActions}>
+                            <button type="button" onClick={() => void toggleVersions(item)} disabled={versionsLoading === item.id}>{versionsLoading === item.id ? <LoaderCircle className={styles.spin} /> : <History />}{t(versionsLoading === item.id ? "community.materials.loadingVersions" : versionsOpen === item.id ? "community.materials.hideVersions" : "community.materials.versions")}</button>
+                            {canModerate && <button type="button" onClick={() => { if (versionEditor === item.id) closeVersionEditor(); else { closeVersionEditor(); setVersionEditor(item.id); } }}><UploadCloud />{t(versionEditor === item.id ? "community.materials.closeVersion" : "community.materials.publishVersion")}</button>}
+                          </div>}
+                          {canModerate && item.status === "pending" ? (
+                            <div className={styles.moderation}>
+                              <button className="button button--primary button--compact" type="button" onClick={() => void moderate(item.id, item.category === "exam" ? "archived" : "approved")} disabled={moderating === item.id}>
+                                {moderating === item.id ? <LoaderCircle className={styles.spin} /> : <Check />}
+                                {item.category === "exam" ? t("community.materials.finishReview") : t("community.materials.approve")}
+                              </button>
+                              <button className="button button--danger button--compact" type="button" onClick={() => void moderate(item.id, "rejected")} disabled={moderating === item.id}>
+                                <X />{t("community.materials.reject")}
+                              </button>
                             </div>
+                          ) : item.status === "approved" && item.fileUrl && (
+                            <a className={`button button--secondary button--compact ${styles.openMaterial}`} href={item.fileUrl} download={item.fileName} target="_blank" rel="noreferrer">
+                              <Download />{t("community.materials.open")}
+                            </a>
+                          )}
+                        </div>
+                        {versioningEnabled && item.status === "approved" && (versionsOpen === item.id || versionEditor === item.id) && (
+                          <div className={styles.versionArea}>
                             {versionsOpen === item.id && (
                               <div className={styles.versionList}>
                                 <strong>{t("community.materials.currentVersion")}: {t("community.materials.version", { number: item.version })}</strong>
@@ -1022,46 +996,6 @@ export function MaterialLibrary() {
                             <div>{item.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download />{t("community.materials.photoNumber", { number: index + 1 })}<small>{attachment.name}</small></a>)}</div>
                           </div>
                         )}
-                        {canModerate && item.status === "pending" ? (
-                          <div className={styles.moderation}>
-                            <button
-                              className="button button--primary button--compact"
-                              type="button"
-                              onClick={() => void moderate(item.id, item.category === "exam" ? "archived" : "approved")}
-                              disabled={moderating === item.id}
-                            >
-                              {moderating === item.id ? (
-                                <LoaderCircle className={styles.spin} />
-                              ) : (
-                                <Check />
-                              )}
-                              {item.category === "exam" ? t("community.materials.finishReview") : t("community.materials.approve")}
-                            </button>
-                            <button
-                              className="button button--danger button--compact"
-                              type="button"
-                              onClick={() => void moderate(item.id, "rejected")}
-                              disabled={moderating === item.id}
-                            >
-                              <X />
-                              {t("community.materials.reject")}
-                            </button>
-                          </div>
-                        ) : (
-                          item.status === "approved" &&
-                          item.fileUrl && (
-                            <a
-                              className="button button--secondary button--compact"
-                              href={item.fileUrl}
-                              download={item.fileName}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <Download />
-                              {t("community.materials.open")}
-                            </a>
-                          )
-                        )}
                         <footer className={styles.materialFooter}>
                           <span>{date(item.createdAt, locale)}</span>
                           <span>{item.unit?.name ?? t("community.common.general")}</span>
@@ -1071,7 +1005,7 @@ export function MaterialLibrary() {
                   ); })}
                 </div>
               )}
-            </section>
+            </section>}
           </div>
         </AppShell>
       </ModuleGuard>

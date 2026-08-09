@@ -393,13 +393,48 @@ async function abandonAttempt(env: QuizEnv, user: QuizUser | null, enabled: Modu
 async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("quizzes.progress")) return disabled();
-  const [summary, topics, mistakes] = await Promise.all([
-    env.DB.prepare("SELECT COUNT(*) AS attempt_count,COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),0) AS completed_count,COALESCE(SUM(answered_count),0) AS answered_count,COALESCE(SUM(correct_count),0) AS correct_count FROM quiz_attempts WHERE user_id=?").bind(user.id).first<Row>(),
+  const [summary, topics, mistakes, recentAttemptsResult] = await Promise.all([
+    env.DB.prepare(`SELECT
+      COUNT(*) AS attempt_count,
+      COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),0) AS completed_count,
+      COALESCE(SUM(answered_count),0) AS answered_count,
+      COALESCE(SUM(correct_count),0) AS correct_count,
+      COALESCE(SUM(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at,0)/1000 AS INTEGER) ELSE 0 END),0) AS total_duration_seconds,
+      AVG(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at,0)/1000 AS INTEGER) END) AS average_duration_seconds,
+      COALESCE(SUM(CASE WHEN status='completed' AND correct_count*2>=question_count THEN 1 ELSE 0 END),0) AS passed_count,
+      (SELECT COUNT(DISTINCT aq.question_id)
+       FROM quiz_attempt_questions aq
+       JOIN quiz_attempts completed ON completed.id=aq.attempt_id
+       WHERE completed.user_id=? AND completed.status='completed' AND aq.selected_option_id IS NOT NULL) AS unique_question_count
+      FROM quiz_attempts
+      WHERE user_id=?`).bind(user.id, user.id).first<Row>(),
     env.DB.prepare("SELECT aq.topic_id,t.title,aq.curricular_unit_id,cu.code AS unit_code,COUNT(aq.question_id) AS answered_count,SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id LEFT JOIN quiz_topics t ON t.id=aq.topic_id LEFT JOIN curricular_units cu ON cu.id=aq.curricular_unit_id WHERE a.user_id=? AND a.status='completed' AND aq.is_correct IS NOT NULL GROUP BY aq.topic_id ORDER BY (1.0 * SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) / COUNT(aq.question_id)) ASC, answered_count DESC").bind(user.id).all(),
     env.DB.prepare("SELECT q.id,q.prompt,q.image_url,q.difficulty,t.id AS topic_id,t.title AS topic_title,cu.id AS unit_id,cu.code AS unit_code,MAX(aq.answered_at) AS last_answered_at FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id JOIN quiz_questions q ON q.id=aq.question_id JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE a.user_id=? AND aq.is_correct=0 AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL GROUP BY q.id ORDER BY last_answered_at DESC LIMIT 50").bind(user.id).all(),
+    env.DB.prepare(`SELECT
+      a.id,
+      a.curricular_unit_id AS unit_id,
+      cu.code AS unit_code,
+      a.mode,
+      a.question_count,
+      a.answered_count,
+      a.correct_count,
+      a.started_at,
+      a.completed_at,
+      CAST(MAX(COALESCE(a.completed_at,a.started_at)-a.started_at,0)/1000 AS INTEGER) AS actual_duration_seconds
+      FROM quiz_attempts a
+      LEFT JOIN curricular_units cu ON cu.id=a.curricular_unit_id
+      WHERE a.user_id=? AND a.status='completed'
+      ORDER BY a.completed_at DESC,a.started_at DESC
+      LIMIT 10`).bind(user.id).all(),
   ]);
   const totalAnswered = Number(summary?.answered_count || 0), totalCorrect = Number(summary?.correct_count || 0);
-  return json({ summary: { attemptCount: summary?.attempt_count || 0, completedCount: summary?.completed_count || 0, answeredCount: totalAnswered, correctCount: totalCorrect, accuracy: totalAnswered ? totalCorrect / totalAnswered : null }, topics: topics.results.map((item) => ({ topicId: item.topic_id, title: item.title, unitId: item.curricular_unit_id, unitCode: item.unit_code, answeredCount: item.answered_count, correctCount: item.correct_count, accuracy: Number(item.answered_count) ? Number(item.correct_count) / Number(item.answered_count) : null })), mistakes: mistakes.results.map((item) => ({ id: item.id, prompt: item.prompt, imageUrl: item.image_url, difficulty: item.difficulty, topicId: item.topic_id, topicTitle: item.topic_title, unitId: item.unit_id, unitCode: item.unit_code, lastAnsweredAt: item.last_answered_at })) });
+  const recentAttempts = recentAttemptsResult.results.map((item) => {
+    const answeredCount = Number(item.answered_count || 0), correctCount = Number(item.correct_count || 0);
+    return { id: item.id, unitId: item.unit_id, unitCode: item.unit_code, mode: item.mode, questionCount: Number(item.question_count || 0), answeredCount, correctCount, accuracy: answeredCount ? correctCount / answeredCount : null, startedAt: item.started_at, completedAt: item.completed_at, durationSeconds: Number(item.actual_duration_seconds || 0) };
+  });
+  const recentAnswered = recentAttempts.reduce((total, attempt) => total + attempt.answeredCount, 0);
+  const recentCorrect = recentAttempts.reduce((total, attempt) => total + attempt.correctCount, 0);
+  return json({ summary: { attemptCount: summary?.attempt_count || 0, completedCount: summary?.completed_count || 0, answeredCount: totalAnswered, correctCount: totalCorrect, accuracy: totalAnswered ? totalCorrect / totalAnswered : null, uniqueQuestionCount: Number(summary?.unique_question_count || 0), totalDurationSeconds: Number(summary?.total_duration_seconds || 0), averageDurationSeconds: summary?.average_duration_seconds === null || summary?.average_duration_seconds === undefined ? null : Math.round(Number(summary.average_duration_seconds)), passedCount: Number(summary?.passed_count || 0), recentAccuracy: recentAnswered ? recentCorrect / recentAnswered : null }, recentAttempts, topics: topics.results.map((item) => ({ topicId: item.topic_id, title: item.title, unitId: item.curricular_unit_id, unitCode: item.unit_code, answeredCount: item.answered_count, correctCount: item.correct_count, accuracy: Number(item.answered_count) ? Number(item.correct_count) / Number(item.answered_count) : null })), mistakes: mistakes.results.map((item) => ({ id: item.id, prompt: item.prompt, imageUrl: item.image_url, difficulty: item.difficulty, topicId: item.topic_id, topicTitle: item.topic_title, unitId: item.unit_id, unitCode: item.unit_code, lastAnsweredAt: item.last_answered_at })) });
 }
 
 async function publicComments(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker, pathQuestionId?: string): Promise<Response> {

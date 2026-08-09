@@ -87,6 +87,7 @@ test("calendar subscription has one setup region and a separate connection manag
   assert.match(subscription, /className=\{styles\.setup\}/);
   assert.match(subscription, /className=\{styles\.actionRow\}/);
   assert.match(subscription, /className=\{styles\.management\}/);
+  assert.doesNotMatch(subscription, /className=\{styles\.explainer\}/);
 });
 
 test("today control shares the calendar toolbar control geometry and keyboard state", () => {

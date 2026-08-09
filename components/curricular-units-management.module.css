@@ -276,14 +276,15 @@
 .unitTableHeader,
 .unitCard {
   display: grid;
-  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) minmax(250px, 1.2fr) auto;
+  grid-template-columns: minmax(280px, 1fr) 110px 210px minmax(230px, 320px) 88px;
   align-items: center;
-  gap: 16px;
-  padding-inline: 20px;
+  gap: 20px;
+  padding-inline: 22px;
 }
 
 .unitTableHeader {
-  min-height: 38px;
+  min-height: 36px;
+  border-bottom: 1px solid var(--line);
   color: var(--color-text-subtle);
   background: var(--color-surface-subtle);
   font-size: var(--font-size-caption);
@@ -294,18 +295,23 @@
 
 .unitCard {
   min-width: 0;
-  min-height: 84px;
-  padding-block: 14px;
-  border-top: 1px solid var(--line);
+  min-height: 66px;
+  padding-block: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .unitCard[data-has-representatives="false"] {
-  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) auto;
+  grid-template-columns: minmax(280px, 1fr) 110px 210px 88px;
 }
 
 .unitTableHeader[data-has-representatives="false"] {
-  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) auto;
+  grid-template-columns: minmax(280px, 1fr) 110px 210px 88px;
 }
+
+.unitCard:last-child { border-bottom: 0; }
 
 .unitCard:hover {
   background: color-mix(in srgb, var(--color-accent-soft) 20%, var(--surface));
@@ -323,7 +329,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -367,7 +373,7 @@
 
 .metric strong {
   color: var(--ink);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -396,7 +402,7 @@
 .representativePerson small { color: var(--muted); font-size: 7px; }
 
 .editButton {
-  min-height: 36px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -434,7 +440,7 @@
   .semesterField { grid-column: auto; }
   .unitTableHeader { display: none; }
   .unitCard,
-  .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(220px, 1.4fr) minmax(90px, .5fr) minmax(140px, .7fr) auto; }
+  .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(220px, 1fr) 90px 170px 88px; }
   .representative { grid-column: 1 / -2; padding-left: 46px; }
 }
 

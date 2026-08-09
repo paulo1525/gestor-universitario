@@ -323,12 +323,9 @@ export function PollsHub() {
                   <p>{t("polls.intro")}</p>
                 </div>
               </div>
-              <div className={styles.heroActions}>
-                <div className={styles.heroStats}>
-                  <span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span>
-                  <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span>
-                </div>
-                {canManage && <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
+              <div className={styles.heroStats}>
+                <span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span>
+                <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span>
               </div>
             </section>
 
@@ -375,7 +372,10 @@ export function PollsHub() {
                 <div className={styles.tabs} role="tablist" aria-label={t("polls.filters.aria")}>
                   {(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"]) ] as Filter[]).map((value) => <button key={value} type="button" className={filter === value ? styles.activeTab : ""} onClick={() => setFilter(value)}>{value === "all" ? t("polls.filters.all") : statusLabels[value]}<span>{counts[value]}</span></button>)}
                 </div>
-                <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("polls.filters.search")} /></label>
+                <div className={styles.toolbarActions}>
+                  <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("polls.filters.search")} /></label>
+                  {canManage && !editor && <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
+                </div>
               </header>
 
               {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>{t("polls.loading")}</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>{t("polls.empty.title")}</strong><p>{t("polls.empty.body")}</p></div> : <div className={styles.pollList}>

@@ -14,6 +14,7 @@
 .kicker { color:#5665dc; font-size:.72rem; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
 .formGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
 .formGrid label { display:flex; flex-direction:column; gap:.42rem; min-width:0; color:#555750; font-weight:750; }
+.richTextField { display:flex; flex-direction:column; gap:.42rem; min-width:0; color:#555750; font-weight:750; }
 .formGrid label > span { font-size:.86rem; }
 .formGrid small { color:#80827b; font-weight:500; }
 .formGrid input,.formGrid select,.formGrid textarea { width:100%; box-sizing:border-box; padding:.78rem .88rem; color:#181914; background:#fff; border:1px solid #d9dbd4; border-radius:.8rem; font:inherit; }
@@ -287,9 +288,9 @@
 
 /* Detalhe amplo e estruturado, com edição integral no mesmo contexto. */
 .modalBackdrop { padding:24px; background:rgba(18,20,17,.54); }
-.eventModal { width:min(760px,100%); max-height:calc(100dvh - 48px); display:flex; flex-direction:column; padding:0; overflow:hidden; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 28px 80px rgba(0,0,0,.24); }
-.createModal { width:min(780px,100%); }
-.eventModal .modalHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:22px 24px; border-bottom:1px solid var(--line); background:#fffdf5; }
+.eventModal { width:min(840px,100%); max-height:calc(100dvh - 48px); display:flex; flex-direction:column; padding:0; overflow:hidden; border-color:var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:0 28px 80px rgba(0,0,0,.24); }
+.createModal { width:min(840px,100%); }
+.eventModal .modalHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:18px 20px; border-bottom:1px solid var(--line); background:var(--surface-header-background); }
 .modalHeading { min-width:0; display:grid; gap:7px; }
 .eventModal .modalHeading h2 { margin:0; font-size:20px; line-height:1.25; letter-spacing:-.025em; }
 .modalHeading > p { margin:0; color:var(--muted); font-size:10px; line-height:1.5; }
@@ -301,7 +302,7 @@
 .modalHeader .modalClose { width:38px; padding:0; color:#5e615a; border:1px solid var(--line); background:var(--surface); }
 .modalHeader .modalClose:hover { color:var(--ink); background:#f3f3ef; }
 .modalHeader .modalClose:disabled { cursor:wait; opacity:.55; }
-.modalBody { min-height:0; padding:22px 24px 24px; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.modalBody { min-height:0; padding:18px 20px 20px; overflow:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .modalOverview { display:grid; gap:18px; }
 .modalMeta { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; padding:0; border:0; }
 .modalMeta p { min-width:0; display:grid; grid-template-columns:38px minmax(0,1fr); align-items:start; gap:11px; padding:14px; border:1px solid var(--line); border-radius:11px; color:#525149; background:#fafaf7; font-size:11px; line-height:1.55; }
@@ -310,7 +311,7 @@
 .modalMeta p strong { color:var(--ink); font-size:10px; }
 .modalDescriptionSection { display:grid; gap:7px; padding:17px 18px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
 .modalDescriptionSection > span { color:#806207; font-size:9px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
-.modalDescription { margin:0; color:#4f524a; font-size:12px; line-height:1.7; white-space:pre-wrap; }
+.modalDescription { margin:0; color:#4f524a; font-size:12px; line-height:1.7; }
 .quickReschedule { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 16px; border:1px solid #e5d48b; border-radius:12px; background:#fffdf4; }
 .quickReschedule > div:first-child { min-width:0; display:grid; grid-template-columns:36px minmax(0,1fr); align-items:center; gap:10px; }
 .quickReschedule > div:first-child > svg { width:18px; box-sizing:content-box; padding:9px; border-radius:9px; color:#806207; background:var(--gold-soft); }
@@ -323,10 +324,12 @@
 .rescheduleControl input { padding:0 10px; }
 .rescheduleControl button { padding:0 12px; }
 .modalEditForm { display:grid; gap:18px; }
-.modalEditForm .formGrid { gap:12px; }
+.modalEditForm .formGrid { grid-template-columns:minmax(0,1.15fr) minmax(240px,.85fr); gap:12px 14px; }
 .modalEditActions { display:flex; justify-content:flex-end; gap:8px; padding-top:16px; border-top:1px solid var(--line); }
 .modalEditActions :global(.button) { min-height:38px; font-size:11px; }
 .eventModal .modalFooter { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0; padding:14px 24px; border-top:1px solid var(--line); background:#fafaf7; }
+.modalFooterActions { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; }
+.modalFooterActions :global(.button) { min-height:38px; font-size:11px; }
 .modalFooter > span { color:var(--muted); font-size:9px; line-height:1.45; }
 .modalDelete { min-height:38px; padding:0 12px; border:1px solid #efc7c2; border-radius:9px; font-size:11px; white-space:nowrap; }
 .eventModal button:focus-visible,.eventModal input:focus-visible,.eventModal select:focus-visible,.eventModal textarea:focus-visible { outline:2px solid #b88e08; outline-offset:2px; }
@@ -350,6 +353,8 @@
   .modalEditActions { align-items:stretch; flex-direction:column-reverse; }
   .modalEditActions :global(.button) { width:100%; justify-content:center; }
   .eventModal .modalFooter { align-items:stretch; flex-direction:column; padding:13px 16px; }
+  .modalFooterActions { width:100%; flex-direction:column-reverse; margin:0; }
+  .modalFooterActions :global(.button),.eventModal .modalFooter > .modalDelete { width:100%; justify-content:center; }
   .modalDelete { align-self:stretch; justify-content:center; }
 }
 

@@ -6,6 +6,7 @@ import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useS
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   BookOpen,
   Check,
   CheckCircle2,
@@ -22,6 +23,7 @@ import {
   Send,
   Sparkles,
   TimerReset,
+  Trophy,
   TriangleAlert,
   XCircle,
 } from "lucide-react";
@@ -35,7 +37,7 @@ import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-cont
 import styles from "@/components/quiz-hub.module.css";
 
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic";
-type Screen = "catalogue" | "attempt" | "results";
+type Screen = "catalogue" | "statistics" | "attempt" | "results";
 type Notice = { kind: ToastKind; message: string } | null;
 
 type ApiOption = { id: string | number; text?: string; label?: string; content?: string };
@@ -96,6 +98,22 @@ type Comment = { id: string; body: string; authorName: string; authorRole?: stri
 
 type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number };
 type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
+type QuizStatistics = {
+  summary: {
+    attemptCount: number;
+    completedCount: number;
+    answeredCount: number;
+    correctCount: number;
+    uniqueQuestionCount: number;
+    passedCount: number;
+    totalDurationSeconds: number;
+    averageDurationSeconds: number;
+    accuracy: number | null;
+    recentAccuracy: number | null;
+  };
+  topics: Array<{ topicId: string; title: string; unitId: string; unitCode: string; answeredCount: number; correctCount: number; accuracy: number | null }>;
+  recentAttempts: Array<{ id: string; unitId: string; unitCode: string; mode: Mode; questionCount: number; answeredCount: number; correctCount: number; accuracy: number | null; startedAt: string | null; completedAt: string | null; durationSeconds: number }>;
+};
 const QUIZ_PREFERENCES_COOKIE = "gu-quiz-preferences";
 const QUIZ_PROGRESS_COOKIE = "gu-quiz-progress";
 const EMPTY_TOPICS: Topic[] = [];
@@ -241,6 +259,36 @@ function humanDate(value: string | null) {
   return Number.isNaN(date.getTime()) ? "agora" : new Intl.DateTimeFormat("pt-PT", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function humanDuration(seconds: number) {
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!hours) return `${minutes} min`;
+  return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
+}
+
+function normaliseStatistics(data: Record<string, unknown>): QuizStatistics {
+  const rawSummary = data.summary && typeof data.summary === "object" ? data.summary as Record<string, unknown> : {};
+  const number = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const ratio = (value: unknown) => value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Math.max(0, Math.min(1, Number(value)));
+  const rawTopics = Array.isArray(data.topics) ? data.topics : [];
+  const rawRecent = Array.isArray(data.recentAttempts) ? data.recentAttempts : [];
+  return {
+    summary: {
+      attemptCount: number(rawSummary.attemptCount), completedCount: number(rawSummary.completedCount), answeredCount: number(rawSummary.answeredCount), correctCount: number(rawSummary.correctCount),
+      uniqueQuestionCount: number(rawSummary.uniqueQuestionCount), passedCount: number(rawSummary.passedCount), totalDurationSeconds: number(rawSummary.totalDurationSeconds), averageDurationSeconds: number(rawSummary.averageDurationSeconds),
+      accuracy: ratio(rawSummary.accuracy), recentAccuracy: ratio(rawSummary.recentAccuracy),
+    },
+    topics: rawTopics.map((item) => item && typeof item === "object" ? item as Record<string, unknown> : {}).map((item) => ({
+      topicId: String(item.topicId ?? ""), title: String(item.title ?? "Tema"), unitId: String(item.unitId ?? ""), unitCode: String(item.unitCode ?? "UC"), answeredCount: number(item.answeredCount), correctCount: number(item.correctCount), accuracy: ratio(item.accuracy),
+    })),
+    recentAttempts: rawRecent.map((item) => item && typeof item === "object" ? item as Record<string, unknown> : {}).map((item) => ({
+      id: String(item.id ?? ""), unitId: String(item.unitId ?? ""), unitCode: String(item.unitCode ?? "UC"), mode: (["quick", "exam", "unseen", "mistakes", "topic"].includes(String(item.mode)) ? String(item.mode) : "quick") as Mode,
+      questionCount: number(item.questionCount), answeredCount: number(item.answeredCount), correctCount: number(item.correctCount), accuracy: ratio(item.accuracy), startedAt: isoDate(item.startedAt), completedAt: isoDate(item.completedAt), durationSeconds: number(item.durationSeconds),
+    })),
+  };
+}
+
 function apiError(data: Record<string, unknown>, fallback: string) {
   return typeof data.error === "string" ? data.error : fallback;
 }
@@ -270,6 +318,9 @@ export function QuizHub() {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [statistics, setStatistics] = useState<QuizStatistics | null>(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(false);
+  const [statisticsError, setStatisticsError] = useState("");
   const attemptRef = useRef<Attempt | null>(null);
   const pendingAnswerSaves = useRef(new Map<string, Promise<void>>());
 
@@ -318,6 +369,21 @@ export function QuizHub() {
       setError(reason instanceof Error ? reason.message : "Não foi possível carregar os testes.");
     } finally {
       setCatalogueLoading(false);
+    }
+  }, []);
+
+  const loadStatistics = useCallback(async () => {
+    setStatisticsLoading(true);
+    setStatisticsError("");
+    try {
+      const response = await fetch("/api/quizzes/progress", { cache: "no-store" });
+      const data = await response.json() as Record<string, unknown>;
+      if (!response.ok) throw new Error(apiError(data, "Não foi possível carregar as tuas estatísticas."));
+      setStatistics(normaliseStatistics(data));
+    } catch (reason) {
+      setStatisticsError(reason instanceof Error ? reason.message : "Não foi possível carregar as tuas estatísticas.");
+    } finally {
+      setStatisticsLoading(false);
     }
   }, []);
 
@@ -635,7 +701,9 @@ export function QuizHub() {
             onRetry={() => void loadCatalogue()}
             onNormal={() => { setAvailability(null); setSelectedMode("quick"); }}
             onMistakes={() => { setAvailability(null); setSelectedMode("mistakes"); }}
+            onStatistics={() => { setScreen("statistics"); void loadStatistics(); }}
           />}
+          {screen === "statistics" && <StatisticsView statistics={statistics} loading={statisticsLoading} error={statisticsError} totalAvailableQuestions={units.reduce((total, unit) => total + unit.questionCount, 0)} onBack={() => setScreen("catalogue")} onRetry={() => void loadStatistics()} />}
           {screen === "attempt" && attempt && question && <AttemptView
             attempt={attempt}
             unit={selectedUnit}
@@ -675,11 +743,12 @@ export function QuizHub() {
   </AuthGuard>;
 }
 
-function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onStart, onResume, onRetry, onNormal, onMistakes }: {
+function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; availableQuestionCount: number; loadingAttempt: boolean;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
   onUnit: (id: string) => void; onMode: (id: Mode) => void; onTopics: (ids: string[]) => void; onQuestionCount: (count: number) => void; onStart: () => void; onResume: () => void; onRetry: () => void; onNormal: () => void; onMistakes: () => void;
+  onStatistics: () => void;
 }) {
   const effectiveMaximum = Math.min(50, availableQuestionCount);
   const insufficientBank = Boolean(selectedUnit && availableQuestionCount < 10);
@@ -692,6 +761,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   return <>
     <header className={`page-heading page-heading--simple ${styles.hero}`}>
       <div><span className="eyebrow">Testes</span><h1>Novo teste</h1></div>
+      <button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />As minhas estatísticas</button>
     </header>
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar teste</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
     {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar os teus testes" text="A carregar unidades curriculares e perguntas disponíveis." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar os testes" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há testes disponíveis" text="Quando forem publicadas perguntas para uma unidade curricular, poderás iniciar um teste aqui." /> : <div className={styles.builder}>
@@ -738,6 +808,37 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
         <button type="button" className={`${styles.personalPractice} ${selectedMode === "mistakes" ? styles.selected : ""}`} onClick={onMistakes} aria-pressed={selectedMode === "mistakes"} title="Criar um teste apenas com perguntas que erraste"><RotateCcw /><strong>Rever os meus erros</strong></button>
       </aside>}
     </div>}
+  </>;
+}
+
+function StatisticsView({ statistics, loading, error, totalAvailableQuestions, onBack, onRetry }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; onBack: () => void; onRetry: () => void }) {
+  if (loading) return <><header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
+  if (error || !statistics) return <><header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
+  const { summary } = statistics;
+  const accuracy = Math.round((summary.accuracy ?? 0) * 100);
+  const recentAccuracy = Math.round((summary.recentAccuracy ?? 0) * 100);
+  const seenPercent = totalAvailableQuestions ? Math.min(100, Math.round((summary.uniqueQuestionCount / totalAvailableQuestions) * 100)) : 0;
+  const passedPercent = summary.completedCount ? Math.round((summary.passedCount / summary.completedCount) * 100) : 0;
+  const readiness = accuracy >= 85 ? "Excelente preparação. Mantém o ritmo e concentra a revisão nos temas mais frágeis." : accuracy >= 70 ? "Boa base. Revê os temas com menor acerto antes de aumentares a dificuldade." : summary.answeredCount ? "Continua a praticar: alterna testes temáticos com revisão de erros para consolidar a matéria." : "Conclui o primeiro teste para começares a acompanhar a tua evolução.";
+  const metrics = [
+    { label: "Perguntas vistas", percent: seenPercent, value: `${summary.uniqueQuestionCount}/${totalAvailableQuestions || 0}` },
+    { label: "Respostas certas", percent: accuracy, value: `${summary.correctCount}/${summary.answeredCount}` },
+    { label: "Testes com ≥50%", percent: passedPercent, value: `${summary.passedCount}/${summary.completedCount}` },
+    { label: "Últimos 10 testes", percent: recentAccuracy, value: `${statistics.recentAttempts.length} concluídos` },
+  ];
+  return <>
+    <header className={`page-heading page-heading--simple ${styles.hero}`}><div><span className="eyebrow">Testes</span><h1>As minhas estatísticas</h1></div><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></header>
+    <section className={styles.statisticsLead}>
+      <article className={styles.readinessCard}><div><span className={styles.statisticsKicker}><BarChart3 />Preparação global</span><div className={styles.statisticsRing} style={{ "--score": `${accuracy}%` } as CSSProperties}><strong>{accuracy}%</strong><small>acerto</small></div></div><div><h2>{summary.completedCount ? `${summary.completedCount} ${summary.completedCount === 1 ? "teste concluído" : "testes concluídos"}` : "Começa a construir o teu histórico"}</h2><p>{readiness}</p></div></article>
+      <article className={styles.timeCard}><span className={styles.statisticsKicker}><Clock3 />Tempo de testes</span><dl><div><dt>Tempo total</dt><dd>{humanDuration(summary.totalDurationSeconds)}</dd></div><div><dt>Média por teste</dt><dd>{humanDuration(summary.averageDurationSeconds)}</dd></div></dl></article>
+    </section>
+    <section className={styles.statisticsGrid} aria-label="Resumo das estatísticas">
+      {metrics.map((metric) => <article className={styles.statisticsMetric} key={metric.label}><h2>{metric.label}</h2><div className={styles.statisticsRing} style={{ "--score": `${metric.percent}%` } as CSSProperties}><strong>{metric.percent}%</strong></div><p>{metric.value}</p></article>)}
+    </section>
+    <div className={styles.statisticsDetailGrid}>
+      <section className={styles.statisticsPanel} aria-labelledby="desempenho-temas"><header><div><span className={styles.statisticsKicker}><Trophy />Desempenho por tema</span><h2 id="desempenho-temas">Onde deves concentrar a revisão</h2></div></header>{statistics.topics.length ? <div className={styles.topicStatistics}>{statistics.topics.slice(0, 8).map((topic) => { const score = Math.round((topic.accuracy ?? 0) * 100); return <div key={`${topic.unitId}-${topic.topicId}`}><div><span className={styles.unitCode}>{topic.unitCode}</span><strong>{topic.title}</strong><small>{topic.correctCount}/{topic.answeredCount} certas</small></div><div className={styles.topicBar} aria-label={`${score}% de acerto`}><span style={{ width: `${score}%` }} /></div><b>{score}%</b></div>; })}</div> : <p className={styles.statisticsEmpty}>Ainda não há temas avaliados em testes concluídos.</p>}</section>
+      <section className={styles.statisticsPanel} aria-labelledby="tentativas-recentes"><header><div><span className={styles.statisticsKicker}><TimerReset />Histórico recente</span><h2 id="tentativas-recentes">Últimos testes concluídos</h2></div></header>{statistics.recentAttempts.length ? <div className={styles.recentAttempts}>{statistics.recentAttempts.map((item) => { const score = Math.round((item.accuracy ?? 0) * 100); return <article key={item.id}><div><span className={styles.unitCode}>{item.unitCode}</span><strong>{modeTitle(item.mode)}</strong><small>{humanDate(item.completedAt)} · {humanDuration(item.durationSeconds)}</small></div><span className={score >= 50 ? styles.passedAttempt : styles.reviewAttempt}><b>{score}%</b><small>{item.correctCount}/{item.questionCount}</small></span></article>; })}</div> : <p className={styles.statisticsEmpty}>Os testes concluídos aparecerão aqui.</p>}</section>
+    </div>
   </>;
 }
 

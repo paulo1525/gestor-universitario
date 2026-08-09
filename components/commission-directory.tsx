@@ -18,6 +18,7 @@ import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
+import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/commission-directory.module.css";
 
 type ApiMember = {
@@ -49,6 +50,9 @@ type Member = {
 
 const departmentLabelKeys = {
   management: "community.directory.department.management",
+  studies: "community.directory.department.studies",
+  curricular_units: "community.directory.department.curricularUnits",
+  recreation_image: "community.directory.department.recreationImage",
   students: "community.directory.department.students",
   faculty: "community.directory.department.faculty",
   commission: "community.directory.department.commission",
@@ -88,6 +92,7 @@ function initials(name: string) {
 
 export function CommissionDirectory() {
   const { locale, t } = useI18n();
+  const classesEnabled = useModuleEnabled("classes");
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -302,7 +307,7 @@ export function CommissionDirectory() {
                         <span>{member.email}</span>
                       </a>
 
-                      {member.representedClass !== null && (
+                      {classesEnabled && member.representedClass !== null && (
                         <div className={styles.classRole}>
                           <GraduationCap aria-hidden="true" />
                           <span>{t("community.directory.classRepresentative", { class: member.representedClass })}</span>
