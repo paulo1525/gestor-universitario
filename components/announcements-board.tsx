@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlignLeft, Archive, Bold, CalendarClock, ChevronLeft, ChevronRight, Flag, Italic, Link2, List, ListOrdered, LoaderCircle, Megaphone, Plus, RotateCcw, Search, Send, Underline, UserRound } from "lucide-react";
+import { AlignLeft, Archive, Bold, CalendarClock, ChevronLeft, ChevronRight, Flag, Italic, Link2, List, ListOrdered, LoaderCircle, Megaphone, Plus, RotateCcw, Search, Send, Underline, UserRound, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -255,11 +255,11 @@ export function AnnouncementsBoard() {
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
     <section className={styles.heading}>
       <div><span className="eyebrow">{t("announcements.eyebrow")}</span><h1>{t("announcements.title")}</h1><p>{t("announcements.intro")}</p></div>
-      {canPublish && <button className="button button--primary" type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor"><Plus />{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button>}
+      {canPublish && <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button>}
     </section>
 
     {canPublish && editorOpen && <form id="announcement-editor" className={`panel ${styles.editor}`} onSubmit={publish}>
-      <header><span className={styles.editorIcon}><Megaphone /></span><div><span className="eyebrow">{t("announcements.editor.eyebrow")}</span><h2>{t("announcements.editor.title")}</h2><p>{t("announcements.editor.intro")}</p></div></header>
+      <header><span className={styles.editorIcon}><Megaphone /></span><div><span className="eyebrow">{t("announcements.editor.eyebrow")}</span><h2>{t("announcements.editor.title")}</h2></div></header>
       <div className={styles.formGrid}>
         <label className={styles.titleField}><FormLabel icon={Megaphone}>{t("announcements.editor.titleLabel")}</FormLabel><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder={t("announcements.editor.titlePlaceholder")} /></label>
         <label><FormLabel icon={Flag}>{t("announcements.editor.priority")}</FormLabel><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">{priorityLabels.normal}</option><option value="important">{priorityLabels.important}</option><option value="urgent">{priorityLabels.urgent}</option></select></label>

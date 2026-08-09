@@ -10,22 +10,78 @@ A identidade visual não deve ser reinventada por módulo. Antes de escrever CSS
 2. A implementação de `components/admin-control.tsx` — cabeçalhos, indicadores, painéis e formulários administrativos.
 3. A implementação de `components/turmas-dashboard.tsx` — cabeçalhos de página, cartões de estatística, filtros, tabelas e estados.
 4. Os componentes e tokens de `app/globals.css` — fonte de verdade para cores, espaçamento, raio, sombra, botões e campos.
+5. As primitivas de `components/admin-ui.tsx` — fonte de verdade para a estrutura de páginas, métricas, secções, navegação, barras de ferramentas, formulários e regiões de dados administrativas.
 
 Uma página nova deve parecer parte destas áreas à primeira vista. Uma inspiração externa pode orientar o fluxo e a interação, mas nunca substituir o tema visual da plataforma.
 
+## Arquitetura da administração
+
+- A administração é um espaço de trabalho separado. O acesso administrativo não é um módulo académico e não deve ser misturado com as ligações principais dos estudantes.
+- `/admin/` é exclusivamente a consola inicial: apresenta um resumo compacto e encaminha para áreas de trabalho. Não contém formulários extensos, tabelas de edição ou várias ferramentas abertas em simultâneo.
+- Cada tarefa tem uma rota própria. Consultar utilizadores, configurar a plataforma, gerir testes e gerir unidades curriculares não podem coexistir na mesma página.
+- A navegação administrativa agrupa destinos por domínio: conteúdo académico, pessoas e acessos, acompanhamento e plataforma. Não ordenar ligações apenas pela data em que foram criadas.
+- O menu administrativo pode revelar ligações secundárias de forma progressiva, mas o destino atual e o respetivo grupo devem permanecer identificáveis.
+- Deve existir uma ação clara para regressar à aplicação sem apresentar opções administrativas a utilizadores sem permissão.
+- Uma inspiração como o XenForo pode orientar a hierarquia e a densidade; o resultado mantém sempre as superfícies claras, os tokens e a identidade do Gestor Universitário.
+
+## Composição obrigatória das páginas administrativas
+
+Usar as primitivas exportadas por `components/admin-ui.tsx` antes de criar estrutura local:
+
+1. `AdminPage` define o ritmo vertical e a largura de trabalho.
+2. `AdminPageHeader` contém uma eyebrow, um único `h1`, descrição curta opcional e no máximo uma ação primária.
+3. `AdminMetricGrid` e `AdminMetric` apresentam apenas números ou estados que ajudam a decidir a próxima ação.
+4. `AdminSection` agrupa uma tarefa coerente; `AdminNavigationList` representa destinos e não cartões promocionais.
+5. `AdminToolbar` reúne pesquisa, filtros e ações em lote numa única faixa.
+6. `AdminDataRegion` envolve uma tabela ou lista extensa sem criar um segundo painel visual.
+7. `AdminFormGrid` organiza campos; ações de gravação pertencem ao rodapé da secção, não a cada campo.
+8. `AdminEmptyState` é reservado a ausência real de dados ou resultados, nunca a instruções introdutórias.
+
+Uma página pode omitir níveis desnecessários. Não deve embrulhar uma destas primitivas noutra superfície equivalente nem criar cartões dentro de cartões.
+
+### Contrato verificável dos cartões administrativos
+
+- Em rotas `/admin/`, cabeçalhos de página usam exclusivamente `AdminPageHeader`.
+- Uma superfície de conteúdo usa `AdminSection`; um indicador usa `AdminMetric`; um destino usa `AdminNavigationItem`. Não criar equivalentes locais para estes três padrões.
+- Secções colocadas na mesma linha através de `AdminSectionGrid` têm sempre a mesma altura, independentemente da quantidade de ligações ou texto.
+- Pesquisa e filtros pertencem a `AdminToolbar`; ausência de dados ou resultados pertence a `AdminEmptyState`.
+- É proibido usar `.panel`, `.panel__header` ou `.empty-state` legados em novas páginas administrativas ou introduzi-los numa página administrativa migrada.
+- É proibido acrescentar barras coloridas no topo, raios, sombras ou paddings locais à estrutura de `AdminSection`, `AdminMetric` e `AdminNavigationItem`.
+- Qualquer exceção exige alteração explícita deste guia e do teste `tests/ui-theme-governance.test.mjs`; não pode surgir apenas num CSS Module local.
+
+## Escala e alinhamento administrativo
+
+- Intervalo entre blocos principais: `var(--space-5)`; em mobile, `var(--space-4)`.
+- Espaçamento interior normal: `var(--space-4)`; formulários densos podem usar `var(--space-5)`.
+- Cabeçalho de secção: 72 px no desktop e pelo menos 66 px no mobile.
+- Ícone de secção: 38 px; ícone de métrica: 42 px; ícone de uma linha de navegação: 34 px.
+- Painéis usam `var(--radius-panel)`, `var(--color-border)`, `var(--color-surface)` e `var(--shadow-panel)`.
+- Controlos usam `var(--control-height)`, `var(--radius-control)` e `var(--focus-ring)`.
+- Títulos, descrições, filtros e colunas que desempenham a mesma função devem começar no mesmo eixo em todas as páginas.
+- Texto auxiliar deve caber numa frase. Se forem necessárias instruções longas, usar ajuda contextual ou documentação separada.
+
 ## Regra de reutilização
 
-Usar primeiro as classes globais existentes, em especial:
+Fora das rotas administrativas, usar primeiro as classes globais existentes, em especial:
 
 - `page-heading`, `page-heading--simple`, `admin-heading`;
 - `eyebrow`;
 - `stats-grid`, `stat-card` e variantes de `stat-card__icon`;
-- `panel`, `panel__header`, `panel-tools`;
+- `panel`, `panel__header`, `panel-tools` (apenas em superfícies legadas fora de `/admin/`);
 - `admin-stats`, `admin-settings`, `admin-settings__header`, `admin-settings__icon`;
 - `button`, `button--primary`, `button--secondary`, `button--ghost`;
 - `search-field`, `select-field`, tabelas e estados vazios existentes.
 
 O CSS Module de uma página deve conter apenas o que é específico dessa página. Não copiar nem recriar o sistema base dentro do módulo.
+
+### Contrato partilhado das superfícies
+
+- Painéis públicos e primitivas administrativas consomem os tokens `--surface-card-*` e `--surface-header-*` definidos em `app/globals.css`; um CSS Module não fixa uma segunda combinação de borda, raio, sombra ou cabeçalho.
+- `AdminSection` e `AdminMetric` expõem `data-platform-surface`; cabeçalhos de secção expõem `data-platform-surface-header`. Estes atributos são o ponto de integração estável entre as primitivas React e os temas.
+- O tema base mantém cabeçalhos claros sem decoração adicional. O tema azul pode usar o seu filete azul funcional através de `--surface-header-accent-*`, sem alterar a anatomia ou a densidade do cartão.
+- Uma coleção extensa vive dentro de uma única superfície. Cada registo é uma linha separada por borda, sem raio ou sombra próprios, como em Avisos e comunicados.
+- Cartões verdadeiramente autónomos, como métricas e destinos, preservam borda, raio e sombra partilhados; tabelas, formulários e listas não devem ser forçados a parecer cartões promocionais.
+- A ação que abre um editor pode ser primária. No estado aberto, “Fechar editor”/“Fechar” é sempre uma ação secundária compacta e troca o ícone de adição por um ícone de fecho.
 
 ## Navegação lateral
 

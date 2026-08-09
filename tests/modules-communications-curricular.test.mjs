@@ -9,6 +9,7 @@ const specialStatusModuleMigration = readFileSync(new URL("../migrations/0026_sp
 const definitions = readFileSync(new URL("../lib/app-modules.ts", import.meta.url), "utf8");
 const moduleUi = readFileSync(new URL("../components/module-management.tsx", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
+const adminNavigation = readFileSync(new URL("../components/admin-navigation.tsx", import.meta.url), "utf8");
 const announcementsUi = readFileSync(new URL("../components/announcements-board.tsx", import.meta.url), "utf8");
 const topbarSearch = readFileSync(new URL("../components/topbar-global-search.tsx", import.meta.url), "utf8");
 const directoryUi = readFileSync(new URL("../components/commission-directory.tsx", import.meta.url), "utf8");
@@ -57,10 +58,10 @@ test("rotas existentes são bloqueadas no backend quando o respetivo submódulo 
   assert.doesNotMatch(shell, /moduleAccess\["classes\.(?:rosters|preferences|placements)"\]/);
   assert.match(shell, /moduleAccess\["quizzes\.practice"\]/);
   assert.match(shell, /href="\/testes"/);
-  assert.match(shell, /hasCommunication&&<div className="nav-section"/);
-  assert.match(shell, /hasAcademicLife&&<div className="nav-section"/);
-  assert.match(shell, /hasCommunity&&<div className="nav-section"/);
-  assert.match(shell, /moduleAccess\["curricular_units\.management"\]/);
+  assert.match(shell, /hasCommunication&&<section className=\{adminNavigationStyles\.group\}/);
+  assert.match(shell, /hasAcademicLife&&<section className=\{adminNavigationStyles\.group\}/);
+  assert.match(shell, /hasCommunity&&<section className=\{adminNavigationStyles\.group\}/);
+  assert.match(adminNavigation, /access\["curricular_units\.management"\]/);
   assert.match(curricularAdminPage, /moduleKey="curricular_units\.management"/);
 });
 
@@ -74,7 +75,7 @@ test("o estado dos módulos é partilhado e não bloqueia novamente cada navega�
 });
 
 test("o gestor de módulos reais não aparece no ambiente de testes", () => {
-  assert.match(shell, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
+  assert.match(adminNavigation, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
   assert.match(moduleUi, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
 });
 
@@ -135,9 +136,9 @@ test("unidades curriculares são geridas apenas pelo Núcleo e aceitam zero a do
   assert.match(representativesMigration, /CREATE TABLE curricular_unit_representatives/);
   assert.match(representativesMigration, /position INTEGER NOT NULL CHECK \(position IN \(1, 2\)\)/);
   assert.match(representativesMigration, /ADD COLUMN representative_user_id TEXT REFERENCES users\(id\) ON DELETE SET NULL/);
-  assert.match(curricularUi, /styles\.unitEntry/);
+  assert.match(curricularUi, /styles\.unitCard/);
   assert.match(curricularUi, /\[0, 1\]\.map/);
   assert.match(curricularUi, /<AppToast/);
   assert.match(moduleUi, /<AppToast/);
-  assert.match(shell, /href="\/admin\/modulos"/);
+  assert.match(adminNavigation, /href:\s*"\/admin\/modulos"/);
 });

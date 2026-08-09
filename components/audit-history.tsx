@@ -11,6 +11,8 @@ import { adminDataLabel } from "@/lib/i18n-admin";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
 import { useScrollLock } from "@/components/use-scroll-lock";
+import { useEscapeKey } from "@/components/use-escape-key";
+import { AdminDataRegion, AdminEmptyState, AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
 
 type Action = { id: string | number; action: string; details: string | null; created_at: number; actor_id?: string; actor_name: string; actor_email?: string; actor_student_number?: string; class_id: number | null };
 type DetailRow = { label: string; value: string };
@@ -105,6 +107,7 @@ export function AuditHistory() {
   const { locale, t } = useI18n();
   const [actions, setActions] = useState<Action[]>([]), [error, setError] = useState(""), [selected, setSelected] = useState<Action | null>(null), [query, setQuery] = useState(""), [page, setPage] = useState(1);
   useScrollLock(Boolean(selected));
+  useEscapeKey(Boolean(selected), () => setSelected(null));
   const auditCopy = useMemo<AuditCopy>(() => ({
     noValue: t("admin.audit.noValue"), noItems: t("admin.audit.noItems"), noData: t("admin.audit.noData"),
     enabled: t("admin.audit.enabled"), disabled: t("admin.audit.disabled"), yes: t("admin.audit.yes"), no: t("admin.audit.no"),
@@ -132,27 +135,25 @@ export function AuditHistory() {
   const pagedActions = visible.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE);
   const selectedDetails = selected ? detailRows(selected.details, locale, auditCopy) : [];
 
-  return <AuthGuard requireAdmin><AppShell active="audit" breadcrumb={t("admin.audit.breadcrumb")}>
-    <section className="page-heading"><div><span className="eyebrow">{t("admin.audit.eyebrow")}</span><h1>{t("admin.audit.title")}</h1><p>{t("admin.audit.description")}</p></div></section>
-    <section className="panel audit-panel">
-      <div className="panel__header"><div><h2>{t("admin.audit.recent")}</h2><p>{t("admin.audit.recentDescription")}</p></div><label className="search-field audit-search"><Search size={16} /><input placeholder={t("admin.audit.search")} value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label></div>
+  return <AuthGuard requireAdmin><AppShell active="audit" breadcrumb={t("admin.audit.breadcrumb")}><AdminPage>
+    <AdminPageHeader eyebrow={t("admin.audit.eyebrow")} title={t("admin.audit.title")} description={t("admin.audit.description")} />
+    <AdminSection icon={<History />} title={t("admin.audit.recent")} description={t("admin.audit.recentDescription")} actions={<label className="search-field audit-search"><Search size={16} /><span className="sr-only">{t("admin.audit.search")}</span><input type="search" placeholder={t("admin.audit.search")} value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label>}>
       {error && <AppToast key={error} kind="error" message={error} onDismiss={() => setError("")} />}
-      <div className="audit-list">
+      {pagedActions.length ? <AdminDataRegion label={t("admin.audit.recent")}><div className="audit-list">
         {pagedActions.map(action => { const actor = personDisplay({ fullName: action.actor_name, id: action.actor_id, email: action.actor_email, studentNumber: action.actor_student_number }, { revealIdentifier: true, locale }); return <article className="audit-row" key={`${action.class_id || "admin"}-${action.id}`}>
           <div className="audit-row__action"><span className="audit-row__icon"><History size={17} /></span><div><strong>{actionLabel(action.action, locale)}</strong><small><PersonName person={actor} /></small></div></div>
           <div className="audit-row__context">{action.class_id ? classLabel(action.class_id, locale) : t("admin.common.administration")}</div>
           <time>{new Date(action.created_at).toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</time>
           <button className="button button--secondary audit-row__button" type="button" onClick={() => setSelected(action)}>{t("admin.audit.details")}</button>
         </article> })}
-        {!visible.length && !error && <p className="empty-state">{query ? t("admin.audit.noSearchResults") : t("admin.audit.empty")}</p>}
-      </div>
+      </div></AdminDataRegion> : !error && <AdminEmptyState icon={<History />} title={query ? t("admin.audit.noSearchResults") : t("admin.audit.empty")} />}
       {visible.length > 0 && <div className="admin-pagination"><span>{(effectivePage - 1) * PAGE_SIZE + 1}–{Math.min(effectivePage * PAGE_SIZE, visible.length)} {t("admin.common.of")} {visible.length}</span><div><button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={effectivePage === 1}>{t("admin.common.previous")}</button><strong>{effectivePage} / {pageCount}</strong><button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={effectivePage === pageCount}>{t("admin.common.next")}</button></div></div>}
-    </section>
+    </AdminSection>
     {selected && <div className="audit-modal-backdrop" role="presentation" onClick={() => setSelected(null)}><section className="audit-modal" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title" onClick={event => event.stopPropagation()}>
       <header><div><span className="eyebrow">{t("admin.audit.record")}</span><h2 id="audit-modal-title">{actionLabel(selected.action, locale)}</h2></div><button type="button" aria-label={t("admin.audit.close")} onClick={() => setSelected(null)}><X size={18} /></button></header>
       <dl><div><dt>{t("admin.audit.user")}</dt><dd>{(() => { const actor = personDisplay({ fullName: selected.actor_name, id: selected.actor_id, email: selected.actor_email, studentNumber: selected.actor_student_number }, { revealIdentifier: true, locale }); return <PersonName person={actor} />; })()}</dd></div><div><dt>{t("admin.audit.context")}</dt><dd>{selected.class_id ? classLabel(selected.class_id, locale) : t("admin.common.administration")}</dd></div><div><dt>{t("admin.audit.date")}</dt><dd>{new Date(selected.created_at).toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</dd></div></dl>
       <h3>{t("admin.audit.actionDetails")}</h3>
       {selectedDetails.length ? <dl>{selectedDetails.map((row, index) => <div key={`${row.label}-${index}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl> : <p>{t("admin.audit.noDetails")}</p>}
     </section></div>}
-  </AppShell></AuthGuard>;
+  </AdminPage></AppShell></AuthGuard>;
 }

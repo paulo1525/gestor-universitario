@@ -17,10 +17,6 @@
 .hero h1 { margin: 5px 0 7px; font-size: clamp(27px, 3vw, 38px); letter-spacing: -.035em; }
 .hero p { max-width: 720px; margin: 0; color: #68675f; font-size: 12px; line-height: 1.6; }
 
-.createButton { min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;padding:0 13px;border:1px solid var(--line);border-radius:10px;color:var(--ink);background:var(--surface);box-shadow:0 2px 8px rgba(20,20,16,.035);font-size:11px;font-weight:850;cursor:pointer; }
-.createButton:hover { border-color:#cfad31;background:var(--gold-soft); }
-.createButton svg { width:15px;height:15px;color:#806000; }
-
 .splitLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -30,19 +26,22 @@
 
 .panel {
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: #fff;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--surface-card-border);
+  border-radius: var(--surface-card-radius);
+  background: var(--surface);
+  box-shadow: var(--surface-card-shadow);
 }
 
 .stickyForm { position: static; }
-.form { display: grid; width:min(980px,100%); margin-inline:auto; }
-.formHeading { padding: 20px 22px 16px; border-bottom: 1px solid #eceae2; }
+.form { display: grid; width:min(860px,100%); margin-inline:auto; }
+.formHeading { display:flex;align-items:center;gap:12px;min-height:var(--surface-header-min-height);padding:var(--surface-header-padding-block) var(--surface-header-padding-inline);border-top:var(--surface-header-accent-size) solid var(--surface-header-accent);border-bottom:1px solid var(--surface-card-border);background:var(--surface-header-background); }
+.formHeading > div { min-width:0; }
+.formHeadingIcon { width:38px;height:38px;display:grid;place-items:center;flex:0 0 auto;border-radius:10px;color:var(--color-accent-text);background:var(--color-accent-soft); }
+.formHeadingIcon svg { width:18px;height:18px; }
 .formHeading h2, .sectionHead h2 { margin: 0; font-size: 17px; letter-spacing: -.015em; }
 .formHeading p, .sectionHead p { margin: 5px 0 0; color: #77756d; font-size: 12px; line-height: 1.6; }
 
-.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 20px 22px; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; padding: 18px 20px; }
 .formGrid > label, .manageRequest label { display: grid; align-content: start; gap: 7px; min-width: 0; color: #535149; font-size: 11px; font-weight: 750; }
 .formGrid input, .formGrid select, .formGrid textarea, .sectionHead select, .manageRequest select, .manageRequest textarea {
   width: 100%;
@@ -70,7 +69,7 @@
 .full { grid-column: 1 / -1; }
 .wide { grid-column: 1 / -1; }
 
-.privacyOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding: 0; border: 0; }
+.privacyOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content:start; gap: 9px; min-width:0; padding: 0; border: 0; }
 .privacyOptions legend { margin-bottom: 7px; color: #535149; font-size: 11px; font-weight: 800; }
 .privacyOptions label {
   display: grid;
@@ -93,15 +92,16 @@
 .privacyOptions strong { color: #39372f; font-size: 11px; line-height: 1.25; }
 .privacyOptions label small { color: #7d7a70; font-size: 10px; line-height: 1.35; }
 
-.formActions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 22px; border-top: 1px solid #eceae2; background: #faf9f5; }
+.formActions { display: flex; justify-content: flex-end; gap: 8px; padding: 11px 20px; border-top: 1px solid var(--surface-card-border); background: var(--color-surface-subtle); }
 .formActions :global(.button), .manageRequest :global(.button) { min-height: 38px; font-size: 10px; }
 .formActions :global(.button) svg { width: 15px; height: 15px; }
 
-.sectionHead { display: flex; align-items: center; gap: 14px; padding: 19px 20px; border-bottom: 1px solid #e8e6dd; background: #fcfcfa; }
+.sectionHead { display: flex; align-items: center; gap: 14px; min-height:var(--surface-header-min-height);padding:var(--surface-header-padding-block) var(--surface-header-padding-inline);border-top:var(--surface-header-accent-size) solid var(--surface-header-accent);border-bottom:1px solid var(--surface-card-border);background:var(--surface-header-background); }
 .sectionHead > div { flex: 1; min-width: 0; }
 .sectionHead label { min-width: 168px; }
-.requestList { display: grid; gap: 10px; padding: 14px; background: #f8f8f5; }
-.requestCard { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(36,34,25,.045); }
+.requestList { display: grid; background: var(--surface); }
+.requestCard { padding: 20px 22px; border: 0; border-bottom: 1px solid var(--surface-card-border); border-radius: 0; background: var(--surface); box-shadow: none; }
+.requestCard:last-child { border-bottom:0; }
 .requestCard > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .requestCard time { color: #858279; font-size: 10px; white-space: nowrap; }
 .requestCard h3 { margin: 13px 0 6px; font-size: 15px; letter-spacing: -.01em; }
@@ -167,7 +167,8 @@
 
 @media (max-width: 680px) {
   .hero { align-items: stretch; flex-direction:column; padding: 4px 2px; }
-  .createButton { width:max-content; }
+  .hero > :global(.button) { width:max-content; }
+  .formHeading p { display:none; }
   .formGrid, .privacyOptions, .manageRequest { grid-template-columns: 1fr; }
   .full, .wide, .manageRequest .wide { grid-column: auto; }
   .sectionHead { align-items: stretch; flex-direction: column; }
@@ -184,7 +185,7 @@
 }
 
 /* Componentes funcionais com a mesma densidade e superfícies do restante site. */
-.panel,.requestCard { border-color:var(--line); background:var(--surface); }
+.panel,.requestCard { border-color:var(--surface-card-border); background:var(--surface); }
 .formHeading,.sectionHead,.formActions { border-color:var(--line); }
 .sectionHead { background:#fcfcfa; }
 .formActions { background:#fafaf7; }
@@ -210,7 +211,7 @@
 :global(html[data-theme="forum"]) .privacyOptions input { accent-color:#247ca9; }
 :global(html[data-theme="forum"]) .privacyOptions svg { color:#1977a5; }
 :global(html[data-theme="forum"]) .formActions :global(.button) { min-height:38px; padding-inline:12px; }
-.requestList { background:#f8f8f5; }
+.requestList { background:var(--surface); }
 .badge { color:#654f00; background:#fff0af; }
 .statusBadge { background:var(--green-soft); }
 .softBadge { background:#f0f0ec; }

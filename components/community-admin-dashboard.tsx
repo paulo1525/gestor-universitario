@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, BarChart3, BookOpen, ClipboardList, FileText, LoaderCircle, Megaphone, TrendingUp, Users, Vote } from "lucide-react";
+import { ArrowRight, BookOpen, ClipboardList, FileText, LoaderCircle, Megaphone, TrendingUp, Users, Vote } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { AdminEmptyState, AdminMetric, AdminMetricGrid, AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useI18n } from "@/components/i18n-context";
@@ -63,6 +64,13 @@ function icon(type: string) {
   return <ClipboardList />;
 }
 
+function activityDetail(item: Dashboard["recent"][number], locale: "pt-PT" | "en"): string {
+  if (item.description) return item.description;
+  if (!item.createdAt) return "";
+  const parsed = new Date(item.createdAt);
+  return Number.isNaN(parsed.getTime()) ? "" : new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pt-PT", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Lisbon" }).format(parsed);
+}
+
 export function CommunityAdminDashboard() {
   const { locale, t } = useI18n();
   const [data, setData] = useState<Dashboard | null>(null);
@@ -89,45 +97,35 @@ export function CommunityAdminDashboard() {
   useEffect(() => { void load(); }, [load]);
 
   return <AuthGuard requireAdmin><ModuleGuard moduleKey="dashboard.analytics"><AppShell active="dashboard" breadcrumb={t("admin.dashboard.breadcrumb")}>
-    <div className={styles.page}>
-      <header className={styles.hero}>
-        <div className={styles.heroCopy}><span className={styles.heroIcon}><BarChart3 /></span><div><span className="eyebrow">{t("admin.dashboard.eyebrow")}</span><h1>{t("admin.dashboard.title")}</h1><p>{t("admin.dashboard.description")}</p></div></div>
-        <div className={styles.heroActions}><button className="button button--secondary" type="button" onClick={() => void load()} disabled={loading}><TrendingUp />{t("admin.dashboard.refresh")}</button></div>
-      </header>
+    <AdminPage>
+      <AdminPageHeader eyebrow={t("admin.dashboard.eyebrow")} title={t("admin.dashboard.title")} description={t("admin.dashboard.description")} actions={<button className="button button--secondary" type="button" onClick={() => void load()} disabled={loading}><TrendingUp />{t("admin.dashboard.refresh")}</button>} />
       {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}
-      {loading ? <section className={styles.panel}><div className={styles.state}><LoaderCircle className={styles.spin} /><strong>{t("admin.dashboard.calculating")}</strong></div></section> : data && <>
-        <section className={styles.statsGrid} aria-label={t("admin.dashboard.mainIndicators")}>
-          <Stat icon={<Megaphone />} value={data.metrics.activeAnnouncements} label={t("admin.dashboard.activeAnnouncements")} locale={locale} />
-          <Stat icon={<ClipboardList />} value={data.metrics.openRequests} label={t("admin.dashboard.openRequests")} locale={locale} />
-          <Stat icon={<FileText />} value={data.metrics.pendingMaterials} label={t("admin.dashboard.pendingMaterials")} locale={locale} />
-          <Stat icon={<Vote />} value={data.metrics.activePolls} label={t("admin.dashboard.activePolls")} locale={locale} />
-        </section>
+      {loading ? <AdminSection icon={<TrendingUp />} title={t("admin.dashboard.mainIndicators")}><AdminEmptyState icon={<LoaderCircle className={styles.spin} />} title={t("admin.dashboard.calculating")} /></AdminSection> : data && <>
+        <AdminMetricGrid label={t("admin.dashboard.mainIndicators")}>
+          <AdminMetric icon={<Megaphone />} value={data.metrics.activeAnnouncements.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.activeAnnouncements")} />
+          <AdminMetric icon={<ClipboardList />} value={data.metrics.openRequests.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.openRequests")} />
+          <AdminMetric icon={<FileText />} value={data.metrics.pendingMaterials.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.pendingMaterials")} />
+          <AdminMetric icon={<Vote />} value={data.metrics.activePolls.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.activePolls")} />
+        </AdminMetricGrid>
         <div className={styles.dashboardGrid}>
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}><div><h2>{t("admin.dashboard.byModule")}</h2><p>{t("admin.dashboard.byModuleDescription")}</p></div></div>
+          <AdminSection icon={<TrendingUp />} title={t("admin.dashboard.byModule")} description={t("admin.dashboard.byModuleDescription")}>
             {data.engagement.length ? <div className={styles.progressList}>{data.engagement.map((item) => {
               const percent = item.total ? Math.min(100, Math.round(item.value / item.total * 100)) : Math.min(100, item.value);
               const label = adminDataLabel(locale, "engagement", item.label) || item.label;
               return <div className={styles.progressLine} key={item.label}><div><strong>{label}</strong><span>{item.value.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</span></div><div className={styles.progressTrack}><span style={{ width: `${percent}%` }} /></div></div>;
-            })}</div> : <div className={styles.state}><TrendingUp /><strong>{t("admin.dashboard.noEngagement")}</strong></div>}
-          </section>
-          <section className={styles.panel}>
-            <div className={styles.panelHeader}><div><h2>{t("admin.dashboard.recent")}</h2><p>{t("admin.dashboard.recentDescription")}</p></div></div>
+            })}</div> : <AdminEmptyState icon={<TrendingUp />} title={t("admin.dashboard.noEngagement")} />}
+          </AdminSection>
+          <AdminSection icon={<ClipboardList />} title={t("admin.dashboard.recent")} description={t("admin.dashboard.recentDescription")}>
             {data.recent.length ? <div className={styles.sectionBody}>{data.recent.map((item) => {
-              const content = <><span className={styles.listIcon}>{icon(item.type)}</span><span><strong>{item.title}</strong><small>{item.description ?? item.createdAt ?? ""}</small></span>{item.href && <ArrowRight />}</>;
+              const content = <><span className={styles.listIcon}>{icon(item.type)}</span><span><strong>{item.title}</strong>{activityDetail(item, locale) && <small>{activityDetail(item, locale)}</small>}</span>{item.href && <ArrowRight />}</>;
               return item.href ? <Link className={styles.listItem} href={item.href} key={item.id}>{content}</Link> : <div className={styles.listItem} key={item.id}>{content}</div>;
-            })}</div> : <div className={styles.state}><ClipboardList /><strong>{t("admin.dashboard.noRecent")}</strong></div>}
-          </section>
+            })}</div> : <AdminEmptyState icon={<ClipboardList />} title={t("admin.dashboard.noRecent")} />}
+          </AdminSection>
         </div>
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}><div><h2>{t("admin.dashboard.byUnit")}</h2><p>{t("admin.dashboard.byUnitDescription")}</p></div><Link className="button button--secondary button--compact" href="/unidades-curriculares"><BookOpen />{t("admin.dashboard.viewCatalog")}</Link></div>
-          {data.units.length ? <div className={styles.grid}>{data.units.map((item) => <Link className={styles.card} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`} key={item.id}><span className={styles.unitCode}>{item.code ?? "UC"}</span><h3>{item.name}</h3><div className={styles.metrics}><div className={styles.metric}><span>{t("admin.dashboard.requests")}</span><strong>{item.issues}</strong></div><div className={styles.metric}><span>{t("admin.dashboard.upcomingEvents")}</span><strong>{item.events}</strong></div></div><span className={styles.linkHint}>{t("admin.dashboard.openUnit")} <ArrowRight /></span></Link>)}</div> : <div className={styles.state}><Users /><strong>{t("admin.dashboard.noUnits")}</strong></div>}
-        </section>
+        <AdminSection icon={<BookOpen />} title={t("admin.dashboard.byUnit")} description={t("admin.dashboard.byUnitDescription")} actions={<Link className="button button--secondary button--compact" href="/unidades-curriculares"><BookOpen />{t("admin.dashboard.viewCatalog")}</Link>}>
+          {data.units.length ? <div className={styles.grid}>{data.units.map((item) => <Link className={styles.card} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`} key={item.id}><span className={styles.unitCode}>{item.code ?? "UC"}</span><h3>{item.name}</h3><div className={styles.metrics}><div className={styles.metric}><span>{t("admin.dashboard.requests")}</span><strong>{item.issues}</strong></div><div className={styles.metric}><span>{t("admin.dashboard.upcomingEvents")}</span><strong>{item.events}</strong></div></div><span className={styles.linkHint}>{t("admin.dashboard.openUnit")} <ArrowRight /></span></Link>)}</div> : <AdminEmptyState icon={<Users />} title={t("admin.dashboard.noUnits")} />}
+        </AdminSection>
       </>}
-    </div>
+    </AdminPage>
   </AppShell></ModuleGuard></AuthGuard>;
-}
-
-function Stat({ icon, value, label, locale }: { icon: React.ReactNode; value: number; label: string; locale: "pt-PT" | "en" }) {
-  return <article className={styles.statCard}><span className={styles.statIcon}>{icon}</span><span><strong>{value.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</strong><small>{label}</small></span></article>;
 }

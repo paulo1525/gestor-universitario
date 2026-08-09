@@ -102,28 +102,6 @@
 
 .editorIcon svg { width: 18px; height: 18px; }
 
-.closeButton {
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
-}
-
-.closeButton:hover,
-.closeButton:focus-visible {
-  border-color: var(--line);
-  color: var(--ink);
-  background: var(--color-surface-muted);
-}
-
-.closeButton svg { width: 16px; }
-
 .form {
   margin-top: 16px;
 }
@@ -206,24 +184,50 @@
   padding: 0;
 }
 
-.listHeading {
-  min-height: 72px;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+.unitSearch {
+  width: min(34vw, 340px);
+  min-width: 230px;
 }
 
-.listHeading > span {
-  min-height: 26px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 9px;
-  border-radius: 999px;
+.searchControl {
+  position: relative;
+  display: block;
+}
+
+.searchControl svg {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 15px;
+  height: 15px;
   color: var(--muted);
-  background: var(--color-surface-muted);
-  font-size: 9px;
-  font-weight: 750;
-  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.searchControl input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 10px 0 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.unitSearch .searchControl input {
+  background: var(--color-surface-subtle);
+}
+
+.searchControl input:focus {
+  border-color: var(--color-focus);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 16%, transparent);
 }
 
 .state {
@@ -245,27 +249,46 @@
 .errorState strong { color: var(--color-danger-text); }
 
 .unitGrid {
-  display: flex;
-  flex-direction: column;
-  padding: 4px 20px 12px;
+  display: grid;
   background: var(--surface);
 }
 
-.unitEntry {
-  min-width: 0;
-  border-bottom: 1px solid var(--line);
+.unitTableHeader,
+.unitCard {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) minmax(250px, 1.2fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding-inline: 20px;
 }
 
-.unitEntry:last-child { border-bottom: 0; }
+.unitTableHeader {
+  min-height: 38px;
+  color: var(--color-text-subtle);
+  background: var(--color-surface-subtle);
+  font-size: var(--font-size-caption);
+  font-weight: 850;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
 
 .unitCard {
   min-width: 0;
-  min-height: 76px;
-  display: grid;
-  grid-template-columns: minmax(220px, 1.7fr) minmax(105px, .55fr) minmax(150px, .75fr) minmax(220px, 1.25fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 2px;
+  min-height: 84px;
+  padding-block: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.unitCard[data-has-representatives="false"] {
+  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) auto;
+}
+
+.unitTableHeader[data-has-representatives="false"] {
+  grid-template-columns: minmax(220px, 1.65fr) minmax(84px, .42fr) minmax(145px, .68fr) auto;
+}
+
+.unitCard:hover {
+  background: color-mix(in srgb, var(--color-accent-soft) 20%, var(--surface));
 }
 
 .identity {
@@ -308,13 +331,18 @@
   gap: 2px;
 }
 
-.metric > span,
-.representative > span {
+.metric > span {
   color: var(--muted);
   font-size: 7px;
   font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
+}
+
+@media (min-width: 1081px) {
+  .unitCard .metric > span {
+    display: none;
+  }
 }
 
 .metric strong {
@@ -331,8 +359,6 @@
   gap: 4px 7px;
 }
 
-.representative > span { grid-column: 1 / -1; }
-
 .representativePerson {
   min-width: 0;
   display: grid;
@@ -348,12 +374,6 @@
 
 .representativePerson strong { color: var(--ink); font-size: 9px; }
 .representativePerson small { color: var(--muted); font-size: 7px; }
-
-.missingRepresentative {
-  grid-column: 1 / -1;
-  color: var(--color-warning);
-  font-size: 9px;
-}
 
 .editButton {
   min-height: 36px;
@@ -380,26 +400,6 @@
 
 .editButton svg { width: 14px; height: 14px; }
 
-.editCard {
-  margin: 10px 0;
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--gold) 48%, var(--line));
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--gold-soft) 34%, var(--surface));
-}
-
-.editContext {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.editContext > div { display: grid; gap: 2px; }
-.editContext strong { color: var(--ink); font-size: 10px; }
-.editContext small { color: var(--muted); font-size: 8px; }
-
 .spin { animation: spin .8s linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -409,7 +409,9 @@
   .nameField,
   .representativeField { grid-column: 1 / -1; }
   .codeField { grid-column: auto; }
-  .unitCard { grid-template-columns: minmax(220px, 1.4fr) minmax(100px, .5fr) minmax(140px, .7fr) auto; }
+  .unitTableHeader { display: none; }
+  .unitCard,
+  .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(220px, 1.4fr) minmax(90px, .5fr) minmax(140px, .7fr) auto; }
   .representative { grid-column: 1 / -2; padding-left: 46px; }
 }
 
@@ -417,9 +419,9 @@
   .heading { align-items: stretch; flex-direction: column; gap: 12px; }
   .heading button { width: 100%; }
   .editor { padding: 14px; }
-  .listHeading { min-height: 66px; padding-inline: 14px; }
-  .unitGrid { padding-inline: 14px; }
-  .unitCard { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 12px 1px; }
+  .unitSearch { width: 100%; min-width: 0; }
+  .unitCard,
+  .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 14px; }
   .identity { grid-column: 1; }
   .editButton { grid-column: 2; grid-row: 1; }
   .metric,
@@ -442,7 +444,6 @@
   .metric,
   .representative { padding-left: 0; }
   .representative { grid-template-columns: 1fr; }
-  .editContext small { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -25,6 +25,7 @@ const MAX_IMPORT_ROWS = 100;
 const MAX_IMAGE_BYTES = 1024 * 1024;
 const MIN_TEST_QUESTIONS = 10;
 const MAX_TEST_QUESTIONS = 50;
+const ADMIN_QUESTION_PAGE_SIZES = new Set([10, 25, 50]);
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
 
 function json(data: unknown, status = 200): Response {
@@ -113,8 +114,8 @@ function questionInput(source: Row): { prompt: string; explanation: string; diff
     return { text: optionText, isCorrect: Boolean(item?.isCorrect ?? item?.correct) || explicitIndex === index };
   }) : null;
   return {
-    prompt: longText(source.prompt ?? source.question ?? source.statement, 6000),
-    explanation: longText(source.explanation ?? source.explicacao, 8000),
+    prompt: sanitizeRichTextHtml(longText(source.prompt ?? source.question ?? source.statement, 6000)),
+    explanation: sanitizeRichTextHtml(longText(source.explanation ?? source.explicacao, 8000)),
     difficulty: optionalDifficulty(source.difficulty),
     image: readImage(source.imageUrl ?? source.image ?? source.imageDataUrl),
     options,
@@ -124,7 +125,7 @@ function questionInput(source: Row): { prompt: string; explanation: string; diff
 }
 
 function validateQuestion(input: ReturnType<typeof questionInput>, requireOptions = true): string | null {
-  if (input.prompt.length < 3) return "A pergunta deve ter pelo menos 3 caracteres.";
+  if (richTextPlainText(input.prompt).length < 3) return "A pergunta deve ter pelo menos 3 caracteres.";
   if (!input.difficulty) return "A dificuldade deve ser fácil, média ou difícil.";
   if ("error" in input.image) return input.image.error;
   if (requireOptions) {
@@ -439,14 +440,46 @@ async function adminCatalog(request: Request, env: QuizEnv, url: URL, user: Quiz
   if (!isAdmin(user)) return user ? forbidden() : unauthenticated();
   if (!await enabled("quizzes.management")) return disabled();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
-  const unitId = text(url.searchParams.get("unitId"), 100), includeDeleted = url.searchParams.get("includeDeleted") === "1";
-  const [units, topics, questions, imports, auditHistory] = await Promise.all([
-    env.DB.prepare("SELECT id,code,name,ects,study_year,semester FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE").all(),
-    env.DB.prepare("SELECT t.*,cu.code AS unit_code,cu.name AS unit_name,COUNT(q.id) AS question_count FROM quiz_topics t JOIN curricular_units cu ON cu.id=t.curricular_unit_id LEFT JOIN quiz_questions q ON q.topic_id=t.id AND q.deleted_at IS NULL WHERE (?='' OR t.curricular_unit_id=?) AND (?=1 OR t.deleted_at IS NULL) GROUP BY t.id ORDER BY cu.study_year,cu.semester,t.sort_order,t.title COLLATE NOCASE").bind(unitId, unitId, includeDeleted ? 1 : 0).all(),
-    env.DB.prepare("SELECT q.*,NULL AS correct_option_id,t.title AS topic_title,cu.code AS unit_code,cu.name AS unit_name FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE (?='' OR q.curricular_unit_id=?) AND (?=1 OR q.deleted_at IS NULL) ORDER BY q.updated_at DESC LIMIT 1000").bind(unitId, unitId, includeDeleted ? 1 : 0).all(),
-    env.DB.prepare("SELECT i.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS imported_by_name FROM quiz_imports i LEFT JOIN curricular_units cu ON cu.id=i.curricular_unit_id JOIN users u ON u.id=i.imported_by ORDER BY i.created_at DESC LIMIT 100").all(),
-    env.DB.prepare("SELECT a.id,a.action,a.details,a.created_at,u.full_name AS actor_name FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.action LIKE 'quiz_%' ORDER BY a.created_at DESC LIMIT 100").all(),
+  const unitId = text(url.searchParams.get("unitId"), 100);
+  const topicId = text(url.searchParams.get("topicId") ?? url.searchParams.get("themeId"), 100);
+  const statusParam = text(url.searchParams.get("status"), 20).toLocaleLowerCase("pt-PT");
+  const status = statusParam && statusParam !== "all" ? normalizeStatus(statusParam, "") : null;
+  const query = text(url.searchParams.get("query") ?? url.searchParams.get("search"), 120);
+  const includeDeleted = url.searchParams.get("includeDeleted") === "1";
+  const requestedPage = Number.parseInt(url.searchParams.get("page") || "1", 10);
+  const requestedPageSize = Number.parseInt(url.searchParams.get("pageSize") || "25", 10);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 100000) : 1;
+  const pageSize = ADMIN_QUESTION_PAGE_SIZES.has(requestedPageSize) ? requestedPageSize : 25;
+  if (statusParam && statusParam !== "all" && !status) return json({ error: "Estado de pergunta inválido." }, 400);
+
+  const where = includeDeleted ? [] : ["q.deleted_at IS NULL"];
+  const bindings: (string | number)[] = [];
+  if (unitId) { where.push("q.curricular_unit_id=?"); bindings.push(unitId); }
+  if (topicId) { where.push("q.topic_id=?"); bindings.push(topicId); }
+  if (status) { where.push("q.status=?"); bindings.push(status); }
+  if (query) {
+    const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    where.push("(q.prompt LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.title LIKE ? ESCAPE '\\' COLLATE NOCASE OR cu.code LIKE ? ESCAPE '\\' COLLATE NOCASE OR cu.name LIKE ? ESCAPE '\\' COLLATE NOCASE)");
+    bindings.push(pattern, pattern, pattern, pattern);
+  }
+  const fromSql = " FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id";
+  const whereSql = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+  const unitsPromise = env.DB.prepare("SELECT id,code,name,ects,study_year,semester FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE").all();
+  const topicsPromise = env.DB.prepare("SELECT t.*,cu.code AS unit_code,cu.name AS unit_name,COUNT(q.id) AS question_count FROM quiz_topics t JOIN curricular_units cu ON cu.id=t.curricular_unit_id LEFT JOIN quiz_questions q ON q.topic_id=t.id AND q.deleted_at IS NULL WHERE (?=1 OR t.deleted_at IS NULL) GROUP BY t.id ORDER BY cu.study_year,cu.semester,t.sort_order,t.title COLLATE NOCASE LIMIT 2000").bind(includeDeleted ? 1 : 0).all();
+  const importsPromise = env.DB.prepare("SELECT i.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS imported_by_name FROM quiz_imports i LEFT JOIN curricular_units cu ON cu.id=i.curricular_unit_id JOIN users u ON u.id=i.imported_by ORDER BY i.created_at DESC LIMIT 100").all();
+  const auditHistoryPromise = env.DB.prepare("SELECT a.id,a.action,a.details,a.created_at,u.full_name AS actor_name FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.action LIKE 'quiz_%' ORDER BY a.created_at DESC LIMIT 100").all();
+  const [units, topics, questionCount, imports, auditHistory] = await Promise.all([
+    unitsPromise,
+    topicsPromise,
+    env.DB.prepare(`SELECT COUNT(*) AS total${fromSql}${whereSql}`).bind(...bindings).first<Row>(),
+    importsPromise,
+    auditHistoryPromise,
   ]);
+  const total = Number(questionCount?.total || 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const effectivePage = Math.min(page, totalPages);
+  const offset = (effectivePage - 1) * pageSize;
+  const questions = await env.DB.prepare(`SELECT q.*,NULL AS correct_option_id,t.title AS topic_title,cu.code AS unit_code,cu.name AS unit_name${fromSql}${whereSql} ORDER BY q.updated_at DESC,q.id ASC LIMIT ? OFFSET ?`).bind(...bindings, pageSize, offset).all();
   const optionMap = await optionsForQuestions(env, questions.results.map((item) => String(item.id)));
   const mappedTopics = topics.results.map((item) => ({ ...topicDto(row(item)), unitCode: item.unit_code, unitName: item.unit_name }));
   const mappedQuestions = questions.results.map((item) => {
@@ -456,7 +489,7 @@ async function adminCatalog(request: Request, env: QuizEnv, url: URL, user: Quiz
   });
   const importHistory = imports.results.map((item) => ({ id: item.id, filename: item.filename, unitId: item.curricular_unit_id, unitCode: item.unit_code, unitName: item.unit_name, rowCount: item.row_count, topicsCreated: item.topics_created, questionsCreated: item.questions_created, importedBy: item.imported_by_name, createdAt: item.created_at }));
   const history = auditHistory.results.map((item) => ({ id: item.id, action: item.action, details: item.details, actorName: item.actor_name, createdAt: item.created_at }));
-  return json({ units: units.results.map((item) => ({ id: item.id, code: item.code, name: item.name, ects: item.ects, year: item.study_year, semester: item.semester })), topics: mappedTopics, themes: mappedTopics, questions: mappedQuestions, comments: [], commentModeration: { enabled: false }, imports: importHistory, history, activity: history });
+  return json({ units: units.results.map((item) => ({ id: item.id, code: item.code, name: item.name, ects: item.ects, year: item.study_year, semester: item.semester })), topics: mappedTopics, themes: mappedTopics, questions: mappedQuestions, pagination: { page: effectivePage, pageSize, total, totalPages, from: total ? offset + 1 : 0, to: Math.min(offset + mappedQuestions.length, total) }, filters: { unitId, topicId, status: status || "all", query }, comments: [], commentModeration: { enabled: false }, imports: importHistory, history, activity: history });
 }
 
 async function createTopic(env: QuizEnv, user: QuizUser, source: Row): Promise<Response> {

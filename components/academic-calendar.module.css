@@ -56,15 +56,16 @@
 .dayCell:nth-last-child(-n+7) { border-bottom:0; }
 .dayCell:hover { z-index:1; background:#fafaff; box-shadow:inset 0 0 0 1px #d8dcff; }
 .outsideMonth { color:#b0b2ac; background:#fafaf8; }
-.selectedDay { z-index:1; background:#f7f8ff; box-shadow:inset 0 0 0 2px #6977e4; }
+.selectedDay { z-index:1; background:#fffdf6; box-shadow:inset 0 0 0 1px #d8bb4c; }
+.selectedDay::before { position:absolute; z-index:2; inset:0 0 auto; height:3px; background:#d2ab1c; content:""; pointer-events:none; }
 .dropTarget { z-index:2; background:#eef1ff; box-shadow:inset 0 0 0 3px #5665dc; }
 .dropTarget::after { content:"Mover para aqui"; position:absolute; inset:auto .35rem .35rem; padding:.3rem; color:#fff; background:#4d5fe8; border-radius:.35rem; font-size:.6rem; font-weight:850; text-align:center; pointer-events:none; }
 .daySelect { display:grid; place-items:center; align-self:flex-start; width:1.75rem; height:1.75rem; padding:0; color:inherit; background:transparent; border:0; border-radius:50%; cursor:pointer; font:inherit; }
 .daySelect:focus-visible { outline:3px solid rgba(77,95,232,.3); }
 .dayNumber { display:grid; place-items:center; width:1.6rem; height:1.6rem; margin-bottom:.28rem; border-radius:50%; font-size:.76rem; font-weight:800; }
 .today { color:#fff; background:#4d5fe8; box-shadow:0 4px 10px rgba(77,95,232,.3); }
-.dayEvents { display:flex; flex-direction:column; gap:.2rem; min-width:0; }
-.eventPill { display:block; width:100%; padding:.25rem .32rem; overflow:hidden; color:#3d4442; text-align:left; background:#edf1ef; border:0; border-left:3px solid #6a7b75; border-radius:.28rem; cursor:pointer; font:inherit; font-size:.64rem; line-height:1.15; text-overflow:ellipsis; white-space:nowrap; }
+.dayEvents { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0; }
+.eventPill { display:block; width:100%; min-height:24px; padding:5px 7px; overflow:hidden; color:#3d4442; text-align:left; background:#edf1ef; border:0; border-left:3px solid #6a7b75; border-radius:6px; cursor:pointer; font:inherit; font-size:10px; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
 .eventPill[draggable="true"] { cursor:grab; }
 .eventPill[draggable="true"]:active { cursor:grabbing; }
 .eventPill:focus-visible { outline:2px solid #4d5fe8; outline-offset:1px; }
@@ -80,7 +81,7 @@
 .dayPanel { min-width:0; background:#fbfbf9; }
 .dayPanelHeading { display:flex; flex-direction:column; gap:.15rem; padding:1.1rem; border-bottom:1px solid #e6e7e1; }
 .dayPanelHeading span { color:#72756e; font-size:.72rem; font-weight:800; text-transform:uppercase; }
-.dayPanelHeading strong { font-size:1.08rem; text-transform:capitalize; }
+.dayPanelHeading strong { font-size:1.08rem; }
 .dayEventList { display:flex; flex-direction:column; gap:.55rem; padding:.9rem; }
 .dayEventCard { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.65rem; width:100%; padding:.78rem; color:#32342e; text-align:left; background:#fff; border:1px solid #e0e1db; border-left:4px solid #6a7b75; border-radius:.8rem; cursor:pointer; font:inherit; box-shadow:0 5px 15px rgba(24,26,22,.035); }
 .dayEventCard:hover { border-color:#cbd0f5; transform:translateY(-1px); }
@@ -253,7 +254,7 @@
 .filterTitle strong { color:#2b2200; background:var(--gold); }
 .filters select { min-height:38px; padding:8px 34px 8px 11px; border-color:var(--line); border-radius:9px; color:var(--ink); background:var(--surface); }
 .dayCell:hover { background:#fffdf5; box-shadow:inset 0 0 0 1px #ead98c; }
-.selectedDay { background:#fffaf0; box-shadow:inset 0 0 0 2px #d1aa1d; }
+.selectedDay { background:#fffdf6; box-shadow:inset 0 0 0 1px #d8bb4c; }
 .dropTarget { background:var(--gold-soft); box-shadow:inset 0 0 0 3px #c49b0e; }
 .dropTarget::after { color:#221b00; background:var(--gold); }
 .daySelect:focus-visible,.eventPill:focus-visible { outline-color:#c49b0e; }
@@ -276,7 +277,7 @@
 /* O dia completo funciona como alvo acessível de seleção/criação. */
 .dayCell { padding:38px 8px 8px; }
 .daySelect { position:absolute; z-index:0; inset:0; width:100%; height:100%; display:block; padding:8px; border-radius:0; text-align:left; }
-.dayNumber { margin:0; pointer-events:none; }
+.dayNumber { position:absolute; top:7px; left:8px; width:24px; height:24px; margin:0; pointer-events:none; }
 .dayEvents { position:relative; z-index:1; }
 .eventPill { position:relative; z-index:2; }
 .creatableDay .daySelect { cursor:cell; }
@@ -333,7 +334,7 @@
 @media (max-width:760px) {
   .dayCell { min-height:4rem; padding:31px 3px 5px; }
   .daySelect { padding:4px; text-align:center; }
-  .dayNumber { margin:0 auto; }
+  .dayNumber { top:4px; left:50%; margin:0; transform:translateX(-50%); }
   .creatableDay .daySelect::after { top:4px; right:4px; width:16px; height:16px; border:0; background:transparent; font-size:12px; }
   .modalBackdrop { align-items:end; padding:10px; }
   .eventModal { width:100%; max-height:calc(100dvh - 20px); }

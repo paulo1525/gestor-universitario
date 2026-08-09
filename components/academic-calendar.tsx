@@ -28,6 +28,8 @@ import { ModuleGuard } from "@/components/module-guard";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import { CalendarSubscription } from "@/components/calendar-subscription";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { useEscapeKey } from "@/components/use-escape-key";
 import { useScrollLock } from "@/components/use-scroll-lock";
 import styles from "@/components/academic-calendar.module.css";
 
@@ -168,6 +170,7 @@ export function AcademicCalendar() {
   const { locale, t } = useI18n();
   const eventLabels = useMemo(() => Object.fromEntries(Object.entries(eventLabelKeys).map(([key, labelKey]) => [key, t(labelKey)])), [t]);
   const weekDays = useMemo(() => weekDayKeys.map((key) => t(key)), [t]);
+  const formatEventDate = (input: DateInput, includeDate = true) => formatDate(input, includeDate, locale, t("community.calendar.dateUnknown"));
   const managementEnabled = useModuleEnabled("calendar.management");
   const subscriptionEnabled = useModuleEnabled("calendar.subscription");
   const canManage = managementEnabled && (user?.role === "admin" || Boolean(user?.commissionPosition));
@@ -190,6 +193,8 @@ export function AcademicCalendar() {
   const [unitFilter, setUnitFilter] = useState("all");
   const [notice, setNotice] = useState<Notice>(null);
   const [form, setForm] = useState<EventForm>(emptyEventForm);
+  const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const editorTitleRef = useRef<HTMLInputElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
 
@@ -216,30 +221,12 @@ export function AcademicCalendar() {
     const frame = window.requestAnimationFrame(() => {
       editorTitleRef.current?.focus();
     });
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setEditor(false);
-        setForm(emptyEventForm);
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
+    return () => window.cancelAnimationFrame(frame);
   }, [editor]);
 
   useEffect(() => {
     if (!selectedEventId) return;
     modalCloseRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setEditingEvent(false);
-        setSelectedEventId(null);
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
   }, [selectedEventId]);
 
   const filtered = useMemo(() => events
@@ -262,6 +249,8 @@ export function AcademicCalendar() {
   const selectedEvents = eventsByDay.get(selectedDate) || [];
   const selectedEvent = filtered.find(item => item.id === selectedEventId) || null;
   useScrollLock(editor || Boolean(selectedEvent));
+  useEscapeKey(editor, () => { if (!saving) { setEditor(false); setForm(emptyEventForm); } });
+  useEscapeKey(Boolean(selectedEvent), () => { if (!saving && movingEventId !== selectedEvent?.id) { setEditingEvent(false); setSelectedEventId(null); } });
   const upcoming = useMemo(() => filtered.filter(item => {
     const date = validDate(item.startsAt);
     return date && date >= today;
@@ -417,18 +406,20 @@ export function AcademicCalendar() {
     }
   };
 
-  const remove = async (id: string) => {
-    if (!window.confirm(t("community.calendar.deleteConfirm"))) return;
+  const remove = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      const response = await fetch("/api/calendar-events", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+      const response = await fetch("/api/calendar-events", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: deleteTarget.id }) });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || t("community.calendar.deleteError"));
       setSelectedEventId(null);
+      setDeleteTarget(null);
       setNotice({ kind: "success", message: t("community.calendar.deleted") });
       await load();
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : t("community.calendar.deleteError") });
-    }
+    } finally { setDeleting(false); setDeleteTarget(null); }
   };
 
   const renderEventFields = (mode: "create" | "edit") => <div className={styles.formGrid}>
@@ -441,42 +432,42 @@ export function AcademicCalendar() {
     <label className={styles.full}><span className={styles.fieldLabel}><FileText />{t("community.calendar.descriptionLabel")} <small>({t("community.common.optional")})</small></span><textarea rows={4} maxLength={2000} value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} /></label>
   </div>;
 
-  return <AuthGuard><ModuleGuard moduleKey="calendar.events"><AppShell active="calendar" breadcrumb="Calendário académico">
+  return <AuthGuard><ModuleGuard moduleKey="calendar.events"><AppShell active="calendar" breadcrumb={t("community.calendar.breadcrumb")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
     <header className={styles.pageHeader}>
       <div className={styles.headerIcon}><CalendarDays /></div>
       <div>
-        <span className="eyebrow">Agenda do curso</span>
-        <h1>Calendário académico</h1>
-        <p>Avaliações, entregas e acontecimentos importantes numa agenda partilhada.{canManage && " Seleciona um dia para adicionar um evento."}</p>
+        <span className="eyebrow">{t("community.calendar.eyebrow")}</span>
+        <h1>{t("community.calendar.breadcrumb")}</h1>
+        <p>{t("community.calendar.description")}{canManage && t("community.calendar.manageHint")}</p>
       </div>
     </header>
 
     {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
 
-    <section className={styles.calendarShell} aria-label="Calendário académico">
+    <section className={styles.calendarShell} aria-label={t("community.calendar.breadcrumb")}>
       <div className={styles.toolbar}>
         <div className={styles.monthNavigation}>
-          <button type="button" onClick={() => moveMonth(-1)} aria-label="Mês anterior"><ChevronLeft /></button>
-          <button type="button" onClick={() => moveMonth(1)} aria-label="Mês seguinte"><ChevronRight /></button>
-          <button type="button" className={styles.todayButton} onClick={goToToday}>Hoje</button>
-          <h2>{new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(visibleMonth)}</h2>
+          <button type="button" onClick={() => moveMonth(-1)} aria-label={t("community.calendar.previousMonth")}><ChevronLeft /></button>
+          <button type="button" onClick={() => moveMonth(1)} aria-label={t("community.calendar.nextMonth")}><ChevronRight /></button>
+          <button type="button" className={styles.todayButton} onClick={goToToday}>{t("community.calendar.today")}</button>
+          <h2>{(() => { const parts = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).formatToParts(visibleMonth); const month = parts.find((part) => part.type === "month")?.value || ""; const year = parts.find((part) => part.type === "year")?.value || ""; return `${month.charAt(0).toLocaleUpperCase(locale)}${month.slice(1)} ${year}`.trim(); })()}</h2>
         </div>
-        <div className={styles.viewSwitch} aria-label="Vista do calendário">
-          <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />Mês</button>
-          <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />Agenda</button>
+        <div className={styles.viewSwitch} aria-label={t("community.calendar.view")}>
+          <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />{t("community.calendar.month")}</button>
+          <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />{t("community.calendar.agenda")}</button>
         </div>
       </div>
 
       <div className={styles.filters}>
-        <div className={styles.filterTitle}><Filter /><span>Filtros</span>{activeFilterCount > 0 && <strong>{activeFilterCount}</strong>}</div>
-        <label><span className={styles.srOnly}>Filtrar por tipo</span><select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(eventLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-        <label><span className={styles.srOnly}>Filtrar por unidade curricular</span><select value={unitFilter} onChange={event => setUnitFilter(event.target.value)}><option value="all">Todas as unidades curriculares</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
-        {activeFilterCount > 0 && <button type="button" className={styles.clearFilters} onClick={() => { setTypeFilter("all"); setUnitFilter("all"); }}>Limpar</button>}
+        <div className={styles.filterTitle}><Filter /><span>{t("community.calendar.filters")}</span>{activeFilterCount > 0 && <strong>{activeFilterCount}</strong>}</div>
+        <label><span className={styles.srOnly}>{t("community.calendar.filterType")}</span><select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">{t("community.calendar.allTypes")}</option>{Object.entries(eventLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
+        <label><span className={styles.srOnly}>{t("community.calendar.filterUnit")}</span><select value={unitFilter} onChange={event => setUnitFilter(event.target.value)}><option value="all">{t("community.calendar.allUnits")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
+        {activeFilterCount > 0 && <button type="button" className={styles.clearFilters} onClick={() => { setTypeFilter("all"); setUnitFilter("all"); }}>{t("community.calendar.clear")}</button>}
       </div>
 
-      {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} /><span>A carregar calendário…</span></div> : view === "month" ? <div className={styles.calendarLayout}>
+      {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} /><span>{t("community.calendar.loading")}</span></div> : view === "month" ? <div className={styles.calendarLayout}>
         <div className={styles.monthView}>
           <div className={styles.weekHeader}>{weekDays.map(day => <span key={day}>{day}</span>)}</div>
           <div className={styles.monthGrid}>
@@ -490,16 +481,16 @@ export function AcademicCalendar() {
                 onDragOver={event => { if (canManage && draggingEventId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTargetDate(key); } }}
                 onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTargetDate(null); }}
                 onDrop={event => { event.preventDefault(); if (canManage) dropEvent(date); }}>
-                <button type="button" className={styles.daySelect} onClick={() => canManage ? openCreateForDate(date) : selectDay(date)} aria-label={`${date.toLocaleDateString("pt-PT")}, ${dayEvents.length} eventos${canManage ? ". Adicionar evento neste dia" : ""}`} aria-pressed={isSelected}><span className={`${styles.dayNumber} ${isToday ? styles.today : ""}`}>{date.getDate()}</span></button>
+                <button type="button" className={styles.daySelect} onClick={() => canManage ? openCreateForDate(date) : selectDay(date)} aria-label={`${t("community.calendar.daySummary", { date: date.toLocaleDateString(locale), count: dayEvents.length })}${canManage ? `. ${t("community.calendar.addOnDay")}` : ""}`} aria-pressed={isSelected}><span className={`${styles.dayNumber} ${isToday ? styles.today : ""}`}>{date.getDate()}</span></button>
                 <span className={styles.dayEvents}>
                   {dayEvents.slice(0, 3).map(item => <button type="button" key={item.id} className={`${styles.eventPill} ${draggingEventId === item.id ? styles.draggingEvent : ""}`} data-event-type={item.type} draggable={canManage && movingEventId !== item.id}
                     onDragStart={event => { if (!canManage) return; event.stopPropagation(); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDraggingEventId(item.id); }}
                     onDragEnd={() => { setDraggingEventId(null); setDropTargetDate(null); }}
                     onClick={event => { event.stopPropagation(); selectEvent(item); }}
-                    aria-label={`${item.title}, ${formatDate(item.startsAt)}${canManage ? ". Pode arrastar para outro dia ou abrir para reagendar com o teclado." : ""}`}>
-                    <span className={styles.eventDot} />{movingEventId === item.id ? "A mover…" : <>{formatDate(item.startsAt, false)} <strong>{item.title}</strong></>}
+                    aria-label={`${t("community.calendar.eventAria", { title: item.title, date: formatEventDate(item.startsAt) })}${canManage ? `. ${t("community.calendar.dragHint")}` : ""}`}>
+                    <span className={styles.eventDot} />{movingEventId === item.id ? t("community.calendar.moving") : <>{formatEventDate(item.startsAt, false)} <strong>{item.title}</strong></>}
                   </button>)}
-                  {dayEvents.length > 3 && <span className={styles.moreEvents}>+{dayEvents.length - 3} eventos</span>}
+                  {dayEvents.length > 3 && <span className={styles.moreEvents}>{t("community.calendar.moreEvents", { count: dayEvents.length - 3 })}</span>}
                 </span>
               </div>;
             })}
@@ -508,19 +499,19 @@ export function AcademicCalendar() {
 
         <aside className={styles.dayPanel} aria-live="polite">
           <div className={styles.dayPanelHeading}>
-            <span>{new Intl.DateTimeFormat("pt-PT", { weekday: "long" }).format(new Date(`${selectedDate}T12:00:00`))}</span>
-            <strong>{new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long" }).format(new Date(`${selectedDate}T12:00:00`))}</strong>
+            <span>{new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(`${selectedDate}T12:00:00`))}</span>
+            <strong>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long" }).format(new Date(`${selectedDate}T12:00:00`))}</strong>
           </div>
-          {selectedEvents.length === 0 ? <div className={styles.emptyDay}><CalendarDays /><strong>Dia livre</strong><span>Não existem eventos agendados.</span></div> : <div className={styles.dayEventList}>{selectedEvents.map(item => <button type="button" key={item.id} className={styles.dayEventCard} onClick={() => selectEvent(item)} data-event-type={item.type}>
-            <span className={styles.eventTime}>{formatDate(item.startsAt, false)}</span><span><strong>{item.title}</strong><small>{item.unitName || eventLabels[item.type] || item.type}</small></span><ChevronRight />
+          {selectedEvents.length === 0 ? <div className={styles.emptyDay}><CalendarDays /><strong>{t("community.calendar.freeDay")}</strong><span>{t("community.calendar.noEvents")}</span></div> : <div className={styles.dayEventList}>{selectedEvents.map(item => <button type="button" key={item.id} className={styles.dayEventCard} onClick={() => selectEvent(item)} data-event-type={item.type}>
+            <span className={styles.eventTime}>{formatEventDate(item.startsAt, false)}</span><span><strong>{item.title}</strong><small>{item.unitName || eventLabels[item.type] || item.type}</small></span><ChevronRight />
           </button>)}</div>}
-          {selectedEvents.length === 0 && upcoming.length > 0 && <div className={styles.upcoming}><span>Próximos</span>{upcoming.slice(0, 3).map(item => <button type="button" key={item.id} onClick={() => selectEvent(item)}><time>{formatDate(item.startsAt)}</time><strong>{item.title}</strong></button>)}</div>}
+          {selectedEvents.length === 0 && upcoming.length > 0 && <div className={styles.upcoming}><span>{t("community.calendar.next")}</span>{upcoming.slice(0, 3).map(item => <button type="button" key={item.id} onClick={() => selectEvent(item)}><time>{formatEventDate(item.startsAt)}</time><strong>{item.title}</strong></button>)}</div>}
         </aside>
-      </div> : filtered.length === 0 ? <div className={styles.emptyState}><CalendarDays /><strong>Sem eventos para apresentar</strong><span>Experimenta alterar os filtros.</span></div> : <div className={styles.agendaList}>
+      </div> : filtered.length === 0 ? <div className={styles.emptyState}><CalendarDays /><strong>{t("community.calendar.noFilteredEvents")}</strong><span>{t("community.calendar.changeFilters")}</span></div> : <div className={styles.agendaList}>
         {filtered.map(item => { const starts = validDate(item.startsAt); return <article key={item.id} className={styles.agendaItem} data-event-type={item.type}>
-          <time dateTime={starts?.toISOString()}><strong>{starts?.getDate() ?? "—"}</strong><span>{starts ? new Intl.DateTimeFormat("pt-PT", { month: "short" }).format(starts) : "data"}</span></time>
-          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && <span className={styles.unitBadge}>{item.unitName}</span>}</div><h3>{item.title}</h3><p><Clock3 />{formatDate(item.startsAt)}{item.endsAt && ` — ${formatDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{item.location}</p>}{item.description && <div className={styles.description}>{item.description}</div>}</div>
-          {canManage && <button type="button" className={styles.deleteButton} onClick={() => void remove(item.id)} aria-label={`Eliminar ${item.title}`}><Trash2 /></button>}
+          <time dateTime={starts?.toISOString()}><strong>{starts?.getDate() ?? "—"}</strong><span>{starts ? new Intl.DateTimeFormat(locale, { month: "short" }).format(starts) : t("community.calendar.dateFallback")}</span></time>
+          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && <span className={styles.unitBadge}>{item.unitName}</span>}</div><h3>{item.title}</h3><p><Clock3 />{formatEventDate(item.startsAt)}{item.endsAt && ` — ${formatEventDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{item.location}</p>}{item.description && <div className={styles.description}>{item.description}</div>}</div>
+          {canManage && <button type="button" className={styles.deleteButton} onClick={() => setDeleteTarget(item)} aria-label={t("community.calendar.deleteNamed", { title: item.title })}><Trash2 /></button>}
         </article>; })}
       </div>}
     </section>
@@ -544,7 +535,7 @@ export function AcademicCalendar() {
       </article>
     </div>}
 
-    {selectedEvent && <div className={styles.modalBackdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) { setEditingEvent(false); setSelectedEventId(null); } }}>
+    {selectedEvent && <div className={styles.modalBackdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving && movingEventId !== selectedEvent.id) { setEditingEvent(false); setSelectedEventId(null); } }}>
       <article className={styles.eventModal} role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
         <header className={styles.modalHeader}>
           <div className={styles.modalHeading}>
@@ -554,7 +545,7 @@ export function AcademicCalendar() {
           </div>
           <div className={styles.modalHeaderActions}>
             {canManage && !editingEvent && <button type="button" className={styles.modalEdit} onClick={() => beginEdit(selectedEvent)}><PencilLine />Editar</button>}
-            <button ref={modalCloseRef} type="button" className={styles.modalClose} onClick={() => { setEditingEvent(false); setSelectedEventId(null); }} aria-label="Fechar detalhe"><X /></button>
+            <button ref={modalCloseRef} type="button" className={styles.modalClose} disabled={saving || movingEventId === selectedEvent.id} onClick={() => { setEditingEvent(false); setSelectedEventId(null); }} aria-label="Fechar detalhe"><X /></button>
           </div>
         </header>
 
@@ -572,8 +563,9 @@ export function AcademicCalendar() {
           </div>}
         </div>
 
-        {canManage && <footer className={styles.modalFooter}><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => void remove(selectedEvent.id)}><Trash2 />Eliminar evento</button></footer>}
+        {canManage && <footer className={styles.modalFooter}><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button></footer>}
       </article>
     </div>}
+    <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow="Agenda partilhada" title="Eliminar este evento?" description={t("community.calendar.deleteConfirm")} subject={deleteTarget?.title} subjectLabel="Evento selecionado" warning="O evento deixa de estar visível para todos os utilizadores e esta ação não pode ser revertida." confirmLabel={deleting ? "A eliminar…" : "Eliminar evento"} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
   </AppShell></ModuleGuard></AuthGuard>;
 }

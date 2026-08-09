@@ -4,7 +4,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, CircleDot, Filter, LoaderCircle, MessageSquareText, Search, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
 import { AuthGuard } from "@/components/auth-guard";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
@@ -34,6 +36,7 @@ export function TicketAdmin() {
   const [saving, setSaving] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/class-tickets", { cache: "no-store" });
@@ -83,25 +86,25 @@ export function TicketAdmin() {
   }
 
   async function remove(row: Row) {
-    if (!window.confirm(t("classes.tickets.deleteConfirm"))) return;
     setSaving(row.id);
     const response = await fetch("/api/admin/class-tickets", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: row.id }) });
     const result = await response.json() as { error?: string };
     setNotice(response.ok ? t("classes.tickets.deleted") : result.error || t("classes.tickets.deleteError"));
     setSaving(null);
+    setDeleteTarget(null);
     if (response.ok) void load();
   }
 
-  return <AuthGuard requireAdmin><AppShell active="tickets" breadcrumb={t("classes.tickets.breadcrumb")}>
-    <section className="admin-heading"><div><span className="eyebrow">{t("classes.tickets.eyebrow")}</span><h1>{t("classes.tickets.title")}</h1><p>{t("classes.tickets.description")}</p></div></section>
-    <section className={`panel ${styles.panel}`}>
-      <header className={styles.panelHeader}>
-        <div className={styles.heading}><span className={styles.headingIcon}><Ticket /></span><div><h2>{t("classes.tickets.listTitle")}</h2><p>{t("classes.tickets.listDescription")}</p></div></div>
+  return <AuthGuard requireAdmin><AppShell active="tickets" breadcrumb={t("classes.tickets.breadcrumb")}><AdminPage>
+    <AdminPageHeader eyebrow={t("classes.tickets.eyebrow")} title={t("classes.tickets.title")} description={t("classes.tickets.description")} />
+    <AdminSection className={styles.panel} icon={<Ticket />} title={t("classes.tickets.listTitle")} description={t("classes.tickets.listDescription")}>
+      <AdminToolbar className={styles.toolbar} label={t("classes.tickets.filter")}>
+        <span />
         <div className={styles.controls}>
           <label className={styles.search}><Search /><span className="sr-only">{t("classes.tickets.search")}</span><input type="search" aria-label={t("classes.tickets.search")} placeholder={t("classes.tickets.searchPlaceholder")} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
           <label className={styles.filter}><Filter /><span className="sr-only">{t("classes.tickets.filter")}</span><select aria-label={t("classes.tickets.filter")} value={filter} onChange={(event) => setFilter(event.target.value as FilterValue)}>{filterOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
         </div>
-      </header>
+      </AdminToolbar>
       {notice && <p className="admin-notice" role="status">{notice}</p>}
       <div className={styles.summary} aria-live="polite"><span>{t("classes.tickets.visibleSummary", { visible: visible.length, total: counts.all })}</span><span>{t("classes.tickets.statusSummary", { pending: counts.pending, resolved: counts.resolved })}</span></div>
       <div className={styles.list}>{visible.map((row) => {
@@ -131,11 +134,12 @@ export function TicketAdmin() {
             <div className={styles.decision}>
               <label><FormLabel icon={CircleDot}>{t("classes.tickets.decisionStatus")}</FormLabel><select value={row.status} disabled={terminal} onChange={(event) => update(row.id, { status: event.target.value })}><option value="pending">{t("classes.tickets.status.pending")}</option><option value="approved">{t("classes.tickets.approveExecute")}</option><option value="rejected">{t("classes.tickets.reject")}</option>{["executed", "execution_error"].includes(row.status) && <option value={row.status}>{labels[row.status]}</option>}</select></label>
               <label><FormLabel icon={MessageSquareText}>{t("classes.tickets.reasoning")}</FormLabel><RichTextEditor value={row.response || ""} onChange={(response) => update(row.id, { response })} ariaLabel={t("classes.tickets.reasoningAria", { name: row.student_name ? student.name : author.name })} placeholder={t("classes.tickets.reasoningPlaceholder")} maxLength={5000} minHeight="compact" disabled={terminal} onInvalidLink={() => setNotice(t("classes.tickets.invalidLink"))} /></label>
-              <footer className={styles.actions}><button className="button button--secondary button--danger" disabled={saving === row.id} onClick={() => void remove(row)}><Trash2 />{t("classes.tickets.delete")}</button><button className="button button--primary" disabled={saving === row.id || terminal} onClick={() => void save(row)}>{saving === row.id ? <LoaderCircle className="spin" /> : <Check />}{t("classes.tickets.save")}</button></footer>
+              <footer className={styles.actions}><button className="button button--secondary button--danger" disabled={saving === row.id} onClick={() => setDeleteTarget(row)}><Trash2 />{t("classes.tickets.delete")}</button><button className="button button--primary" disabled={saving === row.id || terminal} onClick={() => void save(row)}>{saving === row.id ? <LoaderCircle className="spin" /> : <Check />}{t("classes.tickets.save")}</button></footer>
             </div>
           </div>}
         </article>;
-      })}{!visible.length && <div className={styles.empty}><Ticket size={30} /><strong>{query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")}</strong><span>{query ? t("classes.tickets.searchHint") : t("classes.tickets.emptyHint")}</span></div>}</div>
-    </section>
-  </AppShell></AuthGuard>;
+      })}{!visible.length && <AdminEmptyState icon={<Ticket />} title={query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")} description={query ? t("classes.tickets.searchHint") : t("classes.tickets.emptyHint")} />}</div>
+    </AdminSection>
+    <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow={t("classes.tickets.eyebrow")} title={locale === "en" ? "Delete this request?" : "Eliminar este pedido?"} description={t("classes.tickets.deleteConfirm")} subject={deleteTarget?.student_name || deleteTarget?.created_by_name} subjectLabel={locale === "en" ? "Request concerning" : "Pedido relativo a"} warning={locale === "en" ? "The request and its administrative history will be permanently removed." : "O pedido e o respetivo histórico administrativo serão removidos definitivamente."} confirmLabel={locale === "en" ? "Delete request" : "Eliminar pedido"} cancelLabel={locale === "en" ? "Cancel" : "Cancelar"} busy={Boolean(deleteTarget && saving === deleteTarget.id)} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) void remove(deleteTarget); }} />
+  </AdminPage></AppShell></AuthGuard>;
 }

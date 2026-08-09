@@ -35,15 +35,6 @@
 .heading h1 { margin: 3px 0 6px; font-size: clamp(27px, 3vw, 36px); letter-spacing: -.035em; }
 .heading p { max-width: 680px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 
-.headingActions {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex: 0 0 auto;
-}
-
-.headingActions svg { width: 16px; }
-
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -324,8 +315,6 @@
   .dashboard { gap: 16px; }
   .heading { align-items: stretch; flex-direction: column; gap: 16px; }
   .headingCopy { align-items: flex-start; }
-  .headingActions { display: grid; grid-template-columns: 1fr 1fr; }
-  .headingActions a { width: 100%; }
   .summaryGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .summaryCard { min-height: 96px; grid-template-columns: 40px minmax(0, 1fr); gap: 11px; padding: 14px; }
   .summaryIcon { width: 40px; height: 40px; }
@@ -339,7 +328,7 @@
 }
 
 @media (max-width: 480px) {
-  .headingActions, .summaryGrid { grid-template-columns: 1fr; }
+  .summaryGrid { grid-template-columns: 1fr; }
   .summaryCard { min-height: 86px; grid-template-columns: 40px minmax(0, 1fr) 16px; }
   .summaryCopy small, .summaryArrow { display: block; }
   .panelBar { align-items: flex-start; }

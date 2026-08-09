@@ -23,6 +23,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { FileUploadField } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
 import { useModuleEnabled } from "@/components/use-module-enabled";
@@ -115,6 +116,8 @@ export function DocumentsLibrary() {
   const [notice, setNotice] = useState<Notice>(null);
   const [form, setForm] = useState(emptyForm);
   const [file, setFile] = useState<File | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,21 +192,23 @@ export function DocumentsLibrary() {
     }
   };
 
-  const remove = async (id: string) => {
-    if (!window.confirm("Eliminar este documento?")) return;
+  const remove = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
       const response = await fetch("/api/documents", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: deleteTarget.id }),
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel eliminar o documento.");
       setNotice({ kind: "success", message: "Documento eliminado." });
+      setDeleteTarget(null);
       await load();
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "N\u00e3o foi poss\u00edvel eliminar o documento." });
-    }
+    } finally { setDeleting(false); setDeleteTarget(null); }
   };
 
   return (
@@ -258,9 +263,10 @@ export function DocumentsLibrary() {
                 : <div className={styles.cardGrid}>{visible.map((item) => { const author = personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage }); return <article className={styles.fileCard} key={item.id}>
                   <div className={styles.fileIcon}>{item.type === "minutes" ? <FileArchive /> : <FileText />}</div>
                     <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} <PersonName person={author} /> {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>
-                  <div className={styles.cardActions}>{item.fileUrl && <a className="button" href={item.fileUrl} download={item.fileName}><Download />Descarregar</a>}{canManage && <button className={styles.iconDanger} type="button" onClick={() => void remove(item.id)} aria-label={`Eliminar ${item.title}`}><Trash2 /></button>}</div>
+                  <div className={styles.cardActions}>{item.fileUrl && <a className="button" href={item.fileUrl} download={item.fileName}><Download />Descarregar</a>}{canManage && <button className={styles.iconDanger} type="button" onClick={() => setDeleteTarget(item)} aria-label={`Eliminar ${item.title}`}><Trash2 /></button>}</div>
                 </article>; })}</div>}
           </section>
+          <ConfirmationDialog open={Boolean(deleteTarget)} title="Eliminar este documento?" description="O documento deixa de estar disponível no arquivo da plataforma." subject={deleteTarget?.title} subjectLabel="Documento selecionado" warning="Esta ação não pode ser revertida." confirmLabel={deleting ? "A eliminar…" : "Eliminar documento"} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
         </AppShell>
       </ModuleGuard>
     </AuthGuard>
