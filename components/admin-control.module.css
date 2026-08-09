@@ -1,0 +1,157 @@
+.settingsStack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.sectionSwitch {
+  flex: 0 0 auto;
+}
+
+.testModeActive {
+  border-color: var(--color-warning);
+}
+
+.editorBody {
+  padding: var(--space-5);
+}
+
+.editorLabel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.editorLabel > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text);
+  font-size: var(--font-size-small);
+}
+
+.editorLabel > span small {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionFooter {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 60px;
+  padding: 10px var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.userSection {
+  min-height: 0;
+}
+
+.userToolbar {
+  justify-content: flex-end;
+}
+
+.userSearch {
+  flex: 1 1 320px;
+  max-width: 460px;
+}
+
+.userSearch input {
+  width: 100%;
+}
+
+.statusFilter {
+  min-width: 170px;
+  min-height: var(--control-height);
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+
+.statusFilter:focus-visible {
+  outline: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.loadingState {
+  min-height: 260px;
+}
+
+.userTableRegion table {
+  min-width: 1360px !important;
+}
+
+.userTableRegion td:first-child {
+  min-width: 220px;
+}
+
+.userTableRegion td:nth-child(3) { min-width: 190px; }
+.userTableRegion td:nth-child(4) { min-width: 170px; }
+.userTableRegion td:nth-child(5) { min-width: 165px; }
+.userTableRegion td:nth-child(6) { min-width: 205px; }
+.userTableRegion td:nth-child(7) { min-width: 170px; }
+.userTableRegion td:nth-child(8) { min-width: 150px; }
+
+.userTableRegion :global(td) :is(input:not([type="checkbox"]), select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--font-size-small);
+}
+
+.userTableRegion :global(td) :is(input:not([type="checkbox"]), select):focus {
+  border-color: var(--color-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.nameInput {
+  font-weight: 800 !important;
+}
+
+.nameInput:not(:focus) {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.nameInput:hover:not(:focus) {
+  border-color: var(--color-border) !important;
+  background: var(--color-surface-subtle) !important;
+}
+
+.statusCell {
+  display: grid;
+  gap: 6px;
+  min-width: 175px;
+}
+
+@media (max-width: 680px) {
+  .sectionSwitch span small {
+    display: none;
+  }
+
+  .editorBody {
+    padding: var(--space-4);
+  }
+
+  .sectionFooter {
+    padding-inline: var(--space-4);
+  }
+
+  .sectionFooter :global(.button),
+  .userSearch,
+  .statusFilter {
+    width: 100%;
+    max-width: none;
+  }
+}

@@ -28,6 +28,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { ModuleGuard } from "@/components/module-guard";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
@@ -249,6 +250,7 @@ export function QuizHub() {
   const [selectedUnitId, setSelectedUnitId] = useState(() => readQuizPreferences().unitId ?? "");
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
   const [selectedMode, setSelectedMode] = useState<Mode>(() => readQuizPreferences().mode ?? "quick");
+  const [abandonConfirmation, setAbandonConfirmation] = useState(false);
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? 10);
   const [screen, setScreen] = useState<Screen>("catalogue");
   const [attempt, setAttempt] = useState<Attempt | null>(null);
@@ -426,6 +428,7 @@ export function QuizHub() {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível concluir o teste." });
     } finally {
       setFinishing(false);
+      setAbandonConfirmation(false);
     }
   }, [finishing, updateAttempt]);
 
@@ -448,8 +451,6 @@ export function QuizHub() {
   const abandonAttempt = useCallback(async () => {
     const active = attemptRef.current;
     if (!active || finishing) return;
-    const confirmed = window.confirm("Desistir deste teste? O progresso desta tentativa será encerrado e não poderás retomá-la.");
-    if (!confirmed) return;
     setFinishing(true);
     try {
       const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/abandon`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
@@ -457,6 +458,7 @@ export function QuizHub() {
       if (!response.ok) throw new Error(apiError(data, "Não foi possível desistir do teste."));
       setAttempt(null);
       attemptRef.current = null;
+      setAbandonConfirmation(false);
       clearQuizProgress();
       setCurrentIndex(0);
       setRemaining(null);
@@ -654,7 +656,7 @@ export function QuizHub() {
             onPrevious={() => goToQuestion(currentIndex - 1)}
             onQuestion={goToQuestion}
             onPause={() => { saveQuizProgress(attempt, currentIndex); setScreen("catalogue"); }}
-            onQuit={() => void abandonAttempt()}
+            onQuit={() => setAbandonConfirmation(true)}
             onExplain={() => setShowExplanation((current) => !current)}
             onComments={() => setCommentsOpen((current) => !current)}
             onCommentText={setCommentText}
@@ -667,6 +669,7 @@ export function QuizHub() {
           />}
           {screen === "results" && attempt && <ResultsView attempt={attempt} correctCount={correctCount} percent={resultPercent} recommendation={recommendation} onRestart={() => { setAttempt(null); attemptRef.current = null; setScreen("catalogue"); setCurrentIndex(0); }} />}
         </div>
+        <ConfirmationDialog open={abandonConfirmation} eyebrow="Tentativa em curso" title="Desistir deste teste?" description="O progresso desta tentativa será encerrado e não poderás retomá-la." subject={attempt?.title} subjectLabel="Teste atual" warning="As respostas dadas nesta tentativa deixam de poder ser alteradas." confirmLabel={finishing ? "A desistir…" : "Desistir do teste"} busy={finishing} icon={<TriangleAlert />} onClose={() => setAbandonConfirmation(false)} onConfirm={() => void abandonAttempt()} />
       </AppShell>
     </ModuleGuard>
   </AuthGuard>;
@@ -759,7 +762,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
         <div className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
           {question.imageUrl && <figure className={styles.questionImage}><img src={question.imageUrl} alt={question.imageAlt} /></figure>}
           <div className={styles.questionContent}>
-            <h1 id="question-title">{question.text}</h1>
+            <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
             <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
               {question.options.map((option, index) => {
                 const selected = currentAnswer?.selectedOptionId === option.id;
@@ -768,8 +771,8 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 return <button key={option.id} type="button" role="radio" aria-checked={selected} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
               })}
             </div>
-            {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><p>{question.explanation ?? "Consulta a explicação para consolidar este conceito."}</p></div></section>}
-            {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><p>{question.explanation}</p></div></section>}
+            {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><RichTextContent value={question.explanation ?? "Consulta a explicação para consolidar este conceito."} className={styles.answerExplanation} /></div></section>}
+            {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
           </div>
         </div>
         <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} disabled={!answered && isExam}><Lightbulb /> {showExplanation ? "Ocultar explicação" : "Explicação"}</button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /> Comentários</button></div><div><button type="button" className={styles.secondaryButton} onClick={onPrevious} disabled={currentIndex === 0}><ArrowLeft /> Anterior</button><button type="button" className={styles.primaryButton} onClick={onNext} disabled={!answered}>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}<ArrowRight /></button></div></footer>
@@ -786,7 +789,7 @@ function ResultsView({ attempt, correctCount, percent, recommendation, onRestart
     <header className={styles.resultsHero}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong><small>acerto</small></div><div><span className={styles.eyebrow}>Teste concluído</span><h1>O teu resultado</h1><p>Respondeste corretamente a <strong>{displayedCorrect}</strong> de <strong>{total}</strong> perguntas. Revê os pontos abaixo e volta quando te sentires preparado.</p></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></header>
     <section className={styles.resultStats}><span><CheckCircle2 /><b>{displayedCorrect}</b><small>{displayedCorrect === 1 ? "certa" : "certas"}</small></span><span><XCircle /><b>{Math.max(0, total - displayedCorrect)}</b><small>a rever</small></span><span><TimerReset /><b>{modeTitle(attempt.mode)}</b><small>modo concluído</small></span></section>
     <section className={styles.recommendation}><span><Sparkles /></span><div><strong>Próximo passo recomendado</strong><p>{recommendation}</p></div><button type="button" onClick={onRestart}>Praticar agora <ArrowRight /></button></section>
-    <section className={styles.review} aria-labelledby="review-title"><header><div><h2 id="review-title">Revisão das respostas</h2><p>Consulta a resposta correta e a explicação de cada pergunta.</p></div><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>Pergunta {index + 1} · {question.topic}</small><h3>{question.text}</h3><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Resposta correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <p className={styles.reviewExplanation}><Lightbulb />{question.explanation}</p>}</div></article>; })}</div></section>
+    <section className={styles.review} aria-labelledby="review-title"><header><div><h2 id="review-title">Revisão das respostas</h2><p>Consulta a resposta correta e a explicação de cada pergunta.</p></div><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>Pergunta {index + 1} · {question.topic}</small><RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Resposta correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
   </>;
 }
 

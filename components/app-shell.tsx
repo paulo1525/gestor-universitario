@@ -2,19 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, BookOpen, Boxes, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, History, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, Settings, Upload, Vote, X } from "lucide-react";
+import { Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
+import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
+import adminNavigationStyles from "@/components/admin-navigation.module.css";
 import { FontScale, useAuth } from "@/components/auth-context";
 import { useI18n } from "@/components/i18n-context";
 import { useModules } from "@/components/module-context";
 import { UrgentAnnouncementBanner } from "@/components/urgent-announcement-banner";
 import { TopbarGlobalSearch } from "@/components/topbar-global-search";
 import { useScrollLock } from "@/components/use-scroll-lock";
+import { useEscapeKey } from "@/components/use-escape-key";
 import {setTestPersona,TEST_PERSONAS,testPersona} from "@/lib/test-mode";
 
 export type AppShellActive = "overview" | "turmas" | "quizzes" | "quizzes_management" | "notifications" | "useful_links" | "admin" | "modules" | "tickets" | "check" | "placements" | "audit" | "announcements" | "curricular_units" | "curricular_units_management" | "calendar" | "documents" | "requests" | "directory" | "polls" | "dashboard" | "search" | "materials";
 type Props = { children: ReactNode; active: AppShellActive; breadcrumb?: string; currentClassId?: number };
 type SiteTheme = "cc" | "forum";
+type SiteNavigationGroup = "communication" | "academic" | "community";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "gestor-sidebar-collapsed";
 
 export function AppShell({ children, active, breadcrumb = "Visão geral" }: Props) {
@@ -31,8 +35,12 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: Prop
   const hasCommunication = moduleAccess["announcements.feed"] || moduleAccess["requests.submission"] || moduleAccess["polls.voting"];
   const hasAcademicLife = moduleAccess["calendar.events"] || moduleAccess["curricular_units.catalog"] || moduleAccess["quizzes.practice"] || moduleAccess["documents.library"] || moduleAccess["materials.library"] || moduleAccess["materials.submission"] || moduleAccess["useful_links.library"] || moduleAccess["useful_links"];
   const hasCommunity = moduleAccess["directory.members"];
-  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === "up202507850@up.pt");
+  const [openSiteGroup, setOpenSiteGroup] = useState<SiteNavigationGroup | null>(() => ["announcements", "requests", "polls", "notifications"].includes(active) ? "communication" : ["calendar", "curricular_units", "quizzes", "documents", "materials", "useful_links"].includes(active) ? "academic" : active === "directory" ? "community" : null);
+  const administrativeContext = Boolean(user?.role === "admin" && isAdministrativeArea(active));
   useScrollLock(open);
+  useEscapeKey(open, () => setOpen(false));
+  useEscapeKey(profileMenu, () => setProfileMenu(false));
+  useEscapeKey(testMenu, () => setTestMenu(false));
   useEffect(() => {
     const syncPreference = (event?: StorageEvent) => {
       if (event && event.key !== SIDEBAR_COLLAPSED_STORAGE_KEY) return;
@@ -66,14 +74,9 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: Prop
     const closeMenu = (event: MouseEvent) => {
       if (!profileMenuRef.current?.contains(event.target as Node)) setProfileMenu(false);
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileMenu(false);
-    };
     document.addEventListener("mousedown", closeMenu);
-    document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("mousedown", closeMenu);
-      document.removeEventListener("keydown", closeOnEscape);
     };
   }, [profileMenu]);
   const selectTheme = (nextTheme: SiteTheme) => {
@@ -95,37 +98,41 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: Prop
   };
   return <div className={`app-shell${sidebarCollapsed ? " app-shell--sidebar-collapsed" : ""}`}>
     <a className="skip-link" href="#conteudo-principal">{t("shell.skipToContent")}</a>
-    <aside className={`sidebar${sidebarCollapsed ? " sidebar--collapsed" : ""}${open ? " sidebar--open" : ""}`}>
+    <aside className={`sidebar${administrativeContext ? ` ${adminNavigationStyles.adminSidebar}` : ""}${sidebarCollapsed ? " sidebar--collapsed" : ""}${open ? " sidebar--open" : ""}`}>
       <button className="sidebar__collapse" type="button" onClick={toggleSidebar} aria-label={t(sidebarCollapsed ? "shell.expandMenu" : "shell.collapseMenu")} aria-expanded={!sidebarCollapsed} aria-controls="primary-sidebar-navigation">
         {sidebarCollapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
       </button>
-      <div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt={t("shell.brandAlt")} width={58} height={58} priority /></span><div><span className="brand__name">{t("shell.brandName")}</span><span className="brand__context">{t("shell.brandContext")}</span></div><button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label={t("shell.closeMenu")}><X /></button></div>
-      <nav id="primary-sidebar-navigation" className="nav-list" aria-label={t("shell.primaryNavigation")}>
-        {moduleAccess["dashboard.personal"]&&<div className="nav-section"><Link className={active === "overview" ? "is-active" : ""} href="/dashboard" title={sidebarCollapsed ? t("nav.personalDashboard.title") : undefined}><LayoutDashboard/><span><strong>{t("nav.personalDashboard.title")}</strong><small>{t("nav.personalDashboard.description")}</small></span></Link></div>}
-        {hasCommunication&&<div className="nav-section"><span className="nav-label">{t("nav.communication")}</span>
-          {moduleAccess["announcements.feed"]&&<Link className={active === "announcements" ? "is-active" : ""} href="/avisos" title={sidebarCollapsed ? t("nav.announcements.title") : undefined}><Megaphone/><span><strong>{t("nav.announcements.title")}</strong><small>{t("nav.announcements.description")}</small></span></Link>}
-          {moduleAccess["requests.submission"]&&<Link className={active === "requests" ? "is-active" : ""} href="/pedidos" title={sidebarCollapsed ? t("nav.requests.title") : undefined}><Inbox/><span><strong>{t("nav.requests.title")}</strong><small>{t("nav.requests.description")}</small></span></Link>}
-          {moduleAccess["polls.voting"]&&<Link className={active === "polls" ? "is-active" : ""} href="/inqueritos" title={sidebarCollapsed ? t("nav.polls.title") : undefined}><Vote/><span><strong>{t("nav.polls.title")}</strong><small>{t("nav.polls.description")}</small></span></Link>}
-        </div>}
-        {hasAcademicLife&&<div className="nav-section"><span className="nav-label">{t("nav.academicLife")}</span>
-          {moduleAccess["calendar.events"]&&<Link className={active === "calendar" ? "is-active" : ""} href="/calendario" title={sidebarCollapsed ? t("nav.calendar.title") : undefined}><CalendarDays/><span><strong>{t("nav.calendar.title")}</strong><small>{t("nav.calendar.description")}</small></span></Link>}
-          {moduleAccess["curricular_units.catalog"]&&<Link className={active === "curricular_units" ? "is-active" : ""} href="/unidades-curriculares" title={sidebarCollapsed ? t("nav.curricularUnits.title") : undefined}><BookOpen/><span><strong>{t("nav.curricularUnits.title")}</strong><small>{t("nav.curricularUnits.description")}</small></span></Link>}
-          {moduleAccess["quizzes.practice"]&&<Link className={active === "quizzes" ? "is-active" : ""} href="/testes" title={sidebarCollapsed ? t("nav.quizzes.title") : undefined}><BrainCircuit/><span><strong>{t("nav.quizzes.title")}</strong><small>{t("nav.quizzes.description")}</small></span></Link>}
-          {moduleAccess["documents.library"]&&<Link className={active === "documents" ? "is-active" : ""} href="/documentos" title={sidebarCollapsed ? t("nav.documents.title") : undefined}><FileText/><span><strong>{t("nav.documents.title")}</strong><small>{t("nav.documents.description")}</small></span></Link>}
-          {(moduleAccess["materials.library"]||moduleAccess["materials.submission"])&&<Link className={active === "materials" ? "is-active" : ""} href="/materiais" title={sidebarCollapsed ? t("nav.materials.title") : undefined}><Library/><span><strong>{t("nav.materials.title")}</strong><small>{t("nav.materials.description")}</small></span></Link>}
-          {moduleAccess["useful_links.library"]&&<Link className={active === "useful_links" ? "is-active" : ""} href="/links-uteis" title={sidebarCollapsed ? t("links.nav.title") : undefined}><ExternalLink/><span><strong>{t("links.nav.title")}</strong><small>{t("links.nav.description")}</small></span></Link>}
-        </div>}
-        {hasCommunity&&<div className="nav-section"><span className="nav-label">{t("nav.community")}</span>
-          {moduleAccess["directory.members"]&&<Link className={active === "directory" ? "is-active" : ""} href="/comissao" title={sidebarCollapsed ? t("nav.directory.title") : undefined}><ContactRound/><span><strong>{t("nav.directory.title")}</strong><small>{t("nav.directory.description")}</small></span></Link>}
-        </div>}
-        {user?.role === "admin" && <div className="nav-section">
-          <span className="nav-label">{t("nav.administration")}</span>
-          {moduleAccess["dashboard.analytics"]&&<Link className={active === "dashboard" ? "is-active" : ""} href="/admin/dashboard" title={sidebarCollapsed ? t("nav.dashboard.title") : undefined}><LayoutDashboard/><span><strong>{t("nav.dashboard.title")}</strong><small>{t("nav.dashboard.description")}</small></span></Link>}
-          {canManageModules&&<Link className={active === "modules" ? "is-active" : ""} href="/admin/modulos" title={sidebarCollapsed ? t("nav.modules.title") : undefined}><Boxes/><span><strong>{t("nav.modules.title")}</strong><small>{t("nav.modules.description")}</small></span></Link>}
-          {moduleAccess["quizzes.management"]&&<Link className={active === "quizzes_management" ? "is-active" : ""} href="/admin/testes" title={sidebarCollapsed ? t("nav.manageQuizzes.title") : undefined}><Upload/><span><strong>{t("nav.manageQuizzes.title")}</strong><small>{t("nav.manageQuizzes.description")}</small></span></Link>}
-          {moduleAccess["curricular_units.management"]&&(user.commissionDepartment==="management"||user.email.toLowerCase()==="up202507850@up.pt")&&<Link className={active === "curricular_units_management" ? "is-active" : ""} href="/admin/unidades-curriculares" title={sidebarCollapsed ? t("nav.manageUnits.title") : undefined}><BookOpen/><span><strong>{t("nav.manageUnits.title")}</strong><small>{t("nav.manageUnits.description")}</small></span></Link>}
-          <Link className={active === "admin" ? "is-active" : ""} href="/admin" title={sidebarCollapsed ? t("nav.settings.title") : undefined}><Settings /><span><strong>{t("nav.settings.title")}</strong><small>{t("nav.settings.description")}</small></span></Link>
-          <Link className={active === "audit" ? "is-active" : ""} href="/admin/historico" title={sidebarCollapsed ? t("nav.audit.title") : undefined}><History /><span><strong>{t("nav.audit.title")}</strong><small>{t("nav.audit.description")}</small></span></Link>
+      <div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt={t("shell.brandAlt")} width={58} height={58} priority /></span><div><span className="brand__name">{t("shell.brandName")}</span><span className="brand__context">{administrativeContext ? locale === "en" ? "Administration panel" : "Painel administrativo" : t("shell.brandContext")}</span></div><button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label={t("shell.closeMenu")}><X /></button></div>
+      <nav id="primary-sidebar-navigation" className="nav-list" aria-label={administrativeContext ? locale === "en" ? "Administration navigation" : "Navegação administrativa" : t("shell.primaryNavigation")}>
+        {administrativeContext ? <AdminNavigation active={active} collapsed={sidebarCollapsed && !open} onNavigate={() => setOpen(false)} /> : <div className={adminNavigationStyles.navigation}>
+          {moduleAccess["dashboard.personal"]&&<Link className={`${adminNavigationStyles.overviewLink} ${active === "overview" ? adminNavigationStyles.active : ""}`} href="/dashboard" title={sidebarCollapsed ? t("nav.personalDashboard.title") : undefined} onClick={() => setOpen(false)}><LayoutDashboard/><span>{t("nav.personalDashboard.title")}</span></Link>}
+          <div className={adminNavigationStyles.groups}>
+            {hasCommunication&&<section className={adminNavigationStyles.group}>
+              <button className={`${adminNavigationStyles.groupButton} ${["announcements","requests","polls","notifications"].includes(active) ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "communication"} aria-controls="site-navigation-communication" onClick={() => setOpenSiteGroup((current) => current === "communication" ? null : "communication")}><Megaphone/><span>{t("nav.communication")}</span><ChevronDown className={openSiteGroup === "communication" ? adminNavigationStyles.chevronOpen : ""}/></button>
+              <div id="site-navigation-communication" className={`${adminNavigationStyles.groupItems} ${openSiteGroup !== "communication" ? adminNavigationStyles.groupItemsClosed : ""}`}>
+                {moduleAccess["announcements.feed"]&&<Link className={`${adminNavigationStyles.item} ${active === "announcements" ? adminNavigationStyles.active : ""}`} href="/avisos" onClick={() => setOpen(false)}><Megaphone/><span>{t("nav.announcements.title")}</span></Link>}
+                {moduleAccess["requests.submission"]&&<Link className={`${adminNavigationStyles.item} ${active === "requests" ? adminNavigationStyles.active : ""}`} href="/pedidos" onClick={() => setOpen(false)}><Inbox/><span>{t("nav.requests.title")}</span></Link>}
+                {moduleAccess["polls.voting"]&&<Link className={`${adminNavigationStyles.item} ${active === "polls" ? adminNavigationStyles.active : ""}`} href="/inqueritos" onClick={() => setOpen(false)}><Vote/><span>{t("nav.polls.title")}</span></Link>}
+              </div>
+            </section>}
+            {hasAcademicLife&&<section className={adminNavigationStyles.group}>
+              <button className={`${adminNavigationStyles.groupButton} ${["calendar","curricular_units","quizzes","documents","materials","useful_links"].includes(active) ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "academic"} aria-controls="site-navigation-academic" onClick={() => setOpenSiteGroup((current) => current === "academic" ? null : "academic")}><BookOpen/><span>{t("nav.academicLife")}</span><ChevronDown className={openSiteGroup === "academic" ? adminNavigationStyles.chevronOpen : ""}/></button>
+              <div id="site-navigation-academic" className={`${adminNavigationStyles.groupItems} ${openSiteGroup !== "academic" ? adminNavigationStyles.groupItemsClosed : ""}`}>
+                {moduleAccess["calendar.events"]&&<Link className={`${adminNavigationStyles.item} ${active === "calendar" ? adminNavigationStyles.active : ""}`} href="/calendario" onClick={() => setOpen(false)}><CalendarDays/><span>{t("nav.calendar.title")}</span></Link>}
+                {moduleAccess["curricular_units.catalog"]&&<Link className={`${adminNavigationStyles.item} ${active === "curricular_units" ? adminNavigationStyles.active : ""}`} href="/unidades-curriculares" onClick={() => setOpen(false)}><BookOpen/><span>{t("nav.curricularUnits.title")}</span></Link>}
+                {moduleAccess["quizzes.practice"]&&<Link className={`${adminNavigationStyles.item} ${active === "quizzes" ? adminNavigationStyles.active : ""}`} href="/testes" onClick={() => setOpen(false)}><BrainCircuit/><span>{t("nav.quizzes.title")}</span></Link>}
+                {moduleAccess["documents.library"]&&<Link className={`${adminNavigationStyles.item} ${active === "documents" ? adminNavigationStyles.active : ""}`} href="/documentos" onClick={() => setOpen(false)}><FileText/><span>{t("nav.documents.title")}</span></Link>}
+                {(moduleAccess["materials.library"]||moduleAccess["materials.submission"])&&<Link className={`${adminNavigationStyles.item} ${active === "materials" ? adminNavigationStyles.active : ""}`} href="/materiais" onClick={() => setOpen(false)}><Library/><span>{t("nav.materials.title")}</span></Link>}
+                {moduleAccess["useful_links.library"]&&<Link className={`${adminNavigationStyles.item} ${active === "useful_links" ? adminNavigationStyles.active : ""}`} href="/links-uteis" onClick={() => setOpen(false)}><ExternalLink/><span>{t("links.nav.title")}</span></Link>}
+              </div>
+            </section>}
+            {hasCommunity&&<section className={adminNavigationStyles.group}>
+              <button className={`${adminNavigationStyles.groupButton} ${active === "directory" ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "community"} aria-controls="site-navigation-community" onClick={() => setOpenSiteGroup((current) => current === "community" ? null : "community")}><ContactRound/><span>{t("nav.community")}</span><ChevronDown className={openSiteGroup === "community" ? adminNavigationStyles.chevronOpen : ""}/></button>
+              <div id="site-navigation-community" className={`${adminNavigationStyles.groupItems} ${openSiteGroup !== "community" ? adminNavigationStyles.groupItemsClosed : ""}`}>
+                {moduleAccess["directory.members"]&&<Link className={`${adminNavigationStyles.item} ${active === "directory" ? adminNavigationStyles.active : ""}`} href="/comissao" onClick={() => setOpen(false)}><ContactRound/><span>{t("nav.directory.title")}</span></Link>}
+              </div>
+            </section>}
+          </div>
         </div>}
       </nav>
       <div className="sidebar__footer">
@@ -133,6 +140,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral" }: Prop
         <div className="profile-menu-shell" ref={profileMenuRef}>
           {profileMenu&&<div className="profile-menu" role="menu" aria-label={t("profile.menuLabel")}>
             <header><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.fullName || user?.email}</strong><small>{user?.email}</small></span></header>
+            {user?.role === "admin" && <Link className={adminNavigationStyles.profileAdminLink} href="/admin" role="menuitem" onClick={() => { setProfileMenu(false); setOpen(false); }}><ShieldCheck aria-hidden="true"/><span><strong>{locale === "en" ? "Administration panel" : "Painel administrativo"}</strong><small>{locale === "en" ? "Manage content, platform and activity" : "Gerir conteúdo, plataforma e atividade"}</small></span><ChevronRight aria-hidden="true"/></Link>}
             <section role="group" aria-labelledby="profile-theme-label">
               <span id="profile-theme-label" className="profile-menu__label"><Palette/>{t("profile.themeLabel")}</span>
               <button type="button" className={`profile-theme-option${theme === "cc" ? " is-active" : ""}`} role="menuitemradio" aria-checked={theme === "cc"} onClick={() => selectTheme("cc")}>

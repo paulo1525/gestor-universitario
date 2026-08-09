@@ -4,7 +4,10 @@ import test from "node:test";
 
 const worker = await readFile(new URL("../worker/academic-hub.ts", import.meta.url), "utf8");
 const migration = await readFile(new URL("../migrations/0024_personal_dashboard_notifications_links.sql", import.meta.url), "utf8");
+const quizMigration = await readFile(new URL("../migrations/0030_quizzes.sql", import.meta.url), "utf8");
 const modules = await readFile(new URL("../lib/app-modules.ts", import.meta.url), "utf8");
+const personalDashboard = await readFile(new URL("../components/personal-dashboard.tsx", import.meta.url), "utf8");
+const dashboardMessages = await readFile(new URL("../lib/i18n-dashboard.ts", import.meta.url), "utf8");
 
 test("new personal hub routes are reachable through both router stages", () => {
   for (const path of [
@@ -49,6 +52,17 @@ test("personal dashboard and notifications expose frontend compatibility aliases
   ]) assert.ok(worker.includes(alias), `missing API alias ${alias}`);
   assert.match(worker, /mark_all_read/);
   assert.match(worker, /notificationId \?\? item\.id/);
+});
+
+test("personal dashboard summaries expose the requested student metrics in both locales", () => {
+  assert.match(worker, /SELECT COUNT\(\*\) AS n FROM quiz_attempts WHERE user_id=\? AND completed_at IS NOT NULL/);
+  assert.match(worker, /completedQuizAttempts/);
+  assert.match(quizMigration, /CREATE INDEX idx_quiz_attempts_user_history ON quiz_attempts\(user_id, completed_at DESC, started_at DESC\)/);
+  for (const key of ["events", "polls", "materials", "quizzes"]) {
+    assert.ok(personalDashboard.includes(`personalDashboard.summary.${key}`), `summary card missing ${key}`);
+    assert.equal(dashboardMessages.split(`"personalDashboard.summary.${key}"`).length, 3, `${key} must be translated in PT-PT and EN`);
+  }
+  assert.doesNotMatch(personalDashboard, /personalDashboard\.(?:notifications|calendar)/);
 });
 
 test("materials return private feedback state, totals and version history", () => {

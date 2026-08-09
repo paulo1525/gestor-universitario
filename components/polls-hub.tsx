@@ -32,6 +32,7 @@ import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { useScrollLock } from "@/components/use-scroll-lock";
+import { useEscapeKey } from "@/components/use-escape-key";
 import styles from "@/components/polls-hub.module.css";
 
 type ApiOption = { id: string | number; label?: string; text?: string; votes?: number; voteCount?: number; vote_count?: number };
@@ -153,6 +154,7 @@ export function PollsHub() {
   const [votingId, setVotingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Poll | null>(null);
   useScrollLock(Boolean(deleteTarget));
+  useEscapeKey(Boolean(deleteTarget), () => { if (!deleting) setDeleteTarget(null); });
   const [deleting, setDeleting] = useState(false);
   const [choices, setChoices] = useState<Record<string, string[]>>({});
   const [filter, setFilter] = useState<Filter>("all");
@@ -326,7 +328,7 @@ export function PollsHub() {
                   <span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span>
                   <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span>
                 </div>
-                {canManage && <button className={styles.createButton} type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
+                {canManage && <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
               </div>
             </section>
 

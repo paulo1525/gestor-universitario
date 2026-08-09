@@ -17,14 +17,14 @@ type RichTextEditorProps = {
   onInvalidLink?: () => void;
 };
 
-type RichTextContentProps = { value: string; className?: string };
+type RichTextContentProps = { value: string; className?: string; id?: string };
 
-export function RichTextContent({ value, className = "" }: RichTextContentProps) {
+export function RichTextContent({ value, className = "", id }: RichTextContentProps) {
   const html = useMemo(() => {
     const sanitized = sanitizeRichTextHtml(value);
     return /<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a)\b/i.test(sanitized) ? richTextDisplayHtml(sanitized) : `<p>${sanitized}</p>`;
   }, [value]);
-  return <div className={`${styles.content} ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div id={id} className={`${styles.content} ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink }: RichTextEditorProps) {

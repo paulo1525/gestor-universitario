@@ -23,6 +23,7 @@ import { AppShell, AppShellActive } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { useModuleEnabled } from "@/components/use-module-enabled";
@@ -124,6 +125,7 @@ export function UsefulLinks() {
   const [unitFilter, setUnitFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteTarget, setDeleteTarget] = useState<UsefulLink | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -224,7 +226,6 @@ export function UsefulLinks() {
   };
 
   const runAction = async (item: UsefulLink, action: "archive" | "delete") => {
-    if (action === "delete" && !window.confirm(t("links.confirmDelete"))) return;
     setActing(item.id);
     try {
       const response = await fetch("/api/useful-links", {
@@ -245,11 +246,13 @@ export function UsefulLinks() {
       const data = await readJson(response) as { error?: string };
       if (!response.ok) throw new Error(data.error || t("links.actionError"));
       setNotice({ kind: "success", message: t(action === "delete" ? "links.deleted" : "links.archived") });
+      if (action === "delete") setDeleteTarget(null);
       await load();
     } catch (error) {
       setNotice({ kind: "error", message: error instanceof Error ? error.message : t("links.actionError") });
     } finally {
       setActing(null);
+      if (action === "delete") setDeleteTarget(null);
     }
   };
 
@@ -317,7 +320,7 @@ export function UsefulLinks() {
                       <a className={styles.url} href={item.url} target="_blank" rel="noopener noreferrer"><span>{item.url}</span><ExternalLink /></a>
                       <div className={styles.cardActions}>
                         <a className="button button--primary button--compact" href={item.url} target="_blank" rel="noopener noreferrer"><ExternalLink />{t("links.open")}</a>
-                        {canManage && <><button className="button button--secondary button--compact" type="button" onClick={() => edit(item)}><Pencil />{t("links.editAction")}</button>{item.status !== "archived" && <button className="button button--secondary button--compact" type="button" onClick={() => void runAction(item, "archive")} disabled={acting === item.id}><Archive />{t("links.archive")}</button>}<button className="button button--danger button--compact" type="button" onClick={() => void runAction(item, "delete")} disabled={acting === item.id}><Trash2 />{t("links.delete")}</button></>}
+                        {canManage && <><button className="button button--secondary button--compact" type="button" onClick={() => edit(item)}><Pencil />{t("links.editAction")}</button>{item.status !== "archived" && <button className="button button--secondary button--compact" type="button" onClick={() => void runAction(item, "archive")} disabled={acting === item.id}><Archive />{t("links.archive")}</button>}<button className="button button--danger button--compact" type="button" onClick={() => setDeleteTarget(item)} disabled={acting === item.id}><Trash2 />{t("links.delete")}</button></>}
                       </div>
                     </article>
                   ))}
@@ -325,6 +328,7 @@ export function UsefulLinks() {
               )}
             </section>
           </div>
+          <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow={t("links.eyebrow")} title={locale === "en" ? "Delete this useful link?" : "Eliminar esta ligação útil?"} description={t("links.confirmDelete")} subject={deleteTarget?.title} subjectLabel={locale === "en" ? "Selected link" : "Ligação selecionada"} warning={locale === "en" ? "The link will be removed permanently for every user." : "A ligação será removida definitivamente para todos os utilizadores."} confirmLabel={acting ? (locale === "en" ? "Deleting…" : "A eliminar…") : t("links.delete")} cancelLabel={t("links.cancel")} busy={Boolean(acting)} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) void runAction(deleteTarget, "delete"); }} />
         </AppShell>
       </ModuleGuard>
     </AuthGuard>

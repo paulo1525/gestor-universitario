@@ -1,4 +1,6 @@
-import { AdminControl } from "@/components/admin-control";
+import { AdminConsoleHome } from "@/components/admin-console-home";
 import { AuthGuard } from "@/components/auth-guard";
 
-export default function AdminPage() { return <AuthGuard requireAdmin><AdminControl /></AuthGuard>; }
+export default function AdminPage() {
+  return <AuthGuard requireAdmin><AdminConsoleHome /></AuthGuard>;
+}

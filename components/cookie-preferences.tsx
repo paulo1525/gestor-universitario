@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Cookie, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n-context";
+import { useEscapeKey } from "@/components/use-escape-key";
 
 const PERSISTENCE_KEY = "gu_persistent_login";
 
@@ -11,6 +12,7 @@ export function CookiePreferences() {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [persistent, setPersistent] = useState(true);
+  useEscapeKey(open, () => setOpen(false));
 
   useEffect(() => {
     queueMicrotask(() => {

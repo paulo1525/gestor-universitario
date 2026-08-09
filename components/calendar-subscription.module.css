@@ -72,7 +72,7 @@
 
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, .48fr);
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--line);
   background: #fff;
 }
@@ -204,11 +204,11 @@
 .management {
   min-width: 0;
   align-self: stretch;
-  border-left: 1px solid var(--line);
+  border-top: 1px solid var(--line);
   background: #fafaf7;
 }
 
-.management > summary { justify-content: space-between; min-height: 58px; padding: 0 17px; }
+.management > summary { justify-content: space-between; min-height: 48px; padding: 0 20px; }
 .management > summary:hover { background: #f5f5f0; }
 .management > summary span { min-width: 0; display: flex; align-items: center; gap: 7px; }
 .management > summary span > svg { width: 14px; flex: 0 0 auto; color: #4b6d56; }

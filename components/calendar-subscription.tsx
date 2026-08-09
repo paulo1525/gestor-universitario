@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/calendar-subscription.module.css";
 
@@ -43,6 +44,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState("");
+  const [revokeTarget, setRevokeTarget] = useState<Subscription | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -109,7 +111,6 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
   };
 
   const revoke = async (item: Subscription) => {
-    if (!window.confirm(t("calendar.subscription.revokeConfirm"))) return;
     setBusy(item.id);
     setError("");
     try {
@@ -122,10 +123,12 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
       if (!response.ok) throw new Error(String(payload.error || t("calendar.subscription.revokeError")));
       setItems(current => current.filter(candidate => candidate.id !== item.id));
       if (created?.id === item.id) setCreated(null);
+      setRevokeTarget(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("calendar.subscription.revokeError"));
     } finally {
       setBusy("");
+      setRevokeTarget(null);
     }
   };
 
@@ -240,7 +243,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
                 ? t("calendar.subscription.lastUsed", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(item.lastUsedAt) })
                 : t("calendar.subscription.neverUsed")}</small>
             </div>
-            <button type="button" disabled={busy === item.id} onClick={() => void revoke(item)}>
+            <button type="button" disabled={busy === item.id} onClick={() => setRevokeTarget(item)}>
               <Trash2 />{t(busy === item.id ? "calendar.subscription.revoking" : "calendar.subscription.revoke")}
             </button>
           </article>) : <p className={styles.empty}>{t("calendar.subscription.none")}</p>}
@@ -249,5 +252,19 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
 
       {error && <div className={styles.error}><RefreshCw />{error}</div>}
     </div>}
+    <ConfirmationDialog
+      open={Boolean(revokeTarget)}
+      eyebrow={locale === "en" ? "Private calendar link" : "Ligação privada"}
+      title={locale === "en" ? "Revoke this calendar link?" : "Revogar esta ligação ao calendário?"}
+      description={t("calendar.subscription.revokeConfirm")}
+      subject={revokeTarget?.label}
+      subjectLabel={locale === "en" ? "Calendar" : "Calendário"}
+      warning={locale === "en" ? "Applications using this link will stop receiving updates." : "As aplicações que usam esta ligação deixam de receber atualizações."}
+      confirmLabel={t(busy ? "calendar.subscription.revoking" : "calendar.subscription.revoke")}
+      cancelLabel={locale === "en" ? "Cancel" : "Cancelar"}
+      busy={Boolean(busy)}
+      onClose={() => setRevokeTarget(null)}
+      onConfirm={() => { if (revokeTarget) void revoke(revokeTarget); }}
+    />
   </section>;
 }

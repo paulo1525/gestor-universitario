@@ -18,6 +18,7 @@ const csvImport=readFileSync(new URL("../components/class-roster-import.tsx",imp
 const placements=readFileSync(new URL("../components/placement-workbench.tsx",import.meta.url),"utf8");
 const preflight=readFileSync(new URL("../components/distribution-preflight.tsx",import.meta.url),"utf8");
 const shell=readFileSync(new URL("../components/app-shell.tsx",import.meta.url),"utf8");
+const adminNavigation=readFileSync(new URL("../components/admin-navigation.tsx",import.meta.url),"utf8");
 const placementTablePage=readFileSync(new URL("../app/admin/colocacoes/tabela/page.tsx",import.meta.url),"utf8");
 const scrollLock=readFileSync(new URL("../components/use-scroll-lock.ts",import.meta.url),"utf8");
 const styles=readFileSync(new URL("../app/globals.css",import.meta.url),"utf8");
@@ -38,7 +39,8 @@ test("ambiente de testes substitui a aplicação completa com cinco turmas",()=>
   assert.match(testMode,/if\(!TEST_MODE_AVAILABLE\)/);
   assert.match(testMode,/if\(typeof window==="undefined"\|\|!TEST_MODE_AVAILABLE\)return false/);
   assert.match(testMode,/installTestApi\(\)\{if\(!TEST_MODE_AVAILABLE\|\|installed\|\|typeof window==="undefined"\)return/);
-  assert.match(admin,/\{TEST_MODE_AVAILABLE && <section className=\{`panel admin-settings test-mode-setting/);
+  assert.match(admin,/\{TEST_MODE_AVAILABLE && <AdminSection/);
+  assert.match(admin,/title=\{t\("admin\.control\.testTitle"\)\}/);
   assert.match(testMode,/gu-test-mode/);
   assert.match(testMode,/const TEST_MODE_MODULES=/);
   assert.match(testMode,/\{key:"requests",enabled:false,effectiveEnabled:false/);
@@ -236,12 +238,12 @@ test("tickets ficam ocultos e desativados temporariamente",()=>{
 });
 
 test("menu administrativo oculta turmas e apresenta a gestão de testes",()=>{
-  assert.doesNotMatch(shell,/href="\/turmas|href="\/admin\/colocacoes|href="\/admin\/turmas/);
+  assert.doesNotMatch(adminNavigation,/href:\s*"\/turmas|href:\s*"\/admin\/turmas/);
   assert.match(shell,/href="\/testes"/);
-  assert.match(shell,/href="\/admin\/testes"/);
-  assert.doesNotMatch(shell,/href="\/admin\/verificacao"/);
-  assert.match(shell,/href="\/admin"/);
-  assert.match(shell,/href="\/admin\/historico"/);
+  assert.match(adminNavigation,/href:\s*"\/admin\/testes"/);
+  assert.doesNotMatch(adminNavigation,/href:\s*"\/admin\/verificacao"/);
+  assert.match(adminNavigation,/href="\/admin"/);
+  assert.match(adminNavigation,/href:\s*"\/admin\/historico"/);
 });
 
 test("o Núcleo dispõe de uma mesa de colocações auditada",()=>{
@@ -516,7 +518,7 @@ test("informação adicional só é classificada ao guardar e sai da pré-valida
   assert.match(placements,/Informação inválida/);
   assert.match(placements,/additionalInfoStatus/);
   assert.match(placements,/A seleção só fica registada quando guardares as alterações/);
-  assert.match(placements,/event\.key==="Escape"/);
+  assert.match(placements,/useEscapeKey\(true,\(\)=>\{if\(!saving\)onClose\(\)\}\)/);
   assert.doesNotMatch(placements,/method:"PATCH"/);
   assert.match(worker,/additional_info_review_status/);
   assert.doesNotMatch(preflight,/Pontuação administrativa inconsistente/);
@@ -546,10 +548,10 @@ test("a CC pode adiar a validação sem bloquear a simulação, mas não a publi
   assert.match(styles,/\.placement-drawer\{[^}]*scrollbar-gutter:auto/);
 });
 
-test("a CC gere listas e quatro janelas sem sugerir categorias aos estudantes",()=>{
+test("as janelas históricas permanecem no esquema mas não são expostas na administração",()=>{
   assert.match(worker,/function canEditClass\(user: CurrentUser, classId: number\).*canManageAll\(user\)/);
   assert.match(phasedMigration,/preferences_group_4_close_at/);
-  assert.match(admin,/admin\.control\.preferenceWindows/);
+  assert.doesNotMatch(admin,/preferenceWindows|preference_windows|class-deadline-settings/);
   assert.match(preferences,/classes\.preferences\.notes/);
   assert.doesNotMatch(preferences,/bullying|amigos|Pessoa específica/i);
 });
