@@ -175,8 +175,9 @@ export function CurricularUnitCatalog() {
       <ModuleGuard moduleKey="curricular_units.catalog">
         <AppShell active="curricular_units" breadcrumb={t("community.units.breadcrumb")}>
           <div className={styles.page}>
-            <header className={`page-heading page-heading--simple ${styles.hero}`}>
+            <header className={`page-heading ${styles.hero}`}>
               <div className={styles.heroCopy}>
+                <span className="page-heading__icon"><BookOpen /></span>
                 <div>
                   <span className="eyebrow">{t("community.units.eyebrow")}</span>
                   <h1>{t("community.units.title")}</h1>
@@ -421,12 +422,15 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                 <>
                   <section className={`${styles.panel} ${styles.detailHero}`}>
                     <div>
-                      <span className={styles.unitCode}>{data.unit.code}</span>
-                      <h1>{data.unit.name}</h1>
-                      <p>
-                        {data.unit.description ||
-                          t("community.units.detailDescription")}
-                      </p>
+                      <span className="page-heading__icon"><BookOpen /></span>
+                      <div>
+                        <span className={styles.unitCode}>{data.unit.code}</span>
+                        <h1>{data.unit.name}</h1>
+                        <p>
+                          {data.unit.description ||
+                            t("community.units.detailDescription")}
+                        </p>
+                      </div>
                     </div>
                     <div className={styles.detailStats}>
                       <div className={styles.metric}>
