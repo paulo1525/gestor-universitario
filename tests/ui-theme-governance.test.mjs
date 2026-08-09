@@ -119,3 +119,9 @@ test("new feature cards use the shared light surfaces and borders", () => {
   assert.match(files.unitsAdmin, /\.unitGrid\s*\{[^}]*background:\s*var\(--surface\)/s);
   assert.match(files.unitsAdmin, /\.unit(?:Entry|Card)\s*\{[^}]*border-(?:top|bottom):\s*1px solid var\(--line\)/s);
 });
+
+test("the public curricular-unit catalogue follows the shared panel header anatomy", () => {
+  assert.match(files.unitsCatalog, /\.catalogPanel\s*\{[^}]*var\(--surface-header-accent-size\)[^}]*var\(--surface-header-accent\)/s);
+  assert.match(files.unitsCatalog, /\.panelIcon\s*\{[^}]*width:\s*40px[^}]*height:\s*40px/s);
+  assert.match(files.unitsCatalog, /\.catalogToolbar\s*\{[^}]*grid-template-columns:/s);
+});

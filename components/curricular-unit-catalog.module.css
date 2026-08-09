@@ -41,20 +41,48 @@
 
 .panel {
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--surface-card-border);
+  border-radius: var(--surface-card-radius);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--surface-card-shadow);
+}
+
+.catalogPanel {
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
 }
 
 .panelHeader {
-  min-height: 72px;
+  min-height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: 15px 20px;
   border-bottom: 1px solid var(--line);
+  background: var(--surface-header-background);
+}
+
+.panelTitle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panelIcon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 10px;
+  color: var(--color-accent-text);
+  background: var(--gold-soft);
+}
+
+.panelIcon svg {
+  width: 19px;
+  height: 19px;
 }
 
 .panelHeader h2 {
@@ -85,70 +113,18 @@
 }
 
 .catalogToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 260px) auto;
+  align-items: end;
+  gap: 10px;
   padding: 14px 20px 16px;
   border-bottom: 1px solid var(--line);
   background: var(--color-surface-subtle);
 }
 
-.filterHeading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 11px;
-}
-
-.filterTitle {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-.filterTitle > span {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  color: var(--color-accent-text);
-  background: var(--gold-soft);
-}
-
-.filterTitle svg {
-  width: 16px;
-}
-
-.filterTitle strong,
-.filterTitle small {
-  display: block;
-}
-
-.filterTitle strong {
-  color: var(--ink);
-  font-size: 11px;
-}
-
-.filterTitle small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.filterActions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.activeFilters {
-  color: var(--muted);
-  font-size: 8px;
-  font-weight: 750;
-}
-
 .clearFilters,
 .emptyAction {
-  min-height: 32px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -167,12 +143,6 @@
 .clearFilters svg,
 .emptyAction svg {
   width: 13px;
-}
-
-.catalogFilterGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, .28fr);
-  gap: 10px;
 }
 
 .filterField {
@@ -425,7 +395,7 @@
 }
 
 .emptyState {
-  min-height: 250px;
+  min-height: 190px;
 }
 
 .detailHero {
@@ -574,9 +544,8 @@
   .grid,
   .catalogGrid,
   .sectionBody { padding-inline: 14px; }
-  .catalogFilterGrid { grid-template-columns: 1fr; }
-  .filterHeading { align-items: flex-start; flex-direction: column; }
-  .filterActions { width: 100%; justify-content: space-between; }
+  .catalogToolbar { grid-template-columns: 1fr; }
+  .clearFilters { width: 100%; }
   .detailHero { padding: 16px; }
 }
 
