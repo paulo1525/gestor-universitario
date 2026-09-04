@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  BrainCircuit,
   BookOpen,
   Check,
   CheckCircle2,
@@ -32,6 +33,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -104,7 +106,7 @@ type ApiComment = { id: string | number; body?: string; text?: string; authorNam
 type Comment = { id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
 type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
-const QUIZ_QUESTION_COUNTS: readonly number[] = [15, 30, 50];
+const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
 type QuizStatistics = {
@@ -128,46 +130,18 @@ const QUIZ_PROGRESS_COOKIE = "gu-quiz-progress";
 const EMPTY_TOPICS: Topic[] = [];
 
 const modeCards: Array<{ id: Mode; title: string; description: string; icon: typeof Play }> = [
-  { id: "topic", title: "Temático", description: "Foca um tema específico da unidade curricular.", icon: BookOpen },
-  { id: "unseen", title: "Não vistas", description: "Descobre perguntas que ainda não respondeste.", icon: EyeOff },
-  { id: "quick", title: "Teste aleatório", description: "Pratica com uma seleção aleatória de todo o banco.", icon: Play },
+  { id: "quick", title: "Sessão guiada", description: "Mistura perguntas para consolidar o que já estudaste.", icon: BrainCircuit },
+  { id: "unseen", title: "Matéria nova", description: "Descobre conceitos através de perguntas que ainda não viste.", icon: EyeOff },
+  { id: "mistakes", title: "Só erros", description: "Recupera perguntas falhadas e corrige confusões recentes.", icon: RotateCcw },
+  { id: "topic", title: "Por tópico", description: "Concentra a sessão num ou mais temas da unidade curricular.", icon: BookOpen },
 ];
 
 function modeTitle(mode: Mode) {
-  return mode === "topic" ? "Temático" : mode === "unseen" ? "Não vistas" : mode === "mistakes" ? "Rever erros" : mode === "exam" ? "Simulado" : "Teste aleatório";
+  return mode === "topic" ? "Por tópico" : mode === "unseen" ? "Matéria nova" : mode === "mistakes" ? "Só erros" : mode === "exam" ? "Simulado" : "Sessão guiada";
 }
 
 function questionLabel(count: number) {
   return `${count} ${count === 1 ? "pergunta" : "perguntas"}`;
-}
-
-function normalizeShortAnswer(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-PT").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function shortAnswerDistance(left: string, right: string) {
-  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
-    const current = [leftIndex];
-    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
-      current[rightIndex] = Math.min(
-        current[rightIndex - 1] + 1,
-        previous[rightIndex] + 1,
-        previous[rightIndex - 1] + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
-      );
-    }
-    previous.splice(0, previous.length, ...current);
-  }
-  return previous[right.length];
-}
-
-function isShortAnswerMatch(value: string, expected: string) {
-  const normalizedValue = normalizeShortAnswer(value);
-  const normalizedExpected = normalizeShortAnswer(expected);
-  if (!normalizedValue || !normalizedExpected) return false;
-  if (normalizedValue === normalizedExpected) return true;
-  const tolerance = Math.max(1, Math.floor(normalizedExpected.length * .12));
-  return shortAnswerDistance(normalizedValue, normalizedExpected) <= tolerance;
 }
 
 function isoDate(value: unknown): string | null {
@@ -374,9 +348,9 @@ export function QuizHub() {
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
   const availableQuestionCount = useMemo(() => {
     if (!selectedUnit) return 0;
-    if (selectedMode === "topic" && selectedTopicIds.length) return topics.filter((topic) => selectedTopicIds.includes(topic.id)).reduce((total, topic) => total + topic.questionCount, 0);
+    if (selectedTopicIds.length) return topics.filter((topic) => selectedTopicIds.includes(topic.id)).reduce((total, topic) => total + topic.questionCount, 0);
     return selectedUnit.questionCount;
-  }, [selectedMode, selectedTopicIds, selectedUnit, topics]);
+  }, [selectedTopicIds, selectedUnit, topics]);
   const question = attempt?.questions[currentIndex] ?? null;
   const answers = useMemo(() => new Map((attempt?.answers ?? []).map((answer) => [answer.questionId, answer])), [attempt?.answers]);
   const currentAnswer = question ? answers.get(question.id) ?? null : null;
@@ -504,13 +478,13 @@ export function QuizHub() {
       return;
     }
     if (availableQuestionCount < DEFAULT_QUESTION_COUNT) {
-      setNotice({ kind: "warning", message: "São necessárias pelo menos 15 perguntas disponíveis para iniciar um teste." });
+      setNotice({ kind: "warning", message: "São necessárias pelo menos 5 perguntas disponíveis para iniciar uma sessão." });
       return;
     }
     setLoadingAttempt(true);
     setAvailability(null);
     try {
-      const activeTopicIds = selectedMode === "topic" ? selectedTopicIds : [];
+      const activeTopicIds = selectedTopicIds;
       const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: questionCount * 60 }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
@@ -522,7 +496,7 @@ export function QuizHub() {
         throw new Error(apiError(data, "Não foi possível iniciar o teste."));
       }
       const next = updateAttempt(data, selectedMode);
-      if (!next.questions.length) throw new Error("Este teste ainda não tem perguntas disponíveis para este modo.");
+      if (!next.questions.length) throw new Error("Esta sessão ainda não tem perguntas disponíveis para este modo.");
       setCurrentIndex(0);
       saveQuizProgress(next, 0);
       setRemaining(next.endsAt ? Math.max(0, Math.ceil((new Date(next.endsAt).getTime() - Date.now()) / 1000)) : next.durationSeconds);
@@ -550,7 +524,7 @@ export function QuizHub() {
     setExportingAnki(true);
     try {
       const params = new URLSearchParams({ unitId: selectedUnit.id, mode: selectedMode, count: String(questionCount) });
-      if (selectedMode === "topic") params.set("topicIds", selectedTopicIds.join(","));
+      if (selectedTopicIds.length) params.set("topicIds", selectedTopicIds.join(","));
       const response = await fetch(`/api/quizzes/export?${params.toString()}`, { cache: "no-store" });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) throw new Error(apiError(data, "Não foi possível preparar o ficheiro Anki."));
@@ -758,20 +732,25 @@ export function QuizHub() {
       if (answerFormat === "multiple_choice" && number >= 1 && number <= question.options.length) {
         event.preventDefault();
         void answerQuestion(question.options[number - 1].id);
+        return;
       }
-      if (event.key === "ArrowRight") { event.preventDefault(); goToQuestion(currentIndex + 1); }
+      if ((event.key === "ArrowRight" || event.key === "Enter") && currentAnswer?.selectedOptionId) {
+        event.preventDefault();
+        if (attempt && currentIndex === attempt.questions.length - 1) void finishAttempt();
+        else goToQuestion(currentIndex + 1);
+      }
       if (event.key === "ArrowLeft") { event.preventDefault(); goToQuestion(currentIndex - 1); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [answerFormat, answerQuestion, currentIndex, goToQuestion, question, screen]);
+  }, [answerFormat, answerQuestion, attempt, currentAnswer?.selectedOptionId, currentIndex, finishAttempt, goToQuestion, question, screen]);
 
   const score = attempt?.score;
   const resultPercent = typeof score === "number" && Number.isFinite(score) ? Math.round(score) : attempt?.questions.length ? Math.round((correctCount / attempt.questions.length) * 100) : 0;
 
   return <AuthGuard>
     <ModuleGuard moduleKey="quizzes.practice">
-      <AppShell active="quizzes" breadcrumb="Testes">
+      <AppShell active="quizzes" breadcrumb="Testes" focusMode={screen === "attempt"}>
         <div className={styles.page}>
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
           {screen === "catalogue" && <Catalogue
@@ -866,69 +845,40 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   const countOptions = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
   return <>
     <header className={`page-heading page-heading--simple ${styles.hero}`}>
-      <div><span className="eyebrow">Testes</span><h1>Novo teste</h1></div>
-      <button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />As minhas estatísticas</button>
+      <div><span className="eyebrow">Testes</span><h1>Escolhe uma disciplina</h1></div>
+      <button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />Estatísticas</button>
     </header>
-    {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar teste</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
-    {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar os teus testes" text="A carregar unidades curriculares e perguntas disponíveis." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar os testes" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há testes disponíveis" text="Quando forem publicadas perguntas para uma unidade curricular, poderás iniciar um teste aqui." /> : <div className={styles.builder}>
-      <section className={styles.setup} aria-labelledby="quiz-setup-title">
-        <h2 id="quiz-setup-title" className="sr-only">Configurar teste</h2>
-
-        <section className={styles.configBlock}>
-          <div className={styles.configHeading}><span>1</span><strong>Unidade curricular</strong></div>
-          <label className={styles.unitPicker} htmlFor="quiz-unit">
-            <select id="quiz-unit" aria-label="Unidade curricular" value={selectedUnitId} onChange={(event) => onUnit(event.target.value)}>
-              {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}
-            </select>
-            <ChevronDown aria-hidden="true" />
-          </label>
-        </section>
-
-        {selectedUnit && <>
-          <section className={styles.configBlock}>
-            <div className={styles.configHeading}><span>2</span><strong>Tipo de teste</strong></div>
-            <div className={styles.modeStack}>
-              <div className={styles.modeGrid} role="radiogroup" aria-label="Tipo de teste">
-                {modeCards.map((mode) => { const Icon = mode.icon; const selected = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={selected} aria-label={`${mode.title}. ${mode.description}`} title={mode.description} className={`${styles.modeCard} ${selected ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}</strong>{selected && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}
-              </div>
-              {selectedMode === "topic" && <div className={styles.topicPicker} role="group" aria-labelledby="quiz-topics-label"><span id="quiz-topics-label" className={styles.topicTitle}>Temas</span><div className={styles.topicChoices}>{topics.map((topic) => { const checked = selectedTopicIds.includes(topic.id); return <label key={topic.id} className={checked ? styles.topicChecked : ""}><input type="checkbox" checked={checked} onChange={() => onTopics(checked ? selectedTopicIds.filter((id) => id !== topic.id) : [...selectedTopicIds, topic.id])} /><span className={styles.topicName}>{topic.name}</span>{topic.questionCount > 0 && <small>{topic.questionCount}</small>}<span className={styles.topicIndicator}>{checked && <Check />}</span></label>; })}</div>{!topics.length && <small>Esta UC ainda não tem temas publicados.</small>}</div>}
-            </div>
-          </section>
-
-          <section className={styles.configBlock}>
-            <div className={styles.configHeading}><span>3</span><strong>Perguntas</strong></div>
-            <label className={styles.countControl} htmlFor="quiz-question-count"><span className={styles.selectWrap}><select id="quiz-question-count" aria-label="Número de perguntas" value={countOptions.includes(questionCount) ? questionCount : ""} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.length ? countOptions.map((count) => <option key={count} value={count}>{count} perguntas · {count} min</option>) : <option value="">Menos de 15 perguntas disponíveis</option>}</select><ChevronDown aria-hidden="true" /></span><span className={styles.timeRule}><Clock3 />1 min/pergunta</span></label>
-          </section>
-
-          <section className={styles.configBlock}>
-            <div className={styles.configHeading}><span>4</span><strong>Formato de resposta</strong></div>
-            <div className={styles.answerFormatStack}>
-              <div className={styles.answerFormatGrid} role="radiogroup" aria-label="Formato de resposta">
-                <button type="button" role="radio" aria-checked={answerFormat === "multiple_choice"} className={`${styles.modeCard} ${answerFormat === "multiple_choice" ? styles.selected : ""}`} onClick={() => onAnswerFormat("multiple_choice")}><span className={styles.modeIcon}><CheckCircle2 /></span><strong>Escolha múltipla</strong>{answerFormat === "multiple_choice" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>
-                <button type="button" role="radio" aria-checked={answerFormat === "short_answer"} className={`${styles.modeCard} ${answerFormat === "short_answer" ? styles.selected : ""}`} onClick={() => onAnswerFormat("short_answer")}><span className={styles.modeIcon}><Keyboard /></span><strong>Resposta curta</strong>{answerFormat === "short_answer" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>
-              </div>
-              {answerFormat === "short_answer" && <div className={styles.shortModePicker}><span className={styles.topicTitle}>Como responder</span><div className={styles.shortModeChoices} role="radiogroup" aria-label="Modo de resposta curta">
-                <button type="button" role="radio" aria-checked={shortAnswerMode === "type_and_check"} className={shortAnswerMode === "type_and_check" ? styles.selected : ""} onClick={() => onShortAnswerMode("type_and_check")}><Keyboard /><span><strong>Escrever e verificar</strong><small>Compara o texto e confirma o resultado.</small></span></button>
-                <button type="button" role="radio" aria-checked={shortAnswerMode === "reveal_and_self_assess"} className={shortAnswerMode === "reveal_and_self_assess" ? styles.selected : ""} onClick={() => onShortAnswerMode("reveal_and_self_assess")}><Eye /><span><strong>Revelar e autoavaliar</strong><small>Vê a resposta e indica se acertaste.</small></span></button>
-              </div></div>}
-            </div>
-          </section>
-
-          {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}. Faz primeiro um teste normal.</p></div><button type="button" onClick={onNormal}>Teste aleatório</button></aside>}
-          {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir um teste aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Teste aleatório</button><button type="button" onClick={onMistakes}>Rever erros</button></span></aside>}
-          {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; o teste escolhido requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 15 para iniciar um teste.</>}</p></div></aside>}
-        </>}
+    {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
+    {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar a tua sessão" text="A carregar disciplinas e perguntas." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
+      <section className={styles.unitCatalogue} aria-label="Disciplinas">
+        <div className={styles.unitGrid}>
+          {units.map((unit) => {
+            const selected = unit.id === selectedUnitId;
+            return <article key={unit.id} className={`${styles.unitCard} ${selected ? styles.unitCardSelected : ""}`}>
+              <button type="button" className={styles.unitCardHeader} onClick={() => onUnit(unit.id)} aria-expanded={selected}>
+                <span className={styles.unitCode}>{unit.code}</span>
+                <span><strong>{unit.name}</strong><small>{unit.questionCount} perguntas</small></span>
+                <ChevronDown aria-hidden="true" />
+              </button>
+              {selected && <div className={styles.unitSettings}>
+                <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Objetivo</strong></div><div className={styles.modeGrid} role="radiogroup" aria-label={`Objetivo da sessão de ${unit.name}`}>{modeCards.map((mode) => { const Icon = mode.icon; const active = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={active} aria-label={`${mode.title}. ${mode.description}`} title={mode.description} className={`${styles.modeCard} ${active ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}</strong>{active && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}</div>
+                  <div className={styles.topicPicker} role="group" aria-labelledby={`quiz-topics-${unit.id}`}><span id={`quiz-topics-${unit.id}`} className={styles.topicTitle}>Temas</span><div className={styles.topicChoices}>{topics.map((topic) => { const checked = selectedTopicIds.includes(topic.id); return <label key={topic.id} className={checked ? styles.topicChecked : ""}><input type="checkbox" checked={checked} onChange={() => onTopics(checked ? selectedTopicIds.filter((id) => id !== topic.id) : [...selectedTopicIds, topic.id])} /><span className={styles.topicName}>{topic.name}</span>{topic.questionCount > 0 && <small>{topic.questionCount}</small>}<span className={styles.topicIndicator}>{checked && <Check />}</span></label>; })}</div>{!topics.length && <small>Sem temas publicados.</small>}</div>
+                </section>
+                <div className={styles.settingColumns}>
+                  <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Duração</strong></div><label className={styles.countControl} htmlFor={`quiz-question-count-${unit.id}`}><span className={styles.selectWrap}><select id={`quiz-question-count-${unit.id}`} aria-label="Duração da sessão" value={countOptions.includes(questionCount) ? questionCount : ""} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.length ? countOptions.map((count) => <option key={count} value={count}>{count} min · {count} perguntas</option>) : <option value="">Menos de 5 perguntas disponíveis</option>}</select><ChevronDown aria-hidden="true" /></span></label></section>
+                  <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Formato</strong></div><div className={styles.answerFormatGrid} role="radiogroup" aria-label="Formato de resposta"><button type="button" role="radio" aria-checked={answerFormat === "multiple_choice"} className={`${styles.modeCard} ${answerFormat === "multiple_choice" ? styles.selected : ""}`} onClick={() => onAnswerFormat("multiple_choice")}><span className={styles.modeIcon}><CheckCircle2 /></span><strong>Escolha múltipla</strong>{answerFormat === "multiple_choice" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button><button type="button" role="radio" aria-checked={answerFormat === "short_answer"} className={`${styles.modeCard} ${answerFormat === "short_answer" ? styles.selected : ""}`} onClick={() => onAnswerFormat("short_answer")}><span className={styles.modeIcon}><Keyboard /></span><strong>Resposta curta</strong>{answerFormat === "short_answer" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button></div></section>
+                </div>
+                {answerFormat === "short_answer" && <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Resposta curta</strong></div><div className={styles.shortModeChoices} role="radiogroup" aria-label="Modo de resposta curta"><button type="button" role="radio" aria-checked={shortAnswerMode === "type_and_check"} className={shortAnswerMode === "type_and_check" ? styles.selected : ""} onClick={() => onShortAnswerMode("type_and_check")}><Keyboard /><span><strong>Escrever e verificar</strong></span></button><button type="button" role="radio" aria-checked={shortAnswerMode === "reveal_and_self_assess"} className={shortAnswerMode === "reveal_and_self_assess" ? styles.selected : ""} onClick={() => onShortAnswerMode("reveal_and_self_assess")}><Eye /><span><strong>Revelar e autoavaliar</strong></span></button></div></section>}
+                {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Sessão guiada</button></aside>}
+                {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir uma sessão guiada ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Sessão guiada</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
+                {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
+                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
+              </div>}
+            </article>;
+          })}
+        </div>
       </section>
-
-      {selectedUnit && <aside className={styles.setupSummary} aria-label="Resumo do teste">
-        <span className={`${styles.summaryStatus} ${canStart ? styles.summaryReady : ""}`}>{canStart ? <CheckCircle2 /> : <CircleHelp />}{canStart ? "Pronto a iniciar" : needsTopics ? "Escolhe um tema" : availability ? "Ajusta a seleção" : "Configuração incompleta"}</span>
-        <div className={styles.summaryUnit}><span className={styles.unitCode}>{selectedUnit.code}</span><div><strong>{selectedUnit.name}</strong><small>{availableQuestionCount} perguntas elegíveis</small></div></div>
-        <dl className={styles.summaryList}><div><dt>Tipo</dt><dd>{modeTitle(selectedMode)}</dd></div><div><dt>Perguntas</dt><dd>{questionCount}</dd></div><div><dt>Formato</dt><dd>{answerFormat === "multiple_choice" ? "Escolha múltipla" : shortAnswerMode === "type_and_check" ? "Escrever" : "Autoavaliar"}</dd></div><div><dt>Tempo</dt><dd>{questionCount} min</dd></div></dl>
-        <button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Iniciar teste"}</button>
-        <button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar APKG…" : "Baixar para Anki (.apkg)"}</button>
-        <button type="button" className={`${styles.personalPractice} ${selectedMode === "mistakes" ? styles.selected : ""}`} onClick={onMistakes} aria-pressed={selectedMode === "mistakes"} title="Criar um teste apenas com perguntas que erraste"><RotateCcw /><strong>Rever os meus erros</strong></button>
-      </aside>}
-    </div>}
+    </>}
   </>;
 }
 
@@ -970,15 +920,15 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   const isExam = attempt.mode === "exam";
   const answered = Boolean(currentAnswer?.selectedOptionId);
   const feedback = !isExam && currentAnswer?.correct !== null && currentAnswer?.correct !== undefined;
-  const [shortDrafts, setShortDrafts] = useState<Record<string, { value: string; revealed: boolean; proposal: boolean | null }>>({});
-  const shortDraft = shortDrafts[question.id] ?? { value: "", revealed: false, proposal: null };
+  const [shortDrafts, setShortDrafts] = useState<Record<string, { value: string; revealed: boolean; correct: boolean | null }>>({});
+  const shortDraft = shortDrafts[question.id] ?? { value: "", revealed: false, correct: null };
   const correctOption = question.options.find((option) => option.id === question.correctOptionId) ?? null;
   const incorrectOption = question.options.find((option) => option.id !== question.correctOptionId) ?? null;
   const updateShortDraft = (next: Partial<typeof shortDraft>) => setShortDrafts((current) => ({ ...current, [question.id]: { ...shortDraft, ...next } }));
   const assessShortAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!correctOption || !shortDraft.value.trim()) return;
-    updateShortDraft({ revealed: true, proposal: isShortAnswerMatch(shortDraft.value, correctOption.text) });
+    updateShortDraft({ revealed: true, correct: isShortAnswerMatch(shortDraft.value, correctOption.text) });
   };
   const submitSelfAssessment = (correct: boolean) => {
     const option = correct ? correctOption : incorrectOption;
@@ -995,7 +945,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
       <aside className={styles.navigator} aria-label="Navegação pelas perguntas"><header><strong>Perguntas</strong><small>{progress}%</small></header><div className={styles.questionGrid}>{attempt.questions.map((item, index) => { const answer = attempt.answers.find((entry) => entry.questionId === item.id); const state = !answer ? "não respondida" : isExam || answer.correct === null ? "respondida" : answer.correct ? "certa" : "errada"; return <button key={item.id} type="button" className={`${styles.questionNumber} ${index === currentIndex ? styles.current : ""} ${statusClass(answer)}`} onClick={() => onQuestion(index)} aria-current={index === currentIndex ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${state}`}>{index + 1}</button>; })}</div></aside>
       <section className={styles.questionPanel} aria-labelledby="question-title">
         <header className={styles.questionHeader}><span className={styles.topicLabel}>{question.topic}</span><small>{currentIndex + 1} / {attempt.questions.length}</small></header>
-        <div className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
+        <div key={question.id} className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
           {question.imageUrl && <figure className={styles.questionImage}><img src={question.imageUrl} alt={question.imageAlt} /></figure>}
           <div className={styles.questionContent}>
             <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
@@ -1004,18 +954,18 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 const selected = currentAnswer?.selectedOptionId === option.id;
                 const correct = feedback && option.id === question.correctOptionId;
                 const wrong = feedback && selected && currentAnswer?.correct === false;
-                return <button key={option.id} type="button" role="radio" aria-checked={selected} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
+                return <button key={option.id} type="button" role="radio" aria-checked={selected} aria-keyshortcuts={String(index + 1)} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
               })}
             </div> : <section className={styles.shortAnswer} aria-label="Resposta curta">
-              {shortAnswerMode === "type_and_check" && !shortDraft.revealed && !answered && <form className={styles.shortAnswerForm} onSubmit={assessShortAnswer}><label htmlFor={`short-answer-${question.id}`}>A tua resposta</label><div className={styles.shortAnswerComposer}><textarea id={`short-answer-${question.id}`} value={shortDraft.value} onChange={(event) => updateShortDraft({ value: event.target.value, proposal: null })} placeholder="Escreve a resposta por palavras tuas…" rows={2} disabled={answering} /><footer><small>Podes corrigir a avaliação depois de veres a resposta.</small><button type="submit" disabled={!shortDraft.value.trim() || !correctOption}>Verificar</button></footer></div></form>}
+              {shortAnswerMode === "type_and_check" && !shortDraft.revealed && !answered && <form className={styles.shortAnswerForm} onSubmit={assessShortAnswer}><label htmlFor={`short-answer-${question.id}`}>A tua resposta</label><div className={styles.shortAnswerComposer}><textarea id={`short-answer-${question.id}`} value={shortDraft.value} onChange={(event) => updateShortDraft({ value: event.target.value, correct: null })} placeholder="Escreve a resposta…" rows={2} disabled={answering} /><footer><button type="submit" disabled={!shortDraft.value.trim() || !correctOption}>Verificar</button></footer></div></form>}
               {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Ver resposta</button>}
-              {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}><span>Resposta correta</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong>{shortAnswerMode === "type_and_check" && shortDraft.proposal !== null && !answered && <p className={shortDraft.proposal ? styles.proposalCorrect : styles.proposalIncorrect}>{shortDraft.proposal ? <CheckCircle2 /> : <XCircle />}O sistema considera {shortDraft.proposal ? "certo" : "errado"}.</p>}{!answered && <div className={styles.selfAssessmentActions} aria-label="Confirmar autoavaliação"><button type="button" className={styles.selfAssessmentCorrect} onClick={() => submitSelfAssessment(true)} disabled={answering || !correctOption}><CheckCircle2 />Acertei</button><button type="button" className={styles.selfAssessmentIncorrect} onClick={() => submitSelfAssessment(false)} disabled={answering || !incorrectOption}><XCircle />Errei</button></div>}</div>}
+              {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}><span>Resposta correta</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && !answered && <p className={shortDraft.correct ? styles.proposalCorrect : styles.proposalIncorrect}>{shortDraft.correct ? <CheckCircle2 /> : <XCircle />}{shortDraft.correct ? "Certa" : "Errada"}</p>}{!answered && <div className={styles.selfAssessmentActions} aria-label="Confirmar resultado"><button type="button" className={shortDraft.correct === false ? styles.selfAssessmentIncorrect : styles.selfAssessmentCorrect} onClick={() => submitSelfAssessment(shortDraft.correct ?? true)} disabled={answering || !correctOption || !incorrectOption}>{shortDraft.correct === false ? <XCircle /> : <CheckCircle2 />}Confirmar</button>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && <button type="button" className={styles.selfAssessmentOverride} onClick={() => submitSelfAssessment(!shortDraft.correct)} disabled={answering}>{shortDraft.correct ? "Marcar errada" : "Marcar certa"}</button>}</div>}</div>}
             </section>}
             {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><RichTextContent value={question.explanation ?? "Consulta a explicação para consolidar este conceito."} className={styles.answerExplanation} /></div></section>}
             {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
           </div>
         </div>
-        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} disabled={!answered && isExam}><Lightbulb /> {showExplanation ? "Ocultar explicação" : "Explicação"}</button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /> Comentários</button></div><div><button type="button" className={styles.secondaryButton} onClick={onPrevious} disabled={currentIndex === 0}><ArrowLeft /> Anterior</button><button type="button" className={styles.primaryButton} onClick={onNext} disabled={!answered}>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}<ArrowRight /></button></div></footer>
+        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} disabled={!answered && isExam}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /><span>Comentários</span></button></div><div><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={!answered}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}</span><ArrowRight /></button></div></footer>
         {commentsOpen && <Comments comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
       </section>
     </div>
@@ -1026,10 +976,9 @@ function ResultsView({ attempt, correctCount, percent, recommendation, onRestart
   const total = attempt.questions.length;
   const displayedCorrect = attempt.totalCorrect !== null && Number.isFinite(attempt.totalCorrect) ? attempt.totalCorrect : correctCount;
   return <>
-    <header className={styles.resultsHero}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong><small>acerto</small></div><div><span className={styles.eyebrow}>Teste concluído</span><h1>O teu resultado</h1><p>Respondeste corretamente a <strong>{displayedCorrect}</strong> de <strong>{total}</strong> perguntas. Revê os pontos abaixo e volta quando te sentires preparado.</p></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></header>
-    <section className={styles.resultStats}><span><CheckCircle2 /><b>{displayedCorrect}</b><small>{displayedCorrect === 1 ? "certa" : "certas"}</small></span><span><XCircle /><b>{Math.max(0, total - displayedCorrect)}</b><small>a rever</small></span><span><TimerReset /><b>{modeTitle(attempt.mode)}</b><small>modo concluído</small></span></section>
-    <section className={styles.recommendation}><span><Sparkles /></span><div><strong>Próximo passo recomendado</strong><p>{recommendation}</p></div><button type="button" onClick={onRestart}>Praticar agora <ArrowRight /></button></section>
-    <section className={styles.review} aria-labelledby="review-title"><header><div><h2 id="review-title">Revisão das respostas</h2><p>Consulta a resposta correta e a explicação de cada pergunta.</p></div><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>Pergunta {index + 1} · {question.topic}</small><RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Resposta correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
+    <header className={styles.resultsHero}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong></div><div><span className={styles.eyebrow}>Concluído</span><h1>{displayedCorrect}/{total} certas</h1></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></header>
+    <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p><button type="button" onClick={onRestart}>Praticar <ArrowRight /></button></section>
+    <section className={styles.review} aria-labelledby="review-title"><header><h2 id="review-title">Revisão</h2><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>{index + 1} · {question.topic}</small><RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
   </>;
 }
 

@@ -768,6 +768,10 @@ a { color: inherit; }
 .urgent-announcement > button svg { width:16px; }
 
 .main-content { max-width: 1480px; margin: 0 auto; padding: 32px 34px 52px; }
+.app-shell--focus .sidebar,
+.app-shell--focus .topbar { display: none; }
+.app-shell--focus .workspace { margin-left: 0; }
+.app-shell--focus .main-content { max-width: 1320px; min-height: 100dvh; padding: 18px 24px 32px; }
 .main-content--preference { max-width: none; min-height: calc(100vh - 72px); padding: 24px 32px 40px; }
 .main-content--preference > .student-preferences { min-height: 0; margin-bottom: var(--space-4); }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
@@ -1291,6 +1295,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   .workspace { margin-left: 0; }
   .topbar { padding: 0 20px; }
   .main-content { padding: 26px 20px 44px; }
+  .app-shell--focus .main-content { padding: 8px 8px 20px; }
   .main-content--preference { padding: 20px; }
   .main-content--preference > .student-preferences { min-height: 0; }
   .announcement { padding-inline: 20px; }
