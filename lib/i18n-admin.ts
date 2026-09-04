@@ -502,7 +502,7 @@ const enData: Record<DataLabelKind, Record<string, string>> = {
   },
   module: {
     classes: "Class management", "classes.rosters": "Lists and rosters", "classes.preferences": "Student preferences", "classes.placements": "Placements", "classes.special_statuses": "Special statuses",
-    quizzes: "Multiple-choice quizzes", "quizzes.practice": "Practice and mock exams", "quizzes.progress": "Personal progress", "quizzes.management": "Question bank management",
+    quizzes: "Quizzes and learning", "quizzes.practice": "Practice and mock exams", "quizzes.progress": "Personal progress", "quizzes.learning": "Interactive learning", "quizzes.management": "Question bank management",
     announcements: "Notices and announcements", "announcements.feed": "View notices", "announcements.publishing": "Committee publishing",
     curricular_units: "Course units", "curricular_units.catalog": "Catalogue and credits", "curricular_units.management": "Management Team administration", "curricular_units.detail": "Course unit area",
     calendar: "Academic calendar", "calendar.events": "View calendar", "calendar.management": "Event management", "calendar.subscription": "Calendar subscription",
@@ -518,7 +518,7 @@ const enData: Record<DataLabelKind, Record<string, string>> = {
   },
   moduleDescription: {
     classes: "Class rosters, preferences and distribution.", "classes.rosters": "View, prepare and submit class lists.", "classes.preferences": "Collect decisions to remain in or change class.", "classes.placements": "Validate, calculate, review and publish placements.", "classes.special_statuses": "Identify worker-students, athletes and other special statuses.",
-    quizzes: "Interactive practice organised by course unit and topic.", "quizzes.practice": "Quick tests, topic practice, unseen questions, mistakes and timed mock exams.", "quizzes.progress": "History, accuracy and revision of difficult questions.", "quizzes.management": "Import, edit and publish topics and questions.",
+    quizzes: "Interactive practice and learning paths organised by course unit and topic.", "quizzes.practice": "Quick tests, topic practice, unseen questions, mistakes and timed mock exams.", "quizzes.progress": "History, accuracy and revision of difficult questions.", "quizzes.learning": "Learning paths that alternate concise explanations with related exercises.", "quizzes.management": "Import, edit and publish topics and questions.",
     announcements: "Institutional communication from the Course Committee.", "announcements.feed": "Show published notices to users.", "announcements.publishing": "Announcement editor for Committee role holders.",
     curricular_units: "Course catalogue and Committee representatives.", "curricular_units.catalog": "View course units, year, semester and ECTS.", "curricular_units.management": "Creation and editing reserved for the Management Team.", "curricular_units.detail": "Combined page with representative, events, documents and announcements.",
     calendar: "Assessments, submissions, events and academic deadlines.", "calendar.events": "Chronological calendar with course unit filters.", "calendar.management": "Create and edit assessments, submissions and events through the Committee.", "calendar.subscription": "Export and continuously subscribe to the academic calendar using ICS.",

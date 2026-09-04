@@ -7,6 +7,7 @@ export type AppModuleKey =
   | "quizzes"
   | "quizzes.practice"
   | "quizzes.progress"
+  | "quizzes.learning"
   | "quizzes.management"
   | "announcements"
   | "announcements.feed"
@@ -64,9 +65,10 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: "classes.preferences", label: "Preferências dos estudantes", description: "Recolha das decisões de permanência ou mudança de turma.", parentKey: "classes", defaultEnabled: false, retired: true },
   { key: "classes.placements", label: "Colocações", description: "Validação, cálculo, revisão e publicação das colocações.", parentKey: "classes", defaultEnabled: false, retired: true },
   { key: "classes.special_statuses", label: "Estatutos especiais", description: "Identificação de Trabalhadores-Estudantes, Atletas e outros estatutos especiais.", parentKey: "classes", defaultEnabled: false, retired: true },
-  { key: "quizzes", label: "Testes de escolha múltipla", description: "Treino interativo organizado por unidade curricular e tema.", parentKey: null, defaultEnabled: true },
+  { key: "quizzes", label: "Testes e aprendizagem", description: "Treino e percursos interativos organizados por unidade curricular e tema.", parentKey: null, defaultEnabled: true },
   { key: "quizzes.practice", label: "Treino e simulados", description: "Testes rápidos, temáticos, não vistos, erros e simulados cronometrados.", parentKey: "quizzes", defaultEnabled: true },
   { key: "quizzes.progress", label: "Progresso pessoal", description: "Histórico, taxa de acerto e revisão das perguntas com maior dificuldade.", parentKey: "quizzes", defaultEnabled: true },
+  { key: "quizzes.learning", label: "Aprendizagem interativa", description: "Percursos que alternam explicações curtas com exercícios relacionados.", parentKey: "quizzes", defaultEnabled: true },
   { key: "quizzes.management", label: "Gestão do banco de perguntas", description: "Importação CSV e publicação de temas e perguntas pelos administradores.", parentKey: "quizzes", defaultEnabled: true },
   { key: "announcements", label: "Avisos e comunicados", description: "Comunicação institucional da Comissão de Curso.", parentKey: null, defaultEnabled: true },
   { key: "announcements.feed", label: "Consulta de avisos", description: "Apresentação dos avisos publicados aos utilizadores.", parentKey: "announcements", defaultEnabled: true },

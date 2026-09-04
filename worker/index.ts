@@ -9,6 +9,7 @@ import { announcementDisplayHtml, announcementPlainText, sanitizeAnnouncementHtm
 import { isStudentSpecialStatus, studentStatusFromCode, type StudentSpecialStatus } from "@/lib/student-status";
 import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
 import { handleQuizRoute, isQuizPath } from "./quizzes";
+import { handleLearningRoute, isLearningPath } from "./learning";
 
 export interface Env {
   DB: D1Database;
@@ -1555,6 +1556,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (isQuizPath(pathname)) {
     const user = await currentUser(request, env);
     return handleQuizRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
+  }
+  if (isLearningPath(pathname)) {
+    const user = await currentUser(request, env);
+    return handleLearningRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
   }
   if (isAcademicHubPath(pathname)) {
     const user = await currentUser(request, env);

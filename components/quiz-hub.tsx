@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
 
+import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   Eye,
   EyeOff,
   Flag,
+  GraduationCap,
   Lightbulb,
   LoaderCircle,
   Keyboard,
@@ -846,7 +848,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   return <>
     <header className={`page-heading page-heading--simple ${styles.hero}`}>
       <div><span className="eyebrow">Testes</span><h1>Escolhe uma disciplina</h1></div>
-      <button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />Estatísticas</button>
+      <div className={styles.statisticsActions}><Link className={styles.statisticsButton} href="/testes/aprender"><GraduationCap />Aprender matéria</Link><button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />Estatísticas</button></div>
     </header>
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
     {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar a tua sessão" text="A carregar disciplinas e perguntas." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
