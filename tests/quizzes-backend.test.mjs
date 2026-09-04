@@ -6,6 +6,7 @@ const worker = await readFile(new URL("../worker/quizzes.ts", import.meta.url), 
 const router = await readFile(new URL("../worker/index.ts", import.meta.url), "utf8");
 const migration = await readFile(new URL("../migrations/0030_quizzes.sql", import.meta.url), "utf8");
 const commentThreadsMigration = await readFile(new URL("../migrations/0032_quiz_comment_threads.sql", import.meta.url), "utf8");
+const publicQuizMigration = await readFile(new URL("../migrations/0038_enable_public_quizzes.sql", import.meta.url), "utf8");
 const seed = await readFile(new URL("../scripts/setup-local-test.mjs", import.meta.url), "utf8");
 const quizHub = await readFile(new URL("../components/quiz-hub.tsx", import.meta.url), "utf8");
 const quizHubStyles = await readFile(new URL("../components/quiz-hub.module.css", import.meta.url), "utf8");
@@ -48,10 +49,10 @@ test("practice feedback is immediate while exam answers stay hidden until comple
 test("quiz selection, fixed lengths, universal timing and abandonment are enforced server side", () => {
   assert.match(worker, /not_enough_mistakes/);
   assert.match(worker, /all_questions_seen/);
-  assert.match(worker, /TEST_QUESTION_COUNTS = new Set\(\[15, 30, 50\]\)/);
-  assert.match(worker, /DEFAULT_TEST_QUESTION_COUNT = 15/);
+  assert.match(worker, /TEST_QUESTION_COUNTS = new Set\(\[5, 10, 15, 30, 50\]\)/);
+  assert.match(worker, /DEFAULT_TEST_QUESTION_COUNT = 5/);
   assert.match(worker, /!TEST_QUESTION_COUNTS\.has\(requestedCount\)/);
-  assert.match(worker, /Escolha 15, 30 ou 50 perguntas/);
+  assert.match(worker, /Escolha 5, 10, 15, 30 ou 50 perguntas/);
   assert.match(worker, /const durationSeconds = requestedCount \* 60/);
   assert.match(worker, /code: "not_enough_questions"/);
   assert.match(worker, /status='abandoned'/);
@@ -60,6 +61,17 @@ test("quiz selection, fixed lengths, universal timing and abandonment are enforc
   assert.match(worker, /attempt_expired/);
   assert.doesNotMatch(worker, /difficult: "quick"/);
   assert.doesNotMatch(worker, /hard: "quick"/);
+});
+
+test("a publicação mantém todos os módulos de testes disponíveis", () => {
+  for (const key of ["quizzes", "quizzes.practice", "quizzes.progress", "quizzes.management"]) assert.match(publicQuizMigration, new RegExp(`'${key.replaceAll(".", "\\.")}', 1`));
+  assert.match(publicQuizMigration, /ON CONFLICT\(module_key\) DO UPDATE SET/);
+  assert.match(publicQuizMigration, /enabled = 1/);
+});
+
+test("o Worker não expõe nem depende de serviços externos para respostas curtas", () => {
+  assert.doesNotMatch(worker, /evaluateShortAnswer|GEMINI|Gemma|generativelanguage|x-goog-api-key/);
+  assert.doesNotMatch(router, /GEMINI_API_KEY/);
 });
 
 test("authenticated students can export the current quiz selection for Anki", () => {

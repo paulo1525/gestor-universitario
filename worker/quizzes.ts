@@ -23,8 +23,8 @@ type PublicQuizCommentThread = PublicQuizComment & { replies: PublicQuizCommentT
 
 const MAX_IMPORT_ROWS = 100;
 const MAX_IMAGE_BYTES = 1024 * 1024;
-const TEST_QUESTION_COUNTS = new Set([15, 30, 50]);
-const DEFAULT_TEST_QUESTION_COUNT = 15;
+const TEST_QUESTION_COUNTS = new Set([5, 10, 15, 30, 50]);
+const DEFAULT_TEST_QUESTION_COUNT = 5;
 const ADMIN_QUESTION_PAGE_SIZES = new Set([10, 25, 50]);
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
 
@@ -219,7 +219,7 @@ async function exportQuiz(env: QuizEnv, url: URL, user: QuizUser | null, enabled
     ...url.searchParams.getAll("topicId"),
     ...(url.searchParams.get("topicIds") || "").split(","),
   ].map((id) => text(id, 100)).filter(Boolean))].slice(0, 30);
-  if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) return json({ error: "Escolha 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
+  if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) return json({ error: "Escolha 5, 10, 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
   if (!unitId || !await activeUnit(env, unitId)) return json({ error: "Escolha uma unidade curricular válida." }, 400);
   if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para exportar." }, 400);
   const selectedTopics = await Promise.all(topicIds.map((id) => activeTopic(env, id)));
@@ -339,7 +339,7 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const topicId = topicIds.length === 1 ? topicIds[0] : null;
   const requestedCount = Number(body.questionCount ?? body.count ?? DEFAULT_TEST_QUESTION_COUNT);
   if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) {
-    return json({ error: "Escolha 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
+    return json({ error: "Escolha 5, 10, 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
   }
   const durationSeconds = requestedCount * 60;
   if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para o teste temático." }, 400);

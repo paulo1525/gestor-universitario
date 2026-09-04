@@ -4,17 +4,34 @@ import test from "node:test";
 
 const quizHub = await readFile(new URL("../components/quiz-hub.tsx", import.meta.url), "utf8");
 const quizManagement = await readFile(new URL("../components/quiz-management.tsx", import.meta.url), "utf8");
+const appShell = await readFile(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
+const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-test("o configurador oferece apenas testes de 15, 30 ou 50 perguntas suportados pelo banco", () => {
-  assert.match(quizHub, /QUIZ_QUESTION_COUNTS:\s*readonly number\[\]\s*=\s*\[15, 30, 50\]/);
+test("o configurador oferece sessões curtas e testes longos suportados pelo banco", () => {
+  assert.match(quizHub, /QUIZ_QUESTION_COUNTS:\s*readonly number\[\]\s*=\s*\[5, 10, 15, 30, 50\]/);
   assert.match(quizHub, /readQuizPreferences\(\)\.questionCount \?\? DEFAULT_QUESTION_COUNT/);
   assert.match(quizHub, /QUIZ_QUESTION_COUNTS\.filter\(\(count\) => count <= availableQuestionCount\)/);
   assert.match(quizHub, /supportedCounts\.at\(-1\) \?\? DEFAULT_QUESTION_COUNT/);
   assert.match(quizHub, /availableQuestionCount < DEFAULT_QUESTION_COUNT/);
-  assert.match(quizHub, /Menos de 15 perguntas disponíveis/);
-  assert.match(quizHub, /São necessárias pelo menos 15 para iniciar um teste/);
+  assert.match(quizHub, /Menos de 5 perguntas disponíveis/);
+  assert.match(quizHub, /São necessárias pelo menos 5 para iniciar uma sessão/);
   assert.doesNotMatch(quizHub, /Array\.from\(\{ length: effectiveMaximum - 9 \}/);
   assert.doesNotMatch(quizHub, /pelo menos 10 perguntas disponíveis/);
+});
+
+test("a sessão MediLoop mantém poucos controlos durante a resposta", () => {
+  for (const label of ["Sessão guiada", "Matéria nova", "Só erros", "Por tópico"]) {
+    assert.match(quizHub, new RegExp(label));
+  }
+  for (const label of ["Chute", "Dúvida", "Provável", "Certeza", "Falhei", "Difícil", "Bom", "Fácil"]) {
+    assert.doesNotMatch(quizHub, new RegExp(label));
+  }
+  assert.doesNotMatch(quizHub, /confidenceByQuestion|ratingByQuestion/);
+  assert.match(quizHub, /aria-keyshortcuts=\{String\(index \+ 1\)\}/);
+  assert.match(quizHub, /aria-keyshortcuts="ArrowRight Enter"/);
+  assert.match(quizHub, /focusMode=\{screen === "attempt"\}/);
+  assert.match(appShell, /app-shell--focus/);
+  assert.match(globals, /\.app-shell--focus \.main-content/);
 });
 
 test("o formato de resposta e o modo de resposta curta ficam nas preferências do configurador", () => {
@@ -28,17 +45,23 @@ test("o formato de resposta e o modo de resposta curta ficam nas preferências d
   }
 });
 
-test("a tentativa de resposta curta compara localmente e só regista a autoavaliação final", () => {
-  assert.match(quizHub, /function normalizeShortAnswer\(value: string\)/);
-  assert.match(quizHub, /normalize\("NFD"\)/);
-  assert.match(quizHub, /function isShortAnswerMatch\(value: string, expected: string\)/);
+test("a tentativa de resposta curta usa apenas o corretor local e mantém a decisão final do estudante", () => {
+  assert.match(quizHub, /import \{ isShortAnswerMatch \} from "@\/lib\/short-answer-match\.mjs"/);
   assert.match(quizHub, /answerFormat === "multiple_choice" \? <div className=\{styles\.options\}/);
-  assert.match(quizHub, /O sistema considera \{shortDraft\.proposal \? "certo" : "errado"\}\./);
+  assert.match(quizHub, /isShortAnswerMatch\(shortDraft\.value, correctOption\.text\)/);
+  assert.doesNotMatch(quizHub, /\/evaluate|GEMINI|Gemma/);
   assert.match(quizHub, /const option = correct \? correctOption : incorrectOption/);
   assert.match(quizHub, /onSelect\(option\.id\)/);
-  for (const label of ["Verificar", "Ver resposta", "Resposta correta", "Acertei", "Errei"]) {
+  for (const label of ["Verificar", "Ver resposta", "Resposta correta", "Certa", "Errada", "Confirmar", "Marcar certa", "Marcar errada"]) {
     assert.match(quizHub, new RegExp(label));
   }
+});
+
+test("os temas estão sempre disponíveis e filtram qualquer modo de sessão", () => {
+  assert.doesNotMatch(quizHub, /selectedMode === "topic" && <div className=\{styles\.topicPicker\}/);
+  assert.match(quizHub, /const activeTopicIds = selectedTopicIds/);
+  assert.match(quizHub, /if \(selectedTopicIds\.length\) params\.set\("topicIds"/);
+  assert.match(quizHub, /if \(selectedTopicIds\.length\) return topics\.filter/);
 });
 
 test("o gestor apresenta dificuldades no plural sem alterar os valores internos", () => {
