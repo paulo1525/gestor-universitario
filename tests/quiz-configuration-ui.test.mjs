@@ -39,7 +39,7 @@ test("o formato de resposta e o modo de resposta curta ficam nas preferências d
   assert.match(quizHub, /type ShortAnswerMode = "type_and_check" \| "reveal_and_self_assess"/);
   assert.match(quizHub, /answerFormat: preferences\.answerFormat \?\? "multiple_choice"/);
   assert.match(quizHub, /shortAnswerMode: preferences\.shortAnswerMode \?\? "type_and_check"/);
-  assert.match(quizHub, /saveQuizPreferences\(\{ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode \}\)/);
+  assert.match(quizHub, /saveQuizPreferences\(\{ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed \}\)/);
   for (const label of ["Escolha múltipla", "Resposta curta", "Escrever e verificar", "Revelar e autoavaliar"]) {
     assert.match(quizHub, new RegExp(label));
   }

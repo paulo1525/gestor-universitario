@@ -53,7 +53,7 @@ test("quiz selection, fixed lengths, universal timing and abandonment are enforc
   assert.match(worker, /DEFAULT_TEST_QUESTION_COUNT = 5/);
   assert.match(worker, /!TEST_QUESTION_COUNTS\.has\(requestedCount\)/);
   assert.match(worker, /Escolha 5, 10, 15, 30 ou 50 perguntas/);
-  assert.match(worker, /const durationSeconds = requestedCount \* 60/);
+  assert.match(worker, /const durationSeconds = body\.timed === false \? null : requestedCount \* 60/);
   assert.match(worker, /code: "not_enough_questions"/);
   assert.match(worker, /status='abandoned'/);
   assert.match(worker, /answers\|finish\|abandon/);
