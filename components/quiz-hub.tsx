@@ -25,6 +25,7 @@ import {
   Keyboard,
   MessageCircle,
   Play,
+  Pause,
   RotateCcw,
   Send,
   Sparkles,
@@ -35,6 +36,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -96,9 +98,15 @@ type Attempt = {
   status: "active" | "finished";
   quizId: string;
   title: string;
+  answerFormat: AnswerFormat;
+  shortAnswerMode: ShortAnswerMode;
   startedAt: string | null;
   endsAt: string | null;
   durationSeconds: number | null;
+  timed: boolean;
+  timerPaused: boolean;
+  pauseReason: "manual" | "automatic";
+  pausedRemainingSeconds: number | null;
   questions: Question[];
   answers: Answer[];
   score: number | null;
@@ -107,7 +115,7 @@ type Attempt = {
 type ApiComment = { id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
 type Comment = { id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
-type QuizPreferences = { unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
+type QuizPreferences = { timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
 const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
@@ -162,14 +170,14 @@ function readQuizPreferences(): QuizPreferences {
     const questionCount = typeof saved.questionCount === "number" && QUIZ_QUESTION_COUNTS.includes(saved.questionCount) ? saved.questionCount : undefined;
     const answerFormat = saved.answerFormat === "short_answer" ? "short_answer" : saved.answerFormat === "multiple_choice" ? "multiple_choice" : undefined;
     const shortAnswerMode = saved.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : saved.shortAnswerMode === "type_and_check" ? "type_and_check" : undefined;
-    return { unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
+    return { timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
   } catch { return {}; }
 }
 
 function saveQuizPreferences(preferences: QuizPreferences) {
   if (typeof document === "undefined") return;
   const preferredQuestionCount = preferences.questionCount ?? DEFAULT_QUESTION_COUNT;
-  const safe = { unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
+  const safe = { timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
   document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
@@ -187,7 +195,7 @@ function readQuizProgress(): QuizProgress | null {
 
 function saveQuizProgress(attempt: Attempt, currentIndex: number) {
   if (typeof document === "undefined" || !attempt.id || attempt.status !== "active") return;
-  const expiresAt = attempt.endsAt ?? new Date(Date.now() + (attempt.durationSeconds ?? attempt.questions.length * 60) * 1000).toISOString();
+  const expiresAt = attempt.timerPaused || !attempt.timed ? new Date(Date.now() + 30 * 86400000).toISOString() : attempt.endsAt ?? new Date(Date.now() + 30 * 86400000).toISOString();
   const safe: QuizProgress = { attemptId: attempt.id.slice(0, 120), currentIndex: Math.max(0, Math.min(currentIndex, Math.max(0, attempt.questions.length - 1))), expiresAt, updatedAt: new Date().toISOString() };
   const maxAge = Math.max(60, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
   document.cookie = `${QUIZ_PROGRESS_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=${maxAge}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
@@ -250,9 +258,15 @@ function normalizeAttempt(raw: Record<string, unknown>, fallbackMode: Mode = "qu
     status: ["finished", "completed", "abandoned", "expired"].includes(String(value<string>(attempt, "status") ?? "active")) ? "finished" : "active",
     quizId: String(value<string | number>(attempt, "quizId", "quiz_id") ?? ""),
     title: String(value<string>(attempt, "quizTitle", "quiz_title", "title") ?? "Teste"),
+    answerFormat: attempt.answerFormat === "short_answer" ? "short_answer" : "multiple_choice",
+    shortAnswerMode: attempt.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check",
     startedAt: isoDate(rawStartedAt),
     endsAt: isoDate(rawEndsAt),
-    durationSeconds: Number(value<number>(attempt, "durationSeconds", "duration_seconds") ?? 0) || (questions.length ? questions.length * 60 : null),
+    durationSeconds: attempt.timed === false ? null : Number(value<number>(attempt, "durationSeconds", "duration_seconds") ?? 0) || (questions.length ? questions.length * 60 : null),
+    timed: attempt.timed !== false,
+    timerPaused: attempt.timerPaused === true,
+    pauseReason: attempt.pauseReason === "manual" ? "manual" : "automatic",
+    pausedRemainingSeconds: typeof attempt.pausedRemainingSeconds === "number" ? attempt.pausedRemainingSeconds : null,
     questions,
     answers,
     score: Number(value<number>(attempt, "score", "scorePercent", "score_percent") ?? NaN),
@@ -315,8 +329,17 @@ export function QuizHub() {
   const [selectedUnitId, setSelectedUnitId] = useState(() => readQuizPreferences().unitId ?? "");
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
   const [selectedMode, setSelectedMode] = useState<Mode>(() => readQuizPreferences().mode ?? "quick");
+  const [finishConfirmation, setFinishConfirmation] = useState(false);
+  const [finishError, setFinishError] = useState("");
+  const [restoringAttempt, setRestoringAttempt] = useState(true);
+  const [restoreError, setRestoreError] = useState("");
+  const [restoreVersion, setRestoreVersion] = useState(0);
   const [abandonConfirmation, setAbandonConfirmation] = useState(false);
   const [clearStatisticsConfirmation, setClearStatisticsConfirmation] = useState(false);
+  const [timed, setTimed] = useState(() => readQuizPreferences().timed !== false);
+  const [timerBusy, setTimerBusy] = useState(false);
+  const [timerError, setTimerError] = useState("");
+  const timerQueue = useRef<Promise<void>>(Promise.resolve());
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
   const [answerFormat, setAnswerFormat] = useState<AnswerFormat>(() => readQuizPreferences().answerFormat ?? "multiple_choice");
   const [shortAnswerMode, setShortAnswerMode] = useState<ShortAnswerMode>(() => readQuizPreferences().shortAnswerMode ?? "type_and_check");
@@ -345,6 +368,10 @@ export function QuizHub() {
   const [exportingAnki, setExportingAnki] = useState(false);
   const attemptRef = useRef<Attempt | null>(null);
   const pendingAnswerSaves = useRef(new Map<string, Promise<void>>());
+  const failedAnswerIds = useRef(new Set<string>());
+  const finishingRef = useRef(false);
+  const expirySubmitted = useRef<string | null>(null);
+  const commentsRequest = useRef(0);
 
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) ?? null;
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
@@ -363,7 +390,9 @@ export function QuizHub() {
   const correctCount = attempt?.answers.filter((answer) => answer.correct === true).length ?? 0;
   const recommendation = useMemo(() => {
     const incorrect = attempt?.questions.filter((item) => answers.get(item.id)?.correct === false) ?? [];
-    const topic = incorrect[0]?.topic;
+    const topicCounts = new Map<string, number>();
+    for (const item of incorrect) topicCounts.set(item.topic, (topicCounts.get(item.topic) ?? 0) + 1);
+    const topic = [...topicCounts].sort((a, b) => b[1] - a[1])[0]?.[0];
     return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "Mantém o ritmo: alterna testes temáticos e aleatórios para consolidar a matéria.";
   }, [answers, attempt?.questions]);
 
@@ -435,10 +464,11 @@ export function QuizHub() {
     });
   }, [selectedUnit]);
   useEffect(() => {
+    if (catalogueLoading || !selectedUnit) return;
     const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
     setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
-  }, [availableQuestionCount]);
-  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode }); }, [answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
+  }, [availableQuestionCount, catalogueLoading, selectedUnit]);
+  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -452,25 +482,36 @@ export function QuizHub() {
 
   useEffect(() => {
     const saved = readQuizProgress();
-    if (!saved) { clearQuizProgress(); return; }
+    if (!saved) { clearQuizProgress(); setRestoringAttempt(false); return; }
+    setRestoringAttempt(true);
+    setRestoreError("");
     let cancelled = false;
     void (async () => {
       try {
         const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(saved.attemptId)}`, { cache: "no-store" });
-        if (!response.ok) { clearQuizProgress(); return; }
+        if (cancelled) return;
+        if ([403, 404].includes(response.status)) { clearQuizProgress(); return; }
+        if (!response.ok) throw new Error("Não foi possível recuperar a sessão. Tenta novamente.");
         const data = await response.json() as Record<string, unknown>;
         const restored = normalizeAttempt(data);
-        if (cancelled || restored.status !== "active" || !restored.questions.length || (restored.endsAt && new Date(restored.endsAt).getTime() <= Date.now())) { clearQuizProgress(); return; }
+        if (cancelled) return;
+        if (restored.status !== "active" || !restored.questions.length) { clearQuizProgress(); return; }
         setAttempt(restored);
         attemptRef.current = restored;
         setCurrentIndex(Math.min(saved.currentIndex, restored.questions.length - 1));
         if (restored.unitId) setSelectedUnitId(restored.unitId);
-      } catch { clearQuizProgress(); }
+      } catch { if (!cancelled) setRestoreError("Não foi possível recuperar a sessão guardada. Verifica a ligação e tenta novamente."); }
+      finally { if (!cancelled) setRestoringAttempt(false); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [restoreVersion]);
 
   const startAttempt = useCallback(async () => {
+    if (loadingAttempt || restoringAttempt || restoreError) return;
+    if (attemptRef.current?.status === "active") {
+      setNotice({ kind: "warning", message: "Retoma ou encerra a sessão em curso antes de iniciar outra." });
+      return;
+    }
     if (!selectedUnit?.id) {
       setNotice({ kind: "warning", message: "Seleciona uma unidade curricular com perguntas disponíveis." });
       return;
@@ -487,7 +528,7 @@ export function QuizHub() {
     setAvailability(null);
     try {
       const activeTopicIds = selectedTopicIds;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: questionCount * 60 }) });
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: timed ? questionCount * 60 : null, answerFormat, shortAnswerMode, timed }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -500,8 +541,11 @@ export function QuizHub() {
       const next = updateAttempt(data, selectedMode);
       if (!next.questions.length) throw new Error("Esta sessão ainda não tem perguntas disponíveis para este modo.");
       setCurrentIndex(0);
+      failedAnswerIds.current.clear();
+      expirySubmitted.current = null;
+      setFinishError("");
       saveQuizProgress(next, 0);
-      setRemaining(next.endsAt ? Math.max(0, Math.ceil((new Date(next.endsAt).getTime() - Date.now()) / 1000)) : next.durationSeconds);
+      setRemaining(remainingQuizSeconds(next));
       setShowExplanation(false);
       setCommentsOpen(false);
       setReplyTo(null);
@@ -511,7 +555,7 @@ export function QuizHub() {
     } finally {
       setLoadingAttempt(false);
     }
-  }, [availableQuestionCount, questionCount, selectedMode, selectedTopicIds, selectedUnit, updateAttempt]);
+  }, [timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, updateAttempt]);
 
   const exportToAnki = useCallback(async () => {
     if (!selectedUnit?.id || exportingAnki) return;
@@ -520,7 +564,7 @@ export function QuizHub() {
       return;
     }
     if (availableQuestionCount < DEFAULT_QUESTION_COUNT) {
-      setNotice({ kind: "warning", message: "São necessárias pelo menos 15 perguntas para criar o baralho Anki." });
+      setNotice({ kind: "warning", message: "São necessárias pelo menos 5 perguntas para criar o baralho Anki." });
       return;
     }
     setExportingAnki(true);
@@ -546,29 +590,79 @@ export function QuizHub() {
     }
   }, [availableQuestionCount, exportingAnki, questionCount, selectedMode, selectedTopicIds, selectedUnit]);
 
-  const finishAttempt = useCallback(async () => {
+  const finishAttempt = useCallback(async (expired = false) => {
     const requestedAttempt = attemptRef.current;
-    if (!requestedAttempt || finishing) return;
+    if (!requestedAttempt || finishingRef.current) return;
+    finishingRef.current = true;
     setFinishing(true);
+    setFinishError("");
     try {
       if (pendingAnswerSaves.current.size) await Promise.allSettled([...pendingAnswerSaves.current.values()]);
       const active = attemptRef.current;
       if (!active || active.id !== requestedAttempt.id) return;
+      if (!expired && failedAnswerIds.current.size) throw new Error("Há respostas que não foram guardadas. Volta às perguntas por responder e tenta novamente antes de concluir.");
       const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/finish`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) throw new Error(apiError(data, "Não foi possível concluir o teste."));
       const next = updateAttempt(data, active.mode);
       clearQuizProgress();
+      setFinishConfirmation(false);
       setRemaining(0);
       setScreen("results");
       if (next.status !== "finished") setNotice({ kind: "success", message: "Teste concluído. Consulta o resultado e as explicações." });
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível concluir o teste." });
+      setFinishError(reason instanceof Error ? reason.message : "Não foi possível concluir o teste.");
+      setFinishConfirmation(false);
     } finally {
+      finishingRef.current = false;
       setFinishing(false);
       setAbandonConfirmation(false);
     }
-  }, [finishing, updateAttempt]);
+  }, [updateAttempt]);
+
+  const changeTimer = useCallback((action: "pause" | "resume", reason: "manual" | "automatic" = "manual") => {
+    const active = attemptRef.current;
+    if (!active || active.status !== "active" || !active.timed) return Promise.resolve();
+    // Freeze immediately on visibility loss; the server persists the authoritative remainder.
+    if (action === "pause" && !active.timerPaused) {
+      const paused = { ...active, timerPaused: true, pauseReason: reason, pausedRemainingSeconds: remainingQuizSeconds(active), endsAt: null };
+      attemptRef.current = paused;
+      setAttempt(paused);
+      saveQuizProgress(paused, currentIndex);
+    }
+    setTimerBusy(true);
+    setTimerError("");
+    const operation = timerQueue.current.catch(() => {}).then(async () => {
+      try {
+        const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/timer`, { method: "POST", keepalive: true, headers: { "content-type": "application/json" }, body: JSON.stringify({ action, reason }) });
+        const data = await response.json() as Record<string, unknown>;
+        if (!response.ok) throw new Error(apiError(data, "Não foi possível sincronizar o cronómetro."));
+        if (attemptRef.current?.id !== active.id) return;
+        const updated = normalizeAttempt(data);
+        const next = updated.status === "finished" ? updated : { ...attemptRef.current, timed: updated.timed, timerPaused: updated.timerPaused, pauseReason: updated.pauseReason, pausedRemainingSeconds: updated.pausedRemainingSeconds, endsAt: updated.endsAt };
+        attemptRef.current = next;
+        setAttempt(next);
+        setRemaining(remainingQuizSeconds(next));
+        if (next.status === "finished") { clearQuizProgress(); setScreen("results"); }
+        else saveQuizProgress(next, currentIndex);
+      } catch (error) {
+        setTimerError(`${error instanceof Error ? error.message : "Falha de ligação."} O servidor pode ainda estar a contar o tempo. Tenta sincronizar novamente.`);
+      } finally { setTimerBusy(false); }
+    });
+    timerQueue.current = operation;
+    return operation;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    if (screen !== "attempt") return;
+    const visibility = () => { void changeTimer(document.hidden ? "pause" : "resume", "automatic"); };
+    const leavePage = () => { void changeTimer("pause", "automatic"); };
+    if (document.hidden) leavePage();
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("pagehide", leavePage);
+    window.addEventListener("online", visibility);
+    return () => { document.removeEventListener("visibilitychange", visibility); window.removeEventListener("pagehide", leavePage); window.removeEventListener("online", visibility); };
+  }, [changeTimer, screen]);
 
   const resumeAttempt = useCallback(() => {
     const active = attemptRef.current;
@@ -579,18 +673,21 @@ export function QuizHub() {
     const nextIndex = restoredIndex ?? (firstUnanswered >= 0 ? firstUnanswered : Math.max(0, active.questions.length - 1));
     setCurrentIndex(nextIndex);
     saveQuizProgress(active, nextIndex);
-    setRemaining(active.endsAt ? Math.max(0, Math.ceil((new Date(active.endsAt).getTime() - Date.now()) / 1000)) : active.durationSeconds ?? active.questions.length * 60);
+    setRemaining(remainingQuizSeconds(active));
+    if (active.timerPaused && active.pauseReason === "automatic") void changeTimer("resume", "automatic");
     setShowExplanation(false);
     setCommentsOpen(false);
     setReplyTo(null);
     setScreen("attempt");
-  }, []);
+  }, [changeTimer]);
 
   const abandonAttempt = useCallback(async () => {
     const active = attemptRef.current;
-    if (!active || finishing) return;
+    if (!active || finishingRef.current) return;
+    finishingRef.current = true;
     setFinishing(true);
     try {
+      await Promise.allSettled([...pendingAnswerSaves.current.values()]);
       const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/abandon`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) throw new Error(apiError(data, "Não foi possível desistir do teste."));
@@ -606,21 +703,44 @@ export function QuizHub() {
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível desistir do teste." });
     } finally {
+      finishingRef.current = false;
       setFinishing(false);
     }
-  }, [finishing, loadCatalogue]);
+  }, [loadCatalogue]);
+
+  const requestFinish = useCallback(() => {
+    const active = attemptRef.current;
+    if (!active || finishingRef.current) return;
+    if (active.questions.some((item) => !active.answers.some((answer) => answer.questionId === item.id && answer.selectedOptionId))) setFinishConfirmation(true);
+    else void finishAttempt();
+  }, [finishAttempt]);
 
   useEffect(() => {
-    if (screen !== "attempt" || remaining === null) return;
-    if (remaining <= 0) { void finishAttempt(); return; }
-    const timer = window.setInterval(() => setRemaining((current) => current === null ? null : Math.max(0, current - 1)), 1000);
-    return () => window.clearInterval(timer);
-  }, [finishAttempt, remaining, screen]);
+    if (screen !== "attempt" || attempt?.status !== "active") return;
+    const tick = () => { if (attemptRef.current) setRemaining(remainingQuizSeconds(attemptRef.current, Date.now())); };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [attempt?.id, attempt?.status, attempt?.endsAt, attempt?.startedAt, attempt?.durationSeconds, attempt?.timerPaused, attempt?.pausedRemainingSeconds, screen]);
+
+  useEffect(() => {
+    if (screen !== "attempt" || remaining !== 0 || !attempt || attempt.timerPaused || expirySubmitted.current === attempt.id) return;
+    expirySubmitted.current = attempt.id;
+    void finishAttempt(true);
+  }, [attempt, finishAttempt, remaining, screen]);
+
+  useEffect(() => {
+    if (!savingQuestionIds.length) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [savingQuestionIds.length]);
 
   const answerQuestion = useCallback((optionId: string) => {
     const active = attemptRef.current;
     const current = active?.questions[currentIndex];
-    if (!active || !current || pendingAnswerSaves.current.has(current.id) || active.status === "finished") return;
+    if (!active || !current || active.timerPaused || timerError || finishingRef.current || remainingQuizSeconds(active, Date.now()) === 0 || pendingAnswerSaves.current.has(current.id) || active.status === "finished") return;
     const saved = active.answers.find((answer) => answer.questionId === current.id);
     if (!isExam && saved && saved.correct !== null) return;
 
@@ -630,7 +750,7 @@ export function QuizHub() {
       correct: !isExam && current.correctOptionId ? optionId === current.correctOptionId : null,
     };
     setAttempt((previous) => {
-      if (!previous) return previous;
+      if (!previous || previous.id !== active.id) return previous;
       const next = { ...previous, answers: [...previous.answers.filter((answer) => answer.questionId !== current.id), optimistic] };
       attemptRef.current = next;
       return next;
@@ -643,10 +763,11 @@ export function QuizHub() {
         const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(active.id)}/answers`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ questionId: current.id, optionId }) });
         const data = await response.json() as Record<string, unknown>;
         if (!response.ok) throw new Error(apiError(data, "Não foi possível guardar a resposta."));
+        failedAnswerIds.current.delete(current.id);
         const returned = data.answer && typeof data.answer === "object" ? normalizeAnswer(data.answer as Record<string, unknown>) : optimistic;
         const questionFeedback = data.question && typeof data.question === "object" ? normalizeQuestion(data.question as ApiQuestion) : null;
         setAttempt((previous) => {
-          if (!previous) return previous;
+          if (!previous || previous.id !== active.id) return previous;
           const nextAnswers = [...previous.answers.filter((answer) => answer.questionId !== current.id), returned];
           const nextQuestions = questionFeedback ? previous.questions.map((item) => item.id === current.id ? { ...item, correctOptionId: questionFeedback.correctOptionId, explanation: questionFeedback.explanation } : item) : previous.questions;
           const next = { ...previous, answers: nextAnswers, questions: nextQuestions };
@@ -655,8 +776,9 @@ export function QuizHub() {
         });
         if (!isExam) setShowExplanation(true);
       } catch (reason) {
+        failedAnswerIds.current.add(current.id);
         setAttempt((previous) => {
-          if (!previous) return previous;
+          if (!previous || previous.id !== active.id) return previous;
           const remainingAnswers = previous.answers.filter((answer) => answer.questionId !== current.id);
           const next = { ...previous, answers: saved ? [...remainingAnswers, saved] : remainingAnswers };
           attemptRef.current = next;
@@ -669,7 +791,7 @@ export function QuizHub() {
       }
     })();
     pendingAnswerSaves.current.set(current.id, save);
-  }, [currentIndex, isExam]);
+  }, [currentIndex, isExam, timerError]);
 
   const goToQuestion = useCallback((index: number) => {
     if (!attempt || index < 0 || index >= attempt.questions.length) return;
@@ -677,20 +799,25 @@ export function QuizHub() {
     saveQuizProgress(attempt, index);
     setShowExplanation(false);
     setCommentsOpen(false);
+    setComments([]);
+    setCommentText("");
+    commentsRequest.current += 1;
     setReplyTo(null);
   }, [attempt]);
 
   const loadComments = useCallback(async (questionId: string) => {
+    const requestId = ++commentsRequest.current;
+    setComments([]);
     setCommentsLoading(true);
     try {
       const response = await fetch(`/api/quiz-comments?questionId=${encodeURIComponent(questionId)}`, { cache: "no-store" });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) throw new Error(apiError(data, "Não foi possível carregar os comentários."));
-    setComments((value<ApiComment[]>(data, "comments") ?? []).map(normalizeComment));
+      if (requestId === commentsRequest.current) setComments((value<ApiComment[]>(data, "comments") ?? []).map(normalizeComment));
     } catch (reason) {
-      setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível carregar os comentários." });
+      if (requestId === commentsRequest.current) setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível carregar os comentários." });
     } finally {
-      setCommentsLoading(false);
+      if (requestId === commentsRequest.current) setCommentsLoading(false);
     }
   }, []);
 
@@ -729,23 +856,23 @@ export function QuizHub() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null;
-      if (screen !== "attempt" || !question || target?.matches("input, textarea, select, [contenteditable='true']")) return;
+      if (screen !== "attempt" || !question || finishing || finishConfirmation || abandonConfirmation || event.repeat || event.ctrlKey || event.metaKey || event.altKey || target?.closest("input, textarea, select, button, a, [contenteditable], [role='dialog']")) return;
       const number = Number(event.key);
-      if (answerFormat === "multiple_choice" && number >= 1 && number <= question.options.length) {
+      if (attempt?.answerFormat === "multiple_choice" && number >= 1 && number <= question.options.length) {
         event.preventDefault();
         void answerQuestion(question.options[number - 1].id);
         return;
       }
       if ((event.key === "ArrowRight" || event.key === "Enter") && currentAnswer?.selectedOptionId) {
         event.preventDefault();
-        if (attempt && currentIndex === attempt.questions.length - 1) void finishAttempt();
+        if (attempt && currentIndex === attempt.questions.length - 1) requestFinish();
         else goToQuestion(currentIndex + 1);
       }
       if (event.key === "ArrowLeft") { event.preventDefault(); goToQuestion(currentIndex - 1); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [answerFormat, answerQuestion, attempt, currentAnswer?.selectedOptionId, currentIndex, finishAttempt, goToQuestion, question, screen]);
+  }, [answerFormat, answerQuestion, attempt, currentAnswer?.selectedOptionId, currentIndex, requestFinish, goToQuestion, question, screen, finishing, finishConfirmation, abandonConfirmation]);
 
   const score = attempt?.score;
   const resultPercent = typeof score === "number" && Number.isFinite(score) ? Math.round(score) : attempt?.questions.length ? Math.round((correctCount / attempt.questions.length) * 100) : 0;
@@ -755,6 +882,9 @@ export function QuizHub() {
       <AppShell active="quizzes" breadcrumb="Testes" focusMode={screen === "attempt"}>
         <div className={styles.page}>
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
+          {screen === "catalogue" && restoringAttempt && <p className={styles.saving} role="status"><LoaderCircle className={styles.spin} /> A recuperar a sessão…</p>}
+          {screen === "catalogue" && restoreError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{restoreError}</p><button type="button" onClick={() => setRestoreVersion((version) => version + 1)}>Tentar novamente</button></div>}
+          {screen === "attempt" && finishError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{finishError}</p><button type="button" disabled={finishing} onClick={() => remaining === 0 ? void finishAttempt(true) : requestFinish()}>Tentar concluir novamente</button></div>}
           {screen === "catalogue" && <Catalogue
             loading={catalogueLoading}
             error={error}
@@ -765,10 +895,12 @@ export function QuizHub() {
             selectedTopicIds={selectedTopicIds}
             topics={topics}
             questionCount={questionCount}
+            timed={timed}
+            onTimed={setTimed}
             answerFormat={answerFormat}
             shortAnswerMode={shortAnswerMode}
             availableQuestionCount={availableQuestionCount}
-            loadingAttempt={loadingAttempt}
+            loadingAttempt={loadingAttempt || restoringAttempt || Boolean(restoreError)}
             resumeAttempt={attempt?.status === "active" ? attempt : null}
             availability={availability}
             onUnit={(unitId) => { setAvailability(null); setSelectedUnitId(unitId); }}
@@ -789,7 +921,7 @@ export function QuizHub() {
           {screen === "statistics" && <StatisticsView statistics={statistics} loading={statisticsLoading} error={statisticsError} totalAvailableQuestions={units.reduce((total, unit) => total + unit.questionCount, 0)} clearing={clearingStatistics} onBack={() => setScreen("catalogue")} onRetry={() => void loadStatistics()} onClear={() => setClearStatisticsConfirmation(true)} />}
           {screen === "attempt" && attempt && question && <AttemptView
             attempt={attempt}
-            unit={selectedUnit}
+            unit={units.find((unit) => unit.id === attempt.unitId) ?? null}
             question={question}
             currentIndex={currentIndex}
             currentAnswer={currentAnswer}
@@ -797,18 +929,18 @@ export function QuizHub() {
             remaining={remaining}
             progress={progress}
             showExplanation={showExplanation}
-            answerFormat={answerFormat}
-            shortAnswerMode={shortAnswerMode}
+            answerFormat={attempt.answerFormat}
+            shortAnswerMode={attempt.shortAnswerMode}
             commentsOpen={commentsOpen}
             comments={comments}
             commentsLoading={commentsLoading}
             commentText={commentText}
             sendingComment={sendingComment}
             onSelect={(optionId) => void answerQuestion(optionId)}
-            onNext={() => currentIndex === attempt.questions.length - 1 ? void finishAttempt() : goToQuestion(currentIndex + 1)}
+            onNext={() => currentIndex === attempt.questions.length - 1 ? requestFinish() : goToQuestion(currentIndex + 1)}
             onPrevious={() => goToQuestion(currentIndex - 1)}
             onQuestion={goToQuestion}
-            onPause={() => { saveQuizProgress(attempt, currentIndex); setScreen("catalogue"); }}
+            onPause={() => { void changeTimer("pause", "automatic"); saveQuizProgress(attemptRef.current ?? attempt, currentIndex); setScreen("catalogue"); }}
             onQuit={() => setAbandonConfirmation(true)}
             onExplain={() => setShowExplanation((current) => !current)}
             onComments={() => setCommentsOpen((current) => !current)}
@@ -817,11 +949,17 @@ export function QuizHub() {
             replyTo={replyTo}
             onReply={(comment) => setReplyTo(comment)}
             onCancelReply={() => setReplyTo(null)}
-            onDoubleClick={() => currentAnswer && (currentIndex === attempt.questions.length - 1 ? void finishAttempt() : goToQuestion(currentIndex + 1))}
+            onDoubleClick={() => currentAnswer && (currentIndex === attempt.questions.length - 1 ? requestFinish() : goToQuestion(currentIndex + 1))}
             finishing={finishing}
+            savingCount={savingQuestionIds.length}
+            onFinish={requestFinish}
+            timerBusy={timerBusy}
+            timerError={timerError}
+            onTimer={() => void changeTimer(attempt.timerPaused ? "resume" : "pause")}
           />}
           {screen === "results" && attempt && <ResultsView attempt={attempt} correctCount={correctCount} percent={resultPercent} recommendation={recommendation} onRestart={() => { setAttempt(null); attemptRef.current = null; setScreen("catalogue"); setCurrentIndex(0); }} />}
         </div>
+        <ConfirmationDialog open={finishConfirmation} tone="primary" eyebrow="Concluir sessão" title="Concluir com perguntas por responder?" description={`Faltam ${Math.max(0, (attempt?.questions.length ?? 0) - completedCount)} perguntas. As perguntas por responder contam como não certas no resultado.`} confirmLabel="Concluir sessão" cancelLabel="Continuar a responder" busy={finishing} icon={<CheckCircle2 />} onClose={() => setFinishConfirmation(false)} onConfirm={() => void finishAttempt()} />
         <ConfirmationDialog open={abandonConfirmation} eyebrow="" title="Queres desistir do teste?" description="" confirmLabel={finishing ? "A desistir…" : "Desistir"} busy={finishing} icon={<TriangleAlert />} onClose={() => setAbandonConfirmation(false)} onConfirm={() => void abandonAttempt()} />
         <ConfirmationDialog open={clearStatisticsConfirmation} eyebrow="Histórico de testes" title="Limpar as estatísticas?" description="As tentativas concluídas ou abandonadas e as respetivas respostas serão apagadas. Um teste em curso será mantido." warning="Esta ação não pode ser anulada." confirmLabel={clearingStatistics ? "A limpar…" : "Limpar estatísticas"} busy={clearingStatistics} icon={<Trash2 />} onClose={() => setClearStatisticsConfirmation(false)} onConfirm={() => void clearStatistics()} />
       </AppShell>
@@ -829,8 +967,8 @@ export function QuizHub() {
   </AuthGuard>;
 }
 
-function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
-  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
+function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
+  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
   exportingAnki: boolean;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
@@ -863,18 +1001,18 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
                 <ChevronDown aria-hidden="true" />
               </button>
               {selected && <div className={styles.unitSettings}>
-                <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Objetivo</strong></div><div className={styles.modeGrid} role="radiogroup" aria-label={`Objetivo da sessão de ${unit.name}`}>{modeCards.map((mode) => { const Icon = mode.icon; const active = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={active} aria-label={`${mode.title}. ${mode.description}`} title={mode.description} className={`${styles.modeCard} ${active ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}</strong>{active && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}</div>
+                <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Objetivo</strong></div><div className={styles.modeGrid} role="radiogroup" aria-label={`Objetivo da sessão de ${unit.name}`}>{modeCards.map((mode) => { const Icon = mode.icon; const active = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={active} aria-label={`${mode.title}. ${mode.description}`} title={mode.description} className={`${styles.modeCard} ${active ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}<small className={styles.modeDescription}>{mode.description}</small></strong>{active && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}</div>
                   <div className={styles.topicPicker} role="group" aria-labelledby={`quiz-topics-${unit.id}`}><span id={`quiz-topics-${unit.id}`} className={styles.topicTitle}>Temas</span><div className={styles.topicChoices}>{topics.map((topic) => { const checked = selectedTopicIds.includes(topic.id); return <label key={topic.id} className={checked ? styles.topicChecked : ""}><input type="checkbox" checked={checked} onChange={() => onTopics(checked ? selectedTopicIds.filter((id) => id !== topic.id) : [...selectedTopicIds, topic.id])} /><span className={styles.topicName}>{topic.name}</span>{topic.questionCount > 0 && <small>{topic.questionCount}</small>}<span className={styles.topicIndicator}>{checked && <Check />}</span></label>; })}</div>{!topics.length && <small>Sem temas publicados.</small>}</div>
                 </section>
                 <div className={styles.settingColumns}>
-                  <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Duração</strong></div><label className={styles.countControl} htmlFor={`quiz-question-count-${unit.id}`}><span className={styles.selectWrap}><select id={`quiz-question-count-${unit.id}`} aria-label="Duração da sessão" value={countOptions.includes(questionCount) ? questionCount : ""} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.length ? countOptions.map((count) => <option key={count} value={count}>{count} min · {count} perguntas</option>) : <option value="">Menos de 5 perguntas disponíveis</option>}</select><ChevronDown aria-hidden="true" /></span></label></section>
+                  <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Perguntas e tempo</strong></div><label className={styles.timingChoice}><input type="checkbox" checked={!timed} onChange={(event) => onTimed(!event.target.checked)} /><span>Sem limite de tempo</span></label><label className={styles.countControl} htmlFor={`quiz-question-count-${unit.id}`}><span className={styles.selectWrap}><select id={`quiz-question-count-${unit.id}`} aria-label="Número de perguntas e duração da sessão" value={countOptions.includes(questionCount) ? questionCount : ""} disabled={insufficientBank} onChange={(event) => onQuestionCount(Number(event.target.value))}>{countOptions.length ? countOptions.map((count) => <option key={count} value={count}>{count} perguntas{timed ? ` · ${count} min` : " · sem limite"}</option>) : <option value="">Menos de 5 perguntas disponíveis</option>}</select><ChevronDown aria-hidden="true" /></span></label></section>
                   <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Formato</strong></div><div className={styles.answerFormatGrid} role="radiogroup" aria-label="Formato de resposta"><button type="button" role="radio" aria-checked={answerFormat === "multiple_choice"} className={`${styles.modeCard} ${answerFormat === "multiple_choice" ? styles.selected : ""}`} onClick={() => onAnswerFormat("multiple_choice")}><span className={styles.modeIcon}><CheckCircle2 /></span><strong>Escolha múltipla</strong>{answerFormat === "multiple_choice" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button><button type="button" role="radio" aria-checked={answerFormat === "short_answer"} className={`${styles.modeCard} ${answerFormat === "short_answer" ? styles.selected : ""}`} onClick={() => onAnswerFormat("short_answer")}><span className={styles.modeIcon}><Keyboard /></span><strong>Resposta curta</strong>{answerFormat === "short_answer" && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button></div></section>
                 </div>
                 {answerFormat === "short_answer" && <section className={styles.settingGroup}><div className={styles.settingHeading}><strong>Resposta curta</strong></div><div className={styles.shortModeChoices} role="radiogroup" aria-label="Modo de resposta curta"><button type="button" role="radio" aria-checked={shortAnswerMode === "type_and_check"} className={shortAnswerMode === "type_and_check" ? styles.selected : ""} onClick={() => onShortAnswerMode("type_and_check")}><Keyboard /><span><strong>Escrever e verificar</strong></span></button><button type="button" role="radio" aria-checked={shortAnswerMode === "reveal_and_self_assess"} className={shortAnswerMode === "reveal_and_self_assess" ? styles.selected : ""} onClick={() => onShortAnswerMode("reveal_and_self_assess")}><Eye /><span><strong>Revelar e autoavaliar</strong></span></button></div></section>}
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Sessão guiada</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir uma sessão guiada ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Sessão guiada</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
+                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki || Boolean(resumeAttempt)}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
               </div>}
             </article>;
           })}
@@ -915,9 +1053,9 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
   </>;
 }
 
-function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, progress, showExplanation, answerFormat, shortAnswerMode, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing }: {
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, progress, showExplanation, answerFormat, shortAnswerMode, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
   attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; progress: number; showExplanation: boolean; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
-  replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean;
+  replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
 }) {
   const isExam = attempt.mode === "exam";
   const answered = Boolean(currentAnswer?.selectedOptionId);
@@ -929,22 +1067,26 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   const updateShortDraft = (next: Partial<typeof shortDraft>) => setShortDrafts((current) => ({ ...current, [question.id]: { ...shortDraft, ...next } }));
   const assessShortAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!correctOption || !shortDraft.value.trim()) return;
+    if (finishing || attempt.timerPaused || timerError || remaining === 0 || !correctOption || !shortDraft.value.trim()) return;
     updateShortDraft({ revealed: true, correct: isShortAnswerMatch(shortDraft.value, correctOption.text) });
   };
   const submitSelfAssessment = (correct: boolean) => {
+    if (finishing || attempt.timerPaused || timerError || remaining === 0) return;
     const option = correct ? correctOption : incorrectOption;
     if (!answered && !answering && option) onSelect(option.id);
   };
   return <>
     <section className={styles.sessionBar} aria-label="Progresso do teste">
       <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}</small></span></div>
-      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${remaining < 300 ? styles.lowTime : ""}`} aria-label={`Tempo restante: ${formatClock(remaining)}`}><Clock3 /><strong>{formatClock(remaining)}</strong></span>}</div>
-      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing}>Desistir</button></div>
-      <div className={styles.progressTrack} aria-label={`${progress}% respondido`}><span style={{ width: `${progress}%` }} /></div>
+      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, (attempt.durationSeconds ?? 300) * .2) ? styles.lowTime : ""}`} aria-label={`Tempo restante: ${formatClock(remaining)}`}><Clock3 /><strong>{formatClock(remaining)}</strong>{attempt.timerPaused && <small>Em pausa</small>}</span>}{!attempt.timed && <span className={styles.timer}><Clock3 /><strong>Sem limite</strong></span>}</div>
+      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0}>Desistir</button></div>
+      <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Perguntas respondidas"><span style={{ width: `${progress}%` }} /></div>
     </section>
+    <div className={styles.sessionSummary}><span role="status">{savingCount ? <><LoaderCircle className={styles.spin} /> A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{timerBusy ? <LoaderCircle className={styles.spin} /> : attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
+    {timerError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{timerError}</p><button type="button" disabled={timerBusy} onClick={onTimer}>Sincronizar cronómetro</button></div>}
+    {attempt.timerPaused && <p className={styles.saving} role="status"><Pause />Cronómetro em pausa. Retoma para continuar a responder.</p>}
     <div className={styles.attemptLayout}>
-      <aside className={styles.navigator} aria-label="Navegação pelas perguntas"><header><strong>Perguntas</strong><small>{progress}%</small></header><div className={styles.questionGrid}>{attempt.questions.map((item, index) => { const answer = attempt.answers.find((entry) => entry.questionId === item.id); const state = !answer ? "não respondida" : isExam || answer.correct === null ? "respondida" : answer.correct ? "certa" : "errada"; return <button key={item.id} type="button" className={`${styles.questionNumber} ${index === currentIndex ? styles.current : ""} ${statusClass(answer)}`} onClick={() => onQuestion(index)} aria-current={index === currentIndex ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${state}`}>{index + 1}</button>; })}</div></aside>
+      <aside className={styles.navigator} aria-label="Navegação pelas perguntas"><header><strong>Perguntas</strong><small>{progress}%</small></header><div className={styles.questionGrid}>{attempt.questions.map((item, index) => { const answer = attempt.answers.find((entry) => entry.questionId === item.id); const state = !answer ? "não respondida" : isExam || answer.correct === null ? "respondida" : answer.correct ? "certa" : "errada"; return <button key={item.id} type="button" className={`${styles.questionNumber} ${index === currentIndex ? styles.current : ""} ${statusClass(answer)}`} disabled={finishing || sendingComment} onClick={() => onQuestion(index)} aria-current={index === currentIndex ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${state}`}>{index + 1}</button>; })}</div></aside>
       <section className={styles.questionPanel} aria-labelledby="question-title">
         <header className={styles.questionHeader}><span className={styles.topicLabel}>{question.topic}</span><small>{currentIndex + 1} / {attempt.questions.length}</small></header>
         <div key={question.id} className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
@@ -956,18 +1098,18 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 const selected = currentAnswer?.selectedOptionId === option.id;
                 const correct = feedback && option.id === question.correctOptionId;
                 const wrong = feedback && selected && currentAnswer?.correct === false;
-                return <button key={option.id} type="button" role="radio" aria-checked={selected} aria-keyshortcuts={String(index + 1)} disabled={answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
+                return <button key={option.id} type="button" role="radio" aria-checked={selected} aria-keyshortcuts={String(index + 1)} disabled={finishing || attempt.timerPaused || Boolean(timerError) || remaining === 0 || answering || (feedback && !selected)} className={`${styles.option} ${selected ? styles.optionSelected : ""} ${correct ? styles.optionCorrect : ""} ${wrong ? styles.optionWrong : ""}`} onClick={() => !feedback && onSelect(option.id)} onDoubleClick={() => answered && onDoubleClick()}><b>{String.fromCharCode(65 + index)}</b><span>{option.text}</span>{correct && <CheckCircle2 aria-label="Resposta certa" />}{wrong && <XCircle aria-label="Resposta errada" />}</button>;
               })}
             </div> : <section className={styles.shortAnswer} aria-label="Resposta curta">
-              {shortAnswerMode === "type_and_check" && !shortDraft.revealed && !answered && <form className={styles.shortAnswerForm} onSubmit={assessShortAnswer}><label htmlFor={`short-answer-${question.id}`}>A tua resposta</label><div className={styles.shortAnswerComposer}><textarea id={`short-answer-${question.id}`} value={shortDraft.value} onChange={(event) => updateShortDraft({ value: event.target.value, correct: null })} placeholder="Escreve a resposta…" rows={2} disabled={answering} /><footer><button type="submit" disabled={!shortDraft.value.trim() || !correctOption}>Verificar</button></footer></div></form>}
+              {shortAnswerMode === "type_and_check" && !shortDraft.revealed && !answered && <form className={styles.shortAnswerForm} onSubmit={assessShortAnswer}><label htmlFor={`short-answer-${question.id}`}>A tua resposta</label><div className={styles.shortAnswerComposer}><textarea id={`short-answer-${question.id}`} value={shortDraft.value} onChange={(event) => updateShortDraft({ value: event.target.value, correct: null })} placeholder="Escreve a resposta…" rows={2} disabled={answering || finishing || attempt.timerPaused || remaining === 0} /><footer><button type="submit" disabled={!shortDraft.value.trim() || !correctOption}>Verificar</button></footer></div></form>}
               {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Ver resposta</button>}
-              {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}><span>Resposta correta</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && !answered && <p className={shortDraft.correct ? styles.proposalCorrect : styles.proposalIncorrect}>{shortDraft.correct ? <CheckCircle2 /> : <XCircle />}{shortDraft.correct ? "Certa" : "Errada"}</p>}{!answered && <div className={styles.selfAssessmentActions} aria-label="Confirmar resultado"><button type="button" className={shortDraft.correct === false ? styles.selfAssessmentIncorrect : styles.selfAssessmentCorrect} onClick={() => submitSelfAssessment(shortDraft.correct ?? true)} disabled={answering || !correctOption || !incorrectOption}>{shortDraft.correct === false ? <XCircle /> : <CheckCircle2 />}Confirmar</button>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && <button type="button" className={styles.selfAssessmentOverride} onClick={() => submitSelfAssessment(!shortDraft.correct)} disabled={answering}>{shortDraft.correct ? "Marcar errada" : "Marcar certa"}</button>}</div>}</div>}
+              {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}><span>Resposta correta</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && !answered && <p className={shortDraft.correct ? styles.proposalCorrect : styles.proposalIncorrect}>{shortDraft.correct ? <CheckCircle2 /> : <XCircle />}{shortDraft.correct ? "Certa" : "Errada"}</p>}{!answered && <div className={styles.selfAssessmentActions} aria-label="Confirmar resultado">{shortAnswerMode === "reveal_and_self_assess" && <button type="button" className={styles.selfAssessmentIncorrect} onClick={() => submitSelfAssessment(false)} disabled={answering || finishing || !incorrectOption}><XCircle />Errada</button>}<button type="button" className={shortDraft.correct === false ? styles.selfAssessmentIncorrect : styles.selfAssessmentCorrect} onClick={() => submitSelfAssessment(shortDraft.correct ?? true)} disabled={answering || finishing || !correctOption || !incorrectOption}>{shortDraft.correct === false ? <XCircle /> : <CheckCircle2 />}{shortAnswerMode === "reveal_and_self_assess" ? "Certa" : "Confirmar"}</button>{shortAnswerMode === "type_and_check" && shortDraft.correct !== null && <button type="button" className={styles.selfAssessmentOverride} onClick={() => submitSelfAssessment(!shortDraft.correct)} disabled={answering || finishing || attempt.timerPaused || remaining === 0}>{shortDraft.correct ? "Marcar errada" : "Marcar certa"}</button>}</div>}</div>}
             </section>}
-            {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong><RichTextContent value={question.explanation ?? "Consulta a explicação para consolidar este conceito."} className={styles.answerExplanation} /></div></section>}
+            {feedback && <section className={`${styles.feedback} ${currentAnswer?.correct ? styles.feedbackGood : styles.feedbackBad}`} role="status"><span>{currentAnswer?.correct ? <CheckCircle2 /> : <XCircle />}</span><div><strong>{currentAnswer?.correct ? "Resposta certa" : "Ainda não é a resposta correta"}</strong>{showExplanation && question.explanation && <RichTextContent value={question.explanation} className={styles.answerExplanation} />}</div></section>}
             {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
           </div>
         </div>
-        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} disabled={!answered && isExam}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /><span>Comentários</span></button></div><div><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={!answered}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}</span><ArrowRight /></button></div></footer>
+        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} aria-expanded={showExplanation} disabled={!question.explanation || (!answered && isExam)}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments}><MessageCircle /><span>Comentários</span></button></div><div><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}</span><ArrowRight /></button></div></footer>
         {commentsOpen && <Comments comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
       </section>
     </div>
@@ -975,12 +1117,17 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
 }
 
 function ResultsView({ attempt, correctCount, percent, recommendation, onRestart }: { attempt: Attempt; correctCount: number; percent: number; recommendation: string; onRestart: () => void }) {
+  const [filter, setFilter] = useState<"all" | "incorrect" | "unanswered" | "correct">("all");
+  const reviewAnswers = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
+  const counts = { correct: 0, incorrect: 0, unanswered: 0 };
+  for (const item of attempt.questions) counts[quizReviewState(item, reviewAnswers.get(item.id))] += 1;
   const total = attempt.questions.length;
   const displayedCorrect = attempt.totalCorrect !== null && Number.isFinite(attempt.totalCorrect) ? attempt.totalCorrect : correctCount;
   return <>
     <header className={styles.resultsHero}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong></div><div><span className={styles.eyebrow}>Concluído</span><h1>{displayedCorrect}/{total} certas</h1></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></header>
     <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p><button type="button" onClick={onRestart}>Praticar <ArrowRight /></button></section>
-    <section className={styles.review} aria-labelledby="review-title"><header><h2 id="review-title">Revisão</h2><Flag /></header><div className={styles.reviewList}>{attempt.questions.map((question, index) => { const answer = attempt.answers.find((item) => item.questionId === question.id); const correct = answer?.correct ?? (answer?.selectedOptionId === question.correctOptionId); const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : <XCircle />}</span><div><small>{index + 1} · {question.topic}</small><RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
+    <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
+    <section className={styles.review} aria-labelledby="review-title"><header><h2 id="review-title">Revisão</h2><Flag /></header><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{question.imageUrl && <figure className={styles.reviewImage}><img src={question.imageUrl} alt={question.imageAlt} loading="lazy" /></figure>}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
   </>;
 }
 

@@ -282,7 +282,7 @@ function attemptQuestionDto(item: Row, reveal: boolean) {
   const options = parseStoredOptions(item.options_json);
   return {
     id: item.question_id, questionId: item.question_id, position: item.position, prompt: item.prompt, question: item.prompt,
-    imageUrl: item.image_url, difficulty: item.difficulty, topicId: item.topic_id, unitId: item.curricular_unit_id,
+    imageUrl: item.image_url, difficulty: item.difficulty, topicId: item.topic_id, topic: item.topic_title || "Tema geral", unitId: item.curricular_unit_id,
     options, selectedOptionId: item.selected_option_id,
     correctOptionId: reveal ? item.correct_option_id : undefined,
     correct: reveal && item.is_correct !== null && item.is_correct !== undefined ? Number(item.is_correct) === 1 : undefined,
@@ -300,7 +300,13 @@ function attemptDto(item: Row) {
   return {
     id: item.id, mode: item.mode, status: item.status, unitId: item.curricular_unit_id, topicId: item.topic_id,
     topicIds: Array.isArray(config.topicIds) ? config.topicIds.filter((id): id is string => typeof id === "string") : item.topic_id ? [item.topic_id] : [],
+    answerFormat: config.answerFormat === "short_answer" ? "short_answer" : "multiple_choice",
+    shortAnswerMode: config.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check",
     difficulty: item.difficulty_filter, questionCount: item.question_count, answeredCount: item.answered_count,
+    timed: item.duration_seconds !== null && item.duration_seconds !== undefined,
+    timerPaused: config.timerPaused === true || config.timerPaused === 1,
+    pauseReason: config.pauseReason === "manual" ? "manual" : "automatic",
+    pausedRemainingSeconds: typeof config.pausedRemainingMs === "number" ? Math.ceil(config.pausedRemainingMs / 1000) : null,
     correctCount: item.correct_count, durationSeconds: item.duration_seconds, expiresAt: item.expires_at,
     startedAt: item.started_at, completedAt: item.completed_at,
     createdAt: item.created_at, updatedAt: item.updated_at,
@@ -308,7 +314,7 @@ function attemptDto(item: Row) {
 }
 
 async function attemptDetail(env: QuizEnv, attempt: Row): Promise<Row> {
-  const questions = await env.DB.prepare("SELECT * FROM quiz_attempt_questions WHERE attempt_id=? ORDER BY position").bind(attempt.id).all();
+  const questions = await env.DB.prepare("SELECT aq.*,t.title AS topic_title FROM quiz_attempt_questions aq LEFT JOIN quiz_topics t ON t.id=aq.topic_id WHERE aq.attempt_id=? ORDER BY aq.position").bind(attempt.id).all();
   const isExam = attempt.mode === "exam";
   return { ...attemptDto(attempt), questions: questions.results.map((item) => attemptQuestionDto(row(item), attempt.status !== "active" || !isExam)) };
 }
@@ -341,7 +347,7 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) {
     return json({ error: "Escolha 5, 10, 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
   }
-  const durationSeconds = requestedCount * 60;
+  const durationSeconds = body.timed === false ? null : requestedCount * 60;
   if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para o teste temático." }, 400);
   if (unitId && !await activeUnit(env, unitId)) return json({ error: "Unidade curricular inválida." }, 400);
   const selectedTopics = await Promise.all(topicIds.map((id) => activeTopic(env, id)));
@@ -373,7 +379,9 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   }
   if (snapshots.length < requestedCount) return json({ error: "Não existem perguntas válidas suficientes para preparar este teste.", code: "not_enough_questions", available: snapshots.length, required: requestedCount }, 409);
   const now = Date.now(), attemptId = crypto.randomUUID(), expiresAt = durationSeconds ? now + durationSeconds * 1000 : null;
-  const configJson = JSON.stringify({ topicIds, requestedCount, difficulty, durationSeconds });
+  const answerFormat = mode !== "exam" && body.answerFormat === "short_answer" ? "short_answer" : "multiple_choice";
+  const shortAnswerMode = body.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check";
+  const configJson = JSON.stringify({ topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, timerPaused: false, pausedTotalMs: 0 });
   const statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO quiz_attempts (id,user_id,mode,curricular_unit_id,topic_id,difficulty_filter,status,question_count,started_at,created_at,updated_at,config_json,duration_seconds,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(attemptId, user.id, mode, unitId || null, topicId, difficulty, "active", snapshots.length, now, now, now, configJson, durationSeconds, expiresAt)];
   snapshots.forEach(({ question, options }, index) => {
     const correct = options.find((option) => option.isCorrect)!;
@@ -408,16 +416,45 @@ async function answerAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (!attempt) return json({ error: "Tentativa não encontrada." }, 404);
   const activeAttempt = await enforceAttemptExpiry(env, user, attempt);
   if (activeAttempt.status !== "active") return json({ error: "O tempo desta tentativa terminou.", code: "attempt_expired" }, 409);
+  const timing = attemptDto(activeAttempt);
+  if (timing.timerPaused) return json({ error: "Retoma o cronómetro antes de responder.", code: "timer_paused" }, 409);
   const question = await env.DB.prepare("SELECT * FROM quiz_attempt_questions WHERE attempt_id=? AND question_id=?").bind(attemptId, questionId).first<Row>();
   if (!question || !parseStoredOptions(question.options_json).some((option) => option.id === optionId)) return json({ error: "A opção não pertence a esta pergunta." }, 400);
-  if (activeAttempt.mode !== "exam" && question.selected_option_id !== null) return json({ error: "A resposta já recebeu feedback e não pode ser alterada.", code: "answer_locked" }, 409);
+  if (activeAttempt.mode !== "exam" && question.selected_option_id !== null && question.selected_option_id !== optionId) return json({ error: "A resposta já recebeu feedback e não pode ser alterada.", code: "answer_locked" }, 409);
   const correct = optionId === question.correct_option_id ? 1 : 0, now = Date.now();
-  await env.DB.prepare("UPDATE quiz_attempt_questions SET selected_option_id=?,is_correct=?,answered_at=? WHERE attempt_id=? AND question_id=?").bind(optionId, correct, now, attemptId, questionId).run();
+  // A retry of the same answer is safe; a competing answer cannot replace practice feedback.
+  const write = await env.DB.prepare("UPDATE quiz_attempt_questions SET selected_option_id=?,is_correct=?,answered_at=COALESCE(answered_at,?) WHERE attempt_id=? AND question_id=? AND (?='exam' OR selected_option_id IS NULL OR selected_option_id=?) AND EXISTS (SELECT 1 FROM quiz_attempts a WHERE a.id=attempt_id AND a.user_id=? AND a.status='active' AND COALESCE(json_extract(a.config_json,'$.timerPaused'),0)=0 AND (a.expires_at IS NULL OR a.expires_at>?))").bind(optionId, correct, now, attemptId, questionId, activeAttempt.mode, optionId, user.id, now).run();
+  if (!write.meta.changes) return json({ error: "A sessão terminou ou a pergunta já foi respondida. Reabre a sessão para atualizar o estado.", code: "answer_locked" }, 409);
   const totals = await env.DB.prepare("SELECT COUNT(selected_option_id) AS answered_count,COALESCE(SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END),0) AS correct_count FROM quiz_attempt_questions WHERE attempt_id=?").bind(attemptId).first<Row>();
   await env.DB.prepare("UPDATE quiz_attempts SET answered_count=?,correct_count=?,updated_at=? WHERE id=? AND user_id=?").bind(totals?.answered_count || 0, totals?.correct_count || 0, now, attemptId, user.id).run();
   const answer: Row = { questionId, selectedOptionId: optionId };
   if (activeAttempt.mode !== "exam") answer.correct = correct === 1;
   return json(activeAttempt.mode !== "exam" ? { answer, question: { id: questionId, correctOptionId: question.correct_option_id, explanation: question.explanation } } : { answer });
+}
+
+async function updateAttemptTimer(request: Request, env: QuizEnv, user: QuizUser | null, enabled: ModuleChecker, attemptId: string): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("quizzes.practice")) return disabled();
+  const body = await bodyJson(request);
+  if (!body || !["pause", "resume"].includes(String(body.action))) return json({ error: "Ação do cronómetro inválida." }, 400);
+  const attempt = await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attemptId, user.id).first<Row>();
+  if (!attempt) return json({ error: "Tentativa não encontrada." }, 404);
+  const active = await enforceAttemptExpiry(env, user, attempt);
+  if (active.status !== "active" || active.duration_seconds === null) return json({ attempt: await attemptDetail(env, active) });
+  const now = Date.now();
+  const reason = body.reason === "manual" ? "manual" : "automatic";
+  if (body.action === "pause") {
+    // The deadline and remaining time change together; duplicate pause requests cannot reset time.
+    await env.DB.prepare("UPDATE quiz_attempts SET config_json=json_set(config_json,'$.timerPaused',json('true'),'$.pauseReason',?,'$.pausedRemainingMs',MAX(0,expires_at-?),'$.pausedAt',?),expires_at=NULL,updated_at=? WHERE id=? AND user_id=? AND status='active' AND duration_seconds IS NOT NULL AND expires_at>?")
+      .bind(reason, now, now, now, attemptId, user.id, now).run();
+    if (reason === "manual") await env.DB.prepare("UPDATE quiz_attempts SET config_json=json_set(config_json,'$.pauseReason','manual') WHERE id=? AND user_id=? AND status='active' AND json_extract(config_json,'$.timerPaused')=1").bind(attemptId, user.id).run();
+  } else {
+    // Returning to a tab must never cancel a pause explicitly chosen by the student.
+    await env.DB.prepare("UPDATE quiz_attempts SET expires_at=?+MAX(0,COALESCE(json_extract(config_json,'$.pausedRemainingMs'),0)),config_json=json_set(config_json,'$.timerPaused',json('false'),'$.pausedTotalMs',COALESCE(json_extract(config_json,'$.pausedTotalMs'),0)+MAX(0,?-COALESCE(json_extract(config_json,'$.pausedAt'),?))),updated_at=? WHERE id=? AND user_id=? AND status='active' AND duration_seconds IS NOT NULL AND json_extract(config_json,'$.timerPaused')=1 AND (?='manual' OR json_extract(config_json,'$.pauseReason')='automatic')")
+      .bind(now, now, now, now, attemptId, user.id, reason).run();
+  }
+  const updated = await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attemptId, user.id).first<Row>();
+  return json({ attempt: await attemptDetail(env, await enforceAttemptExpiry(env, user, updated || active)) });
 }
 
 async function finishAttempt(env: QuizEnv, user: QuizUser | null, enabled: ModuleChecker, attemptId: string): Promise<Response> {
@@ -452,8 +489,8 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
       COALESCE(SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END),0) AS completed_count,
       COALESCE(SUM(answered_count),0) AS answered_count,
       COALESCE(SUM(correct_count),0) AS correct_count,
-      COALESCE(SUM(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at,0)/1000 AS INTEGER) ELSE 0 END),0) AS total_duration_seconds,
-      AVG(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at,0)/1000 AS INTEGER) END) AS average_duration_seconds,
+      COALESCE(SUM(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at-COALESCE(json_extract(config_json,'$.pausedTotalMs'),0)-CASE WHEN json_extract(config_json,'$.timerPaused')=1 THEN MAX(COALESCE(completed_at,started_at)-COALESCE(json_extract(config_json,'$.pausedAt'),completed_at),0) ELSE 0 END,0)/1000 AS INTEGER) ELSE 0 END),0) AS total_duration_seconds,
+      AVG(CASE WHEN status='completed' THEN CAST(MAX(COALESCE(completed_at,started_at)-started_at-COALESCE(json_extract(config_json,'$.pausedTotalMs'),0)-CASE WHEN json_extract(config_json,'$.timerPaused')=1 THEN MAX(COALESCE(completed_at,started_at)-COALESCE(json_extract(config_json,'$.pausedAt'),completed_at),0) ELSE 0 END,0)/1000 AS INTEGER) END) AS average_duration_seconds,
       COALESCE(SUM(CASE WHEN status='completed' AND correct_count*2>=question_count THEN 1 ELSE 0 END),0) AS passed_count,
       (SELECT COUNT(DISTINCT aq.question_id)
        FROM quiz_attempt_questions aq
@@ -473,7 +510,7 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
       a.correct_count,
       a.started_at,
       a.completed_at,
-      CAST(MAX(COALESCE(a.completed_at,a.started_at)-a.started_at,0)/1000 AS INTEGER) AS actual_duration_seconds
+      CAST(MAX(COALESCE(a.completed_at,a.started_at)-a.started_at-COALESCE(json_extract(a.config_json,'$.pausedTotalMs'),0)-CASE WHEN json_extract(a.config_json,'$.timerPaused')=1 THEN MAX(COALESCE(a.completed_at,a.started_at)-COALESCE(json_extract(a.config_json,'$.pausedAt'),a.completed_at),0) ELSE 0 END,0)/1000 AS INTEGER) AS actual_duration_seconds
       FROM quiz_attempts a
       LEFT JOIN curricular_units cu ON cu.id=a.curricular_unit_id
       WHERE a.user_id=? AND a.status='completed'
@@ -796,7 +833,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return path === "/api/quizzes" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
+  return path === "/api/quizzes" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
 export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -827,8 +864,9 @@ export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, 
     if (request.method === "POST") return createAttempt(request, env, user, enabled);
     if (request.method === "GET") return getAttempts(env, user, enabled);
   }
-  const attemptAction = path.match(/^\/api\/quiz-attempts\/([^/]+)\/(answers|finish|abandon)$/);
+  const attemptAction = path.match(/^\/api\/quiz-attempts\/([^/]+)\/(answers|finish|abandon|timer)$/);
   if (attemptAction) {
+    if (attemptAction[2] === "timer" && request.method === "POST") return updateAttemptTimer(request, env, user, enabled, attemptAction[1]);
     if (attemptAction[2] === "answers" && request.method === "PUT") return answerAttempt(request, env, user, enabled, attemptAction[1]);
     if (attemptAction[2] === "finish" && request.method === "POST") return finishAttempt(env, user, enabled, attemptAction[1]);
     if (attemptAction[2] === "abandon" && request.method === "POST") return abandonAttempt(env, user, enabled, attemptAction[1]);
