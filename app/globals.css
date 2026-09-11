@@ -4344,7 +4344,7 @@ section.placement-command-center > div.placement-command-center__main {
 .placement-table-wrap {
   max-height: none !important;
   overflow-x: auto;
-  overflow-y: visible !important;
+  overflow-y: auto;
   scrollbar-gutter: auto;
 }
 
