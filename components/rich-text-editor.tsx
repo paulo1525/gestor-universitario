@@ -15,6 +15,7 @@ type RichTextEditorProps = {
   disabled?: boolean;
   minHeight?: "minimal" | "compact" | "regular";
   onInvalidLink?: () => void;
+  allowHeadings?: boolean;
 };
 
 type RichTextContentProps = { value: string; className?: string; id?: string };
@@ -22,12 +23,12 @@ type RichTextContentProps = { value: string; className?: string; id?: string };
 export function RichTextContent({ value, className = "", id }: RichTextContentProps) {
   const html = useMemo(() => {
     const sanitized = sanitizeRichTextHtml(value);
-    return /<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a)\b/i.test(sanitized) ? richTextDisplayHtml(sanitized) : `<p>${sanitized}</p>`;
+    return /<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a|h2|h3)\b/i.test(sanitized) ? richTextDisplayHtml(sanitized) : `<p>${sanitized}</p>`;
   }, [value]);
   return <div id={id} className={`${styles.content} ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink, allowHeadings = false }: RichTextEditorProps) {
   const { t } = useI18n();
   const editorRef = useRef<HTMLDivElement>(null);
   const plainLength = richTextPlainText(value).length;
@@ -42,10 +43,10 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLen
 
   const emit = () => onChange(sanitizeRichTextHtml(editorRef.current?.innerHTML ?? ""));
 
-  const format = (command: string) => {
+  const format = (command: string, argument?: string) => {
     if (disabled) return;
     editorRef.current?.focus();
-    document.execCommand(command, false);
+    document.execCommand(command, false, argument);
     emit();
   };
 
@@ -66,6 +67,7 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLen
 
   return <div className={`${styles.editor} ${styles[minHeight]} ${disabled ? styles.disabled : ""}`}>
     <div className={styles.toolbar} role="toolbar" aria-label={t("richText.toolbar", { label: ariaLabel })}>
+      {allowHeadings && <><button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("formatBlock", "h3")} aria-label="Título" title="Título">H</button><button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("formatBlock", "p")} aria-label="Parágrafo" title="Parágrafo">¶</button><span aria-hidden="true" /></>}
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("bold")} aria-label={t("richText.bold")} title={t("richText.bold")}><Bold /></button>
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("italic")} aria-label={t("richText.italic")} title={t("richText.italic")}><Italic /></button>
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={() => format("underline")} aria-label={t("richText.underline")} title={t("richText.underline")}><Underline /></button>
