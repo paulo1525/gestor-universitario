@@ -10,7 +10,9 @@ import {
   useMemo,
   useState,
 } from "react";
+import Link from "next/link";
 import {
+  BookOpenCheck,
   Check,
   Download,
   FileText,
@@ -60,6 +62,49 @@ function MaterialThumbnail({ fileType, src, title }: { fileType: string; src: st
         </span>
       )}
     </div>
+  );
+}
+
+function InteractiveStudyMaterial({
+  summaryLabel,
+  openLabel,
+  description,
+  unitLabel,
+}: {
+  summaryLabel: string;
+  openLabel: string;
+  description: string;
+  unitLabel: string;
+}) {
+  return (
+    <article className={styles.material + " " + styles.studyMaterial}>
+      <div className={styles.studyMaterialThumb} aria-hidden="true"><BookOpenCheck /></div>
+      <div className={styles.materialBody}>
+        <header className={styles.materialHeader}>
+          <div className={styles.cardTop}>
+            <span className={styles.tag}>{summaryLabel}</span>
+            <span className={styles.status + " " + styles.statusApproved}>Disponível</span>
+          </div>
+          <div className={styles.materialCopy}>
+            <h3>Neuroanatomia · Aula prática 1</h3>
+            <p className={styles.materialDescription}>{description}</p>
+          </div>
+          <div className={styles.materialBadges}>
+            <span className={styles.unitCode}>NEURO</span>
+          </div>
+        </header>
+        <div className={styles.meta}>
+          <span className={styles.metaRow}><BookOpenCheck aria-hidden="true" /><span>{unitLabel}</span></span>
+          <span className={styles.metaRow}><FileText aria-hidden="true" /><span>Leitura online</span></span>
+        </div>
+        <div className={styles.cardActions}>
+          <Link className={"button button--secondary button--compact " + styles.openMaterial} href="/materiais/neuroanatomia/aula-1">
+            <BookOpenCheck aria-hidden="true" />{openLabel}
+          </Link>
+        </div>
+        <footer className={styles.materialFooter}><span>Conteúdo académico</span><span>Resumo guiado</span></footer>
+      </div>
+    </article>
   );
 }
 type ApiMaterial = {
@@ -371,6 +416,8 @@ export function MaterialLibrary() {
       materials.filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter)),
     [materials, filter],
   );
+  const interactiveStudyVisible = filter === "all" || filter === "summary";
+  const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
   const pick = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0] ?? null;
     if (!selected) return;
@@ -688,14 +735,15 @@ export function MaterialLibrary() {
               </div>
               {submissionEnabled && <div className={styles.heroActions}>
                 <button
-                  className="button button--primary"
-                  type="button"
-                  onClick={() => setEditor((value) => !value)}
-                >
-                  {editor ? <X /> : <Upload />}
-                  {editor ? t("community.materials.closeForm") : t("community.materials.share")}
-                </button>
-              </div>}
+                    className="button button--primary"
+                    type="button"
+                    onClick={() => setEditor((value) => !value)}
+                  >
+                    {editor ? <X /> : <Upload />}
+                    {editor ? t("community.materials.closeForm") : t("community.materials.share")}
+                  </button>
+              </div>
+              }
             </header>
             {notice && (
               <AppToast
@@ -857,8 +905,8 @@ export function MaterialLibrary() {
                 </div>
                 {!loading && (
                   <span className={styles.count}>
-                    {visible.length}{" "}
-                    {visible.length === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}
+                     {libraryCount}{" "}
+                     {libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}
                   </span>
                 )}
               </div>
@@ -885,7 +933,7 @@ export function MaterialLibrary() {
                   <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
                   <strong>{t("community.materials.loading")}</strong>
                 </div>
-              ) : visible.length === 0 ? (
+              ) : libraryCount === 0 ? (
                 <div className={styles.state}>
                   <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
                   <strong>{t("community.materials.empty")}</strong>
@@ -899,6 +947,12 @@ export function MaterialLibrary() {
                 </div>
               ) : (
                 <div className={styles.materialGrid}>
+                  {interactiveStudyVisible && <InteractiveStudyMaterial
+                    summaryLabel={t("community.materials.category.summary")}
+                    openLabel={t("community.materials.open")}
+                    description="Leitura guiada com perguntas associadas, imagens e apontamentos pessoais."
+                    unitLabel="Neuroanatomia"
+                  />}
                   {visible.map((item) => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale }); return (
                     <article className={styles.material} key={item.id}>
                       <MaterialThumbnail key={`${item.id}-${item.fileUrl}`} fileType={item.fileType} src={item.fileUrl} title={item.title} />

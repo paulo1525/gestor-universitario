@@ -10,6 +10,8 @@ import { isStudentSpecialStatus, studentStatusFromCode, type StudentSpecialStatu
 import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
 import { handleQuizRoute, isQuizPath } from "./quizzes";
 import { handleLearningRoute, isLearningPath } from "./learning";
+import { handleStudyAnnotations } from "./study-annotations";
+import { neuroParagraphs } from "@/lib/neuroanatomia-study";
 
 export interface Env {
   DB: D1Database;
@@ -1560,6 +1562,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (isLearningPath(pathname)) {
     const user = await currentUser(request, env);
     return handleLearningRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
+  }
+  if (pathname === "/api/study/neuro-ap1/annotations") {
+    const user = await currentUser(request, env);
+    return handleStudyAnnotations(request, env, user, (key) => isModuleEnabled(env, key), (id) => neuroParagraphs.get(id));
   }
   if (isAcademicHubPath(pathname)) {
     const user = await currentUser(request, env);

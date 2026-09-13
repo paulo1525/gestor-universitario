@@ -1,4 +1,4 @@
-const allowedTags = new Set(["div", "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a"]);
+const allowedTags = new Set(["div", "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "a", "h2", "h3"]);
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -49,7 +49,7 @@ export function announcementPlainText(value: string): string {
   return tokens
     .map((token) => {
       if (!token.startsWith("<") || token === "<") return decodeHtmlText(token);
-      return /^<\s*\/?\s*(?:div|p|br|li)\b/i.test(token) ? " " : "";
+      return /^<\s*\/?\s*(?:div|p|br|li|h2|h3)\b/i.test(token) ? " " : "";
     })
     .join("")
     .replace(/\s+/g, " ")
@@ -58,7 +58,7 @@ export function announcementPlainText(value: string): string {
 
 export function announcementDisplayHtml(value: string): string {
   const sanitized = sanitizeAnnouncementHtml(value);
-  if (/<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a)\b/i.test(sanitized)) return sanitized;
+  if (/<\/?(?:div|p|br|strong|b|em|i|u|ul|ol|li|a|h2|h3)\b/i.test(sanitized)) return sanitized;
   return `<p>${escapeHtml(announcementPlainText(value))}</p>`;
 }
 
