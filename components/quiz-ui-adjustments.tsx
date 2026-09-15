@@ -13,13 +13,13 @@ function selectedUnitCode(): string {
   return expanded?.querySelector("span")?.textContent?.trim().toUpperCase() ?? "";
 }
 
-function buttonByStrongText(container: ParentNode, text: string): HTMLButtonElement | null {
+function buttonByStrongText(container: Element, text: string): HTMLButtonElement | null {
   return [...container.querySelectorAll<HTMLButtonElement>("button")]
     .find((button) => button.querySelector("strong")?.textContent?.trim() === text) ?? null;
 }
 
 function configureNeuroDefaults() {
-  const count = document.querySelector<HTMLSelectElement>('select[aria-label="Número de perguntas e duração da sessão"]');
+  const count = document.querySelector('select[aria-label="Número de perguntas e duração da sessão"]') as HTMLSelectElement | null;
   if (count && [...count.options].some((option) => option.value === NEURO_DEFAULT_QUESTION_COUNT) && count.value !== NEURO_DEFAULT_QUESTION_COUNT) {
     count.value = NEURO_DEFAULT_QUESTION_COUNT;
     count.dispatchEvent(new Event("change", { bubbles: true }));
