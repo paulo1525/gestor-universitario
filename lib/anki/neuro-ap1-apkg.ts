@@ -21,5 +21,6 @@ function decodeBase64(value: string): Uint8Array {
 
 export function neuroAp1ApkgBlob(): Blob {
   const bytes = decodeBase64(NEURO_AP1_APKG_BASE64);
-  return new Blob([bytes], { type: "application/zip" });
+  const copied = bytes.slice();
+  return new Blob([copied.buffer], { type: "application/zip" });
 }
