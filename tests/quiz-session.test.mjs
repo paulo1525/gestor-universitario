@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from '../lib/quiz-session.mjs';
+import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from '../lib/quiz-session.mjs';
 
 test('o cronómetro recupera o tempo real após suspensão do separador', () => {
   const start = Date.parse('2026-09-05T10:00:00Z');
@@ -10,6 +10,13 @@ test('o cronómetro recupera o tempo real após suspensão do separador', () => 
   assert.equal(remainingQuizSeconds(attempt, start + 900000), 0);
   assert.equal(remainingQuizSeconds({ ...attempt, endsAt: null }, start + 183200), 117);
   assert.equal(remainingQuizSeconds({ endsAt: null, startedAt: null, durationSeconds: null }, start), null);
+});
+
+test('o cronómetro corrige prazos legados curtos e timestamps em segundos', () => {
+  const start = Date.parse('2026-09-05T10:00:00Z');
+  assert.equal(normaliseQuizDurationSeconds(30, 5), 300);
+  assert.equal(remainingQuizSeconds({ timed: true, questionCount: 5, startedAt: new Date(start).toISOString(), endsAt: new Date(start + 30000).toISOString(), durationSeconds: 30 }, start), 300);
+  assert.equal(remainingQuizSeconds({ timed: true, questionCount: 5, startedAt: Math.floor(start / 1000), endsAt: Math.floor((start + 300000) / 1000), durationSeconds: 300 }, start), 300);
 });
 
 test('a revisão distingue omissões de erros e respeita a correção do servidor', () => {

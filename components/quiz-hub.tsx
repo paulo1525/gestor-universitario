@@ -36,7 +36,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
+import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -118,6 +118,8 @@ type Comment = { id: string; body: string; authorName: string; authorRole?: stri
 type QuizPreferences = { timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
 const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
+const SECONDS_PER_QUESTION = 60;
+const DEFAULT_TIMED_DURATION_SECONDS = DEFAULT_QUESTION_COUNT * SECONDS_PER_QUESTION;
 type QuizProgress = { attemptId: string; currentIndex: number; expiresAt: string; updatedAt: string };
 type QuizStatistics = {
   summary: {
@@ -195,7 +197,10 @@ function readQuizProgress(): QuizProgress | null {
 
 function saveQuizProgress(attempt: Attempt, currentIndex: number) {
   if (typeof document === "undefined" || !attempt.id || attempt.status !== "active") return;
-  const expiresAt = attempt.timerPaused || !attempt.timed ? new Date(Date.now() + 30 * 86400000).toISOString() : attempt.endsAt ?? new Date(Date.now() + 30 * 86400000).toISOString();
+  const durationSeconds = normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT);
+  const fallbackDeadline = attempt.startedAt ? Date.parse(attempt.startedAt) + durationSeconds * 1000 : NaN;
+  const fallbackExpiresAt = Number.isFinite(fallbackDeadline) ? new Date(fallbackDeadline).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString();
+  const expiresAt = attempt.timerPaused || !attempt.timed ? new Date(Date.now() + 30 * 86400000).toISOString() : attempt.endsAt ?? fallbackExpiresAt;
   const safe: QuizProgress = { attemptId: attempt.id.slice(0, 120), currentIndex: Math.max(0, Math.min(currentIndex, Math.max(0, attempt.questions.length - 1))), expiresAt, updatedAt: new Date().toISOString() };
   const maxAge = Math.max(60, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 1000));
   document.cookie = `${QUIZ_PROGRESS_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=${maxAge}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
@@ -262,7 +267,7 @@ function normalizeAttempt(raw: Record<string, unknown>, fallbackMode: Mode = "qu
     shortAnswerMode: attempt.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check",
     startedAt: isoDate(rawStartedAt),
     endsAt: isoDate(rawEndsAt),
-    durationSeconds: attempt.timed === false ? null : Number(value<number>(attempt, "durationSeconds", "duration_seconds") ?? 0) || (questions.length ? questions.length * 60 : null),
+    durationSeconds: attempt.timed === false ? null : normaliseQuizDurationSeconds(value<number>(attempt, "durationSeconds", "duration_seconds"), questions.length || DEFAULT_QUESTION_COUNT),
     timed: attempt.timed !== false,
     timerPaused: attempt.timerPaused === true,
     pauseReason: attempt.pauseReason === "manual" ? "manual" : "automatic",
@@ -528,7 +533,7 @@ export function QuizHub() {
     setAvailability(null);
     try {
       const activeTopicIds = selectedTopicIds;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: timed ? questionCount * 60 : null, answerFormat, shortAnswerMode, timed }) });
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: timed ? questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -940,7 +945,7 @@ export function QuizHub() {
             onNext={() => currentIndex === attempt.questions.length - 1 ? requestFinish() : goToQuestion(currentIndex + 1)}
             onPrevious={() => goToQuestion(currentIndex - 1)}
             onQuestion={goToQuestion}
-            onPause={() => { void changeTimer("pause", "automatic"); saveQuizProgress(attemptRef.current ?? attempt, currentIndex); setScreen("catalogue"); }}
+            onPause={async () => { await changeTimer("pause", "automatic"); saveQuizProgress(attemptRef.current ?? attempt, currentIndex); setScreen("catalogue"); }}
             onQuit={() => setAbandonConfirmation(true)}
             onExplain={() => setShowExplanation((current) => !current)}
             onComments={() => setCommentsOpen((current) => !current)}
@@ -1058,6 +1063,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
 }) {
   const isExam = attempt.mode === "exam";
+  const durationLabel = attempt.timed ? humanDuration(normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT)) : "Sem limite";
   const answered = Boolean(currentAnswer?.selectedOptionId);
   const feedback = !isExam && currentAnswer?.correct !== null && currentAnswer?.correct !== undefined;
   const [shortDrafts, setShortDrafts] = useState<Record<string, { value: string; revealed: boolean; correct: boolean | null }>>({});
@@ -1077,9 +1083,9 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   };
   return <>
     <section className={styles.sessionBar} aria-label="Progresso do teste">
-      <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}</small></span></div>
-      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, (attempt.durationSeconds ?? 300) * .2) ? styles.lowTime : ""}`} aria-label={`Tempo restante: ${formatClock(remaining)}`}><Clock3 /><strong>{formatClock(remaining)}</strong>{attempt.timerPaused && <small>Em pausa</small>}</span>}{!attempt.timed && <span className={styles.timer}><Clock3 /><strong>Sem limite</strong></span>}</div>
-      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0}>Desistir</button></div>
+      <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}{attempt.timed ? ` · ${durationLabel}` : " · sem limite"}</small></span></div>
+      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT) * .2) ? styles.lowTime : ""}`} role="timer" aria-live="polite" aria-atomic="true" data-timer-state={attempt.timerPaused ? "paused" : remaining <= 60 ? "low" : "running"} aria-label={`Tempo restante: ${formatClock(remaining)}. Limite: ${durationLabel}`}><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>{formatClock(remaining)}</strong><small>{attempt.timerPaused ? "Em pausa" : `de ${durationLabel}`}</small></span></span>}{!attempt.timed && <span className={styles.timer} data-timer-state="untimed"><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>Sem limite</strong><small>sem cronómetro</small></span></span>}</div>
+      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0 || timerBusy}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0 || timerBusy}>Desistir</button></div>
       <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Perguntas respondidas"><span style={{ width: `${progress}%` }} /></div>
     </section>
     <div className={styles.sessionSummary}><span role="status">{savingCount ? <><LoaderCircle className={styles.spin} /> A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{timerBusy ? <LoaderCircle className={styles.spin} /> : attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>

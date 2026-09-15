@@ -13,10 +13,19 @@ test("o configurador oferece sessões curtas e testes longos suportados pelo ban
   assert.match(quizHub, /QUIZ_QUESTION_COUNTS\.filter\(\(count\) => count <= availableQuestionCount\)/);
   assert.match(quizHub, /supportedCounts\.at\(-1\) \?\? DEFAULT_QUESTION_COUNT/);
   assert.match(quizHub, /availableQuestionCount < DEFAULT_QUESTION_COUNT/);
+  assert.match(quizHub, /normaliseQuizDurationSeconds/);
+  assert.match(quizHub, /questionCount \* SECONDS_PER_QUESTION/);
   assert.match(quizHub, /Menos de 5 perguntas disponíveis/);
   assert.match(quizHub, /São necessárias pelo menos 5 para iniciar uma sessão/);
   assert.doesNotMatch(quizHub, /Array\.from\(\{ length: effectiveMaximum - 9 \}/);
   assert.doesNotMatch(quizHub, /pelo menos 10 perguntas disponíveis/);
+});
+
+test("a sessão mostra o limite total e o estado do cronómetro", () => {
+  assert.match(quizHub, /data-timer-state=/);
+  assert.match(quizHub, /Limite: \$\{durationLabel\}/);
+  assert.match(quizHub, /de \$\{durationLabel\}/);
+  assert.match(quizHub, /onPause=\{async \(\) => \{ await changeTimer\("pause", "automatic"\)/);
 });
 
 test("a sessão MediLoop mantém poucos controlos durante a resposta", () => {

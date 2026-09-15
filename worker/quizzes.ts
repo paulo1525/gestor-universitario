@@ -23,6 +23,8 @@ type PublicQuizCommentThread = PublicQuizComment & { replies: PublicQuizCommentT
 
 const MAX_IMPORT_ROWS = 100;
 const MAX_IMAGE_BYTES = 1024 * 1024;
+const SECONDS_PER_QUESTION = 60;
+const MINIMUM_TIMED_DURATION_SECONDS = 5 * SECONDS_PER_QUESTION;
 const TEST_QUESTION_COUNTS = new Set([5, 10, 15, 30, 50]);
 const DEFAULT_TEST_QUESTION_COUNT = 5;
 const ADMIN_QUESTION_PAGE_SIZES = new Set([10, 25, 50]);
@@ -291,26 +293,55 @@ function attemptQuestionDto(item: Row, reveal: boolean) {
   };
 }
 
+function minimumAttemptDurationSeconds(attempt: Row): number {
+  const questionCount = Number(attempt.question_count);
+  return Math.max(MINIMUM_TIMED_DURATION_SECONDS, Number.isInteger(questionCount) && questionCount > 0 ? questionCount * SECONDS_PER_QUESTION : MINIMUM_TIMED_DURATION_SECONDS);
+}
+
+function effectiveAttemptDurationSeconds(attempt: Row): number | null {
+  if (attempt.duration_seconds === null || attempt.duration_seconds === undefined) return null;
+  const configured = Number(attempt.duration_seconds);
+  const minimum = minimumAttemptDurationSeconds(attempt);
+  return Number.isFinite(configured) && configured >= minimum ? configured : minimum;
+}
+
 function attemptDto(item: Row) {
   let config: Row = {};
   try {
     const parsed = JSON.parse(String(item.config_json || "{}"));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) config = parsed as Row;
   } catch { /* A configuração é sempre escrita pelo Worker; ignora dados legados inválidos. */ }
+  const durationSeconds = effectiveAttemptDurationSeconds(item);
+  const startedAt = Number(item.started_at);
+  const expiresAt = item.expires_at === null || item.expires_at === undefined ? NaN : Number(item.expires_at);
+  const minimumDeadline = durationSeconds !== null && Number.isFinite(startedAt) ? startedAt + durationSeconds * 1000 : NaN;
   return {
     id: item.id, mode: item.mode, status: item.status, unitId: item.curricular_unit_id, topicId: item.topic_id,
     topicIds: Array.isArray(config.topicIds) ? config.topicIds.filter((id): id is string => typeof id === "string") : item.topic_id ? [item.topic_id] : [],
     answerFormat: config.answerFormat === "short_answer" ? "short_answer" : "multiple_choice",
     shortAnswerMode: config.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check",
     difficulty: item.difficulty_filter, questionCount: item.question_count, answeredCount: item.answered_count,
-    timed: item.duration_seconds !== null && item.duration_seconds !== undefined,
+    timed: durationSeconds !== null,
     timerPaused: config.timerPaused === true || config.timerPaused === 1,
     pauseReason: config.pauseReason === "manual" ? "manual" : "automatic",
     pausedRemainingSeconds: typeof config.pausedRemainingMs === "number" ? Math.ceil(config.pausedRemainingMs / 1000) : null,
-    correctCount: item.correct_count, durationSeconds: item.duration_seconds, expiresAt: item.expires_at,
+    correctCount: item.correct_count, durationSeconds, expiresAt: Number.isFinite(expiresAt) && Number.isFinite(minimumDeadline) && item.status === "active" ? Math.max(expiresAt, minimumDeadline) : item.expires_at,
     startedAt: item.started_at, completedAt: item.completed_at,
     createdAt: item.created_at, updatedAt: item.updated_at,
   };
+}
+
+async function repairAttemptTimer(env: QuizEnv, user: QuizUser, attempt: Row): Promise<Row> {
+  if (attempt.status !== "active" || attempt.duration_seconds === null || attempt.duration_seconds === undefined) return attempt;
+  const configured = Number(attempt.duration_seconds);
+  const minimum = minimumAttemptDurationSeconds(attempt);
+  const startedAt = Number(attempt.started_at);
+  if (!Number.isFinite(configured) || configured >= minimum || !Number.isFinite(startedAt)) return attempt;
+  const expectedExpiresAt = startedAt + minimum * 1000;
+  const now = Date.now();
+  await env.DB.prepare("UPDATE quiz_attempts SET duration_seconds=?,expires_at=CASE WHEN expires_at IS NULL THEN NULL ELSE MAX(expires_at,?) END,config_json=json_set(config_json,'$.durationSeconds',?),updated_at=? WHERE id=? AND user_id=? AND status='active' AND duration_seconds IS NOT NULL AND duration_seconds<?")
+    .bind(minimum, expectedExpiresAt, minimum, now, attempt.id, user.id, minimum).run();
+  return (await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attempt.id, user.id).first<Row>()) || attempt;
 }
 
 async function attemptDetail(env: QuizEnv, attempt: Row): Promise<Row> {
@@ -329,7 +360,8 @@ async function completeAttempt(env: QuizEnv, user: QuizUser, attempt: Row): Prom
 }
 
 async function enforceAttemptExpiry(env: QuizEnv, user: QuizUser, attempt: Row): Promise<Row> {
-  return attempt.status === "active" && typeof attempt.expires_at === "number" && attempt.expires_at <= Date.now() ? completeAttempt(env, user, attempt) : attempt;
+  const repaired = await repairAttemptTimer(env, user, attempt);
+  return repaired.status === "active" && typeof repaired.expires_at === "number" && repaired.expires_at <= Date.now() ? completeAttempt(env, user, repaired) : repaired;
 }
 
 async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -347,7 +379,7 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (!mode || !Number.isInteger(requestedCount) || !TEST_QUESTION_COUNTS.has(requestedCount)) {
     return json({ error: "Escolha 5, 10, 15, 30 ou 50 perguntas.", code: "invalid_question_count", allowed: [...TEST_QUESTION_COUNTS] }, 400);
   }
-  const durationSeconds = body.timed === false ? null : requestedCount * 60;
+  const durationSeconds = body.timed === false ? null : requestedCount * SECONDS_PER_QUESTION;
   if (mode === "topic" && !topicIds.length) return json({ error: "Escolha pelo menos um tema para o teste temático." }, 400);
   if (unitId && !await activeUnit(env, unitId)) return json({ error: "Unidade curricular inválida." }, 400);
   const selectedTopics = await Promise.all(topicIds.map((id) => activeTopic(env, id)));
@@ -462,7 +494,8 @@ async function finishAttempt(env: QuizEnv, user: QuizUser | null, enabled: Modul
   if (!await enabled("quizzes.practice")) return disabled();
   const attempt = await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attemptId, user.id).first<Row>();
   if (!attempt) return json({ error: "Tentativa não encontrada." }, 404);
-  const completed = await completeAttempt(env, user, attempt);
+  const active = await enforceAttemptExpiry(env, user, attempt);
+  const completed = await completeAttempt(env, user, active);
   return json({ attempt: await attemptDetail(env, completed) });
 }
 
