@@ -1,6 +1,11 @@
 # Recursos temporários de Neuroanatomia
 
-Estes ficheiros foram colocados temporariamente no ramo de implementação para apoiar o desenvolvimento das áreas de Materiais e Anki. Não são assets destinados ao bundle final da aplicação.
+Estes ficheiros foram colocados temporariamente no checkout local do ramo de implementação para apoiar o desenvolvimento das áreas de Materiais e Anki. Não são assets destinados ao bundle final da aplicação.
+
+> Estado da cópia remota: o manifesto e os checksums estão no GitHub. Os binários
+> permanecem preservados no commit local `023ffe9` porque o conector GitHub não
+> suporta o envio destes ficheiros grandes. A publicação definitiva será feita no
+> bucket R2 `MATERIALS_BUCKET`, já preparado na aplicação.
 
 ## Conteúdo
 

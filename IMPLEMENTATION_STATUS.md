@@ -73,9 +73,12 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 ## Recursos temporários no ramo de trabalho
 
 Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia foram copiados para
-`temporary-resources/neuroanatomia/`. O ZIP de bibliografia foi dividido em partes
-inferiores a 100 MB e inclui instruções de reconstrução e checksums em `README.md`.
-Estes recursos não podem ser apagados sem autorização explícita do utilizador.
+`temporary-resources/neuroanatomia/` no checkout local. O ZIP de bibliografia foi
+dividido em partes inferiores a 100 MB e inclui instruções de reconstrução e
+checksums em `README.md`. O manifesto está no GitHub; os binários permanecem no
+commit local `023ffe9` até serem enviados para o bucket R2 `MATERIALS_BUCKET`,
+porque o conector GitHub não suporta esta transferência. Estes recursos não podem
+ser apagados sem autorização explícita do utilizador.
 
 ## Conteúdo inicial de Neuroanatomia
 
