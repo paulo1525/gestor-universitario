@@ -5,14 +5,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  BadgeCheck,
   BookOpen,
   CalendarDays,
+  CalendarClock,
   FileText,
   GraduationCap,
   LoaderCircle,
   Mail,
   Megaphone,
   Search,
+  ShieldAlert,
   UserRound,
   X,
 } from "lucide-react";
@@ -20,6 +23,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { RichTextContent } from "@/components/rich-text-editor";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/curricular-unit-catalog.module.css";
 
@@ -61,6 +65,24 @@ type Unit = {
   semester: number;
   representatives: Representative[];
 };
+type AcademicContent = {
+  academicYear: string | null;
+  availableYears: string[];
+  profile: {
+    description: string;
+    attendanceRequired: boolean;
+    attendancePolicy: string;
+    absenceLimit: string;
+    absencePolicy: string;
+    attendanceNotes: string;
+    status: "a_validar" | "verificado";
+    lastValidatedAt?: number | null;
+    lastValidatedBy?: string | null;
+  } | null;
+  evaluations: Array<{ id: string; title: string; weight: number | null; minimumScore: number | null; details: string }>;
+  exams: Array<{ id: string; title: string; examType: string; notes: string; calendarEvent?: { startsAt?: number; location?: string | null } | null }>;
+  sources: Array<{ id: string; title: string; sourceType: string; citation: string; pages: string; url?: string | null }>;
+};
 type Detail = {
   unit: Unit;
   announcements: Array<{ id: string; title: string; publishedAt: string }>;
@@ -79,6 +101,7 @@ type Detail = {
     category?: string;
     type?: never;
   }>;
+  academicContent: AcademicContent;
 };
 function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string): Unit {
   const legacyRepresentative = item.representative ?? (item.representativeName || item.representative_name ? {
@@ -124,6 +147,27 @@ function date(value: string, locale: string) {
     timeStyle: "short",
     timeZone: "Europe/Lisbon",
   }).format(new Date(value));
+}
+
+function normaliseAcademicContent(value: unknown): AcademicContent {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const profileSource = source.profile && typeof source.profile === "object" && !Array.isArray(source.profile) ? source.profile as Record<string, unknown> : null;
+  const textValue = (item: unknown) => typeof item === "string" ? item : "";
+  const profile = profileSource ? {
+    description: textValue(profileSource.description),
+    attendanceRequired: profileSource.attendanceRequired === true,
+    attendancePolicy: textValue(profileSource.attendancePolicy),
+    absenceLimit: textValue(profileSource.absenceLimit),
+    absencePolicy: textValue(profileSource.absencePolicy),
+    attendanceNotes: textValue(profileSource.attendanceNotes),
+    status: profileSource.status === "verificado" ? "verificado" as const : "a_validar" as const,
+    lastValidatedAt: typeof profileSource.lastValidatedAt === "number" ? profileSource.lastValidatedAt : null,
+    lastValidatedBy: textValue(profileSource.lastValidatedBy) || null,
+  } : null;
+  const evaluations = Array.isArray(source.evaluations) ? source.evaluations.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item))).map(item => ({ id: textValue(item.id), title: textValue(item.title), weight: typeof item.weight === "number" ? item.weight : null, minimumScore: typeof item.minimumScore === "number" ? item.minimumScore : null, details: textValue(item.details) })) : [];
+  const exams = Array.isArray(source.exams) ? source.exams.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item))).map(item => ({ id: textValue(item.id), title: textValue(item.title), examType: textValue(item.examType), notes: textValue(item.notes), calendarEvent: item.calendarEvent && typeof item.calendarEvent === "object" && !Array.isArray(item.calendarEvent) ? { startsAt: typeof (item.calendarEvent as Record<string, unknown>).startsAt === "number" ? (item.calendarEvent as Record<string, unknown>).startsAt as number : undefined, location: textValue((item.calendarEvent as Record<string, unknown>).location) || null } : null })) : [];
+  const sources = Array.isArray(source.sources) ? source.sources.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item))).map(item => ({ id: textValue(item.id), title: textValue(item.title), sourceType: textValue(item.sourceType), citation: textValue(item.citation), pages: textValue(item.pages), url: textValue(item.url) || null })) : [];
+  return { academicYear: textValue(source.academicYear) || null, availableYears: Array.isArray(source.availableYears) ? source.availableYears.filter((item): item is string => typeof item === "string") : [], profile, evaluations, exams, sources };
 }
 
 export function CurricularUnitCatalog() {
@@ -326,6 +370,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
           type?: string;
           attachmentDataUrl?: string;
         }>;
+        academicContent?: unknown;
         error?: string;
       };
       if (!response.ok || !raw.unit)
@@ -366,6 +411,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                   : t("community.units.material.other")),
           url: item.url ?? item.attachmentDataUrl,
         })),
+        academicContent: normaliseAcademicContent(raw.academicContent),
       });
     } catch (reason) {
       setError(
@@ -411,7 +457,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       <span className={styles.unitCode}>{data.unit.code}</span>
                       <h1>{data.unit.name}</h1>
                       <p>
-                        {data.unit.description ||
+                        {data.academicContent.profile?.description || data.unit.description ||
                           t("community.units.detailDescription")}
                       </p>
                     </div>
@@ -430,6 +476,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       </div>
                     </div>
                   </section>
+                  {data.academicContent.profile && <AcademicContentPanel content={data.academicContent} locale={locale} />}
                   <div className={styles.columns}>
                     <div className={styles.page}>
                       <DetailSection
@@ -530,6 +577,63 @@ export function CurricularUnitDetail({ id }: { id: string }) {
       </ModuleGuard>
     </AuthGuard>
   );
+}
+
+function ValidationBadge({ status }: { status: "a_validar" | "verificado" }) {
+  const verified = status === "verificado";
+  return <span className={`${styles.validationBadge} ${verified ? styles.validationVerified : styles.validationPending}`} data-status={status} title={verified ? "Informação verificada" : "Informação ainda por validar"}>
+    {verified ? <BadgeCheck aria-hidden="true" /> : <ShieldAlert aria-hidden="true" />}
+    {verified ? "Verificado" : "A validar"}
+  </span>;
+}
+
+function AcademicContentPanel({ content, locale }: { content: AcademicContent; locale: string }) {
+  const profile = content.profile;
+  if (!profile) return null;
+  const empty = <p className={styles.academicEmpty}>Ainda não foi adicionada informação para este bloco.</p>;
+  const examLabels: Record<string, string> = { frequencia: "Frequência", normal: "Época normal", recurso: "Recurso", especial: "Época especial", melhoria: "Melhoria", outro: "Outro" };
+  const sourceLabels: Record<string, string> = { oficial: "Oficial", recomendada: "Recomendada", regulamento: "Regulamento", bibliografia: "Bibliografia", outro: "Outra fonte" };
+  return <section className={`${styles.panel} ${styles.academicPanel}`} aria-labelledby="academic-content-title">
+    <header className={styles.panelHeader}>
+      <div className={styles.panelTitle}>
+        <span className={styles.panelIcon} aria-hidden="true"><GraduationCap /></span>
+        <div>
+          <h2 id="academic-content-title">Informação académica{content.academicYear ? ` · ${content.academicYear}` : ""}</h2>
+          <p>Regras e recursos específicos do ano letivo selecionado.</p>
+        </div>
+      </div>
+      <ValidationBadge status={profile.status} />
+    </header>
+    <div className={styles.academicBlocks}>
+      <article className={styles.academicBlock}>
+        <header><h3>Descrição</h3><ValidationBadge status={profile.status} /></header>
+        {profile.description ? <RichTextContent value={profile.description} className={styles.academicText} /> : empty}
+      </article>
+      <article className={styles.academicBlock}>
+        <header><h3>Presenças e faltas</h3><ValidationBadge status={profile.status} /></header>
+        <dl className={styles.academicFacts}>
+          <div><dt>Presença obrigatória</dt><dd>{profile.attendanceRequired ? "Sim" : "Não indicada"}</dd></div>
+          {profile.absenceLimit && <div><dt>Limite de faltas</dt><dd>{profile.absenceLimit}</dd></div>}
+        </dl>
+        {profile.attendancePolicy ? <RichTextContent value={profile.attendancePolicy} className={styles.academicText} /> : !profile.attendanceRequired && !profile.absenceLimit ? empty : null}
+        {profile.absencePolicy && <RichTextContent value={profile.absencePolicy} className={styles.academicText} />}
+        {profile.attendanceNotes && <RichTextContent value={profile.attendanceNotes} className={styles.academicText} />}
+      </article>
+      <article className={styles.academicBlock}>
+        <header><h3>Avaliação</h3><ValidationBadge status={profile.status} /></header>
+        {content.evaluations.length ? <div className={styles.academicRows}>{content.evaluations.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong>{item.details && <RichTextContent value={item.details} className={styles.academicText} />}</div><span>{item.weight === null ? "Peso não indicado" : `${item.weight}%`}{item.minimumScore === null ? "" : ` · mínimo ${item.minimumScore}/20`}</span></div>)}</div> : empty}
+      </article>
+      <article className={styles.academicBlock}>
+        <header><h3>Frequências e exames</h3><ValidationBadge status={profile.status} /></header>
+        {content.exams.length ? <div className={styles.academicRows}>{content.exams.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong><small>{examLabels[item.examType] || item.examType}{item.calendarEvent?.startsAt ? ` · ${new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pt-PT", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Lisbon" }).format(new Date(item.calendarEvent.startsAt))}` : ""}{item.calendarEvent?.location ? ` · ${item.calendarEvent.location}` : ""}</small>{item.notes && <RichTextContent value={item.notes} className={styles.academicText} />}</div>{item.calendarEvent && <Link href="/calendario">Calendário <CalendarClock aria-hidden="true" /></Link>}</div>)}</div> : empty}
+      </article>
+      <article className={styles.academicBlock}>
+        <header><h3>Fontes e bibliografia</h3><ValidationBadge status={profile.status} /></header>
+        {content.sources.length ? <div className={styles.academicRows}>{content.sources.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong><small>{sourceLabels[item.sourceType] || item.sourceType}{item.pages ? ` · ${item.pages}` : ""}</small>{item.citation && <p>{item.citation}</p>}</div>{item.url && <a href={item.url} target="_blank" rel="noreferrer">Abrir <ArrowRight aria-hidden="true" /></a>}</div>)}</div> : empty}
+      </article>
+    </div>
+    {profile.status === "a_validar" && <p className={styles.validationNotice}><ShieldAlert aria-hidden="true" />Esta informação foi disponibilizada pela Comissão de Curso, mas ainda não foi formalmente validada. Confirma sempre as regras oficiais da unidade curricular.</p>}
+  </section>;
 }
 
 function DetailSection({

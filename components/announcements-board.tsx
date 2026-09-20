@@ -23,6 +23,8 @@ type ApiAnnouncement = {
   body?: string;
   content?: string;
   priority?: Priority;
+  isCritical?: boolean;
+  is_critical?: number;
   status?: ApiAnnouncementStatus;
   author?: { fullName?: string; full_name?: string; commissionPosition?: string; commission_position?: string };
   authorName?: string;
@@ -57,6 +59,7 @@ type Announcement = {
   authorStudentNumber: string;
   publishedAt: string | number;
   expiresAt: string | number | null;
+  isCritical: boolean;
 };
 
 type AnnouncementsResponse = {
@@ -93,6 +96,7 @@ function normalize(item: ApiAnnouncement, fallbackMember: string, fallbackCommis
     authorStudentNumber: String(item.authorStudentNumber ?? ""),
     publishedAt: item.publishedAt ?? item.published_at ?? item.createdAt ?? item.created_at ?? Date.now(),
     expiresAt: item.expiresAt ?? item.expires_at ?? null,
+    isCritical: item.isCritical === true || item.is_critical === 1,
   };
 }
 
@@ -133,6 +137,9 @@ export function AnnouncementsBoard() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<Priority>("normal");
+  const [isCritical, setIsCritical] = useState(false);
+  const [audienceScope, setAudienceScope] = useState<"all" | "year">("all");
+  const [audienceYear, setAudienceYear] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<Priority | "all">("all");
@@ -194,11 +201,11 @@ export function AnnouncementsBoard() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), body: body.trim(), priority, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }),
+        body: JSON.stringify({ title: title.trim(), body: body.trim(), priority, isCritical, audienceScope, audienceYear: audienceScope === "year" && audienceYear ? Number(audienceYear) : null, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }),
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || t("announcements.publishError"));
-      setTitle(""); setBody(""); setPriority("normal"); setExpiresAt(""); setEditorOpen(false);
+      setTitle(""); setBody(""); setPriority("normal"); setIsCritical(false); setAudienceScope("all"); setAudienceYear(""); setExpiresAt(""); setEditorOpen(false);
       if (editorRef.current) editorRef.current.innerHTML = "";
       setNotice({ kind: "success", message: t("announcements.publishSuccess") });
       await load();
@@ -263,6 +270,9 @@ export function AnnouncementsBoard() {
       <div className={styles.formGrid}>
         <label className={styles.titleField}><FormLabel icon={Megaphone}>{t("announcements.editor.titleLabel")}</FormLabel><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder={t("announcements.editor.titlePlaceholder")} /></label>
         <label><FormLabel icon={Flag}>{t("announcements.editor.priority")}</FormLabel><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">{priorityLabels.normal}</option><option value="important">{priorityLabels.important}</option><option value="urgent">{priorityLabels.urgent}</option></select></label>
+        <label><FormLabel icon={Flag}>{t("announcements.editor.audience")}</FormLabel><select value={audienceScope} onChange={event => setAudienceScope(event.target.value as "all" | "year")}><option value="all">{t("announcements.editor.audienceAll")}</option><option value="year">{t("announcements.editor.audienceYear")}</option></select></label>
+        {audienceScope === "year" && <label><FormLabel icon={Flag}>{t("announcements.editor.audienceYear")}</FormLabel><input type="number" min={1} max={6} value={audienceYear} onChange={event => setAudienceYear(event.target.value)} placeholder={t("announcements.editor.audienceYearPlaceholder")} required /></label>}
+        <label className={styles.criticalOption}><input type="checkbox" checked={isCritical} onChange={event => setIsCritical(event.target.checked)} /><span><strong>{t("announcements.editor.critical")}</strong></span></label>
         <div className={styles.bodyField}><FormLabel icon={AlignLeft}>{t("announcements.editor.content")}</FormLabel><div className={styles.richEditor}>
           <div className={styles.toolbar} role="toolbar" aria-label={t("announcements.editor.toolbar")}>
             <button type="button" onClick={() => format("bold")} aria-label={t("announcements.editor.bold")} title={t("announcements.editor.bold")}><Bold /></button>
@@ -294,7 +304,7 @@ export function AnnouncementsBoard() {
         {paginatedAnnouncements.map(item => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber }, { revealIdentifier: canViewAuthorIdentifiers, locale }); return <article className={`${styles.card} ${styles[`priority_${item.priority}`]} ${item.status === "archived" ? styles.archived : ""}`} key={item.id}>
           <div className={styles.cardRail}><Megaphone /></div>
           <div className={styles.cardContent}>
-            <header><div className={styles.badges}><span className={styles.priority}>{priorityLabels[item.priority]}</span><span className={`${styles.status} ${styles[`status_${item.status}`]}`}>{statusLabels[item.status]}</span></div>{canArchive && item.status !== "archived" && <button className={styles.archiveButton} type="button" onClick={() => void archive(item.id)} disabled={archivingId === item.id}><Archive />{archivingId === item.id ? t("announcements.archiving") : t("announcements.archive")}</button>}</header>
+            <header><div className={styles.badges}><span className={styles.priority}>{priorityLabels[item.priority]}</span>{item.isCritical && <span className={styles.priority}>Crítico · confirmação</span>}<span className={`${styles.status} ${styles[`status_${item.status}`]}`}>{statusLabels[item.status]}</span></div>{canArchive && item.status !== "archived" && <button className={styles.archiveButton} type="button" onClick={() => void archive(item.id)} disabled={archivingId === item.id}><Archive />{archivingId === item.id ? t("announcements.archiving") : t("announcements.archive")}</button>}</header>
             <h3>{item.title}</h3>
             <div className={styles.body} dangerouslySetInnerHTML={{ __html: announcementDisplayHtml(item.body) }} />
             <footer>

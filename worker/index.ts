@@ -8,6 +8,7 @@ import { moduleHomepageAvailable, moduleHomepageTarget, resolveModuleHomepage } 
 import { announcementDisplayHtml, announcementPlainText, sanitizeAnnouncementHtml } from "@/lib/announcement-content";
 import { isStudentSpecialStatus, studentStatusFromCode, type StudentSpecialStatus } from "@/lib/student-status";
 import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
+import { handleCampusRoute, isCampusPath } from "./campus";
 import { handleQuizRoute, isQuizPath } from "./quizzes";
 import { handleLearningRoute, isLearningPath } from "./learning";
 import { handleStudyAnnotations } from "./study-annotations";
@@ -476,21 +477,21 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; commissionDepartment: string | null; commissionPosition: string | null; commissionPositionLabel: string | null; preview?:boolean; actorId?:string };
+type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; studyYear: number | null; commissionDepartment: string | null; commissionPosition: string | null; commissionPositionLabel: string | null; preview?:boolean; actorId?:string };
 async function currentUser(request: Request, env: Env): Promise<CurrentUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
-  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.commission_department, users.commission_position, commission_positions.label AS commission_position_label, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN commission_positions ON commission_positions.code = users.commission_position WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
-    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; commission_department: string | null; commission_position: string | null; commission_position_label: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
+  const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.study_year, users.commission_department, users.commission_position, commission_positions.label AS commission_position_label, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN commission_positions ON commission_positions.code = users.commission_position WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
+    .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; study_year: number | null; commission_department: string | null; commission_position: string | null; commission_position_label: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
   if (!row) return null;
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
-  const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, commissionDepartment: row.commission_department, commissionPosition: row.commission_position, commissionPositionLabel: row.commission_position_label };
+  const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, studyYear: row.study_year, commissionDepartment: row.commission_department, commissionPosition: row.commission_position, commissionPositionLabel: row.commission_position_label };
   const previewId=cookieValue(request,"gu_preview_user");
   if(row.email.toLowerCase()===PERMANENT_ADMIN_EMAIL&&previewId){
-    const target=await env.DB.prepare("SELECT users.id,users.email,users.full_name,users.role,users.font_scale,users.class_representative,users.represented_class,users.commission_department,users.commission_position,commission_positions.label AS commission_position_label FROM users LEFT JOIN commission_positions ON commission_positions.code=users.commission_position WHERE users.id=? AND users.status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;commission_department:string|null;commission_position:string|null;commission_position_label:string|null}>();
-    if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,commissionDepartment:target.commission_department,commissionPosition:target.commission_position,commissionPositionLabel:target.commission_position_label,preview:true,actorId:row.id};
+    const target=await env.DB.prepare("SELECT users.id,users.email,users.full_name,users.role,users.font_scale,users.class_representative,users.represented_class,users.study_year,users.commission_department,users.commission_position,commission_positions.label AS commission_position_label FROM users LEFT JOIN commission_positions ON commission_positions.code=users.commission_position WHERE users.id=? AND users.status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;study_year:number|null;commission_department:string|null;commission_position:string|null;commission_position_label:string|null}>();
+    if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,studyYear:target.study_year,commissionDepartment:target.commission_department,commissionPosition:target.commission_position,commissionPositionLabel:target.commission_position_label,preview:true,actorId:row.id};
   }
   return base;
 }
@@ -1371,26 +1372,44 @@ async function handleAnnouncements(request: Request, env: Env, user: CurrentUser
   const canPublish = Boolean(publishingEnabled && user.commissionPosition);
   const canViewAuthorIdentifiers = user.role === "admin" || Boolean(user.commissionPosition);
   if (request.method === "GET") {
-    const announcements = await env.DB.prepare("SELECT a.id,a.title,a.body,a.priority,a.status,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) ORDER BY CASE a.priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,a.published_at DESC LIMIT 100").bind(Date.now()).all<Record<string, unknown>>();
-    return json({ announcements: announcements.results.map((announcement) => { const { author_user_id, author_email, author_student_number, ...publicFields } = announcement; return { ...publicFields, body: announcementDisplayHtml(String(announcement.body || "")), ...(canViewAuthorIdentifiers ? { authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number } : {}) }; }), canPublish, canViewAuthorIdentifiers, publishingEnabled });
+    const management = canPublish || user.role === "admin";
+    const audienceWhere = management ? "1=1" : "(a.audience_scope='all' OR (a.audience_scope='year' AND (a.audience_year IS NULL OR u_view.study_year IS NULL OR a.audience_year=u_view.study_year)) OR (a.audience_scope='unit' AND (a.audience_unit_id IS NULL OR EXISTS (SELECT 1 FROM curricular_unit_representatives cur_view WHERE cur_view.curricular_unit_id=a.audience_unit_id AND cur_view.user_id=u_view.id))) )";
+    const announcements = await env.DB.prepare(`SELECT a.id,a.title,a.body,a.priority,a.status,a.is_critical,a.audience_scope,a.audience_year,a.audience_unit_id,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,CASE WHEN ack.user_id IS NULL THEN 0 ELSE 1 END AS acknowledged,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id LEFT JOIN users u_view ON u_view.id=? LEFT JOIN announcement_acknowledgements ack ON ack.announcement_id=a.id AND ack.user_id=? WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) AND ${audienceWhere} ORDER BY CASE WHEN a.is_critical=1 THEN 0 WHEN a.priority='urgent' THEN 1 WHEN a.priority='important' THEN 2 ELSE 3 END,a.published_at DESC LIMIT 100`).bind(user.id, user.id, Date.now()).all<Record<string, unknown>>();
+    return json({ announcements: announcements.results.map((announcement) => { const { author_user_id, author_email, author_student_number, ...publicFields } = announcement; return { ...publicFields, isCritical: announcement.is_critical === 1, requiresAcknowledgement: announcement.is_critical === 1, acknowledged: announcement.acknowledged === 1, body: announcementDisplayHtml(String(announcement.body || "")), ...(canViewAuthorIdentifiers ? { authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number } : {}) }; }), canPublish, canViewAuthorIdentifiers, publishingEnabled });
   }
   if (!canPublish) return json({ error: "A publicação está reservada a membros da Comissão de Curso com cargo definido." }, 403);
   const body = await parseJson(request);
+  if (request.method === "PATCH" && body?.action === "acknowledge") {
+    const id = String(body.id || "").trim();
+    if (!id) return json({ error: "Aviso inválido." }, 400);
+    const exists = await env.DB.prepare("SELECT id FROM announcements WHERE id=? AND status='published'").bind(id).first();
+    if (!exists) return json({ error: "Aviso não encontrado." }, 404);
+    const now = Date.now();
+    await env.DB.prepare("INSERT INTO announcement_acknowledgements(announcement_id,user_id,acknowledged_at) VALUES (?,?,?) ON CONFLICT(announcement_id,user_id) DO UPDATE SET acknowledged_at=excluded.acknowledged_at").bind(id, user.id, now).run();
+    return json({ ok: true, id, acknowledgedAt: now });
+  }
   if (request.method === "POST") {
     const title = String(body?.title || "").trim().replace(/\s+/g, " ").slice(0, 140);
     const content = sanitizeAnnouncementHtml(String(body?.body || "").trim());
     const plainContent = announcementPlainText(content);
     const priority = String(body?.priority || "normal");
+    const isCritical = body?.isCritical === true;
+    const audienceScope = String(body?.audienceScope || "all");
+    const audienceYear = body?.audienceYear === null || body?.audienceYear === "" || body?.audienceYear === undefined ? null : Number(body.audienceYear);
+    const audienceUnitId = String(body?.audienceUnitId || body?.unitId || body?.curricularUnitId || "").trim();
     const curricularUnitId = String(body?.unitId || body?.curricularUnitId || "").trim();
     const expiresAt = body?.expiresAt === null || body?.expiresAt === "" || body?.expiresAt === undefined ? null : Date.parse(String(body.expiresAt));
     if (title.length < 5 || plainContent.length < 10 || plainContent.length > 5000) return json({ error: "Indique um título e uma mensagem completos, até 5000 caracteres." }, 400);
-    if (!["normal", "important", "urgent"].includes(priority)) return json({ error: "Prioridade inválida." }, 400);
+    if (!["normal", "important", "urgent"].includes(priority) || !["all", "unit", "year"].includes(audienceScope)) return json({ error: "Prioridade ou segmento inválido." }, 400);
+    if (audienceScope === "year" && (!Number.isInteger(audienceYear) || Number(audienceYear) < 1 || Number(audienceYear) > 6)) return json({ error: "Indique um ano curricular entre 1 e 6." }, 400);
+    if (audienceScope === "unit" && !audienceUnitId) return json({ error: "Indique a unidade curricular do segmento." }, 400);
     if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) return json({ error: "A validade deve terminar no futuro." }, 400);
     if (curricularUnitId && !await env.DB.prepare("SELECT id FROM curricular_units WHERE id=? AND active=1").bind(curricularUnitId).first()) return json({ error: "Unidade curricular inválida." }, 400);
+    if (audienceUnitId && !await env.DB.prepare("SELECT id FROM curricular_units WHERE id=? AND active=1").bind(audienceUnitId).first()) return json({ error: "Unidade curricular do segmento inválida." }, 400);
     const id = crypto.randomUUID(), now = Date.now(), actorId = user.actorId || user.id;
     const statements = [
-      env.DB.prepare("INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at) VALUES (?,?,?,?,'published',?,?,?,?,?,?,?,?)").bind(id, title, content, priority, user.id, user.fullName, user.commissionPosition, user.commissionPositionLabel || user.commissionPosition, now, expiresAt, now, now),
-      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_published',?,?)").bind(actorId, JSON.stringify({ id, title, priority, expiresAt }), now),
+      env.DB.prepare("INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at,is_critical,audience_scope,audience_year,audience_unit_id) VALUES (?,?,?,?,'published',?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, title, content, priority, user.id, user.fullName, user.commissionPosition, user.commissionPositionLabel || user.commissionPosition, now, expiresAt, now, now, isCritical ? 1 : 0, audienceScope, audienceYear, audienceScope === "unit" ? audienceUnitId : null),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_published',?,?)").bind(actorId, JSON.stringify({ id, title, priority, expiresAt, isCritical, audienceScope, audienceYear, audienceUnitId: audienceScope === "unit" ? audienceUnitId : null }), now),
     ];
     if (curricularUnitId) statements.push(env.DB.prepare("INSERT INTO announcement_curricular_units (announcement_id,curricular_unit_id) VALUES (?,?)").bind(id, curricularUnitId));
     await env.DB.batch(statements);
@@ -1570,6 +1589,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (isAcademicHubPath(pathname)) {
     const user = await currentUser(request, env);
     return handleAcademicHubRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
+  }
+  if (isCampusPath(pathname)) {
+    const user = await currentUser(request, env);
+    return handleCampusRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
   }
   if (pathname === "/api/student/destinations" && ["GET","PUT"].includes(request.method)) {
     const user = await currentUser(request, env); return user ? await isModuleEnabled(env,"classes.preferences") ? handleOwnDestinations(request, env, user) : moduleDisabled() : json({ error:"Sessão inválida." },401);

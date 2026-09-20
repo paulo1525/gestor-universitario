@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "@/components/i18n-context";
 import { announcementPlainText } from "@/lib/announcement-content";
 
-type ApiAnnouncement = { id: string | number; title: string; body?: string; content?: string; priority?: string; published_at?: string | number; publishedAt?: string | number };
+type ApiAnnouncement = { id: string | number; title: string; body?: string; content?: string; priority?: string; isCritical?: boolean; is_critical?: number; acknowledged?: boolean; published_at?: string | number; publishedAt?: string | number };
 type UrgentAnnouncement = { id: string; title: string; body: string };
 
 export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
@@ -22,8 +22,8 @@ export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
         return (await response.json() as { announcements?: ApiAnnouncement[] }).announcements ?? [];
       })
       .then((announcements) => {
-        const latest = announcements.filter((item) => item.priority === "urgent").sort((a, b) => new Date(b.publishedAt ?? b.published_at ?? 0).getTime() - new Date(a.publishedAt ?? a.published_at ?? 0).getTime())[0];
-        if (!latest || window.sessionStorage.getItem(`dismissed-urgent-announcement-v2:${latest.id}`)) return;
+        const latest = announcements.filter((item) => item.priority === "urgent" || item.isCritical === true || item.is_critical === 1).sort((a, b) => new Date(b.publishedAt ?? b.published_at ?? 0).getTime() - new Date(a.publishedAt ?? a.published_at ?? 0).getTime())[0];
+        if (!latest || latest.acknowledged || window.sessionStorage.getItem(`dismissed-urgent-announcement-v2:${latest.id}`)) return;
         setAnnouncement({ id: String(latest.id), title: latest.title, body: latest.body ?? latest.content ?? "" });
       })
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setAnnouncement(null); });
@@ -34,6 +34,7 @@ export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
   const summary = announcementPlainText(announcement.body);
   const dismiss = () => {
     window.sessionStorage.setItem(`dismissed-urgent-announcement-v2:${announcement.id}`, "1");
+    void fetch("/api/announcements", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "acknowledge", id: announcement.id }) });
     setAnnouncement(null);
   };
 

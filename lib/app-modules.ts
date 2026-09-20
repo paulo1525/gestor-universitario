@@ -12,10 +12,13 @@ export type AppModuleKey =
   | "announcements"
   | "announcements.feed"
   | "announcements.publishing"
+  | "announcements.critical"
   | "curricular_units"
   | "curricular_units.catalog"
   | "curricular_units.management"
   | "curricular_units.detail"
+  | "curricular_units.content"
+  | "curricular_units.content.management"
   | "calendar"
   | "calendar.events"
   | "calendar.management"
@@ -26,6 +29,7 @@ export type AppModuleKey =
   | "requests"
   | "requests.submission"
   | "requests.management"
+  | "requests.reveal_audit"
   | "directory"
   | "directory.members"
   | "polls"
@@ -46,6 +50,14 @@ export type AppModuleKey =
   | "materials.favorites"
   | "materials.feedback"
   | "materials.versioning"
+  | "materials.exam_workflow"
+  | "campus"
+  | "campus.directory"
+  | "campus.management"
+  | "materials.catalog"
+  | "materials.summaries"
+  | "materials.bibliography"
+  | "materials.anki"
   | "useful_links"
   | "useful_links.library"
   | "useful_links.management";
@@ -73,10 +85,13 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: "announcements", label: "Avisos e comunicados", description: "Comunicação institucional da Comissão de Curso.", parentKey: null, defaultEnabled: true },
   { key: "announcements.feed", label: "Consulta de avisos", description: "Apresentação dos avisos publicados aos utilizadores.", parentKey: "announcements", defaultEnabled: true },
   { key: "announcements.publishing", label: "Publicação por membros CC", description: "Editor de comunicados para membros com cargo na Comissão.", parentKey: "announcements", defaultEnabled: true },
+  { key: "announcements.critical", label: "Avisos críticos", description: "Confirmação persistente e segmentação dos avisos críticos.", parentKey: "announcements", defaultEnabled: true },
   { key: "curricular_units", label: "Unidades curriculares", description: "Catálogo de cadeiras e representantes da Comissão.", parentKey: null, defaultEnabled: true },
   { key: "curricular_units.catalog", label: "Catálogo e créditos", description: "Consulta de unidades curriculares, ano, semestre e ECTS.", parentKey: "curricular_units", defaultEnabled: true },
   { key: "curricular_units.management", label: "Gestão pelo Núcleo", description: "Criação e edição reservadas ao Núcleo de Gestão.", parentKey: "curricular_units", defaultEnabled: true },
   { key: "curricular_units.detail", label: "Área de cada unidade curricular", description: "Página agregada com representante, eventos, documentos e comunicados.", parentKey: "curricular_units", defaultEnabled: true },
+  { key: "curricular_units.content", label: "Informação académica por ano", description: "Descrição, presenças, avaliação, exames e fontes específicas de cada ano letivo.", parentKey: "curricular_units", defaultEnabled: true },
+  { key: "curricular_units.content.management", label: "Gestão da informação académica", description: "Criação, validação e auditoria da informação académica por unidade curricular.", parentKey: "curricular_units", defaultEnabled: true },
   { key: "calendar", label: "Calendário académico", description: "Avaliações, entregas, eventos e prazos académicos.", parentKey: null, defaultEnabled: true },
   { key: "calendar.events", label: "Consulta do calendário", description: "Calendário cronológico com filtros por unidade curricular.", parentKey: "calendar", defaultEnabled: true },
   { key: "calendar.management", label: "Gestão de eventos", description: "Criação e edição de avaliações, entregas e eventos pela Comissão.", parentKey: "calendar", defaultEnabled: true },
@@ -87,6 +102,7 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: "requests", label: "Pedidos e sugestões", description: "Canal de contacto identificado ou anónimo com a Comissão.", parentKey: null, defaultEnabled: true },
   { key: "requests.submission", label: "Envio de pedidos", description: "Submissão identificada ou anónima de pedidos e sugestões.", parentKey: "requests", defaultEnabled: true },
   { key: "requests.management", label: "Gestão de pedidos", description: "Triagem, estados e respostas públicas ou privadas.", parentKey: "requests", defaultEnabled: true },
+  { key: "requests.reveal_audit", label: "Auditoria de revelação", description: "Registo reservado das revelações excecionais de identidades anónimas.", parentKey: "requests", defaultEnabled: true },
   { key: "directory", label: "Representantes e contactos", description: "Diretório sincronizado com os membros registados.", parentKey: null, defaultEnabled: true },
   { key: "directory.members", label: "Diretório da Comissão", description: "Membros, cargos, núcleos e unidades representadas.", parentKey: "directory", defaultEnabled: true },
   { key: "polls", label: "Inquéritos rápidos", description: "Votações e recolha de opinião dos estudantes.", parentKey: null, defaultEnabled: true },
@@ -107,6 +123,14 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: "materials.favorites", label: "Favoritos de materiais", description: "Lista pessoal de materiais guardados para consulta posterior.", parentKey: "materials", defaultEnabled: true },
   { key: "materials.feedback", label: "Feedback de materiais", description: "Indicações de utilidade e sinalização de conteúdo desatualizado.", parentKey: "materials", defaultEnabled: true },
   { key: "materials.versioning", label: "Versões de materiais", description: "Publicação de novas versões com preservação do histórico dos ficheiros.", parentKey: "materials", defaultEnabled: true },
+  { key: "materials.exam_workflow", label: "Fluxo de questões de exame", description: "Transcrição, revisão e importação estruturada das fotografias de exames.", parentKey: "materials", defaultEnabled: true },
+  { key: "campus", label: "Salas e docentes", description: "Mapa pesquisável de edifícios, pisos, salas, docentes e unidades curriculares.", parentKey: null, defaultEnabled: true },
+  { key: "campus.directory", label: "Consulta de salas e docentes", description: "Pesquisa de espaços, percursos, docentes e unidades curriculares associadas.", parentKey: "campus", defaultEnabled: true },
+  { key: "campus.management", label: "Gestão de salas e docentes", description: "Criação, atualização e validação do diretório do campus.", parentKey: "campus", defaultEnabled: true },
+  { key: "materials.catalog", label: "Catálogo estruturado", description: "Organização por unidade curricular, aula, fonte e estado de verificação.", parentKey: "materials", defaultEnabled: true },
+  { key: "materials.summaries", label: "Sumários", description: "Consulta de sumários originais e versões verificadas por aula.", parentKey: "materials", defaultEnabled: true },
+  { key: "materials.bibliography", label: "Bibliografia recomendada", description: "Excerto bibliográfico recomendado com páginas impressas e físicas.", parentKey: "materials", defaultEnabled: true },
+  { key: "materials.anki", label: "Baralhos Anki", description: "Download de pacotes prontos e criação de baralhos por aula e subtópico.", parentKey: "materials", defaultEnabled: true },
   { key: "useful_links", label: "Links úteis", description: "Diretório de plataformas, serviços e recursos recomendados para o ano.", parentKey: null, defaultEnabled: true },
   { key: "useful_links.library", label: "Consulta de links úteis", description: "Pesquisa e filtragem de links por prioridade, categoria e unidade curricular.", parentKey: "useful_links", defaultEnabled: true },
   { key: "useful_links.management", label: "Gestão de links úteis", description: "Criação, edição, arquivo e eliminação de links pelo Núcleo e administradores.", parentKey: "useful_links", defaultEnabled: true },

@@ -38,27 +38,44 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 | Ramo | Âmbito | Estado |
 |---|---|---|
 | `feat/implementation-orchestration` | Auditoria, protótipos, integração e validação final | Em curso |
-| `feat/academic-content-plan` | Informação das unidades curriculares e calendário | Em implementação |
-| `feat/materials-anki-plan` | Materiais, sumários, bibliografia e Anki | Em implementação |
-| `feat/community-campus-plan` | Dúvidas, exames, salas, docentes e avisos críticos | Em implementação |
+| `feat/academic-content-plan` | Informação das unidades curriculares e calendário | Integrado |
+| `feat/materials-anki-plan` | Materiais, sumários, bibliografia e Anki | Integrado |
+| `feat/community-campus-plan` | Dúvidas, exames, salas, docentes e avisos críticos | Integrado |
 
 ## Estado por área
 
 | Área | Estado inicial | Implementação | Testes | Validação visual |
 |---|---|---|---|---|
-| Auditoria da UI atual | Iniciada | — | — | Pendente |
-| Protótipos visuais | Pendente | — | — | Pendente |
-| Informação das unidades curriculares | Parcial | Em curso | Pendente | Pendente |
-| Calendário e ligações às unidades curriculares | Implementado parcialmente | Em curso | Pendente | Pendente |
-| Sumários por aula | Ausente | Em curso | Pendente | Pendente |
-| Bibliografia recomendada recortada | Ausente | Em curso | Pendente | Pendente |
-| Catálogo Anki | Ausente em Materiais | Em curso | Pendente | Pendente |
-| Gerador Anki personalizado | Parcial em Testes | Em curso | Pendente | Pendente |
-| Dúvidas anónimas | Parcial | Em curso | Pendente | Pendente |
-| Envio e transcrição de exames | Parcial | Em curso | Pendente | Pendente |
-| Mapa de salas | Ausente | Em curso | Pendente | Pendente |
-| Diretório de docentes | Ausente | Em curso | Pendente | Pendente |
-| Avisos críticos persistentes | Parcial | Em curso | Pendente | Pendente |
+| Auditoria da UI atual | Concluída | — | — | Captura pública concluída; áreas autenticadas aguardam ramo publicado |
+| Protótipos visuais | Concluídos | Desktop e mobile definidos | — | Referência aprovada pelo utilizador |
+| Informação das unidades curriculares | Parcial | Integrada | 300/300 no ramo funcional | Pendente no ramo consolidado |
+| Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada | 300/300 no ramo funcional | Pendente no ramo consolidado |
+| Sumários por aula | Ausente | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
+| Bibliografia recomendada recortada | Ausente | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
+| Catálogo Anki | Ausente em Materiais | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
+| Gerador Anki personalizado | Parcial em Testes | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
+| Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Envio e transcrição de exames | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Mapa de salas | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Diretório de docentes | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Avisos críticos persistentes | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+
+## Direção visual aprovada
+
+- navegação preta, superfícies claras e dourado usado apenas para foco, seleção e ações principais;
+- cabeçalhos com hierarquia tipográfica forte e elevada legibilidade;
+- painéis brancos, bordas discretas, raios e sombras retirados dos tokens globais;
+- Materiais organizado por `Visão geral`, `Sumários`, `Bibliografia`, `Anki` e `Exames`;
+- configurador Anki com tipos de cartão, aulas/tópicos, opções e resumo da seleção;
+- versão móvel com cabeçalho compacto, separadores deslocáveis, cartões empilhados e navegação inferior;
+- a inspiração aprovada orienta a composição, mantendo os componentes, tokens e regras de acessibilidade do produto.
+
+## Recursos temporários no ramo de trabalho
+
+Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia foram copiados para
+`temporary-resources/neuroanatomia/`. O ZIP de bibliografia foi dividido em partes
+inferiores a 100 MB e inclui instruções de reconstrução e checksums em `README.md`.
+Estes recursos não podem ser apagados sem autorização explícita do utilizador.
 
 ## Conteúdo inicial de Neuroanatomia
 
@@ -107,8 +124,13 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 |---|---|---|
 | 20/09/2026 | Suite da `main` antes das alterações | 295/295 testes aprovados |
 | 20/09/2026 | Sincronização com `origin/main` | Commit base `80d02b0` |
-| 20/09/2026 | Preparação local da D1 | Bloqueada na migration de seed por ausência do administrador técnico; correção local em análise |
+| 20/09/2026 | Preparação local da D1 | Migrations 0056–0058 e seed local concluídos |
+| 20/09/2026 | Protótipos de Materiais/Anki | Desktop e mobile aprovados como direção visual |
+| 20/09/2026 | Integração de conteúdo académico | Commit funcional integrado; testes, TypeScript, lint e build aprovados no ramo de origem |
+| 20/09/2026 | Integração de comunidade e campus | Commit funcional integrado; TypeScript aprovado no ramo consolidado |
+| 20/09/2026 | Integração de Materiais e Anki | Catálogo, tabs, builder e fallback R2 integrados |
+| 20/09/2026 | Validação consolidada | 303/303 testes, TypeScript, ESLint e build Next.js aprovados |
 
 ## Próxima atualização prevista
 
-O documento será atualizado após a entrega dos três ramos, depois da integração e após cada etapa de validação final.
+O documento será atualizado após a publicação do ramo, a validação visual autenticada e a decisão de integração em `main`.

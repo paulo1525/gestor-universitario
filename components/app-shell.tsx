@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X } from "lucide-react";
+import { Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
 import adminNavigationStyles from "@/components/admin-navigation.module.css";
@@ -15,7 +15,7 @@ import { useScrollLock } from "@/components/use-scroll-lock";
 import { useEscapeKey } from "@/components/use-escape-key";
 import {setTestPersona,TEST_PERSONAS,testPersona} from "@/lib/test-mode";
 
-export type AppShellActive = "overview" | "turmas" | "quizzes" | "quizzes_management" | "notifications" | "useful_links" | "admin" | "modules" | "tickets" | "check" | "placements" | "audit" | "announcements" | "curricular_units" | "curricular_units_management" | "calendar" | "documents" | "requests" | "directory" | "polls" | "dashboard" | "search" | "materials";
+export type AppShellActive = "overview" | "turmas" | "quizzes" | "quizzes_management" | "notifications" | "useful_links" | "admin" | "modules" | "tickets" | "check" | "placements" | "audit" | "announcements" | "curricular_units" | "curricular_units_management" | "calendar" | "documents" | "requests" | "directory" | "campus" | "polls" | "dashboard" | "search" | "materials";
 type Props = { children: ReactNode; active: AppShellActive; breadcrumb?: string; currentClassId?: number; focusMode?: boolean };
 type SiteTheme = "cc" | "forum";
 type SiteNavigationGroup = "communication" | "academic" | "community";
@@ -34,8 +34,8 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
   const { breadcrumb: translateBreadcrumb, locale, setLocale, t } = useI18n();
   const hasCommunication = moduleAccess["announcements.feed"] || moduleAccess["requests.submission"] || moduleAccess["polls.voting"];
   const hasAcademicLife = moduleAccess["calendar.events"] || moduleAccess["curricular_units.catalog"] || moduleAccess["quizzes.practice"] || moduleAccess["quizzes.learning"] || moduleAccess["documents.library"] || moduleAccess["materials.library"] || moduleAccess["materials.submission"] || moduleAccess["useful_links.library"] || moduleAccess["useful_links"];
-  const hasCommunity = moduleAccess["directory.members"];
-  const [openSiteGroup, setOpenSiteGroup] = useState<SiteNavigationGroup | null>(() => ["announcements", "requests", "polls", "notifications"].includes(active) ? "communication" : ["calendar", "curricular_units", "quizzes", "documents", "materials", "useful_links"].includes(active) ? "academic" : active === "directory" ? "community" : null);
+  const hasCommunity = moduleAccess["directory.members"] || moduleAccess["campus.directory"];
+  const [openSiteGroup, setOpenSiteGroup] = useState<SiteNavigationGroup | null>(() => ["announcements", "requests", "polls", "notifications"].includes(active) ? "communication" : ["calendar", "curricular_units", "quizzes", "documents", "materials", "useful_links"].includes(active) ? "academic" : ["directory", "campus"].includes(active) ? "community" : null);
   const administrativeContext = Boolean(user?.role === "admin" && isAdministrativeArea(active));
   useScrollLock(open);
   useEscapeKey(open, () => setOpen(false));
@@ -127,9 +127,10 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
               </div>
             </section>}
             {hasCommunity&&<section className={adminNavigationStyles.group}>
-              <button className={`${adminNavigationStyles.groupButton} ${active === "directory" ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "community"} aria-controls="site-navigation-community" onClick={() => setOpenSiteGroup((current) => current === "community" ? null : "community")}><ContactRound/><span>{t("nav.community")}</span><ChevronDown className={openSiteGroup === "community" ? adminNavigationStyles.chevronOpen : ""}/></button>
+              <button className={`${adminNavigationStyles.groupButton} ${["directory", "campus"].includes(active) ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "community"} aria-controls="site-navigation-community" onClick={() => setOpenSiteGroup((current) => current === "community" ? null : "community")}><ContactRound/><span>{t("nav.community")}</span><ChevronDown className={openSiteGroup === "community" ? adminNavigationStyles.chevronOpen : ""}/></button>
               <div id="site-navigation-community" className={`${adminNavigationStyles.groupItems} ${openSiteGroup !== "community" ? adminNavigationStyles.groupItemsClosed : ""}`}>
                 {moduleAccess["directory.members"]&&<Link className={`${adminNavigationStyles.item} ${active === "directory" ? adminNavigationStyles.active : ""}`} href="/comissao" onClick={() => setOpen(false)}><ContactRound/><span>{t("nav.directory.title")}</span></Link>}
+                {moduleAccess["campus.directory"]&&<Link className={`${adminNavigationStyles.item} ${active === "campus" ? adminNavigationStyles.active : ""}`} href="/salas-docentes" onClick={() => setOpen(false)}><MapPinned/><span>{t("nav.campus.title")}</span></Link>}
               </div>
             </section>}
           </div>

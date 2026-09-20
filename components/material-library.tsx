@@ -42,6 +42,7 @@ import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
+import { MaterialCatalog, type MaterialCatalogTab } from "@/components/material-catalog";
 import styles from "@/components/material-library.module.css";
 
 type Status = "pending" | "approved" | "rejected" | "archived";
@@ -204,6 +205,11 @@ type Material = {
   versionCount: number;
   versions: MaterialVersion[];
   versionsLoaded: boolean;
+  examSitting?: string;
+  assessmentComponent?: string;
+  examDate?: string | number | null;
+  questionCount?: number | null;
+  transcriptionStatus?: string;
 };
 type Unit = { id: string; code: string; name: string };
 type Notice = { kind: ToastKind; message: string } | null;
@@ -351,7 +357,8 @@ export function MaterialLibrary() {
     [versionFileData, setVersionFileData] = useState(""),
     [versionNotes, setVersionNotes] = useState(""),
     [publishingVersion, setPublishingVersion] = useState(false),
-    [filter, setFilter] = useState("all");
+    [filter, setFilter] = useState("all"),
+    [activeTab, setActiveTab] = useState<MaterialCatalogTab>("overview");
   const [title, setTitle] = useState(""),
     [description, setDescription] = useState(""),
     [category, setCategory] = useState<Category>("exam"),
@@ -359,7 +366,11 @@ export function MaterialLibrary() {
     [anonymous, setAnonymous] = useState(true),
     [file, setFile] = useState<File | null>(null),
     [fileData, setFileData] = useState(""),
-    [examFiles, setExamFiles] = useState<Array<SelectedUpload & { dataUrl: string }>>([]);
+    [examFiles, setExamFiles] = useState<Array<SelectedUpload & { dataUrl: string }>>([]),
+    [examSitting, setExamSitting] = useState("unknown"),
+    [assessmentComponent, setAssessmentComponent] = useState("unknown"),
+    [examDate, setExamDate] = useState(""),
+    [questionCount, setQuestionCount] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -493,6 +504,10 @@ export function MaterialLibrary() {
     setFile(null);
     setFileData("");
     setExamFiles([]);
+    setExamSitting("unknown");
+    setAssessmentComponent("unknown");
+    setExamDate("");
+    setQuestionCount("");
     setEditor(false);
   };
   const descriptionLength = richTextPlainText(description).length;
@@ -526,6 +541,10 @@ export function MaterialLibrary() {
           attachmentName: examSubmission ? primaryExamFile.file.name : file?.name,
           attachmentDataUrl: examSubmission ? primaryExamFile.dataUrl : fileData,
           attachments: examSubmission ? examFiles.map((item) => ({ name: item.file.name, dataUrl: item.dataUrl })) : undefined,
+          sitting: examSubmission ? examSitting : undefined,
+          assessmentComponent: examSubmission ? assessmentComponent : undefined,
+          examDate: examSubmission && examDate ? examDate : undefined,
+          questionCount: examSubmission && questionCount ? Number(questionCount) : undefined,
         }),
       });
       const data = (await response.json()) as { error?: string };
@@ -735,9 +754,12 @@ export function MaterialLibrary() {
               </div>
               {submissionEnabled && <div className={styles.heroActions}>
                 <button
-                    className="button button--primary"
-                    type="button"
-                    onClick={() => setEditor((value) => !value)}
+                  className="button button--primary"
+                  type="button"
+                    onClick={() => {
+                      setActiveTab("exams");
+                      setEditor((value) => !value);
+                    }}
                   >
                     {editor ? <X /> : <Upload />}
                     {editor ? t("community.materials.closeForm") : t("community.materials.share")}
@@ -752,7 +774,14 @@ export function MaterialLibrary() {
                 onDismiss={() => setNotice(null)}
               />
             )}{" "}
-            {submissionEnabled && editor && (
+            <MaterialCatalog
+              activeTab={activeTab}
+              onTabChange={(tab) => {
+                setActiveTab(tab);
+                if (tab !== "exams") setEditor(false);
+              }}
+            />
+            {submissionEnabled && activeTab === "exams" && editor && (
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div className={styles.panelHeading}>
@@ -826,6 +855,12 @@ export function MaterialLibrary() {
                     </div>
                     <aside className={styles.formAside}>
                       {category === "exam" ? <>
+                        <div className={styles.examMetadata}>
+                          <label className={styles.field}><span>{t("community.materials.examSitting")}</span><select value={examSitting} onChange={(event) => setExamSitting(event.target.value)}><option value="unknown">{t("community.materials.examSittingUnknown")}</option><option value="normal">{t("community.materials.examSittingNormal")}</option><option value="resit">{t("community.materials.examSittingResit")}</option><option value="special">{t("community.materials.examSittingSpecial")}</option><option value="continuous">{t("community.materials.examSittingContinuous")}</option></select></label>
+                          <label className={styles.field}><span>{t("community.materials.examComponent")}</span><select value={assessmentComponent} onChange={(event) => setAssessmentComponent(event.target.value)}><option value="unknown">{t("community.materials.examComponentUnknown")}</option><option value="theory">{t("community.materials.examComponentTheory")}</option><option value="practical">{t("community.materials.examComponentPractical")}</option><option value="mixed">{t("community.materials.examComponentMixed")}</option></select></label>
+                          <label className={styles.field}><span>{t("community.materials.examDate")}</span><input type="date" value={examDate} onChange={(event) => setExamDate(event.target.value)} /></label>
+                          <label className={styles.field}><span>{t("community.materials.questionCount")}</span><input type="number" min={1} max={500} value={questionCount} onChange={(event) => setQuestionCount(event.target.value)} placeholder="Ex.: 40" /></label>
+                        </div>
                         <div className={styles.privateNotice} role="note">
                           <ShieldCheck />
                           <span><strong>{t("community.materials.privateTitle")}</strong><small>{t("community.materials.privateNotice")}</small></span>
@@ -886,7 +921,7 @@ export function MaterialLibrary() {
                 </form>
               </section>
             )}
-            {!editor && <section className={styles.panel}>
+            {activeTab === "exams" && !editor && <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div className={styles.panelHeading}>
                   <span className={styles.panelIcon} aria-hidden="true"><FolderOpen /></span>

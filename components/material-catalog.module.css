@@ -1,0 +1,72 @@
+.catalog { display: grid; gap: 18px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+.tab { min-height: 38px; padding: 0 15px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+.tab:hover { color: var(--ink); background: var(--gold-soft); }
+.tabActive { color: #4c3a00; background: var(--gold-soft); box-shadow: inset 0 -2px 0 var(--gold); }
+.overviewGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.overviewCard { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: 132px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.overviewCard > div { display: grid; gap: 3px; min-width: 0; }
+.overviewCard strong { font-size: 25px; letter-spacing: -.035em; }
+.overviewCard span:not(.overviewIcon) { color: var(--ink); font-size: 12px; font-weight: 800; }
+.overviewCard small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.overviewCard button { grid-column: 2; width: max-content; padding: 0; border: 0; color: var(--blue); background: transparent; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.overviewIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; color: #695200; background: var(--gold-soft); }
+.overviewIcon svg { width: 20px; height: 20px; }
+.overviewNote, .examHint { display: flex; align-items: flex-start; gap: 11px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); background: var(--surface); }
+.overviewNote > svg, .examHint > svg { flex: 0 0 auto; width: 18px; margin-top: 2px; color: #a17a00; }
+.overviewNote strong, .examHint strong { color: var(--ink); font-size: 11px; }
+.overviewNote p, .examHint p { margin: 4px 0 0; font-size: 10px; line-height: 1.5; }
+.toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.toolbar label { display: grid; gap: 6px; width: min(500px, 100%); color: var(--muted); font-size: 10px; font-weight: 800; }
+.toolbar input { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-size: 11px; }
+.resultCount { color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.resourceList { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.resource { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 13px; padding: 15px 17px; border-bottom: 1px solid var(--line); }
+.resource:last-child { border-bottom: 0; }
+.resourceIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; color: #6b5300; background: var(--gold-soft); }
+.resourceIcon svg { width: 19px; height: 19px; }
+.resourceMain { display: grid; gap: 8px; min-width: 0; }
+.resourceHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.resourceLabel { color: #806500; font-size: 9px; font-weight: 850; letter-spacing: .02em; text-transform: uppercase; }
+.resource h3 { margin: 3px 0 0; color: var(--ink); font-size: 14px; line-height: 1.35; }
+.resource p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.badge { display: inline-flex; align-items: center; min-height: 23px; padding: 0 8px; border-radius: 999px; color: var(--muted); background: var(--line); font-size: 9px; font-weight: 800; white-space: nowrap; }
+.badgeVerified { color: var(--color-success-text); background: var(--color-success-soft); }
+.resourceMeta { display: flex; flex-wrap: wrap; gap: 5px 15px; color: var(--muted); font-size: 9px; }
+.resourceActions { display: flex; align-items: center; gap: 8px; }
+.pending { color: var(--muted); font-size: 10px; font-weight: 700; }
+.empty { display: grid; min-height: 170px; place-items: center; align-content: center; gap: 8px; padding: 25px; color: var(--muted); font-size: 11px; text-align: center; }
+.empty svg { width: 22px; color: #aa8400; }
+.ankiWorkspace { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); gap: 18px; align-items: start; }
+.ankiMain { display: grid; gap: 16px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.segmented { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-subtle, #faf9f5); }
+.segmented button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font: inherit; font-size: 10px; font-weight: 850; cursor: pointer; }
+.segmented button:hover, .segmentActive { color: #4c3a00 !important; background: var(--gold-soft) !important; }
+.controlLabel { display: block; margin: 0 0 8px; color: var(--ink); font-size: 10px; font-weight: 850; }
+.segmented .controlLabel { margin: 0 6px 0 4px; color: var(--muted); }
+.filterBlock { display: grid; gap: 1px; }
+.checkChips { display: flex; flex-wrap: wrap; gap: 7px; }
+.checkChips button { min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.checkChips button:hover { border-color: #d8bc44; color: #5c4700; }
+.checkChips .chipActive { border-color: #d5bd52; color: #594500; background: var(--gold-soft); }
+.builderPreview { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px; border: 1px solid #eadb92; border-radius: 12px; background: #fffdf1; }
+.builderPreview h2 { margin: 3px 0 0; font-size: 15px; }
+.builderPreview p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.cardTypeSummary { display: grid; gap: 7px; min-width: 150px; color: var(--muted); font-size: 9px; font-weight: 750; }
+.cardTypeSummary span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.cardTypeSummary svg { width: 13px; height: 13px; color: #967300; }
+.downloadGenerated { width: max-content; }
+.ankiAside { display: grid; align-content: start; gap: 10px; min-height: 250px; padding: 19px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.ankiAside .overviewIcon { margin-bottom: 3px; }
+.ankiAside h2 { margin: 0; font-size: 18px; line-height: 1.25; }
+.ankiAside p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.ankiAside strong { color: var(--ink); font-size: 22px; letter-spacing: -.03em; }
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); font-size: 10px; font-weight: 700; }
+.notice button { display: grid; width: 25px; height: 25px; place-items: center; border: 0; border-radius: 7px; color: inherit; background: transparent; cursor: pointer; }
+.notice button svg { width: 14px; }
+.noticeError { border-color: #e0a69f; color: #8b3229; background: #fff0ed; }
+.noticeSuccess { border-color: #a8ccae; color: var(--color-success-text); background: var(--color-success-soft); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 850px) { .overviewGrid { grid-template-columns: 1fr; } .ankiWorkspace { grid-template-columns: 1fr; } .builderPreview { align-items: flex-start; flex-direction: column; } .cardTypeSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; } }
+@media (max-width: 560px) { .tabs { overflow-x: auto; flex-wrap: nowrap; } .tab { flex: 0 0 auto; } .toolbar { align-items: stretch; flex-direction: column; } .resultCount { align-self: flex-start; } .resource { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 13px; } .resourceIcon { width: 34px; height: 34px; } .resourceHeading { flex-direction: column; gap: 6px; } .cardTypeSummary { grid-template-columns: 1fr; } }

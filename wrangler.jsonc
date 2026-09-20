@@ -19,6 +19,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "MATERIALS_BUCKET",
+      "bucket_name": "gestor-universitario-materials"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

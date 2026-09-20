@@ -32,6 +32,8 @@
 .toolbar button:hover { color:#493900; background:var(--gold-soft); }
 .resetFilters,.archiveButton,.pagination>button,.pagination>div button { border-color:var(--line); background:var(--surface); }
 .pagination>div .activePage { color:#231c00; border-color:#d6ae18; background:var(--gold); }
+.criticalOption { display:flex !important; align-items:center; gap:8px; min-height:42px; padding:9px 11px; border:1px solid var(--line); border-radius:9px; background:var(--gold-soft); }
+.criticalOption input { width:16px; min-height:16px; accent-color:#a78300; }
 
 @media(max-width:760px){
   .heading { padding:4px 2px; }

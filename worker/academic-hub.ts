@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { handleMaterialsCatalogRoute, isMaterialsCatalogPath } from "./materials-catalog";
 
 export type HubUser = {
   id: string;
@@ -14,7 +15,7 @@ export type HubUser = {
   actorId?: string;
 };
 
-type HubEnv = { DB: D1Database; AUTH_PEPPER: string };
+type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket };
 type ModuleChecker = (key: string) => Promise<boolean>;
 
 const PRIMARY_ADMIN = "up202507850@up.pt";
@@ -26,6 +27,9 @@ const MATERIAL_MIMES = new Set([
 const NOTIFICATION_TYPES = new Set(["announcement", "event", "poll", "request", "material"]);
 const USEFUL_LINK_PRIORITIES = new Set(["urgent", "important", "normal"]);
 const USEFUL_LINK_CATEGORIES = new Set(["academic", "platform", "curricular_unit", "support", "association", "other"]);
+const ACADEMIC_CONTENT_STATUSES = new Set(["a_validar", "verificado"]);
+const ACADEMIC_CONTENT_EXAM_TYPES = new Set(["frequencia", "normal", "recurso", "especial", "melhoria", "outro"]);
+const ACADEMIC_CONTENT_SOURCE_TYPES = new Set(["oficial", "recomendada", "regulamento", "bibliografia", "outro"]);
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -218,12 +222,29 @@ function requestDto(row: Record<string, unknown>, viewer: HubUser, management: b
   const owns = row.submitted_by === viewer.id;
   const dto: Record<string, unknown> = { id: row.id, subject: row.subject, body: row.body, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, anonymous: row.anonymous === 1, status: row.status, response: row.response, responseVisibility: row.response_visibility, respondedAt: row.responded_at, createdAt: row.created_at, updatedAt: row.updated_at, isOwn: owns };
   if (row.anonymous !== 1 && (management || owns)) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: management ? row.submitter_student_number : undefined };
-  if (row.anonymous === 1 && isPrimary(viewer)) dto.internalIdentity = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: row.submitter_student_number };
+  // Identidades anónimas nunca são incluídas automaticamente. A revelação
+  // excecional usa o endpoint dedicado e deixa um registo de auditoria.
+  if (row.anonymous === 1 && isPrimary(viewer)) dto.canRevealIdentity = true;
   return dto;
 }
 
 async function requests(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
+  if (request.method === "POST" && (url.searchParams.get("action") === "reveal" || url.pathname.replace(/\/+$/, "") === "/api/requests/reveal")) {
+    if (!isPrimary(user)) return json({ error: "A revelação de uma identidade anónima está reservada ao administrador principal." }, 403);
+    if (!await enabled("requests.reveal_audit")) return disabled();
+    const body = await bodyJson(request), id = text(body?.id, 80), reason = longText(body?.reason, 500);
+    if (!id || reason.length < 10) return json({ error: "Indique um motivo com pelo menos 10 caracteres para a revelação." }, 400);
+    const current = await env.DB.prepare("SELECT r.id,r.anonymous,r.submitted_by,u.full_name,u.email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS student_number FROM course_requests r JOIN users u ON u.id=r.submitted_by WHERE r.id=?").bind(id).first<Record<string, unknown>>();
+    if (!current) return json({ error: "Pedido não encontrado." }, 404);
+    if (current.anonymous !== 1) return json({ error: "Este pedido não foi submetido anonimamente." }, 400);
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO course_request_reveal_audit(id,request_id,actor_user_id,reason,revealed_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(), id, actor(user), reason, now),
+      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'course_request_identity_revealed',?,?)").bind(actor(user), JSON.stringify({ requestId: id, reason }), now),
+    ]);
+    return json({ id, identity: { id: current.submitted_by, fullName: current.full_name, email: current.email, studentNumber: current.student_number }, auditedAt: now });
+  }
   if (request.method === "DELETE") {
     const id = text(url.searchParams.get("id"), 80);
     if (!id) return json({ error: "Pedido inválido." }, 400);
@@ -250,7 +271,7 @@ async function requests(request: Request, env: HubEnv, url: URL, user: HubUser |
     const where = management ? "1=1" : "(r.submitted_by=? OR (r.response_visibility='public' AND r.response IS NOT NULL))";
     const query = `SELECT r.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id JOIN users u ON u.id=r.submitted_by WHERE ${where} ORDER BY r.created_at DESC LIMIT 500`;
     const [result, units] = await Promise.all([management ? env.DB.prepare(query).all() : env.DB.prepare(query).bind(user.id).all(), unitChoices(env)]);
-    return json({ requests: result.results.map((row) => requestDto(rowObject(row), user, management)), units });
+    return json({ requests: result.results.map((row) => requestDto(rowObject(row), user, management)), units, canRevealAnonymousIdentity: isPrimary(user) && management });
   }
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
@@ -259,6 +280,7 @@ async function requests(request: Request, env: HubEnv, url: URL, user: HubUser |
     if (subject.length < 3 || content.length < 10 || !["suggestion", "problem", "curricular_unit", "facilities", "academic", "other", "complaint", "question"].includes(category) || !await existingUnit(env, unitId)) return json({ error: "Preencha o assunto e a mensagem do pedido." }, 400);
     const id = crypto.randomUUID(), now = Date.now();
     await env.DB.prepare("INSERT INTO course_requests (id,subject,body,category,curricular_unit_id,anonymous,submitted_by,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'received',?,?)").bind(id, subject, content, category, unitId || null, anonymous ? 1 : 0, user.id, now, now).run();
+    await audit(env, user, "course_request_created", { id, category, anonymous });
     return json({ ok: true, id, anonymous }, 201);
   }
   if (request.method === "PATCH") {
@@ -297,22 +319,189 @@ async function unitCatalog(env: HubEnv, user: HubUser | null, enabled: ModuleChe
   return json({ units: result.results.map((item) => { const row = rowObject(item), representatives = representativeMap.get(String(row.id)) || [], primary = representatives[0] || null; return { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representatives, representativeUserIds: representatives.map((representative) => representative.id), representativeUserId: primary?.id || null, representativeName: primary?.name || null, representativeEmail: primary?.email || null, representativePosition: primary?.position || null, representative: primary }; }) });
 }
 
-async function unitDetail(env: HubEnv, id: string, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+async function unitDetail(env: HubEnv, id: string, user: HubUser | null, enabled: ModuleChecker, requestedAcademicYear = ""): Promise<Response> {
   if (!await enabled("curricular_units.detail")) return disabled();
   const unit = await env.DB.prepare("SELECT id,code,name,ects,study_year,semester FROM curricular_units WHERE id=? AND active=1").bind(id).first();
   if (!unit) return json({ error: "Unidade curricular não encontrada." }, 404);
   const visibility = isCommission(user) ? "1=1" : user ? "visibility!='cc'" : "visibility='public'";
-  const [representativesResult, eventsResult, docsResult, announcementsResult, materialsResult] = await Promise.all([
+  const [representativesResult, eventsResult, docsResult, announcementsResult, materialsResult, academicContent] = await Promise.all([
     env.DB.prepare("SELECT cur.user_id,cur.position,u.full_name,u.email,p.label AS position_label,d.label AS department_label FROM curricular_unit_representatives cur JOIN users u ON u.id=cur.user_id LEFT JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE cur.curricular_unit_id=? ORDER BY cur.position").bind(id).all(),
     env.DB.prepare(`SELECT * FROM academic_events WHERE curricular_unit_id=? AND ${visibility} AND status='scheduled' ORDER BY starts_at LIMIT 100`).bind(id).all(),
     env.DB.prepare(`SELECT d.*,u.id AS author_id,u.full_name AS author_name,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM academic_documents d JOIN users u ON u.id=d.created_by WHERE d.curricular_unit_id=? AND ${visibility} AND d.status='published' ORDER BY d.published_at DESC LIMIT 100`).bind(id).all(),
     env.DB.prepare("SELECT a.* FROM announcements a JOIN announcement_curricular_units acu ON acu.announcement_id=a.id WHERE acu.curricular_unit_id=? AND a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) ORDER BY a.published_at DESC LIMIT 50").bind(id, Date.now()).all(),
     env.DB.prepare("SELECT id,title,description,material_type,academic_year,attachment_name,attachment_mime,attachment_data_url,created_at FROM material_submissions WHERE curricular_unit_id=? AND status='published' AND material_type!='exam_photo' ORDER BY created_at DESC LIMIT 100").bind(id).all(),
+    loadAcademicContent(env, id, requestedAcademicYear),
   ]);
   const row = rowObject(unit);
   const representatives = representativesResult.results.map((item) => { const representative = rowObject(item); return { id: representative.user_id, name: representative.full_name, fullName: representative.full_name, email: representative.email, position: representative.position_label, department: representative.department_label }; });
   const primary = representatives[0] || null;
-  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representatives, representativeUserIds: representatives.map((representative) => representative.id), representativeUserId: primary?.id || null, representativeName: primary?.fullName || null, representativeEmail: primary?.email || null, representativePosition: primary?.position || null, representative: primary }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false, isCommission(user))), announcements: announcementsResult.results, materials: materialsResult.results.map((item) => materialDto(item)) });
+  return json({ unit: { id: row.id, code: row.code, name: row.name, ects: row.ects, year: row.study_year, semester: row.semester, representatives, representativeUserIds: representatives.map((representative) => representative.id), representativeUserId: primary?.id || null, representativeName: primary?.fullName || null, representativeEmail: primary?.email || null, representativePosition: primary?.position || null, representative: primary }, events: eventsResult.results.map((item) => eventDto(rowObject(item))), documents: docsResult.results.map((item) => documentDto(rowObject(item), false, isCommission(user))), announcements: announcementsResult.results, materials: materialsResult.results.map((item) => materialDto(item)), academicContent });
+}
+
+function academicYearValue(value: unknown): string {
+  const candidate = text(value, 20);
+  return /^(?:\d{4}[/-]\d{2,4})$/.test(candidate) ? candidate : "";
+}
+
+function optionalScore(value: unknown, maximum: number): number | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 && number <= maximum ? number : undefined;
+}
+
+function optionalHttps(value: unknown): string | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  const candidate = text(value, 1000);
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "https:" ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function academicProfileDto(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    curricularUnitId: row.curricular_unit_id,
+    academicYear: row.academic_year,
+    description: sanitizeRichTextHtml(String(row.description || "")),
+    attendanceRequired: row.attendance_required === 1,
+    attendancePolicy: sanitizeRichTextHtml(String(row.attendance_policy || "")),
+    absenceLimit: row.absence_limit || "",
+    absencePolicy: sanitizeRichTextHtml(String(row.absence_policy || "")),
+    attendanceNotes: sanitizeRichTextHtml(String(row.attendance_notes || "")),
+    status: row.status,
+    lastValidatedAt: row.last_validated_at,
+    lastValidatedBy: row.last_validated_by_name || row.last_validated_by || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function loadAcademicContent(env: HubEnv, unitId: string, requestedYear = "", includeAllProfiles = false) {
+  const yearsResult = await env.DB.prepare("SELECT academic_year FROM curricular_unit_academic_profiles WHERE curricular_unit_id=? ORDER BY academic_year DESC").bind(unitId).all();
+  const availableYears = yearsResult.results.map((item) => String(rowObject(item).academic_year));
+  const profileResult = includeAllProfiles
+    ? await env.DB.prepare("SELECT p.*,u.full_name AS last_validated_by_name FROM curricular_unit_academic_profiles p LEFT JOIN users u ON u.id=p.last_validated_by WHERE p.curricular_unit_id=? ORDER BY p.academic_year DESC").bind(unitId).all()
+    : requestedYear
+      ? await env.DB.prepare("SELECT p.*,u.full_name AS last_validated_by_name FROM curricular_unit_academic_profiles p LEFT JOIN users u ON u.id=p.last_validated_by WHERE p.curricular_unit_id=? AND p.academic_year=? LIMIT 1").bind(unitId, requestedYear).all()
+      : await env.DB.prepare("SELECT p.*,u.full_name AS last_validated_by_name FROM curricular_unit_academic_profiles p LEFT JOIN users u ON u.id=p.last_validated_by WHERE p.curricular_unit_id=? ORDER BY p.academic_year DESC LIMIT 1").bind(unitId).all();
+  const profiles = profileResult.results.map((item) => rowObject(item));
+  const selected = profiles[0] || null;
+  if (!selected) return { academicYear: requestedYear || null, availableYears, profile: null, profiles: includeAllProfiles ? [] : undefined, evaluations: [], exams: [], sources: [] };
+  const [evaluationsResult, examsResult, sourcesResult] = await Promise.all([
+    env.DB.prepare("SELECT id,title,weight,minimum_score,details,sort_order FROM curricular_unit_evaluations WHERE profile_id=? ORDER BY sort_order,title COLLATE NOCASE").bind(selected.id).all(),
+    env.DB.prepare("SELECT x.id,x.title,x.exam_type,x.calendar_event_id,x.notes,x.sort_order,e.title AS event_title,e.event_type AS event_type,e.starts_at AS event_starts_at,e.ends_at AS event_ends_at,e.location AS event_location,e.status AS event_status FROM curricular_unit_exams x LEFT JOIN academic_events e ON e.id=x.calendar_event_id WHERE x.profile_id=? ORDER BY x.sort_order,x.title COLLATE NOCASE").bind(selected.id).all(),
+    env.DB.prepare("SELECT id,title,source_type,citation,pages,url,sort_order FROM curricular_unit_sources WHERE profile_id=? ORDER BY sort_order,title COLLATE NOCASE").bind(selected.id).all(),
+  ]);
+  const evaluations = evaluationsResult.results.map((item) => {
+    const row = rowObject(item);
+    return { id: row.id, title: row.title, weight: row.weight, minimumScore: row.minimum_score, details: sanitizeRichTextHtml(String(row.details || "")), sortOrder: row.sort_order };
+  });
+  const exams = examsResult.results.map((item) => {
+    const row = rowObject(item);
+    const calendarEvent = row.calendar_event_id ? { id: row.calendar_event_id, title: row.event_title, type: row.event_type, startsAt: row.event_starts_at, endsAt: row.event_ends_at, location: row.event_location, status: row.event_status } : null;
+    return { id: row.id, title: row.title, examType: row.exam_type, calendarEventId: row.calendar_event_id, calendarEvent, notes: sanitizeRichTextHtml(String(row.notes || "")), sortOrder: row.sort_order };
+  });
+  const sources = sourcesResult.results.map((item) => {
+    const row = rowObject(item);
+    return { id: row.id, title: row.title, sourceType: row.source_type, citation: row.citation, pages: row.pages, url: row.url, sortOrder: row.sort_order };
+  });
+  return {
+    academicYear: selected.academic_year,
+    availableYears,
+    profile: academicProfileDto(selected),
+    profiles: includeAllProfiles ? profiles.map(academicProfileDto) : undefined,
+    evaluations,
+    exams,
+    sources,
+  };
+}
+
+type AcademicContentItems = {
+  evaluations: Array<{ title: string; weight: number | null; minimumScore: number | null; details: string; sortOrder: number }>;
+  exams: Array<{ title: string; examType: string; calendarEventId: string | null; notes: string; sortOrder: number }>;
+  sources: Array<{ title: string; sourceType: string; citation: string; pages: string; url: string | null; sortOrder: number }>;
+};
+
+function academicContentItems(body: Record<string, unknown>): { items?: AcademicContentItems; error?: string } {
+  const rawEvaluations = Array.isArray(body.evaluations) ? body.evaluations.slice(0, 40) : [];
+  const rawExams = Array.isArray(body.exams) ? body.exams.slice(0, 30) : [];
+  const rawSources = Array.isArray(body.sources) ? body.sources.slice(0, 50) : [];
+  const evaluations: AcademicContentItems["evaluations"] = [];
+  for (const item of rawEvaluations) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { error: "Componentes de avaliação inválidos." };
+    const value = item as Record<string, unknown>, title = text(value.title, 180), details = sanitizeRichTextHtml(longText(value.details, 5000));
+    const weight = optionalScore(value.weight, 100), minimumScore = optionalScore(value.minimumScore ?? value.minimum_score, 20);
+    if (title.length < 2 || weight === undefined || minimumScore === undefined || richTextPlainText(details).length > 4000) return { error: "Cada componente de avaliação deve ter dados válidos." };
+    evaluations.push({ title, weight, minimumScore, details, sortOrder: Math.max(0, Math.min(999, Number(value.sortOrder ?? value.sort_order ?? evaluations.length) || 0)) });
+  }
+  const exams: AcademicContentItems["exams"] = [];
+  for (const item of rawExams) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { error: "Exames inválidos." };
+    const value = item as Record<string, unknown>, title = text(value.title, 180), examType = text(value.examType ?? value.exam_type, 20) || "outro", notes = sanitizeRichTextHtml(longText(value.notes, 5000));
+    const calendarEventId = text(value.calendarEventId ?? value.calendar_event_id, 80) || null;
+    if (title.length < 2 || !ACADEMIC_CONTENT_EXAM_TYPES.has(examType) || richTextPlainText(notes).length > 4000) return { error: "Cada exame deve ter dados válidos." };
+    exams.push({ title, examType, calendarEventId, notes, sortOrder: Math.max(0, Math.min(999, Number(value.sortOrder ?? value.sort_order ?? exams.length) || 0)) });
+  }
+  const sources: AcademicContentItems["sources"] = [];
+  for (const item of rawSources) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { error: "Fontes inválidas." };
+    const value = item as Record<string, unknown>, title = text(value.title, 180), sourceType = text(value.sourceType ?? value.source_type, 20) || "outro", citation = longText(value.citation, 1000), pages = text(value.pages, 120), url = optionalHttps(value.url);
+    if (title.length < 2 || !ACADEMIC_CONTENT_SOURCE_TYPES.has(sourceType) || url === undefined) return { error: "Cada fonte deve ter dados válidos e, quando indicada, uma ligação HTTPS." };
+    sources.push({ title, sourceType, citation, pages, url: url || null, sortOrder: Math.max(0, Math.min(999, Number(value.sortOrder ?? value.sort_order ?? sources.length) || 0)) });
+  }
+  return { items: { evaluations, exams, sources } };
+}
+
+async function curricularUnitAcademicContent(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker, unitIdOverride?: string, managementOverride = false): Promise<Response> {
+  const management = managementOverride || request.method !== "GET";
+  if (!user) return unauthenticated();
+  if (!await enabled(management ? "curricular_units.content.management" : "curricular_units.content")) return disabled();
+  if (management && !canManageCore(user)) return forbidden();
+  const unitId = text(unitIdOverride || url.searchParams.get("unitId"), 80);
+  if (!unitId || !await existingUnit(env, unitId)) return json({ error: "Unidade curricular inválida." }, 400);
+  if (request.method === "GET") {
+    const content = await loadAcademicContent(env, unitId, academicYearValue(url.searchParams.get("academicYear")), management);
+    return json({ unitId, ...content, canManage: canManageCore(user) });
+  }
+  const body = await bodyJson(request);
+  if (!body) return json({ error: "Pedido JSON inválido." }, 400);
+  if (!['POST', 'PUT'].includes(request.method)) return json({ error: "Operação não suportada." }, 405);
+  const academicYear = academicYearValue(body.academicYear);
+  const description = sanitizeRichTextHtml(longText(body.description, 30000));
+  const attendancePolicy = sanitizeRichTextHtml(longText(body.attendancePolicy, 10000));
+  const absenceLimit = text(body.absenceLimit, 160);
+  const absencePolicy = sanitizeRichTextHtml(longText(body.absencePolicy, 10000));
+  const attendanceNotes = sanitizeRichTextHtml(longText(body.attendanceNotes, 10000));
+  const status = text(body.status, 20) || "a_validar";
+  const attendanceRequired = body.attendanceRequired === true || body.attendanceRequired === 1 || body.attendanceRequired === "1" ? 1 : 0;
+  const current = await env.DB.prepare("SELECT id FROM curricular_unit_academic_profiles WHERE curricular_unit_id=? AND academic_year=?").bind(unitId, academicYear).first<{ id: string }>();
+  const suppliedId = text(body.id, 80);
+  if (!academicYear || !ACADEMIC_CONTENT_STATUSES.has(status) || richTextPlainText(description).length > 20000 || richTextPlainText(attendancePolicy).length > 8000 || richTextPlainText(absencePolicy).length > 8000 || richTextPlainText(attendanceNotes).length > 8000) return json({ error: "Preencha um ano letivo válido e informação académica dentro dos limites permitidos." }, 400);
+  if (suppliedId && (!current || current.id !== suppliedId)) return json({ error: "Perfil académico não encontrado para esta unidade e ano letivo." }, 404);
+  const parsedItems = academicContentItems(body);
+  if (parsedItems.error || !parsedItems.items) return json({ error: parsedItems.error || "Conteúdo académico inválido." }, 400);
+  const invalidCalendarEvent = await Promise.all(parsedItems.items.exams.filter((exam) => exam.calendarEventId).map(async (exam) => !await env.DB.prepare("SELECT id FROM academic_events WHERE id=? AND curricular_unit_id=?").bind(exam.calendarEventId, unitId).first()));
+  if (invalidCalendarEvent.some(Boolean)) return json({ error: "Cada exame tem de estar ligado a um evento do calendário da mesma unidade curricular." }, 400);
+  const id = current?.id || suppliedId || crypto.randomUUID(), now = Date.now(), validatedAt = status === "verificado" ? now : null, validatedBy = status === "verificado" ? actor(user) : null;
+  const statements: D1PreparedStatement[] = current
+    ? [env.DB.prepare("UPDATE curricular_unit_academic_profiles SET description=?,attendance_required=?,attendance_policy=?,absence_limit=?,absence_policy=?,attendance_notes=?,status=?,last_validated_at=?,last_validated_by=?,updated_by=?,updated_at=? WHERE id=?").bind(description, attendanceRequired, attendancePolicy, absenceLimit, absencePolicy, attendanceNotes, status, validatedAt, validatedBy, actor(user), now, id)]
+    : [env.DB.prepare("INSERT INTO curricular_unit_academic_profiles (id,curricular_unit_id,academic_year,description,attendance_required,attendance_policy,absence_limit,absence_policy,attendance_notes,status,last_validated_at,last_validated_by,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, unitId, academicYear, description, attendanceRequired, attendancePolicy, absenceLimit, absencePolicy, attendanceNotes, status, validatedAt, validatedBy, actor(user), actor(user), now, now)];
+  statements.push(
+    env.DB.prepare("DELETE FROM curricular_unit_evaluations WHERE profile_id=?").bind(id),
+    ...parsedItems.items.evaluations.map((item) => env.DB.prepare("INSERT INTO curricular_unit_evaluations (id,profile_id,title,weight,minimum_score,details,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, item.title, item.weight, item.minimumScore, item.details, item.sortOrder, now, now)),
+    env.DB.prepare("DELETE FROM curricular_unit_exams WHERE profile_id=?").bind(id),
+    ...parsedItems.items.exams.map((item) => env.DB.prepare("INSERT INTO curricular_unit_exams (id,profile_id,title,exam_type,calendar_event_id,notes,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, item.title, item.examType, item.calendarEventId, item.notes, item.sortOrder, now, now)),
+    env.DB.prepare("DELETE FROM curricular_unit_sources WHERE profile_id=?").bind(id),
+    ...parsedItems.items.sources.map((item) => env.DB.prepare("INSERT INTO curricular_unit_sources (id,profile_id,title,source_type,citation,pages,url,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, item.title, item.sourceType, item.citation, item.pages, item.url, item.sortOrder, now, now)),
+    env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,?,?,?)").bind(actor(user), current ? "curricular_unit_academic_content_updated" : "curricular_unit_academic_content_created", JSON.stringify({ id, unitId, academicYear, status, evaluationCount: parsedItems.items.evaluations.length, examCount: parsedItems.items.exams.length, sourceCount: parsedItems.items.sources.length }), now),
+  );
+  try { await env.DB.batch(statements); } catch { return json({ error: "Não foi possível guardar a informação académica. Verifique se o ano letivo ainda não foi criado." }, 409); }
+  if (status === "verificado") await audit(env, user, "curricular_unit_academic_content_verified", { id, unitId, academicYear });
+  const content = await loadAcademicContent(env, unitId, academicYear, false);
+  return json({ ok: true, unitId, ...content }, current ? 200 : 201);
 }
 
 function pollDto(row: Record<string, unknown>, questions: Array<Record<string, unknown>>, options: Array<Record<string, unknown>>, canResults: boolean, voted: boolean) {
@@ -446,7 +635,7 @@ function materialDto(item: unknown, extraAttachments: Array<Record<string, unkno
   const row = rowObject(item);
   const categories: Record<string, string> = { exam_photo: "exam", summary: "summary", notes: "notes", other: "other" };
   const attachments = [{ id: `${String(row.id)}-legacy`, name: row.attachment_name, mime: row.attachment_mime, dataUrl: row.attachment_data_url }, ...extraAttachments.map((attachment) => ({ id: attachment.id, name: attachment.attachment_name, mime: attachment.attachment_mime, dataUrl: attachment.attachment_data_url }))];
-  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, favorite: row.is_favorite === 1, isFavorite: row.is_favorite === 1, favoriteCount: Number(row.favorite_count || 0), helpful: row.helpful_by_me === 1, helpfulByMe: row.helpful_by_me === 1, helpfulCount: Number(row.helpful_count || 0), outdated: row.outdated_by_me === 1, reportedOutdated: row.outdated_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1, outdatedCount: Number(row.outdated_count || 0), currentVersion: Number(row.current_version || versions[0]?.version_number || 1), versionCount: Number(row.version_count || Math.max(1, versions.length)), versions: versions.map(materialVersionDto), createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, examSitting: row.exam_sitting, assessmentComponent: row.assessment_component, examDate: row.exam_date, questionCount: row.question_count, transcriptionStatus: row.transcription_status, transcriptionNotes: row.transcription_notes, favorite: row.is_favorite === 1, isFavorite: row.is_favorite === 1, favoriteCount: Number(row.favorite_count || 0), helpful: row.helpful_by_me === 1, helpfulByMe: row.helpful_by_me === 1, helpfulCount: Number(row.helpful_count || 0), outdated: row.outdated_by_me === 1, reportedOutdated: row.outdated_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1, outdatedCount: Number(row.outdatedCount || row.outdated_count || 0), currentVersion: Number(row.current_version || versions[0]?.version_number || 1), versionCount: Number(row.version_count || Math.max(1, versions.length)), versions: versions.map(materialVersionDto), createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function validDataUrl(value: string): { mime: string; bytes: number } | null {
@@ -467,7 +656,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     const showModeration = moderation || canModerate;
     const materialVisibility = showModeration ? "1=1" : "m.status='published' AND m.material_type!='exam_photo'";
     const [result, units, attachmentResult, versionResult] = await Promise.all([
-      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number,EXISTS(SELECT 1 FROM material_favorites mf WHERE mf.material_id=m.id AND mf.user_id=?) AS is_favorite,(SELECT COUNT(*) FROM material_favorites mf WHERE mf.material_id=m.id) AS favorite_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.helpful=1) AS helpful_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.outdated=1) AS outdated_count,COALESCE((SELECT fb.helpful FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS helpful_by_me,COALESCE((SELECT fb.outdated FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS outdated_by_me,COALESCE((SELECT MAX(mv.version_number) FROM material_versions mv WHERE mv.material_id=m.id),1) AS current_version,MAX(1,(SELECT COUNT(*) FROM material_versions mv WHERE mv.material_id=m.id)) AS version_count FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(user.id, user.id, user.id, unitId, unitId).all(),
+      env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ed.sitting AS exam_sitting,ed.assessment_component,ed.exam_date,ed.question_count,ed.transcription_status,ed.transcription_notes,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number,EXISTS(SELECT 1 FROM material_favorites mf WHERE mf.material_id=m.id AND mf.user_id=?) AS is_favorite,(SELECT COUNT(*) FROM material_favorites mf WHERE mf.material_id=m.id) AS favorite_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.helpful=1) AS helpful_count,(SELECT COUNT(*) FROM material_feedback fb WHERE fb.material_id=m.id AND fb.outdated=1) AS outdated_count,COALESCE((SELECT fb.helpful FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS helpful_by_me,COALESCE((SELECT fb.outdated FROM material_feedback fb WHERE fb.material_id=m.id AND fb.user_id=?),0) AS outdated_by_me,COALESCE((SELECT MAX(mv.version_number) FROM material_versions mv WHERE mv.material_id=m.id),1) AS current_version,MAX(1,(SELECT COUNT(*) FROM material_versions mv WHERE mv.material_id=m.id)) AS version_count FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN exam_submission_details ed ON ed.submission_id=m.id JOIN users u ON u.id=m.submitted_by WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY CASE m.status WHEN 'pending' THEN 0 ELSE 1 END,m.created_at DESC LIMIT 300`).bind(user.id, user.id, user.id, unitId, unitId).all(),
       unitChoices(env),
       env.DB.prepare(`SELECT a.* FROM material_submission_attachments a JOIN material_submissions m ON m.id=a.submission_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY a.submission_id,a.sort_order,a.created_at`).bind(unitId, unitId).all(),
       env.DB.prepare(`SELECT mv.* FROM material_versions mv JOIN material_submissions m ON m.id=mv.material_id WHERE ${materialVisibility} AND (?='' OR m.curricular_unit_id=?) ORDER BY mv.material_id,mv.version_number DESC`).bind(unitId, unitId).all(),
@@ -502,13 +691,37 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     if (title.length < 3 || !["exam_photo", "summary", "notes", "other"].includes(type) || !attachmentName || !parsed || parsed.bytes > 8 * 1024 * 1024 || !await existingUnit(env, unitId)) return json({ error: "Dados ou anexo inválidos. O ficheiro deve ter até 8 MB." }, 400);
     const id = crypto.randomUUID(), now = Date.now();
     const primaryAttachment = type === "exam_photo" ? photos[0] : { name: attachmentName, dataUrl: attachmentData, parsed };
-    const statements = [env.DB.prepare("INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)").bind(id, title, description, type, unitId || null, academicYear || null, anonymous ? 1 : 0, user.id, primaryAttachment.name, primaryAttachment.parsed?.mime || parsed.mime, primaryAttachment.dataUrl, now, now)];
+    const statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)").bind(id, title, description, type, unitId || null, academicYear || null, anonymous ? 1 : 0, user.id, primaryAttachment.name, primaryAttachment.parsed?.mime || parsed.mime, primaryAttachment.dataUrl, now, now)];
     if (type === "exam_photo") photos.slice(1).forEach((item, index) => statements.push(env.DB.prepare("INSERT INTO material_submission_attachments (id,submission_id,attachment_name,attachment_mime,attachment_data_url,sort_order,created_at) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, item.name, item.parsed?.mime, item.dataUrl, index + 1, now)));
+    if (type === "exam_photo") {
+      const sitting = ["normal", "resit", "special", "continuous", "unknown"].includes(text(body.sitting, 20)) ? text(body.sitting, 20) : "unknown";
+      const assessmentComponent = ["theory", "practical", "mixed", "unknown"].includes(text(body.assessmentComponent, 20)) ? text(body.assessmentComponent, 20) : "unknown";
+      const examDateValue = body.examDate ? Date.parse(String(body.examDate)) : NaN;
+      const examDate = Number.isFinite(examDateValue) ? examDateValue : null;
+      const questionCount = body.questionCount === undefined || body.questionCount === "" ? null : Number(body.questionCount);
+      if (questionCount !== null && (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > 500)) return json({ error: "O número de questões deve estar entre 1 e 500." }, 400);
+      statements.push(env.DB.prepare("INSERT INTO exam_submission_details(submission_id,sitting,assessment_component,exam_date,question_count,transcription_status,transcription_notes,updated_at) VALUES (?,?,?,?,?,'received',?,?)").bind(id, sitting, assessmentComponent, examDate, questionCount, longText(body.transcriptionNotes, 2000), now));
+      statements.push(env.DB.prepare("INSERT INTO exam_submission_workflow(id,submission_id,from_status,to_status,note,actor_user_id,created_at) VALUES (?,?,NULL,'received',?, ?,?)").bind(crypto.randomUUID(), id, longText(body.transcriptionNotes, 2000), actor(user), now));
+    }
     await env.DB.batch(statements);
     return json({ ok: true, id, anonymous, status: "pending" }, 201);
   }
   if (request.method === "PATCH") {
     const id = text(body.id, 80), rawStatus = text(body.status, 20), status = rawStatus === "approved" ? "published" : rawStatus, note = longText(body.moderationNote, 2000);
+    const workflowStatus = text(body.transcriptionStatus ?? body.workflowStatus, 20);
+    if (workflowStatus) {
+      if (!isCommission(user) || !await enabled("materials.exam_workflow")) return forbidden();
+      if (!["received", "transcribing", "reviewing", "imported", "archived"].includes(workflowStatus)) return json({ error: "Estado de transcrição inválido." }, 400);
+      const current = await env.DB.prepare("SELECT transcription_status FROM exam_submission_details WHERE submission_id=?").bind(id).first<{ transcription_status: string }>();
+      if (!current) return json({ error: "Fluxo de exame não encontrado." }, 404);
+      const now = Date.now();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE exam_submission_details SET transcription_status=?,transcription_notes=?,transcribed_by=CASE WHEN ? IN ('transcribing','reviewing','imported') THEN ? ELSE transcribed_by END,reviewed_by=CASE WHEN ? IN ('reviewing','imported') THEN ? ELSE reviewed_by END,imported_at=CASE WHEN ?='imported' THEN ? ELSE imported_at END,updated_at=? WHERE submission_id=?").bind(workflowStatus, note, workflowStatus, actor(user), workflowStatus, actor(user), workflowStatus, now, now, id),
+        env.DB.prepare("INSERT INTO exam_submission_workflow(id,submission_id,from_status,to_status,note,actor_user_id,created_at) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(), id, current.transcription_status, workflowStatus, note, actor(user), now),
+        env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'exam_submission_workflow_updated',?,?)").bind(actor(user), JSON.stringify({ id, from: current.transcription_status, to: workflowStatus }), now),
+      ]);
+      return json({ ok: true, id, transcriptionStatus: workflowStatus });
+    }
     const submission = id ? await env.DB.prepare("SELECT material_type FROM material_submissions WHERE id=?").bind(id).first<{ material_type: string }>() : null;
     if (submission?.material_type === "exam_photo" && status === "published") return json({ error: "As fotos de exame sao privadas e nao podem ser publicadas diretamente." }, 400);
     if (!id || !["pending", "published", "rejected", "archived"].includes(status)) return json({ error: "Moderação inválida." }, 400);
@@ -928,11 +1141,12 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
 
 export function isAcademicHubPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/commission-directory" || path === "/api/curricular-units" || /^\/api\/curricular-units\/[^/]+$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
+  return isMaterialsCatalogPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
 export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
+  if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled);
   if (pathname === "/api/calendar-events") return calendar(request, env, url, user, enabled);
   if (pathname === "/api/calendar-subscription" || pathname === "/api/calendar-subscriptions") return calendarSubscription(request, env, url, user, enabled);
   if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);
@@ -940,8 +1154,11 @@ export async function handleAcademicHubRoute(request: Request, env: HubEnv, url:
   if (pathname === "/api/requests") return requests(request, env, url, user, enabled);
   if (pathname === "/api/commission-directory" && request.method === "GET") return directory(env, user, enabled);
   if (pathname === "/api/curricular-units" && request.method === "GET") return unitCatalog(env, user, enabled);
+  if (pathname === "/api/admin/curricular-unit-content") return curricularUnitAcademicContent(request, env, url, user, enabled, undefined, true);
+  const academicContent = pathname.match(/^\/api\/curricular-units\/([^/]+)\/academic-content$/);
+  if (academicContent) return curricularUnitAcademicContent(request, env, url, user, enabled, decodeURIComponent(academicContent[1]));
   const unit = pathname.match(/^\/api\/curricular-units\/([^/]+)$/);
-  if (unit && request.method === "GET") return unitDetail(env, decodeURIComponent(unit[1]), user, enabled);
+  if (unit && request.method === "GET") return unitDetail(env, decodeURIComponent(unit[1]), user, enabled, academicYearValue(url.searchParams.get("academicYear")));
   const vote = pathname.match(/^\/api\/polls\/([^/]+)\/vote$/);
   if (vote) return polls(request, env, url, user, enabled, decodeURIComponent(vote[1]), "vote");
   if (pathname === "/api/polls") return polls(request, env, url, user, enabled);
