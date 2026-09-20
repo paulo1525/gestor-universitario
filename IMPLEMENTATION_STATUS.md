@@ -133,6 +133,14 @@ ser apagados sem autorização explícita do utilizador.
 | 20/09/2026 | Integração de comunidade e campus | Commit funcional integrado; TypeScript aprovado no ramo consolidado |
 | 20/09/2026 | Integração de Materiais e Anki | Catálogo, tabs, builder e fallback R2 integrados |
 | 20/09/2026 | Validação consolidada | 303/303 testes, TypeScript, ESLint e build Next.js aprovados |
+| 20/09/2026 | Publicação do ramo | Ramo enviado ao GitHub e PR draft #97 criada |
+
+## Bloqueios antes de `main`
+
+1. enviar os binários de Neuroanatomia para o bucket R2 `MATERIALS_BUCKET`;
+2. executar QA visual autenticado em desktop e mobile no ramo publicado;
+3. aplicar as migrations D1 remotas 0056–0058;
+4. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
 
 ## Próxima atualização prevista
 
