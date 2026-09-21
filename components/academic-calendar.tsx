@@ -458,10 +458,7 @@ export function AcademicCalendar() {
       icon={<CalendarDays />}
       eyebrow={t("community.calendar.eyebrow")}
       title={t("community.calendar.breadcrumb")}
-      description={<>{t("community.calendar.description")}{canManage && t("community.calendar.manageHint")}</>}
     />
-
-    {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
 
     <section className={styles.calendarShell} aria-label={t("community.calendar.breadcrumb")}>
       <div className={styles.toolbar}>
@@ -471,9 +468,12 @@ export function AcademicCalendar() {
           <button type="button" className={styles.todayButton} onClick={goToToday}>{t("community.calendar.today")}</button>
           <h2>{(() => { const parts = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).formatToParts(visibleMonth); const month = parts.find((part) => part.type === "month")?.value || ""; const year = parts.find((part) => part.type === "year")?.value || ""; return `${month.charAt(0).toLocaleUpperCase(locale)}${month.slice(1)} ${year}`.trim(); })()}</h2>
         </div>
-        <div className={styles.viewSwitch} aria-label={t("community.calendar.view")}>
-          <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />{t("community.calendar.month")}</button>
-          <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />{t("community.calendar.agenda")}</button>
+        <div className={styles.toolbarActions}>
+          {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
+          <div className={styles.viewSwitch} aria-label={t("community.calendar.view")}>
+            <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />{t("community.calendar.month")}</button>
+            <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />{t("community.calendar.agenda")}</button>
+          </div>
         </div>
       </div>
 
@@ -533,28 +533,28 @@ export function AcademicCalendar() {
       </div>}
     </section>
 
-    {canManage && editor && <div className={styles.modalBackdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
-      <article className={`${styles.eventModal} ${styles.createModal}`} role="dialog" aria-modal="true" aria-labelledby="calendar-create-title" aria-describedby="calendar-create-context">
-        <header className={styles.modalHeader}>
+    {canManage && editor && <div className={styles.modalBackdrop} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
+      <article className={`${styles.eventModal} ${styles.createModal}`} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-create-title">
+        <header className={styles.modalHeader} data-app-modal-header>
           <div className={styles.modalHeading}>
             <span className={styles.kicker}>Criar evento</span>
             <h2 id="calendar-create-title">Adicionar à agenda</h2>
-            <p id="calendar-create-context">As datas são apresentadas no fuso horário de Lisboa.</p>
+            
           </div>
-          <div className={styles.modalHeaderActions}><button type="button" className={styles.modalClose} disabled={saving} onClick={closeEditor} aria-label="Fechar criação de evento"><X /></button></div>
+          <div className={styles.modalHeaderActions}><button type="button" className={styles.modalClose} data-app-modal-close disabled={saving} onClick={closeEditor} aria-label="Fechar criação de evento"><X /></button></div>
         </header>
-        <div className={styles.modalBody}>
+        <div className={styles.modalBody} data-app-modal-body>
           <form className={styles.modalEditForm} onSubmit={save}>
             {renderEventFields("create")}
-            <div className={styles.modalEditActions}><button type="button" className="button button--secondary" disabled={saving} onClick={closeEditor}><X />Cancelar</button><button className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar evento"}</button></div>
+            <div className={styles.modalEditActions} data-app-modal-footer="embedded"><button type="button" className="button button--secondary" disabled={saving} onClick={closeEditor}>Cancelar</button><button className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar evento"}</button></div>
           </form>
         </div>
       </article>
     </div>}
 
-    {selectedEvent && <div className={styles.modalBackdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving && movingEventId !== selectedEvent.id) { setEditingEvent(false); setSelectedEventId(null); } }}>
-      <article className={styles.eventModal} role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
-        <header className={styles.modalHeader}>
+    {selectedEvent && <div className={styles.modalBackdrop} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving && movingEventId !== selectedEvent.id) { setEditingEvent(false); setSelectedEventId(null); } }}>
+      <article className={styles.eventModal} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
+        <header className={styles.modalHeader} data-app-modal-header>
           <div className={styles.modalHeading}>
             <div className={styles.badgeRow}><span className={styles.typeBadge} data-event-type={selectedEvent.type}>{eventLabels[selectedEvent.type] || selectedEvent.type}</span>{selectedEvent.unitName && (selectedEvent.unitId ? <Link className={`${styles.unitBadge} ${styles.unitLink}`} href={unitHref(selectedEvent.unitId)}>{selectedEvent.unitName}</Link> : <span className={styles.unitBadge}>{selectedEvent.unitName}</span>)}</div>
             <h2 id="calendar-event-title">{editingEvent ? "Editar evento" : selectedEvent.title}</h2>
@@ -562,11 +562,11 @@ export function AcademicCalendar() {
           </div>
           <div className={styles.modalHeaderActions}>
             {canManage && !editingEvent && <button type="button" className={styles.modalEdit} onClick={() => beginEdit(selectedEvent)}><PencilLine />Editar</button>}
-            <button ref={modalCloseRef} type="button" className={styles.modalClose} disabled={saving || movingEventId === selectedEvent.id} onClick={() => { setEditingEvent(false); setSelectedEventId(null); }} aria-label="Fechar detalhe"><X /></button>
+            <button ref={modalCloseRef} type="button" className={styles.modalClose} data-app-modal-close disabled={saving || movingEventId === selectedEvent.id} onClick={() => { setEditingEvent(false); setSelectedEventId(null); }} aria-label="Fechar detalhe"><X /></button>
           </div>
         </header>
 
-        <div className={styles.modalBody}>
+        <div className={styles.modalBody} data-app-modal-body>
           {editingEvent && canManage ? <form id="calendar-event-edit-form" className={styles.modalEditForm} onSubmit={update}>
             {renderEventFields("edit")}
           </form> : <div className={styles.modalOverview}>
@@ -579,7 +579,7 @@ export function AcademicCalendar() {
           </div>}
         </div>
 
-        {canManage && <footer className={styles.modalFooter}>{editingEvent ? <><button type="button" className={styles.modalDelete} disabled={saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button><div className={styles.modalFooterActions}><button type="button" className="button button--secondary" disabled={saving} onClick={() => { setEditingEvent(false); setForm(emptyEventForm); }}><X />Cancelar</button><button type="submit" form="calendar-event-edit-form" className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar alterações"}</button></div></> : <><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button></>}</footer>}
+        {canManage && <footer className={styles.modalFooter} data-app-modal-footer>{editingEvent ? <><button type="button" className={styles.modalDelete} disabled={saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button><div className={styles.modalFooterActions}><button type="button" className="button button--secondary" disabled={saving} onClick={() => { setEditingEvent(false); setForm(emptyEventForm); }}>Cancelar</button><button type="submit" form="calendar-event-edit-form" className="button button--primary" disabled={saving || descriptionLength > 2000}>{saving ? <LoaderCircle className={styles.spin} /> : <Check />}{saving ? "A guardar…" : "Guardar alterações"}</button></div></> : <><span>As alterações ficam imediatamente visíveis na agenda partilhada.</span><button type="button" className={styles.modalDelete} disabled={movingEventId === selectedEvent.id || saving} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 />Eliminar evento</button></>}</footer>}
       </article>
     </div>}
     <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow="Agenda partilhada" title="Eliminar este evento?" description={t("community.calendar.deleteConfirm")} subject={deleteTarget?.title} subjectLabel="Evento selecionado" warning="O evento deixa de estar visível para todos os utilizadores e esta ação não pode ser revertida." confirmLabel={deleting ? "A eliminar…" : "Eliminar evento"} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void remove()} />

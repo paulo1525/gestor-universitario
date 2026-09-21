@@ -51,9 +51,9 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 | Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
 | Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada; eventos ligam à UC e pesquisam o local no diretório | 311/311 no consolidado | Pendente no ramo publicado |
 | Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
-| Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor e notas | 306/306 no consolidado | Pendente no ramo publicado |
-| Catálogo Anki | Ausente em Materiais | Integrada | 306/306 no consolidado | Pendente no ramo publicado |
-| Gerador Anki personalizado | Parcial em Testes | Integrada; controlos acessíveis | 306/306 no consolidado | Pendente no ramo publicado |
+| Bibliografia recomendada | Ausente | Integrada como referências e intervalos de páginas; excertos protegidos não são distribuídos | Testes de direitos atualizados | Pendente no ramo publicado |
+| Catálogo Anki | Ausente em Materiais | Integrado; pacotes binários protegidos arquivados | Testes de direitos atualizados | Pendente no ramo publicado |
+| Gerador Anki personalizado | Parcial em Testes | Integrado; gera APKG localmente a partir do banco moderado, sem media bibliográfica protegida | Testes atualizados | Pendente no ramo publicado |
 | Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Envio e transcrição de exames | Parcial | Integrada; transições sequenciais e idempotentes validadas | 311/311 no consolidado | Pendente no ramo publicado |
 | Mapa de salas | Ausente | Integrada; resultados incluídos na pesquisa global | 311/311 no consolidado | Pendente no ramo publicado |
@@ -70,33 +70,26 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 - versão móvel com cabeçalho compacto, separadores deslocáveis, cartões empilhados e navegação inferior;
 - a inspiração aprovada orienta a composição, mantendo os componentes, tokens e regras de acessibilidade do produto.
 
-## Recursos temporários no ramo de trabalho
+## Materiais de Neuroanatomia e direitos
 
-Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia foram copiados para
-`temporary-resources/neuroanatomia/` no checkout local. O ZIP de bibliografia foi
-dividido em partes inferiores a 100 MB e inclui instruções de reconstrução e
-checksums em `README.md`. O manifesto está no GitHub; os binários permanecem no
-commit local `023ffe9` até serem enviados para o bucket R2 `MATERIALS_BUCKET`,
-porque o conector GitHub não suporta esta transferência. Estes recursos não podem
-ser apagados sem autorização explícita do utilizador.
+Os dois APKG binários que incluíam imagens/recortes sem autorização de distribuição
+ficam arquivados e fora do fluxo de download. Os dados JSON derivados desses
+pacotes foram retirados da árvore atual. O gerador Anki cria agora um novo APKG
+no navegador a partir de perguntas publicadas no banco moderado, sem reutilizar
+media bibliográfica protegida.
 
-## Conteúdo inicial de Neuroanatomia
+O ZIP bibliográfico agregado fica arquivado. As referências bibliográficas
+continuam disponíveis no catálogo apenas como metadados, incluindo obra, edição,
+autor e intervalos de páginas; os excertos não são distribuídos pelo Gestor
+Universitário.
 
-### Anki
+## Banco de perguntas de Neuroanatomia
 
-- pacote Essencial: 1 099 cartões e 29 imagens;
-- pacote Completo: 1 620 cartões e 29 imagens;
-- organização por AT1–AT5, AP1–AP3 e subtópicos;
-- modelos de resposta curta, identificação prática por imagem e escolha múltipla gerada a partir do banco de Testes.
-
-### Sumários e bibliografia
-
-- 9 ficheiros originais, incluindo o plano curricular provisório;
-- 4 versões verificadas de AT1 e AT3;
-- 32 excertos bibliográficos;
-- mapa entre páginas impressas e páginas físicas;
-- preservação simultânea dos originais e das versões corrigidas;
-- deduplicação dos excertos comuns a várias aulas.
+- 1 207 registos importados;
+- 1 057 publicados após a conclusão da moderação;
+- 167 itens sem opções reais reclassificados para resposta curta, sem criação de distratores;
+- 150 itens com truncamentos, placeholders ou fragmentos insuficientes arquivados;
+- 0 itens pendentes de revisão.
 
 ## Decisões técnicas
 
@@ -106,7 +99,7 @@ ser apagados sem autorização explícita do utilizador.
 - Materiais submetidos continuam sujeitos a moderação.
 - Informação académica não confirmada aparece como `A validar`.
 - Revelações excecionais de identidade em submissões anónimas exigem autorização restrita, justificação e auditoria.
-- Acesso a excertos bibliográficos fica reservado a utilizadores autenticados e sujeito à validação das permissões de disponibilização.
+- Excertos bibliográficos sem autorização de distribuição não são servidos; o catálogo expõe apenas referências e intervalos de páginas.
 
 ## Critérios globais de conclusão
 
@@ -148,15 +141,14 @@ ser apagados sem autorização explícita do utilizador.
 | 21/09/2026 | Aperfeiçoamento do diretório de Campus | Edifícios, salas, mapas, acessibilidade e docentes associados a unidades curriculares passaram a ter apresentação responsiva e editor administrativo acessível |
 | 21/09/2026 | Aperfeiçoamento de Materiais/Anki | Navegação por separadores com teclado, estados de erro e repetição, cancelamento de pedidos obsoletos, proteção contra seleções Anki vazias e adaptação móvel a 390 px |
 | 21/09/2026 | Validação consolidada após três frentes Luna Max | 318/318 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
+| 21/09/2026 | Revisão científica do banco de Neuroanatomia | 167 perguntas reclassificadas para resposta curta; 150 arquivadas; 0 pendentes |
+| 21/09/2026 | Resolução de direitos de Materiais | APKG binários e ZIP bibliográfico arquivados; referências passam a metadados e o APKG é gerado localmente sem media protegida |
 
 ## Bloqueios antes de `main`
 
-1. enviar os binários de Neuroanatomia para o bucket R2 `MATERIALS_BUCKET`;
-2. executar QA visual autenticado em desktop e mobile no ramo publicado;
-3. confirmar no painel Cloudflare o resultado do build após a separação das migrations e o provisionamento do bucket R2;
-4. aplicar as migrations D1 remotas 0056–0058;
-5. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
+1. obter resultado positivo dos checks obrigatórios da PR #100;
+2. validar que as migrations 0061–0062 são aplicadas no ambiente de produção pelo fluxo normal de publicação.
 
 ## Próxima atualização prevista
 
-O documento será atualizado após a publicação do ramo, a validação visual autenticada e a decisão de integração em `main`.
+A PR #100 conclui a revisão científica pendente e a substituição dos materiais protegidos; a atualização seguinte regista o resultado dos checks e do merge em `main`.

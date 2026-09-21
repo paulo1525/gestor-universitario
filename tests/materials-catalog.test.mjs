@@ -6,11 +6,11 @@ import initSqlJs from "sql.js/dist/sql-asm.js";
 import { buildMaterialApkg } from "../lib/anki/materials.ts";
 
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
+const rightsMigration = await readFile(new URL("../migrations/0062_material_rights_substitution.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
 const artifactScript = await readFile(new URL("../scripts/prepare-material-artifacts.mjs", import.meta.url), "utf8");
 const component = await readFile(new URL("../components/material-catalog.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/material-catalog.module.css", import.meta.url), "utf8");
-const essential = JSON.parse(await readFile(new URL("../data/materials/anki/neuro-essential.json", import.meta.url), "utf8"));
 
 test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos anexos", async () => {
   const SQL = await initSqlJs();
@@ -39,20 +39,40 @@ test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos
   }
 });
 
-test("os anexos Anki são catalogados como dados textuais e expostos com filtros e fallback R2", () => {
-  assert.equal(essential.source.noteCount, 1099);
-  assert.equal(essential.cards.length, 1099);
-  assert.ok(essential.cards.every((card) => ["short", "image"].includes(card.type)));
+test("a resolução de direitos publica apenas metadados bibliográficos e arquiva os APKG binários", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE app_module_settings (module_key TEXT PRIMARY KEY,enabled INTEGER,updated_by TEXT,updated_at INTEGER);
+      CREATE TABLE curricular_units (id TEXT PRIMARY KEY,code TEXT,active INTEGER);
+      INSERT INTO curricular_units VALUES ('unit-neuro','NEURO',1);
+    `);
+    db.run(migration);
+    db.run(rightsMigration);
+    db.run(rightsMigration);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='published' AND storage_backend='inline' AND storage_state='ready' AND file_name IS NULL")[0].values[0][0], 19);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE id='material-bibliography-neuro-package' AND publication_status='archived'")[0].values[0][0], 1);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='archived'")[0].values[0][0], 2);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='published'")[0].values[0][0], 0);
+  } finally {
+    db.close();
+  }
+});
+
+test("o APKG personalizado usa apenas o banco moderado e não depende dos pacotes protegidos", () => {
   assert.match(worker, /material-catalog/);
   assert.match(worker, /material-anki/);
-  assert.match(worker, /STORAGE_NOT_READY/);
-  assert.match(worker, /multipleChoiceCards/);
-  assert.match(worker, /externalUrl/);
-  assert.match(worker, /unitCode/);
-  assert.match(component, /Visão geral|catalog\.tab\.overview/);
-  assert.match(component, /Essencial/);
-  assert.match(component, /Completo/);
-  assert.match(component, /multiple_choice/);
+  assert.match(worker, /question_bank_items/);
+  assert.match(worker, /q\.status='published'/);
+  assert.match(worker, /question-bank-reviewed/);
+  assert.match(worker, /imageUrl: null/);
+  assert.doesNotMatch(worker, /neuro-essential\.json|neuro-complete\.json/);
+  assert.match(component, /APKG revisto/);
+  assert.match(component, /sem media bibliográfica protegida/);
+  assert.match(component, /Referência bibliográfica apenas/);
+  assert.doesNotMatch(component, /setAnkiVariant/);
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
   assert.match(component, /aria-pressed/);

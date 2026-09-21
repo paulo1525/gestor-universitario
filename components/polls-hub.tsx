@@ -5,7 +5,6 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlignLeft,
   BarChart3,
-  AlertTriangle,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -28,6 +27,7 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
@@ -321,7 +321,6 @@ export function PollsHub() {
               icon={<Vote />}
               eyebrow={t("polls.eyebrow")}
               title={t("polls.title")}
-              description={t("polls.intro")}
               actions={<div className={styles.heroStats}><span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span><span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span></div>}
             />
 
@@ -410,7 +409,17 @@ export function PollsHub() {
               </div>}
             </section>
 
-            {deleteTarget && <div className={styles.confirmBackdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deleting) setDeleteTarget(null); }}><section className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="delete-poll-title"><span className={styles.confirmIcon}><AlertTriangle /></span><div><span className={styles.eyebrow}>{t("polls.delete.eyebrow")}</span><h2 id="delete-poll-title">{t("polls.delete.title", { title: deleteTarget.title })}</h2><p>{t("polls.delete.intro")}</p></div><footer><button className={styles.secondaryButton} type="button" disabled={deleting} onClick={() => setDeleteTarget(null)}>{t("polls.delete.cancel")}</button><button className={styles.dangerButton} type="button" disabled={deleting} onClick={() => void deletePoll()}>{deleting ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deleting ? t("polls.delete.deleting") : t("polls.delete.confirm")}</button></footer></section></div>}
+            <ConfirmationDialog
+              open={Boolean(deleteTarget)}
+              eyebrow={t("polls.delete.eyebrow")}
+              title={deleteTarget ? t("polls.delete.title", { title: deleteTarget.title }) : ""}
+              description={t("polls.delete.intro")}
+              confirmLabel={t(deleting ? "polls.delete.deleting" : "polls.delete.confirm")}
+              cancelLabel={t("polls.delete.cancel")}
+              busy={deleting}
+              onClose={() => setDeleteTarget(null)}
+              onConfirm={() => void deletePoll()}
+            />
           </main>
         </AppShell>
       </ModuleGuard>

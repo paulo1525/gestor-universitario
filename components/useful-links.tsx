@@ -264,7 +264,7 @@ export function UsefulLinks() {
       <ModuleGuard moduleKey="useful_links.library">
         <AppShell active={"useful_links" as AppShellActive} breadcrumb={t("links.breadcrumb")}>
           <div className={styles.page}>
-            <SurfaceHeader standalone headingLevel="h1" icon={<Link2 />} eyebrow={t("links.eyebrow")} title={t("links.title")} description={t("links.description")} actions={canManage ? <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button> : undefined} />
+            <SurfaceHeader standalone headingLevel="h1" icon={<Link2 />} eyebrow={t("links.eyebrow")} title={t("links.title")} actions={canManage ? <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button> : undefined} />
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 

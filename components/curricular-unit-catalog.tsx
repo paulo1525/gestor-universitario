@@ -462,7 +462,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       icon={<BookOpen />}
                       eyebrow={data.unit.code}
                       title={data.unit.name}
-                      description={data.academicContent.profile?.description || data.unit.description || t("community.units.detailDescription")}
+                     
                       actions={<div className={styles.detailStats}>
                         <div className={styles.metric}><span>{t("community.units.credits")}</span><strong>{data.unit.ects} ECTS</strong></div>
                         <div className={styles.metric}><span>{t("community.units.year")}</span><strong>{data.unit.year}.º</strong></div>

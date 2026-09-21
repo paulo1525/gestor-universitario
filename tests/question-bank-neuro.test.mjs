@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const migration = readFileSync(new URL("../migrations/0059_question_bank_neuro.sql", import.meta.url), "utf8");
+const reviewMigration = readFileSync(new URL("../migrations/0061_question_bank_scientific_review.sql", import.meta.url), "utf8");
 
 function database({ withNeuro = true, withActor = true } = {}) {
   const db = new DatabaseSync(":memory:");
@@ -23,35 +24,40 @@ function database({ withNeuro = true, withActor = true } = {}) {
 test("a migration importa a origem canónica com proveniência anonimizada", () => {
   const db = database();
   db.exec(migration);
+  db.exec(reviewMigration);
   const source = db.prepare("SELECT * FROM question_bank_sources").get();
   assert.equal(source.locator, "184x7c5w44eZJ5SsUlgUlDMKyOoUNvQGRH74YGvdETUQ");
   assert.equal(source.source_row_count, 1370);
   assert.equal(source.imported_count, 1207);
-  assert.equal(source.published_count, 890);
-  assert.equal(source.review_count, 317);
-  assert.equal(source.verification_status, "review");
+  assert.equal(source.published_count, 1057);
+  assert.equal(source.review_count, 0);
+  assert.equal(source.verification_status, "verified");
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_topics").get().count, 21);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items").get().count, 1207);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='published'").get().count, 890);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='review'").get().count, 317);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='published'").get().count, 1057);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='review'").get().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='archived'").get().count, 150);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='published' AND trim(review_note)<>''").get().count, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='published' AND response_type='multiple_choice'").get().count, 2);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='published' AND response_type='multiple_choice' AND (instr(lower(options_text),'a)')=0 OR instr(lower(options_text),'b)')=0)").get().count, 0);
   assert.equal(db.prepare("SELECT COUNT(DISTINCT lower(trim(prompt))) AS count FROM question_bank_items").get().count, 1207);
   const typeCounts = Object.fromEntries(db.prepare("SELECT response_type,COUNT(*) AS count FROM question_bank_items GROUP BY response_type ORDER BY response_type").all().map((item) => [item.response_type, item.count]));
-  assert.deepEqual(typeCounts, { case: 18, multiple_choice: 169, short_answer: 1020 });
+  assert.deepEqual(typeCounts, { case: 18, multiple_choice: 2, short_answer: 1187 });
   assert.equal(db.prepare("SELECT COUNT(DISTINCT source_subtopic) AS count FROM question_bank_items").get().count, 149);
   assert.equal(db.prepare("SELECT COUNT(DISTINCT source_academic_year) AS count FROM question_bank_items").get().count, 6);
   assert.equal(db.prepare("SELECT COUNT(DISTINCT source_assessment) AS count FROM question_bank_items").get().count, 11);
   assert.equal(db.prepare("SELECT COUNT(DISTINCT source_session) AS count FROM question_bank_items").get().count, 21);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE validation_state='VALIDADO' AND confidence='ALTO'").get().count, 1207);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='review' AND trim(review_note)<>''").get().count, 317);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE validation_state='VALIDADO' AND confidence='ALTO'").get().count, 1057);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='review' AND trim(review_note)<>''").get().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE status='archived' AND trim(review_note)<>''").get().count, 150);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items WHERE options_text<>'' AND answer_indicated<>'' AND answer_text<>''").get().count, 1207);
   const itemColumns = new Set(db.prepare("PRAGMA table_info(question_bank_items)").all().map((column) => column.name));
   for (const column of ["source_original", "anatomical_justification"]) assert.ok(itemColumns.has(column));
   assert.match(String(source.coverage_json), /"subtopic":\{"nonEmpty":1370,"distinct":154\}/);
   assert.match(String(source.coverage_json), /"columns":18/);
-  assert.match(String(source.coverage_json), /"reviewTotal":317/);
+  assert.match(String(source.coverage_json), /"reviewTotal":0/);
+  assert.match(String(source.coverage_json), /"reclassifiedShortAnswer":167/);
+  assert.match(String(source.coverage_json), /"archivedScientificReview":150/);
   assert.match(String(source.coverage_json), /sourceOriginal/);
   assert.match(String(source.coverage_json), /anatomicalJustification/);
   assert.doesNotMatch(migration, /mimed/i);
@@ -59,15 +65,17 @@ test("a migration importa a origem canónica com proveniência anonimizada", () 
   assert.doesNotMatch(migration, /up\d{9}/i);
 });
 
-test("a carga é idempotente e mantém a divisão publicada/revisão", () => {
+test("a carga é idempotente e mantém a revisão científica concluída", () => {
   const db = database();
   db.exec(migration);
+  db.exec(reviewMigration);
   db.exec(migration);
+  db.exec(reviewMigration);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_sources").get().count, 1);
   const source = db.prepare("SELECT published_count,review_count,verification_status FROM question_bank_sources").get();
-  assert.equal(source.published_count, 890);
-  assert.equal(source.review_count, 317);
-  assert.equal(source.verification_status, "review");
+  assert.equal(source.published_count, 1057);
+  assert.equal(source.review_count, 0);
+  assert.equal(source.verification_status, "verified");
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_topics").get().count, 21);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM question_bank_items").get().count, 1207);
   assert.equal(db.prepare("SELECT COUNT(DISTINCT external_key) AS count FROM question_bank_items").get().count, 1207);

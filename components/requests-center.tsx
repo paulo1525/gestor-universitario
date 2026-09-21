@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlignLeft, CheckCircle2, CircleDot, Eye, EyeOff, GraduationCap, Inbox, LoaderCircle, LockKeyhole, MessageSquareReply, MessageSquareText, Plus, Send, ShieldCheck, Tags, Trash2, TriangleAlert, UserRound, X, ShieldAlert } from "lucide-react";
+import { AlignLeft, CheckCircle2, CircleDot, Eye, EyeOff, GraduationCap, Inbox, LoaderCircle, LockKeyhole, MessageSquareReply, MessageSquareText, Plus, Send, ShieldCheck, Tags, Trash2, UserRound, X, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
@@ -52,7 +53,7 @@ export function RequestsCenter() {
   const remove = async () => { if (!deleteTarget) return; setDeletingId(deleteTarget.id); setDeleteError(""); try { const response = await fetch(`/api/requests?id=${encodeURIComponent(deleteTarget.id)}`, { method: "DELETE" }); const data = await response.json() as { error?: string }; if (!response.ok) throw new Error(data.error || t("requests.deleteError")); const deletedId = deleteTarget.id; setDeleteTarget(null); setManagingId(current => current === deletedId ? null : current); setNotice({ kind: "success", message: t("requests.deleteSuccess") }); await load(); } catch (error) { setDeleteError(error instanceof Error ? error.message : t("requests.deleteError")); } finally { setDeletingId(null); } };
   return <AuthGuard><ModuleGuard moduleKey="requests.submission"><AppShell active="requests" breadcrumb={t("requests.title")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-    <SurfaceHeader standalone headingLevel="h1" icon={<Inbox />} eyebrow={t("requests.eyebrow")} title={t("requests.title")} description={t("requests.intro")} actions={<button className={`button button--compact ${composerOpen ? "button--secondary" : "button--primary"}`} type="button" aria-expanded={composerOpen} aria-controls="request-composer" onClick={() => setComposerOpen((open) => !open)}>{composerOpen ? <X /> : <Plus />}{composerOpen ? t("requests.close") : t("requests.new")}</button>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<Inbox />} eyebrow={t("requests.eyebrow")} title={t("requests.title")} actions={<button className={`button button--compact ${composerOpen ? "button--secondary" : "button--primary"}`} type="button" aria-expanded={composerOpen} aria-controls="request-composer" onClick={() => setComposerOpen((open) => !open)}>{composerOpen ? <X /> : <Plus />}{composerOpen ? t("requests.close") : t("requests.new")}</button>} />
     <div className={styles.splitLayout}>
       {composerOpen && <form id="request-composer" className={`${styles.panel} ${styles.form}`} onSubmit={submit}><SurfaceHeader icon={<Inbox />} title={t("requests.form.title")} description={t("requests.form.intro")} /><div className={styles.formGrid}>
         <label className={styles.full}><FormLabel icon={MessageSquareText}>{t("requests.form.subject")}</FormLabel><input required maxLength={160} value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} placeholder={t("requests.form.subjectPlaceholder")} /></label>
@@ -69,6 +70,19 @@ export function RequestsCenter() {
         </article>; })}</div>}
       </section>}
     </div>
-    {deleteTarget && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={event => { if (!deletingId && event.currentTarget === event.target) setDeleteTarget(null); }}><section className={styles.deleteDialog} role="dialog" aria-modal="true" aria-labelledby="delete-request-title"><header><span className={styles.deleteIcon}><Trash2 /></span><div><span className="eyebrow">{t("requests.delete.eyebrow")}</span><h2 id="delete-request-title">{t("requests.delete.title")}</h2><p>{t("requests.delete.intro")}</p></div></header><div className={styles.deleteSummary}><span>{t("requests.delete.selected")}</span><strong>{deleteTarget.subject}</strong></div><div className={styles.deleteWarning}><TriangleAlert /><p>{t("requests.delete.warning")}</p></div>{deleteError && <p className={styles.deleteError} role="alert">{deleteError}</p>}<footer><button className="button button--secondary" type="button" disabled={Boolean(deletingId)} onClick={() => setDeleteTarget(null)}>{t("requests.delete.cancel")}</button><button className={styles.deleteConfirm} type="button" disabled={Boolean(deletingId)} onClick={() => void remove()}>{deletingId ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deletingId ? t("requests.delete.deleting") : t("requests.delete.confirm")}</button></footer></section></div>}
+    <ConfirmationDialog
+      open={Boolean(deleteTarget)}
+      eyebrow={t("requests.delete.eyebrow")}
+      title={t("requests.delete.title")}
+      description={t("requests.delete.intro")}
+      subject={deleteTarget?.subject}
+      subjectLabel={t("requests.delete.selected")}
+      warning={t("requests.delete.warning")}
+      confirmLabel={t(deletingId ? "requests.delete.deleting" : "requests.delete.confirm")}
+      cancelLabel={t("requests.delete.cancel")}
+      busy={Boolean(deletingId)}
+      onClose={() => { if (!deletingId) setDeleteTarget(null); }}
+      onConfirm={() => void remove()}
+    />
   </AppShell></ModuleGuard></AuthGuard>;
 }
