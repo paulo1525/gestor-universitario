@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
@@ -314,33 +315,28 @@ export function PollsHub() {
       <ModuleGuard moduleKey="polls.voting">
         <AppShell active="polls" breadcrumb={t("polls.breadcrumb")}>
           <main className={styles.page}>
-            <section className={styles.hero}>
-              <div className={styles.heroContent}>
-                <span className={styles.heroIcon}><Vote /></span>
-                <div>
-                  <span className={styles.eyebrow}>{t("polls.eyebrow")}</span>
-                  <h1>{t("polls.title")}</h1>
-                  <p>{t("polls.intro")}</p>
-                </div>
-              </div>
-              <div className={styles.heroStats}>
-                <span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span>
-                <span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span>
-              </div>
-            </section>
+            <SurfaceHeader
+              standalone
+              headingLevel="h1"
+              icon={<Vote />}
+              eyebrow={t("polls.eyebrow")}
+              title={t("polls.title")}
+              description={t("polls.intro")}
+              actions={<div className={styles.heroStats}><span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span><span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span></div>}
+            />
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
             {editor && (
               <section className={styles.editor} aria-labelledby="poll-editor-title">
-                <header className={styles.editorHeader}>
-                  <div>
-                    <span className={styles.eyebrow}>{editor === "edit" ? t("polls.editor.management") : t("polls.editor.new")}</span>
-                    <h2 id="poll-editor-title">{editor === "edit" ? t("polls.editor.edit") : t("polls.editor.create")}</h2>
-                    <p>{optionsLocked ? t("polls.editor.lockedIntro") : t("polls.editor.intro")}</p>
-                  </div>
-                  <button className={styles.closeButton} type="button" onClick={closeEditor} aria-label={t("polls.editor.close")}><X /></button>
-                </header>
+                <SurfaceHeader
+                  icon={<Vote />}
+                  eyebrow={editor === "edit" ? t("polls.editor.management") : t("polls.editor.new")}
+                  title={editor === "edit" ? t("polls.editor.edit") : t("polls.editor.create")}
+                  description={optionsLocked ? t("polls.editor.lockedIntro") : t("polls.editor.intro")}
+                  headingId="poll-editor-title"
+                  actions={<button className={styles.closeButton} type="button" onClick={closeEditor} aria-label={t("polls.editor.close")}><X /></button>}
+                />
                 <form className={styles.editorBody} onSubmit={save}>
                   <div className={styles.editorMain}>
                     <label className={styles.field}><FormLabel icon={MessageSquareText}>{t("polls.editor.question")}</FormLabel><input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} maxLength={180} required placeholder={t("polls.editor.questionPlaceholder")} /></label>
@@ -368,7 +364,8 @@ export function PollsHub() {
             )}
 
             <section className={styles.workspace}>
-              <header className={styles.toolbar}>
+              <SurfaceHeader icon={<Vote />} title={t("polls.title")} meta={`${visible.length}`} />
+              <div className={styles.toolbar}>
                 <div className={styles.tabs} role="tablist" aria-label={t("polls.filters.aria")}>
                   {(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"]) ] as Filter[]).map((value) => <button key={value} type="button" className={filter === value ? styles.activeTab : ""} onClick={() => setFilter(value)}>{value === "all" ? t("polls.filters.all") : statusLabels[value]}<span>{counts[value]}</span></button>)}
                 </div>
@@ -376,7 +373,7 @@ export function PollsHub() {
                   <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("polls.filters.search")} /></label>
                   {canManage && !editor && <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
                 </div>
-              </header>
+              </div>
 
               {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>{t("polls.loading")}</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>{t("polls.empty.title")}</strong><p>{t("polls.empty.body")}</p></div> : <div className={styles.pollList}>
                 {visible.map((poll) => {
