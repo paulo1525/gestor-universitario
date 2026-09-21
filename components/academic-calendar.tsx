@@ -533,7 +533,7 @@ export function AcademicCalendar() {
     </section>
 
     {canManage && editor && <div className={styles.modalBackdrop} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
-      <article className={`${styles.eventModal} ${styles.createModal}`} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby="calendar-create-title">
+      <article className={`${styles.eventModal} ${styles.createModal}`} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-create-title">
         <header className={styles.modalHeader} data-app-modal-header>
           <div className={styles.modalHeading}>
             <span className={styles.kicker}>Criar evento</span>
@@ -551,7 +551,7 @@ export function AcademicCalendar() {
     </div>}
 
     {selectedEvent && <div className={styles.modalBackdrop} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving && movingEventId !== selectedEvent.id) { setEditingEvent(false); setSelectedEventId(null); } }}>
-      <article className={styles.eventModal} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
+      <article className={styles.eventModal} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
         <header className={styles.modalHeader} data-app-modal-header>
           <div className={styles.modalHeading}>
             <div className={styles.badgeRow}><span className={styles.typeBadge} data-event-type={selectedEvent.type}>{eventLabels[selectedEvent.type] || selectedEvent.type}</span>{selectedEvent.unitName && (selectedEvent.unitId ? <Link className={`${styles.unitBadge} ${styles.unitLink}`} href={unitHref(selectedEvent.unitId)}>{selectedEvent.unitName}</Link> : <span className={styles.unitBadge}>{selectedEvent.unitName}</span>)}</div>
