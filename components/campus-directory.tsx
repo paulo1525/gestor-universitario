@@ -291,7 +291,7 @@ export function CampusDirectory() {
             <label htmlFor="campus-title">{t("campus.titleField")}<input id="campus-title" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} /></label>
             <label htmlFor="campus-office">{t("campus.office")}<input id="campus-office" value={form.office} onChange={event => setForm(current => ({ ...current, office: event.target.value }))} /></label>
           </>}
-          <footer data-app-modal-footer><button className="button button--secondary" data-app-modal-action="secondary" type="button" onClick={closeEditor} disabled={saving}>{t("campus.cancel")}</button><button className="button button--primary" data-app-modal-action="primary" type="submit" disabled={saving}>{saving && <LoaderCircle className={styles.spin} aria-hidden="true" />}{t("campus.save")}</button></footer>
+          <footer data-app-modal-footer="embedded"><button className="button button--secondary" data-app-modal-action="secondary" type="button" onClick={closeEditor} disabled={saving}>{t("campus.cancel")}</button><button className="button button--primary" data-app-modal-action="primary" type="submit" disabled={saving}>{saving && <LoaderCircle className={styles.spin} aria-hidden="true" />}{t("campus.save")}</button></footer>
         </form>
       </section>
     </div>}
