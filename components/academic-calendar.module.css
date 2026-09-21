@@ -28,6 +28,7 @@
 
 .calendarShell { overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
 .toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 1.15rem; border-bottom:1px solid #e7e8e2; }
+.toolbarActions { display:flex; align-items:center; gap:.55rem; margin-left:auto; }
 .monthNavigation { display:flex; align-items:center; gap:.5rem; min-width:0; }
 .monthNavigation > button { display:grid; place-items:center; width:2.35rem; height:2.35rem; padding:0; color:#41443d; background:#fff; border:1px solid #dfe0da; border-radius:.72rem; cursor:pointer; }
 .monthNavigation > button:hover { color:#4455d5; background:#f5f6ff; border-color:#cdd2f5; }
@@ -202,9 +203,11 @@
   .formGrid { grid-template-columns:1fr; }
   .wide,.full { grid-column:1; }
   .toolbar { align-items:stretch; flex-direction:column; }
+  .toolbarActions { width:100%; justify-content:space-between; margin-left:0; }
   .monthNavigation { display:grid; grid-template-columns:auto auto auto 1fr; }
   .monthNavigation h2 { grid-column:1/-1; grid-row:2; margin:.35rem 0 0; }
   .viewSwitch { align-self:flex-start; }
+  .toolbarActions .viewSwitch { align-self:auto; }
   .filters { align-items:stretch; flex-wrap:wrap; }
   .filterTitle { width:100%; }
   .filters label { flex:1 1 12rem; min-width:0; }
