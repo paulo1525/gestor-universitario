@@ -218,7 +218,7 @@ export function DocumentsLibrary() {
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
           <section className={styles.hero}>
             <div className={styles.heroIcon}><FileArchive /></div>
-            <div><span className="eyebrow">{"Arquivo da Comiss\u00e3o de Curso"}</span><h1>Documentos e atas</h1><p>{"Consulta atas, regulamentos, formul\u00e1rios e outros documentos \u00fateis."}</p></div>
+            <div><span className="eyebrow">{"Arquivo da Comiss\u00e3o de Curso"}</span><h1>Documentos e atas</h1></div>
             {canManage && <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button>}
           </section>
 
