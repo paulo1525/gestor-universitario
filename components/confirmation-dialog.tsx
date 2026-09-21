@@ -48,7 +48,7 @@ export function ConfirmationDialog({ open, title, description, subject, subjectL
   const compact = !eyebrow && !description && !subject && !warning;
   if (!open) return null;
   return <div className={styles.backdrop} data-app-modal-backdrop role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) dismiss(); }}>
-    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
+    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} data-app-modal="modal" data-app-modal-size={compact ? "compact" : "medium"} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
       <header className={styles.header} data-app-modal-header>
         <span className={`${styles.icon} ${tone === "primary" ? styles.primaryIcon : ""}`} aria-hidden="true">{icon ?? <Trash2 />}</span>
         <div className={styles.copy}>{eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}<h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div>
