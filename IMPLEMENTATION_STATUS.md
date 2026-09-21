@@ -49,15 +49,15 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 | Auditoria da UI atual | Concluída | — | — | Captura pública concluída; áreas autenticadas aguardam ramo publicado |
 | Protótipos visuais | Concluídos | Desktop e mobile definidos | — | Referência aprovada pelo utilizador |
 | Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
-| Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada | 300/300 no ramo funcional | Pendente no ramo consolidado |
+| Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada; eventos ligam à UC e pesquisam o local no diretório | 311/311 no consolidado | Pendente no ramo publicado |
 | Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
 | Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor e notas | 306/306 no consolidado | Pendente no ramo publicado |
 | Catálogo Anki | Ausente em Materiais | Integrada | 306/306 no consolidado | Pendente no ramo publicado |
 | Gerador Anki personalizado | Parcial em Testes | Integrada; controlos acessíveis | 306/306 no consolidado | Pendente no ramo publicado |
 | Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
-| Envio e transcrição de exames | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
-| Mapa de salas | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
-| Diretório de docentes | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Envio e transcrição de exames | Parcial | Integrada; transições sequenciais e idempotentes validadas | 311/311 no consolidado | Pendente no ramo publicado |
+| Mapa de salas | Ausente | Integrada; resultados incluídos na pesquisa global | 311/311 no consolidado | Pendente no ramo publicado |
+| Diretório de docentes | Ausente | Integrada; pesquisa global e ligações a partir das UC | 311/311 no consolidado | Pendente no ramo publicado |
 | Avisos críticos persistentes | Parcial | Integrada; confirmação permitida a estudantes elegíveis | 306/306 no consolidado | Pendente no ramo publicado |
 
 ## Direção visual aprovada
@@ -139,6 +139,11 @@ ser apagados sem autorização explícita do utilizador.
 | 21/09/2026 | Aperfeiçoamento de Materiais | Filtros, estados editoriais, metadados bibliográficos, URLs externas e acessibilidade integrados |
 | 21/09/2026 | Validação consolidada | 306/306 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
 | 21/09/2026 | Build remoto da PR #97 | A integração Cloudflare reportou falha após o commit remoto anterior; a causa não é reproduzível no build local e os logs detalhados exigem acesso ao painel Cloudflare |
+| 21/09/2026 | Fluxo de transcrição de exames | Transições limitadas a etapas adjacentes, com repetição idempotente e resposta 409 para saltos inválidos |
+| 21/09/2026 | Integração do calendário | Unidades curriculares e locais físicos ligam ao respetivo detalhe e ao diretório de salas |
+| 21/09/2026 | Integração da pesquisa | Edifícios, salas e docentes ativos passam a integrar a pesquisa global com etiquetas bilingues |
+| 21/09/2026 | Validação consolidada | 311/311 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
+| 21/09/2026 | Nova tentativa remota da PR #97 | A integração Cloudflare voltou a falhar no commit `8df7c06e`; o build OpenNext local continua aprovado, reforçando o bloqueio de configuração/provisionamento remoto |
 
 ## Bloqueios antes de `main`
 
