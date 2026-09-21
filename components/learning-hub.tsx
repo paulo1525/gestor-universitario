@@ -160,7 +160,7 @@ export function LearningHub() {
 function Catalogue({ modules, loading, error, busy, onOpen, onRetry }: { modules: LearningModule[]; loading: boolean; error: string; busy: boolean; onOpen: (module: LearningModule) => void; onRetry: () => void }) {
   return <>
     <header className={`page-heading page-heading--simple ${styles.pageHeader}`}>
-      <div><span className="eyebrow">Aprendizagem interativa</span><h1>Aprender por ciclos</h1><p>Uma explicação curta, um exercício relacionado — e depois o ciclo seguinte.</p></div>
+      <div><span className="eyebrow">Aprendizagem interativa</span><h1>Aprender por ciclos</h1></div>
       <Link className="button button--secondary" href="/testes"><ArrowLeft />Testes</Link>
     </header>
     {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar os percursos" text="A carregar explicações e exercícios." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar os percursos" text={error} action={<button className="button button--secondary" type="button" onClick={onRetry}>Tentar novamente</button>} /> : !modules.length ? <State icon={<CircleHelp />} title="Ainda não há percursos publicados" text="Os primeiros conteúdos aparecerão aqui quando estiverem disponíveis." /> : <section className={styles.moduleList} aria-label="Percursos de aprendizagem">
