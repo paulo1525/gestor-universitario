@@ -36,17 +36,6 @@
 
 .trigger > svg { width: 14px; height: 14px; }
 
-.triggerCount {
-  min-width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  padding-inline: 5px;
-  border-radius: 999px;
-  color: #5b4600;
-  background: #f2e4a6;
-  font-size: 8px;
-}
 
 .backdrop {
   position: fixed;
