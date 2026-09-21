@@ -22,7 +22,6 @@ export function AdminPageHeader({
     <div>
       <span className="eyebrow">{eyebrow}</span>
       <h1>{title}</h1>
-      {description && <p>{description}</p>}
     </div>
     {actions && <div className={styles.pageActions}>{actions}</div>}
   </header>;
