@@ -196,8 +196,9 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
   if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const unitId = text(url.searchParams.get("unitId"), 100), lessonCode = text(url.searchParams.get("lesson"), 20).toUpperCase(), kind = text(url.searchParams.get("kind"), 30), query = text(url.searchParams.get("q"), 180);
+  const queryPattern = query ? `%${query}%` : "";
   const conditions = ["m.publication_status='published'", "(?='' OR m.curricular_unit_id=?)", "(?='' OR m.material_kind=?)", "(?='' OR lower(m.title || ' ' || m.description) LIKE lower(?))"];
-  const bindings: unknown[] = [unitId, unitId, kind && catalogKinds.has(kind) ? kind : "", kind && catalogKinds.has(kind) ? kind : "", query ? `%${query}%` : ""];
+  const bindings: unknown[] = [unitId, unitId, kind && catalogKinds.has(kind) ? kind : "", kind && catalogKinds.has(kind) ? kind : "", queryPattern, queryPattern];
   if (lessonCode) { conditions.push("(EXISTS (SELECT 1 FROM material_catalog_lessons ml_filter JOIN material_lessons fl ON fl.id=ml_filter.lesson_id WHERE ml_filter.material_id=m.id AND fl.code=?) OR ml.code=?)"); bindings.push(lessonCode, lessonCode); }
   const [itemsResult, lessonsResult, sourcesResult, deckResult, deckLessonsResult] = await Promise.all([
     env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id WHERE ${conditions.join(" AND ")} ORDER BY CASE m.material_kind WHEN 'summary' THEN 1 WHEN 'bibliography' THEN 2 WHEN 'anki' THEN 3 ELSE 4 END,m.is_recommended DESC,m.updated_at DESC LIMIT 500`).bind(...bindings).all(),
