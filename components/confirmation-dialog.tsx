@@ -47,15 +47,15 @@ export function ConfirmationDialog({ open, title, description, subject, subjectL
   };
   const compact = !eyebrow && !description && !subject && !warning;
   if (!open) return null;
-  return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) dismiss(); }}>
-    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
-      <header className={styles.header}>
+  return <div className={styles.backdrop} data-app-modal-backdrop role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) dismiss(); }}>
+    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
+      <header className={styles.header} data-app-modal-header>
         <span className={`${styles.icon} ${tone === "primary" ? styles.primaryIcon : ""}`} aria-hidden="true">{icon ?? <Trash2 />}</span>
         <div className={styles.copy}>{eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}<h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div>
-        <button ref={closeRef} className={styles.close} type="button" disabled={busy} onClick={dismiss} aria-label="Fechar confirmação"><X /></button>
+        <button ref={closeRef} className={styles.close} data-app-modal-close type="button" disabled={busy} onClick={dismiss} aria-label="Fechar confirmação"><X /></button>
       </header>
-      {(subject || warning) && <div className={styles.body}>{subject && <div className={styles.subject}><span>{subjectLabel}</span><strong>{subject}</strong></div>}{warning && <div className={styles.warning}><TriangleAlert aria-hidden="true" /><p>{warning}</p></div>}</div>}
-      <footer className={styles.footer}>{!compact && <button className={styles.cancel} type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button>}<button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} type="button" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className={styles.spin} /> : (icon ?? <Trash2 />)}{confirmLabel}</button></footer>
+      {(subject || warning) && <div className={styles.body} data-app-modal-body>{subject && <div className={styles.subject}><span>{subjectLabel}</span><strong>{subject}</strong></div>}{warning && <div className={styles.warning}><TriangleAlert aria-hidden="true" /><p>{warning}</p></div>}</div>}
+      <footer className={styles.footer} data-app-modal-footer>{!compact && <button className={styles.cancel} data-app-modal-action="secondary" type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button>}<button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} data-app-modal-action={tone === "primary" ? "primary" : "danger"} type="button" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className={styles.spin} /> : (icon ?? <Trash2 />)}{confirmLabel}</button></footer>
     </section>
   </div>;
 }
