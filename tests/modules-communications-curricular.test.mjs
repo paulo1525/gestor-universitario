@@ -116,6 +116,16 @@ test("comunicados podem ser pesquisados, filtrados e paginados", () => {
   assert.match(announcementsUi, /announcements\.filters\.reset/);
 });
 
+test("qualquer estudante pode confirmar um aviso visível e a confirmação fica persistente", () => {
+  const acknowledgement = announcements.indexOf('if (request.method === "PATCH" && body?.action === "acknowledge")');
+  const publishingGate = announcements.indexOf('if (!canPublish) return json({ error: "A publicação está reservada');
+  assert.ok(acknowledgement >= 0, "o endpoint de confirmação deve existir");
+  assert.ok(publishingGate > acknowledgement, "a confirmação não pode ficar atrás da autorização de publicação");
+  assert.match(announcements, /announcement_acknowledgements/);
+  assert.match(announcements, /a\.audience_scope='all'/);
+  assert.match(announcements, /a\.expires_at IS NULL OR a\.expires_at>\?/);
+});
+
 test("a pesquisa global ocupa a barra superior e o diretório apresenta responsabilidades", () => {
   assert.match(shell, /TopbarGlobalSearch/);
   assert.doesNotMatch(shell, /href="\/pesquisa"><Search/);

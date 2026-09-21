@@ -1371,23 +1371,23 @@ async function handleAnnouncements(request: Request, env: Env, user: CurrentUser
   const publishingEnabled = await isModuleEnabled(env, "announcements.publishing");
   const canPublish = Boolean(publishingEnabled && user.commissionPosition);
   const canViewAuthorIdentifiers = user.role === "admin" || Boolean(user.commissionPosition);
+  const audienceWhere = (management: boolean) => management ? "1=1" : "(a.audience_scope='all' OR (a.audience_scope='year' AND (a.audience_year IS NULL OR u_view.study_year IS NULL OR a.audience_year=u_view.study_year)) OR (a.audience_scope='unit' AND (a.audience_unit_id IS NULL OR EXISTS (SELECT 1 FROM curricular_unit_representatives cur_view WHERE cur_view.curricular_unit_id=a.audience_unit_id AND cur_view.user_id=u_view.id))) )";
   if (request.method === "GET") {
     const management = canPublish || user.role === "admin";
-    const audienceWhere = management ? "1=1" : "(a.audience_scope='all' OR (a.audience_scope='year' AND (a.audience_year IS NULL OR u_view.study_year IS NULL OR a.audience_year=u_view.study_year)) OR (a.audience_scope='unit' AND (a.audience_unit_id IS NULL OR EXISTS (SELECT 1 FROM curricular_unit_representatives cur_view WHERE cur_view.curricular_unit_id=a.audience_unit_id AND cur_view.user_id=u_view.id))) )";
-    const announcements = await env.DB.prepare(`SELECT a.id,a.title,a.body,a.priority,a.status,a.is_critical,a.audience_scope,a.audience_year,a.audience_unit_id,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,CASE WHEN ack.user_id IS NULL THEN 0 ELSE 1 END AS acknowledged,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id LEFT JOIN users u_view ON u_view.id=? LEFT JOIN announcement_acknowledgements ack ON ack.announcement_id=a.id AND ack.user_id=? WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) AND ${audienceWhere} ORDER BY CASE WHEN a.is_critical=1 THEN 0 WHEN a.priority='urgent' THEN 1 WHEN a.priority='important' THEN 2 ELSE 3 END,a.published_at DESC LIMIT 100`).bind(user.id, user.id, Date.now()).all<Record<string, unknown>>();
+    const announcements = await env.DB.prepare(`SELECT a.id,a.title,a.body,a.priority,a.status,a.is_critical,a.audience_scope,a.audience_year,a.audience_unit_id,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,CASE WHEN ack.user_id IS NULL THEN 0 ELSE 1 END AS acknowledged,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id LEFT JOIN users u_view ON u_view.id=? LEFT JOIN announcement_acknowledgements ack ON ack.announcement_id=a.id AND ack.user_id=? WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) AND ${audienceWhere(management)} ORDER BY CASE WHEN a.is_critical=1 THEN 0 WHEN a.priority='urgent' THEN 1 WHEN a.priority='important' THEN 2 ELSE 3 END,a.published_at DESC LIMIT 100`).bind(user.id, user.id, Date.now()).all<Record<string, unknown>>();
     return json({ announcements: announcements.results.map((announcement) => { const { author_user_id, author_email, author_student_number, ...publicFields } = announcement; return { ...publicFields, isCritical: announcement.is_critical === 1, requiresAcknowledgement: announcement.is_critical === 1, acknowledged: announcement.acknowledged === 1, body: announcementDisplayHtml(String(announcement.body || "")), ...(canViewAuthorIdentifiers ? { authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number } : {}) }; }), canPublish, canViewAuthorIdentifiers, publishingEnabled });
   }
-  if (!canPublish) return json({ error: "A publicação está reservada a membros da Comissão de Curso com cargo definido." }, 403);
   const body = await parseJson(request);
   if (request.method === "PATCH" && body?.action === "acknowledge") {
     const id = String(body.id || "").trim();
     if (!id) return json({ error: "Aviso inválido." }, 400);
-    const exists = await env.DB.prepare("SELECT id FROM announcements WHERE id=? AND status='published'").bind(id).first();
+    const exists = await env.DB.prepare(`SELECT a.id FROM announcements a LEFT JOIN users u_view ON u_view.id=? WHERE a.id=? AND a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) AND ${audienceWhere(false)}`).bind(user.id, id, Date.now()).first();
     if (!exists) return json({ error: "Aviso não encontrado." }, 404);
     const now = Date.now();
     await env.DB.prepare("INSERT INTO announcement_acknowledgements(announcement_id,user_id,acknowledged_at) VALUES (?,?,?) ON CONFLICT(announcement_id,user_id) DO UPDATE SET acknowledged_at=excluded.acknowledged_at").bind(id, user.id, now).run();
     return json({ ok: true, id, acknowledgedAt: now });
   }
+  if (!canPublish) return json({ error: "A publicação está reservada a membros da Comissão de Curso com cargo definido." }, 403);
   if (request.method === "POST") {
     const title = String(body?.title || "").trim().replace(/\s+/g, " ").slice(0, 140);
     const content = sanitizeAnnouncementHtml(String(body?.body || "").trim());
