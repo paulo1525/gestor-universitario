@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Children, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/admin-ui.module.css";
 
@@ -24,7 +24,7 @@ export function AdminPageHeader({
   return <SurfaceHeader
     standalone
     headingLevel="h1"
-    icon={icon}
+    icon={icon ?? <ShieldCheck />}
     eyebrow={eyebrow}
     title={title}
     description={description}
@@ -82,7 +82,7 @@ export function AdminSection({
 }) {
   return <section className={`${styles.section}${className ? ` ${className}` : ""}`} data-platform-surface="section" data-content={children ? "true" : "false"}>
     <SurfaceHeader
-      icon={icon}
+      icon={icon ?? <ShieldCheck />}
       eyebrow={eyebrow}
       title={title}
       description={description}
