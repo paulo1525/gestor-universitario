@@ -83,6 +83,11 @@
   --surface-header-background: var(--color-surface);
   --surface-header-accent-size: 0px;
   --surface-header-accent: transparent;
+  --surface-header-icon-color: var(--color-accent-text);
+  --surface-header-icon-background: var(--color-accent-soft);
+  --surface-header-meta-color: var(--color-accent-text);
+  --surface-header-meta-background: var(--color-accent-soft);
+  --surface-header-meta-border: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
 
   --ink: var(--color-text);
   --ink-soft: var(--color-text-soft);
@@ -809,6 +814,95 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 .stat-card small { margin-top: 2px; color: #858580; font-size: 9px; }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+
+.surface-header {
+  display: flex;
+  min-width: 0;
+  min-height: var(--surface-header-min-height);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--surface-header-padding-block) var(--surface-header-padding-inline);
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
+  border-bottom: 1px solid var(--surface-card-border);
+  background: var(--surface-header-background);
+}
+
+.surface-header--standalone {
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--surface-card-border);
+  border-top: max(1px, var(--surface-header-accent-size)) solid var(--surface-header-accent);
+  border-radius: var(--surface-card-radius);
+  box-shadow: var(--surface-card-shadow);
+}
+
+.surface-header__icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--surface-header-icon-color);
+  background: var(--surface-header-icon-background);
+}
+
+.surface-header__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.surface-header__heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.surface-header__heading .eyebrow {
+  margin-bottom: 3px;
+}
+
+.surface-header__heading :is(h1, h2, h3) {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-heading-2);
+  line-height: 1.3;
+  letter-spacing: -.02em;
+}
+
+.surface-header__heading p {
+  max-width: 760px;
+  margin: 3px 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  line-height: 1.5;
+}
+
+.surface-header__aside {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.surface-header__meta {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid var(--surface-header-meta-border);
+  border-radius: 999px;
+  color: var(--surface-header-meta-color);
+  background: var(--surface-header-meta-background);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .panel { border: 1px solid var(--surface-card-border); border-radius: var(--surface-card-radius); background: var(--color-surface); box-shadow: var(--surface-card-shadow); }
 .content-grid > *, .panel--table, .panel-tools, .search-field, .select-field { min-width: 0; }
 .panel__header { min-height: var(--surface-header-min-height); display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: var(--surface-header-padding-block) var(--surface-header-padding-inline); border-top: var(--surface-header-accent-size) solid var(--surface-header-accent); border-bottom: 1px solid var(--surface-card-border); background: var(--surface-header-background); }
@@ -5214,6 +5308,24 @@ section.placement-command-center > div.placement-command-center__main {
 }
 
 @media (max-width: 680px) {
+  .surface-header {
+    flex-wrap: wrap;
+    min-height: 66px;
+    padding: 12px 14px;
+  }
+
+  .surface-header__aside {
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-left: 50px;
+  }
+
+  .surface-header__heading p {
+    display: none;
+  }
+
+
   .placement-draft-workspace > header {
     align-items: stretch;
     flex-direction: column;
