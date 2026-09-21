@@ -261,7 +261,7 @@ export function AnnouncementsBoard() {
   return <AuthGuard><ModuleGuard moduleKey="announcements.feed"><AppShell active="announcements" breadcrumb={t("announcements.title")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
     <section className={styles.heading}>
-      <div><span className="eyebrow">{t("announcements.eyebrow")}</span><h1>{t("announcements.title")}</h1><p>{t("announcements.intro")}</p></div>
+      <div><span className="eyebrow">{t("announcements.eyebrow")}</span><h1>{t("announcements.title")}</h1></div>
       {canPublish && <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button>}
     </section>
 
