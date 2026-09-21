@@ -13,6 +13,7 @@ import {
   GraduationCap,
   LoaderCircle,
   Mail,
+  MapPin,
   Megaphone,
   Search,
   ShieldAlert,
@@ -36,6 +37,14 @@ type ApiRepresentative = {
   position?: string;
   commissionPositionLabel?: string;
 };
+type ApiFacultyMember = {
+  id?: string | number;
+  fullName?: string;
+  full_name?: string;
+  title?: string | null;
+  email?: string | null;
+  office?: string | null;
+};
 type ApiUnit = {
   id: string | number;
   code?: string;
@@ -53,8 +62,10 @@ type ApiUnit = {
   representative_name?: string;
   representativeEmail?: string;
   representative_email?: string;
+  faculty?: ApiFacultyMember[] | null;
 };
 type Representative = { id: string; name: string; email: string; position: string };
+type FacultyMember = { id: string; fullName: string; title: string; email: string; office: string };
 type Unit = {
   id: string;
   code: string;
@@ -64,6 +75,7 @@ type Unit = {
   year: number;
   semester: number;
   representatives: Representative[];
+  faculty: FacultyMember[];
 };
 type AcademicContent = {
   academicYear: string | null;
@@ -117,6 +129,13 @@ function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string)
     }))
     .filter((representative) => representative.name)
     .slice(0, 2);
+  const faculty = (item.faculty ?? []).map((member, index) => ({
+    id: String(member.id ?? `faculty-${index + 1}`),
+    fullName: member.fullName ?? member.full_name ?? "",
+    title: member.title ?? "",
+    email: member.email ?? "",
+    office: member.office ?? "",
+  })).filter((member) => member.fullName);
   return {
     id: String(item.id),
     code: item.code ?? "UC",
@@ -126,6 +145,7 @@ function unit(item: ApiUnit, defaultUnit: string, defaultRepresentative: string)
     year: Number(item.year ?? item.studyYear ?? item.study_year ?? 1),
     semester: Number(item.semester ?? 1),
     representatives,
+    faculty,
   };
 }
 async function readUnits(defaultUnit: string, defaultRepresentative: string, loadError: string) {
@@ -519,6 +539,29 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       </DetailSection>
                     </div>
                     <div className={styles.page}>
+                      {data.unit.faculty.length > 0 && <section className={styles.panel}>
+                        <div className={styles.panelHeader}>
+                          <div className={styles.panelTitle}>
+                            <span className={styles.panelIcon} aria-hidden="true"><GraduationCap /></span>
+                            <div>
+                              <h2>{t("community.units.faculty")}</h2>
+                              <p>{t("community.units.facultyDescription")}</p>
+                            </div>
+                          </div>
+                          <Link className={styles.panelLink} href="/salas-docentes">{t("community.units.facultyDirectory")} <ArrowRight aria-hidden="true" /></Link>
+                        </div>
+                        <div className={`${styles.sectionBody} ${styles.representativeList}`}>
+                          {data.unit.faculty.map((member) => <article className={styles.representativeCard} key={member.id}>
+                            <div className={styles.cardTop}>
+                              <span className={styles.avatar}>{member.fullName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("")}</span>
+                              {member.title && <span className={styles.tag}>{member.title}</span>}
+                            </div>
+                            <h3>{member.fullName}</h3>
+                            {member.email && <div className={styles.metaRow}><Mail /><a href={`mailto:${member.email}`}>{member.email}</a></div>}
+                            {member.office && <div className={styles.metaRow}><MapPin /><span>{t("campus.office")}: {member.office}</span></div>}
+                          </article>)}
+                        </div>
+                      </section>}
                       {data.unit.representatives.length > 0 && <section className={styles.panel}>
                         <div className={styles.panelHeader}>
                           <div>

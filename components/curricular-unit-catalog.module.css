@@ -99,6 +99,22 @@
   line-height: 1.5;
 }
 
+.panelLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: var(--color-accent-text);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.panelLink svg {
+  width: 13px;
+  height: 13px;
+}
+
 .count {
   min-height: 28px;
   display: inline-flex;
@@ -346,6 +362,13 @@
 
 .metaRow span {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metaRow a {
+  overflow: hidden;
+  color: var(--color-accent-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
