@@ -11,11 +11,12 @@ import {
   LoaderCircle,
   RefreshCw,
   Settings2,
-  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useEscapeKey } from "@/components/use-escape-key";
+import { useScrollLock } from "@/components/use-scroll-lock";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/calendar-subscription.module.css";
@@ -47,6 +48,8 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
   const [revokeTarget, setRevokeTarget] = useState<Subscription | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  useScrollLock(open);
+  useEscapeKey(open, () => setOpen(false));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,97 +150,106 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
     ? `https://outlook.live.com/calendar/0/addcalendar?url=${encodeURIComponent(created.feedUrl)}&name=${encodeURIComponent(created.label)}`
     : "";
 
-  return <section className={styles.shell}>
-    <div className={styles.summary}>
-      <span className={styles.summaryIcon} aria-hidden="true"><CalendarPlus /></span>
-      <div className={styles.summaryCopy}>
-        <h2>{t("calendar.subscription.title")}</h2>
-        <p>{t("calendar.subscription.description")}</p>
-      </div>
-      <button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="calendar-subscription-panel">
-        {open ? <X aria-hidden="true" /> : <Settings2 aria-hidden="true" />}
-        {t(open ? "calendar.subscription.close" : "calendar.subscription.open")}
-      </button>
-    </div>
+  return <>
+    <button
+      className={styles.trigger}
+      type="button"
+      onClick={() => setOpen(true)}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls="calendar-subscription-panel"
+    >
+      <CalendarPlus aria-hidden="true" />
+      {t("calendar.subscription.open")}
+      {items.length > 0 && <span className={styles.triggerCount}>{items.length}</span>}
+    </button>
 
-    {open && <div className={styles.body} id="calendar-subscription-panel">
-      <div className={styles.setup}>
-        {!created ? <form className={styles.form} onSubmit={create}>
-        <div className={styles.formHeading}>
-          <div><strong>{t("calendar.subscription.createTitle")}</strong><span>{t("calendar.subscription.createHelp")}</span></div>
-          <ShieldCheck />
-        </div>
-
-        <details className={styles.customise}>
-          <summary><Settings2 />{t("calendar.subscription.customise")}<ChevronDown /></summary>
-          <div className={styles.customiseBody}>
-            <label>
-              <strong>{t("calendar.subscription.label")}</strong>
-              <input maxLength={80} value={label} onChange={event => setLabel(event.target.value)} placeholder={t("calendar.subscription.labelPlaceholder")} />
-            </label>
-            {units.length > 0 && <fieldset>
-              <legend>{t("calendar.subscription.units")}</legend>
-              <small>{t("calendar.subscription.unitsHelp")}</small>
-              <div className={styles.unitGrid}>{units.map(unit => <label key={unit.id}>
-                <input
-                  type="checkbox"
-                  checked={unitIds.includes(unit.id)}
-                  onChange={event => setUnitIds(current => event.target.checked
-                    ? [...current, unit.id]
-                    : current.filter(id => id !== unit.id))}
-                />
-                <span>{unit.code ? <b>{unit.code}</b> : null}{unit.name}</span>
-              </label>)}</div>
-            </fieldset>}
-          </div>
-        </details>
-
-        <div className={styles.actionRow}>
-          <button className={styles.primary} disabled={saving}>
-            {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
-            {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
-          </button>
-          <p className={styles.revokeHint}><ShieldCheck />{t("calendar.subscription.revokeHint")}</p>
-        </div>
-      </form> : <div className={styles.created}>
-        <header><span><Check /></span><div><strong>{t("calendar.subscription.createdTitle")}</strong><p>{t("calendar.subscription.created")}</p></div></header>
-        <div className={styles.external}>
-          <a className={styles.recommended} href={google} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.google")}</a>
-          <a href={webcal}><Apple />{t("calendar.subscription.apple")}</a>
-          <a href={outlook} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.outlook")}</a>
-        </div>
-        <details className={styles.manual}>
-          <summary>{t("calendar.subscription.otherApp")}<ChevronDown /></summary>
-          <div className={styles.url}>
-            <input readOnly value={created.feedUrl} aria-label={t("calendar.subscription.copy")} />
-            <button type="button" onClick={() => void copy()}>{copied ? <Check /> : <Clipboard />}{t(copied ? "calendar.subscription.copied" : "calendar.subscription.copy")}</button>
-          </div>
-        </details>
-      </div>}
-      </div>
-
-      <details className={styles.management}>
-        <summary>
-          <span><Settings2 /><strong>{t("calendar.subscription.active")}</strong>{items.length > 0 && <b>{items.length}</b>}</span>
-          <ChevronDown />
-        </summary>
-        <div className={styles.list}>
-          {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /></div> : items.length ? items.map(item => <article key={item.id}>
+    {open && <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
+      <aside className={styles.drawer} id="calendar-subscription-panel" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
+        <header className={styles.drawerHeader}>
+          <div>
+            <span className={styles.drawerIcon} aria-hidden="true"><CalendarPlus /></span>
             <div>
-              <strong>{item.label}</strong>
-              <small>{item.lastUsedAt
-                ? t("calendar.subscription.lastUsed", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(item.lastUsedAt) })
-                : t("calendar.subscription.neverUsed")}</small>
+              <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
+              <p>{t("calendar.subscription.description")}</p>
             </div>
-            <button type="button" disabled={busy === item.id} onClick={() => setRevokeTarget(item)}>
-              <Trash2 />{t(busy === item.id ? "calendar.subscription.revoking" : "calendar.subscription.revoke")}
-            </button>
-          </article>) : <p className={styles.empty}>{t("calendar.subscription.none")}</p>}
-        </div>
-      </details>
+          </div>
+          <button className={styles.close} type="button" onClick={() => setOpen(false)} aria-label={t("calendar.subscription.close")}><X /></button>
+        </header>
 
-      {error && <div className={styles.error}><RefreshCw />{error}</div>}
+        <div className={styles.drawerBody}>
+          <div className={styles.setup}>
+            {!created ? <form className={styles.form} onSubmit={create}>
+              <details className={styles.customise}>
+                <summary><Settings2 />{t("calendar.subscription.customise")}<ChevronDown /></summary>
+                <div className={styles.customiseBody}>
+                  <label>
+                    <strong>{t("calendar.subscription.label")}</strong>
+                    <input maxLength={80} value={label} onChange={event => setLabel(event.target.value)} placeholder={t("calendar.subscription.labelPlaceholder")} />
+                  </label>
+                  {units.length > 0 && <fieldset>
+                    <legend>{t("calendar.subscription.units")}</legend>
+                    <small>{t("calendar.subscription.unitsHelp")}</small>
+                    <div className={styles.unitGrid}>{units.map(unit => <label key={unit.id}>
+                      <input
+                        type="checkbox"
+                        checked={unitIds.includes(unit.id)}
+                        onChange={event => setUnitIds(current => event.target.checked
+                          ? [...current, unit.id]
+                          : current.filter(id => id !== unit.id))}
+                      />
+                      <span>{unit.code ? <b>{unit.code}</b> : null}{unit.name}</span>
+                    </label>)}</div>
+                  </fieldset>}
+                </div>
+              </details>
+
+              <button className={styles.primary} disabled={saving}>
+                {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
+                {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
+              </button>
+            </form> : <div className={styles.created}>
+              <header><span><Check /></span><div><strong>{t("calendar.subscription.createdTitle")}</strong><p>{t("calendar.subscription.created")}</p></div></header>
+              <div className={styles.external}>
+                <a className={styles.recommended} href={google} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.google")}</a>
+                <a href={webcal}><Apple />{t("calendar.subscription.apple")}</a>
+                <a href={outlook} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.outlook")}</a>
+              </div>
+              <details className={styles.manual}>
+                <summary>{t("calendar.subscription.otherApp")}<ChevronDown /></summary>
+                <div className={styles.url}>
+                  <input readOnly value={created.feedUrl} aria-label={t("calendar.subscription.copy")} />
+                  <button type="button" onClick={() => void copy()}>{copied ? <Check /> : <Clipboard />}{t(copied ? "calendar.subscription.copied" : "calendar.subscription.copy")}</button>
+                </div>
+              </details>
+            </div>}
+          </div>
+
+          <details className={styles.management}>
+            <summary>
+              <span><Settings2 /><strong>{t("calendar.subscription.active")}</strong>{items.length > 0 && <b>{items.length}</b>}</span>
+              <ChevronDown />
+            </summary>
+            <div className={styles.list}>
+              {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /></div> : items.length ? items.map(item => <article key={item.id}>
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{item.lastUsedAt
+                    ? t("calendar.subscription.lastUsed", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(item.lastUsedAt) })
+                    : t("calendar.subscription.neverUsed")}</small>
+                </div>
+                <button type="button" disabled={busy === item.id} onClick={() => setRevokeTarget(item)}>
+                  <Trash2 />{t(busy === item.id ? "calendar.subscription.revoking" : "calendar.subscription.revoke")}
+                </button>
+              </article>) : <p className={styles.empty}>{t("calendar.subscription.none")}</p>}
+            </div>
+          </details>
+
+          {error && <div className={styles.error}><RefreshCw />{error}</div>}
+        </div>
+      </aside>
     </div>}
+
     <ConfirmationDialog
       open={Boolean(revokeTarget)}
       eyebrow={locale === "en" ? "Private calendar link" : "Ligação privada"}
@@ -252,5 +264,5 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
       onClose={() => setRevokeTarget(null)}
       onConfirm={() => { if (revokeTarget) void revoke(revokeTarget); }}
     />
-  </section>;
+  </>;
 }
