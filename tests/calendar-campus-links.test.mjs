@@ -21,3 +21,7 @@ test("eventos associados a uma unidade curricular abrem o respetivo detalhe", ()
   assert.match(calendar, /href=\{unitHref\(item\.unitId\)\}/);
   assert.match(calendar, /href=\{unitHref\(selectedEvent\.unitId\)\}/);
 });
+
+test("criação de eventos não expõe texto auxiliar sobre o fuso horário", () => {
+  assert.doesNotMatch(calendar, /fuso horário de Lisboa/i);
+});
