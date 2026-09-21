@@ -276,7 +276,7 @@ export function CampusDirectory() {
     </section>
 
     {editor && <div className={styles.dialog} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
-      <section className={styles.dialogPanel} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby="campus-editor-title">
+      <section className={styles.dialogPanel} data-app-modal="modal" data-app-modal-size="medium" role="dialog" aria-modal="true" aria-labelledby="campus-editor-title">
         <header className={styles.dialogHeader} data-app-modal-header><div><span className="eyebrow">{t("campus.manage")}</span><h2 id="campus-editor-title">{editor === "building" ? t("campus.newBuilding") : t("campus.newFaculty")}</h2></div><button className={styles.dialogClose} data-app-modal-close type="button" onClick={closeEditor} disabled={saving} aria-label={t("common.close")}><X aria-hidden="true" /></button></header>
         <form className={styles.dialogForm} data-app-modal-body onSubmit={save}>
           <label htmlFor="campus-name">{t("campus.name")}<input id="campus-name" ref={firstFieldRef} required value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} /></label>
