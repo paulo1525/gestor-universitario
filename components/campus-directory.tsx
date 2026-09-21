@@ -210,7 +210,6 @@ export function CampusDirectory() {
       <div>
         <span className="eyebrow">{t("campus.eyebrow")}</span>
         <h1>{t("campus.title")}</h1>
-        <p>{t("campus.intro")}</p>
       </div>
       {canManage && <div className={styles.actions}>
         <button className="button button--secondary button--compact" type="button" onClick={() => openEditor("building")}><Building2 aria-hidden="true" />{t("campus.newBuilding")}</button>
