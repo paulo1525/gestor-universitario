@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { isExamWorkflowTransitionAllowed } from "@/lib/exam-workflow.mjs";
 import { handleMaterialsCatalogRoute, isMaterialsCatalogPath } from "./materials-catalog";
 
 export type HubUser = {
@@ -716,6 +717,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
       if (!["received", "transcribing", "reviewing", "imported", "archived"].includes(workflowStatus)) return json({ error: "Estado de transcrição inválido." }, 400);
       const current = await env.DB.prepare("SELECT transcription_status FROM exam_submission_details WHERE submission_id=?").bind(id).first<{ transcription_status: string }>();
       if (!current) return json({ error: "Fluxo de exame não encontrado." }, 404);
+      if (!isExamWorkflowTransitionAllowed(current.transcription_status, workflowStatus)) return json({ error: `Transição inválida: ${current.transcription_status} → ${workflowStatus}. Avance uma etapa de cada vez.` }, 409);
       const now = Date.now();
       await env.DB.batch([
         env.DB.prepare("UPDATE exam_submission_details SET transcription_status=?,transcription_notes=?,transcribed_by=CASE WHEN ? IN ('transcribing','reviewing','imported') THEN ? ELSE transcribed_by END,reviewed_by=CASE WHEN ? IN ('reviewing','imported') THEN ? ELSE reviewed_by END,imported_at=CASE WHEN ?='imported' THEN ? ELSE imported_at END,updated_at=? WHERE submission_id=?").bind(workflowStatus, note, workflowStatus, actor(user), workflowStatus, actor(user), workflowStatus, now, now, id),
