@@ -8,6 +8,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
+import { SurfaceHeader } from "@/components/surface-header";
 import { announcementDisplayHtml, announcementPlainText } from "@/lib/announcement-content";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
@@ -260,13 +261,18 @@ export function AnnouncementsBoard() {
 
   return <AuthGuard><ModuleGuard moduleKey="announcements.feed"><AppShell active="announcements" breadcrumb={t("announcements.title")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-    <section className={styles.heading}>
-      <div><span className="eyebrow">{t("announcements.eyebrow")}</span><h1>{t("announcements.title")}</h1><p>{t("announcements.intro")}</p></div>
-      {canPublish && <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button>}
-    </section>
+    <SurfaceHeader
+      standalone
+      headingLevel="h1"
+      icon={<Megaphone />}
+      eyebrow={t("announcements.eyebrow")}
+      title={t("announcements.title")}
+      description={t("announcements.intro")}
+      actions={canPublish ? <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button> : undefined}
+    />
 
     {canPublish && editorOpen && <form id="announcement-editor" className={`panel ${styles.editor}`} onSubmit={publish}>
-      <header><span className={styles.editorIcon}><Megaphone /></span><div><span className="eyebrow">{t("announcements.editor.eyebrow")}</span><h2>{t("announcements.editor.title")}</h2></div></header>
+      <SurfaceHeader icon={<Megaphone />} eyebrow={t("announcements.editor.eyebrow")} title={t("announcements.editor.title")} />
       <div className={styles.formGrid}>
         <label className={styles.titleField}><FormLabel icon={Megaphone}>{t("announcements.editor.titleLabel")}</FormLabel><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder={t("announcements.editor.titlePlaceholder")} /></label>
         <label><FormLabel icon={Flag}>{t("announcements.editor.priority")}</FormLabel><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">{priorityLabels.normal}</option><option value="important">{priorityLabels.important}</option><option value="urgent">{priorityLabels.urgent}</option></select></label>
@@ -291,7 +297,7 @@ export function AnnouncementsBoard() {
     </form>}
 
     {!editorOpen && <section className={`panel ${styles.feed}`} aria-busy={loading}>
-      <header className="panel__header"><div><h2>{t("announcements.feed.title")}</h2></div><span className={styles.count}>{hasFilters ? t("announcements.feed.countFiltered", { visible: filteredAnnouncements.length, total: announcements.length }) : t(filteredAnnouncements.length === 1 ? "announcements.feed.countOne" : "announcements.feed.countMany", { count: filteredAnnouncements.length })}</span></header>
+      <SurfaceHeader icon={<Megaphone />} title={t("announcements.feed.title")} meta={hasFilters ? t("announcements.feed.countFiltered", { visible: filteredAnnouncements.length, total: announcements.length }) : t(filteredAnnouncements.length === 1 ? "announcements.feed.countOne" : "announcements.feed.countMany", { count: filteredAnnouncements.length })} />
       <div className={styles.filters} aria-label={t("announcements.filters.aria")}>
         <label className={styles.searchField}><FormLabel icon={Search}>{t("announcements.filters.search")}</FormLabel><div><Search /><input type="search" value={searchQuery} onChange={event => { setSearchQuery(event.target.value); setPage(1); }} placeholder={t("announcements.filters.placeholder")} /></div></label>
         <label><FormLabel icon={Flag}>{t("announcements.filters.priority")}</FormLabel><select value={priorityFilter} onChange={event => { setPriorityFilter(event.target.value as Priority | "all"); setPage(1); }}><option value="all">{t("announcements.filters.allPriorities")}</option><option value="urgent">{priorityLabels.urgent}</option><option value="important">{priorityLabels.important}</option><option value="normal">{priorityLabels.normal}</option></select></label>
