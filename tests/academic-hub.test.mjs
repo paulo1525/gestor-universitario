@@ -85,7 +85,9 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
   assert.match(backend, /curricular_unit_representatives/);
   assert.match(backend, /representatives/);
   assert.match(backend, /announcement_curricular_units/);
-  assert.match(directory, /community\.directory\.sync/);
+  assert.doesNotMatch(directory, /community\.directory\.sync/);
+  assert.match(directory, /<SurfaceHeader/);
+  assert.match(directory, /community\.directory\.title/);
   assert.match(unitCatalog, /community\.units\.upcoming/);
   assert.match(unitCatalog, /community\.units\.documents/);
   assert.match(unitCatalog, /data\.unit\.representatives\.length > 0/);
