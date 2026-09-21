@@ -41,10 +41,15 @@ test("os anexos Anki são catalogados como dados textuais e expostos com filtros
   assert.match(worker, /material-anki/);
   assert.match(worker, /STORAGE_NOT_READY/);
   assert.match(worker, /multipleChoiceCards/);
+  assert.match(worker, /externalUrl/);
+  assert.match(worker, /unitCode/);
   assert.match(component, /Visão geral|catalog\.tab\.overview/);
   assert.match(component, /Essencial/);
   assert.match(component, /Completo/);
   assert.match(component, /multiple_choice/);
+  assert.match(component, /verificationFilter/);
+  assert.match(component, /Páginas físicas/);
+  assert.match(component, /aria-pressed/);
 });
 
 test("o builder cria um APKG com escolha múltipla, resposta curta, imagem e media", async () => {

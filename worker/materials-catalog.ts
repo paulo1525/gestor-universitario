@@ -62,9 +62,14 @@ function unauthenticated(): Response { return json({ error: "Sessão inválida."
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
 function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = []) {
   const ready = item.storage_state === "ready";
+  const externalUrl = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url)
+    ? item.external_url
+    : null;
   return {
     id: item.id,
     unitId: item.curricular_unit_id,
+    unitCode: item.unit_code,
+    unitName: item.unit_name,
     lessonId: item.lesson_id,
     lessonCode: item.lesson_code,
     lessonCodes,
@@ -74,7 +79,9 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     fileName: item.file_name,
     mimeType: item.mime_type,
     storage: { backend: item.storage_backend, state: item.storage_state, ready, size: item.byte_size, checksum: item.checksum_sha256 },
-    downloadUrl: ready ? `/api/material-catalog/${encodeURIComponent(String(item.id))}/download` : null,
+    downloadUrl: ready
+      ? externalUrl || `/api/material-catalog/${encodeURIComponent(String(item.id))}/download`
+      : null,
     verification: item.verification_status,
     status: item.publication_status,
     source: item.source_id ? { id: item.source_id, title: item.source_title, edition: item.source_edition, author: item.source_author } : null,

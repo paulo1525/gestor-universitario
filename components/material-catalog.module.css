@@ -16,9 +16,13 @@
 .overviewNote > svg, .examHint > svg { flex: 0 0 auto; width: 18px; margin-top: 2px; color: #a17a00; }
 .overviewNote strong, .examHint strong { color: var(--ink); font-size: 11px; }
 .overviewNote p, .examHint p { margin: 4px 0 0; font-size: 10px; line-height: 1.5; }
-.toolbar { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.toolbar label { display: grid; gap: 6px; width: min(500px, 100%); color: var(--muted); font-size: 10px; font-weight: 800; }
-.toolbar input { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-size: 11px; }
+.toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.toolbarField { display: grid; flex: 1 1 175px; gap: 6px; min-width: min(175px, 100%); color: var(--muted); font-size: 10px; font-weight: 800; }
+.toolbarField:first-child { flex-basis: 260px; }
+.toolbarField input, .toolbarField select { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); outline: none; color: var(--ink); background: var(--surface); font: inherit; font-size: 11px; }
+.toolbarField input:focus, .toolbarField select:focus { border-color: var(--gold); box-shadow: var(--focus-ring-accent); }
+.toolbarCheck { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; padding: 0 4px; color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.toolbarCheck input { width: 16px; height: 16px; accent-color: var(--gold); }
 .resultCount { color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
 .resourceList { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .resource { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 13px; padding: 15px 17px; border-bottom: 1px solid var(--line); }
@@ -32,6 +36,7 @@
 .resource p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .badge { display: inline-flex; align-items: center; min-height: 23px; padding: 0 8px; border-radius: 999px; color: var(--muted); background: var(--line); font-size: 9px; font-weight: 800; white-space: nowrap; }
 .badgeVerified { color: var(--color-success-text); background: var(--color-success-soft); }
+.badgePending { color: var(--color-warning); background: var(--color-warning-soft); }
 .resourceMeta { display: flex; flex-wrap: wrap; gap: 5px 15px; color: var(--muted); font-size: 9px; }
 .resourceActions { display: flex; align-items: center; gap: 8px; }
 .pending { color: var(--muted); font-size: 10px; font-weight: 700; }
