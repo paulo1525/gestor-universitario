@@ -266,7 +266,7 @@ export function UsefulLinks() {
             <header className={styles.hero}>
               <div className={styles.heroCopy}>
                 <span className={styles.heroIcon}><Link2 /></span>
-                <div><span className="eyebrow">{t("links.eyebrow")}</span><h1>{t("links.title")}</h1><p>{t("links.description")}</p></div>
+                <div><span className="eyebrow">{t("links.eyebrow")}</span><h1>{t("links.title")}</h1></div>
               </div>
               {canManage && <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button>}
             </header>
