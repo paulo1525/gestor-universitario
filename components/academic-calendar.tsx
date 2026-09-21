@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   BookOpen,
   CalendarDays,
@@ -125,6 +126,18 @@ function formForEvent(item: CalendarEvent): EventForm {
     location: item.location,
     unitId: item.unitId,
   };
+}
+
+function campusSearchHref(location: string) {
+  return `/salas-docentes?q=${encodeURIComponent(location.trim())}`;
+}
+
+function unitHref(unitId: string) {
+  return `/unidades-curriculares/${encodeURIComponent(unitId)}`;
+}
+
+function isExternalLocation(location: string) {
+  return /^(?:https?:|mailto:)/i.test(location.trim());
 }
 
 function formatDate(input: DateInput, includeDate = true, locale = "pt-PT", fallback = "Date to be confirmed") {
@@ -513,7 +526,7 @@ export function AcademicCalendar() {
       </div> : filtered.length === 0 ? <div className={styles.emptyState}><CalendarDays /><strong>{t("community.calendar.noFilteredEvents")}</strong><span>{t("community.calendar.changeFilters")}</span></div> : <div className={styles.agendaList}>
         {filtered.map(item => { const starts = validDate(item.startsAt); return <article key={item.id} className={styles.agendaItem} data-event-type={item.type}>
           <time dateTime={starts?.toISOString()}><strong>{starts?.getDate() ?? "—"}</strong><span>{starts ? new Intl.DateTimeFormat(locale, { month: "short" }).format(starts) : t("community.calendar.dateFallback")}</span></time>
-          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && <span className={styles.unitBadge}>{item.unitName}</span>}</div><h3>{item.title}</h3><p><Clock3 />{formatEventDate(item.startsAt)}{item.endsAt && ` — ${formatEventDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{item.location}</p>}{item.description && <RichTextContent value={item.description} className={styles.description} />}</div>
+          <div className={styles.agendaBody}><div className={styles.badgeRow}><span className={styles.typeBadge}>{eventLabels[item.type] || item.type}</span>{item.unitName && (item.unitId ? <Link className={`${styles.unitBadge} ${styles.unitLink}`} href={unitHref(item.unitId)}>{item.unitName}</Link> : <span className={styles.unitBadge}>{item.unitName}</span>)}</div><h3>{item.title}</h3><p><Clock3 />{formatEventDate(item.startsAt)}{item.endsAt && ` — ${formatEventDate(item.endsAt)}`}</p>{item.location && <p><MapPin />{isExternalLocation(item.location) ? item.location : <Link className={styles.locationLink} href={campusSearchHref(item.location)} aria-label={t("community.calendar.openCampus", { location: item.location })}>{item.location}</Link>}</p>}{item.description && <RichTextContent value={item.description} className={styles.description} />}</div>
           {canManage && <button type="button" className={styles.deleteButton} onClick={() => setDeleteTarget(item)} aria-label={t("community.calendar.deleteNamed", { title: item.title })}><Trash2 /></button>}
         </article>; })}
       </div>}
@@ -542,7 +555,7 @@ export function AcademicCalendar() {
       <article className={styles.eventModal} role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" aria-describedby="calendar-event-context">
         <header className={styles.modalHeader}>
           <div className={styles.modalHeading}>
-            <div className={styles.badgeRow}><span className={styles.typeBadge} data-event-type={selectedEvent.type}>{eventLabels[selectedEvent.type] || selectedEvent.type}</span>{selectedEvent.unitName && <span className={styles.unitBadge}>{selectedEvent.unitName}</span>}</div>
+            <div className={styles.badgeRow}><span className={styles.typeBadge} data-event-type={selectedEvent.type}>{eventLabels[selectedEvent.type] || selectedEvent.type}</span>{selectedEvent.unitName && (selectedEvent.unitId ? <Link className={`${styles.unitBadge} ${styles.unitLink}`} href={unitHref(selectedEvent.unitId)}>{selectedEvent.unitName}</Link> : <span className={styles.unitBadge}>{selectedEvent.unitName}</span>)}</div>
             <h2 id="calendar-event-title">{editingEvent ? "Editar evento" : selectedEvent.title}</h2>
             <p id="calendar-event-context">{editingEvent ? `A atualizar “${selectedEvent.title}”` : "Detalhes completos do evento académico"}</p>
           </div>
@@ -558,7 +571,7 @@ export function AcademicCalendar() {
           </form> : <div className={styles.modalOverview}>
             <section className={styles.modalMeta} aria-label="Informação do evento">
               <p><Clock3 /><span><strong>Data e hora</strong>{formatDate(selectedEvent.startsAt)}{selectedEvent.endsAt && ` — ${formatDate(selectedEvent.endsAt)}`}</span></p>
-              <p><MapPin /><span><strong>Local</strong>{selectedEvent.location || "Não indicado"}</span></p>
+              <p><MapPin /><span><strong>Local</strong>{selectedEvent.location ? (isExternalLocation(selectedEvent.location) ? selectedEvent.location : <Link className={styles.locationLink} href={campusSearchHref(selectedEvent.location)} aria-label={t("community.calendar.openCampus", { location: selectedEvent.location })}>{selectedEvent.location}</Link>) : "Não indicado"}</span></p>
             </section>
             <section className={styles.modalDescriptionSection}><span>Descrição</span>{selectedEvent.description ? <RichTextContent value={selectedEvent.description} className={styles.modalDescription} /> : <p className={styles.modalDescription}>Este evento não tem uma descrição adicional.</p>}</section>
             {canManage && <section className={styles.quickReschedule}><div><CalendarClock /><span><strong>Reagendamento rápido</strong><small>Mantém a hora e a duração atuais.</small></span></div><div className={styles.rescheduleControl}><label className={styles.srOnly} htmlFor="event-reschedule-date">Nova data</label><input id="event-reschedule-date" type="date" value={rescheduleDate} onChange={event => setRescheduleDate(event.target.value)} /><button type="button" disabled={!rescheduleDate || movingEventId === selectedEvent.id} onClick={() => { const target = new Date(`${rescheduleDate}T12:00:00`); if (!Number.isNaN(target.getTime())) void reschedule(selectedEvent, target); }}>{movingEventId === selectedEvent.id ? "A guardar…" : "Alterar data"}</button></div></section>}

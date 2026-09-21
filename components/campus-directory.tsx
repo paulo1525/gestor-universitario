@@ -24,6 +24,12 @@ export function CampusDirectory() {
   const [rooms, setRooms] = useState<Room[]>([]), [faculty, setFaculty] = useState<Faculty[]>([]), [buildings, setBuildings] = useState<Building[]>([]);
   const [query, setQuery] = useState(""), [tab, setTab] = useState<"rooms" | "faculty">("rooms"), [loading, setLoading] = useState(true), [notice, setNotice] = useState<Notice>(null), [editor, setEditor] = useState<"building" | "faculty" | null>(null), [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", code: "", email: "", title: "", address: "" });
+  useEffect(() => {
+    const preset = new URLSearchParams(window.location.search).get("q")?.trim();
+    // The query is an external navigation input; copy it once after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (preset) setQuery(current => current || preset.slice(0, 100));
+  }, []);
   const load = useCallback(async () => { setLoading(true); try { const response = await fetch(`/api/campus?q=${encodeURIComponent(query)}`, { cache: "no-store" }); const data = await response.json() as { rooms?: Room[]; faculty?: Faculty[]; buildings?: Building[]; error?: string }; if (!response.ok) throw new Error(data.error || t("campus.loadError")); setRooms(data.rooms || []); setFaculty(data.faculty || []); setBuildings(data.buildings || []); } catch (error) { setNotice({ kind: "error", message: error instanceof Error ? error.message : t("campus.loadError") }); } finally { setLoading(false); } }, [query, t]);
   useEffect(() => { const timeout = window.setTimeout(() => void load(), 180); return () => window.clearTimeout(timeout); }, [load]);
   const save = async (event: FormEvent) => { event.preventDefault(); if (!editor) return; setSaving(true); try { const entity = editor; const response = await fetch("/api/campus", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ entity, name: form.name, code: form.code, email: form.email, title: form.title, address: form.address }) }); const data = await response.json() as { error?: string }; if (!response.ok) throw new Error(data.error || t("campus.loadError")); setEditor(null); setForm({ name: "", code: "", email: "", title: "", address: "" }); setNotice({ kind: "success", message: t("campus.saved") }); await load(); } catch (error) { setNotice({ kind: "error", message: error instanceof Error ? error.message : t("campus.loadError") }); } finally { setSaving(false); } };

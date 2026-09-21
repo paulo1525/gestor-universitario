@@ -114,6 +114,10 @@
 .agendaBody h3 { margin:.48rem 0; font-size:1.06rem; }
 .agendaBody p { display:flex; align-items:center; gap:.4rem; margin:.3rem 0; color:#63665e; font-size:.82rem; }
 .agendaBody p svg { width:.9rem; flex:none; }
+.locationLink { color:inherit; text-decoration:underline; text-decoration-color:#d2ab1c; text-underline-offset:2px; }
+.locationLink:hover,.unitLink:hover { color:#806207; }
+.locationLink:focus-visible,.unitLink:focus-visible { outline:2px solid #4d5fe8; outline-offset:2px; }
+.unitLink { text-decoration:none; }
 .description { margin-top:.7rem; color:#50534b; font-size:.87rem; line-height:1.52; white-space:pre-wrap; }
 .badgeRow { display:flex; flex-wrap:wrap; gap:.38rem; }
 .typeBadge,.unitBadge { display:inline-flex; width:max-content; padding:.3rem .58rem; border-radius:999px; font-size:.68rem; line-height:1; font-weight:850; }
