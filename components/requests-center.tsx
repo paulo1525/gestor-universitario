@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AlignLeft, CheckCircle2, CircleDot, Eye, EyeOff, GraduationCap, Inbox, LoaderCircle, LockKeyhole, MessageSquareReply, MessageSquareText, Plus, Send, ShieldCheck, Tags, Trash2, TriangleAlert, UserRound, X, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AuthGuard } from "@/components/auth-guard";
 import { FormLabel } from "@/components/form-label";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
@@ -68,6 +69,19 @@ export function RequestsCenter() {
         </article>; })}</div>}
       </section>}
     </div>
-    {deleteTarget && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={event => { if (!deletingId && event.currentTarget === event.target) setDeleteTarget(null); }}><section className={styles.deleteDialog} role="dialog" aria-modal="true" aria-labelledby="delete-request-title"><header><span className={styles.deleteIcon}><Trash2 /></span><div><span className="eyebrow">{t("requests.delete.eyebrow")}</span><h2 id="delete-request-title">{t("requests.delete.title")}</h2><p>{t("requests.delete.intro")}</p></div></header><div className={styles.deleteSummary}><span>{t("requests.delete.selected")}</span><strong>{deleteTarget.subject}</strong></div><div className={styles.deleteWarning}><TriangleAlert /><p>{t("requests.delete.warning")}</p></div>{deleteError && <p className={styles.deleteError} role="alert">{deleteError}</p>}<footer><button className="button button--secondary" type="button" disabled={Boolean(deletingId)} onClick={() => setDeleteTarget(null)}>{t("requests.delete.cancel")}</button><button className={styles.deleteConfirm} type="button" disabled={Boolean(deletingId)} onClick={() => void remove()}>{deletingId ? <LoaderCircle className={styles.spin} /> : <Trash2 />}{deletingId ? t("requests.delete.deleting") : t("requests.delete.confirm")}</button></footer></section></div>}
+    <ConfirmationDialog
+      open={Boolean(deleteTarget)}
+      eyebrow={t("requests.delete.eyebrow")}
+      title={t("requests.delete.title")}
+      description={t("requests.delete.intro")}
+      subject={deleteTarget?.subject}
+      subjectLabel={t("requests.delete.selected")}
+      warning={t("requests.delete.warning")}
+      confirmLabel={t(deletingId ? "requests.delete.deleting" : "requests.delete.confirm")}
+      cancelLabel={t("requests.delete.cancel")}
+      busy={Boolean(deletingId)}
+      onClose={() => { if (!deletingId) setDeleteTarget(null); }}
+      onConfirm={() => void remove()}
+    />
   </AppShell></ModuleGuard></AuthGuard>;
 }
