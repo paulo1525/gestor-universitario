@@ -345,6 +345,7 @@ export function MaterialLibrary() {
     [units, setUnits] = useState<Unit[]>([]),
     [canModerate, setCanModerate] = useState(false),
     [loading, setLoading] = useState(true),
+    [loadError, setLoadError] = useState(""),
     [notice, setNotice] = useState<Notice>(null),
     [editor, setEditor] = useState(false),
     [saving, setSaving] = useState(false),
@@ -373,6 +374,7 @@ export function MaterialLibrary() {
     [questionCount, setQuestionCount] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const moderator = moderationEnabled &&
         (user?.role === "admin" || Boolean(user?.commissionPosition));
@@ -408,12 +410,11 @@ export function MaterialLibrary() {
         })),
       );
     } catch (reason) {
+      const message = reason instanceof Error ? reason.message : t("community.materials.loadError");
+      setLoadError(message);
       setNotice({
         kind: "error",
-        message:
-          reason instanceof Error
-            ? reason.message
-            : t("community.materials.loadError"),
+        message,
       });
     } finally {
       setLoading(false);
@@ -967,6 +968,16 @@ export function MaterialLibrary() {
                 <div className={styles.state}>
                   <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
                   <strong>{t("community.materials.loading")}</strong>
+                </div>
+              ) : loadError ? (
+                <div className={styles.state} role="alert">
+                  <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
+                  <strong>{t("community.materials.loadError")}</strong>
+                  <p>{loadError}</p>
+                  <button className={styles.emptyAction} type="button" onClick={() => void load()}>
+                    <LoaderCircle aria-hidden="true" />
+                    {t("community.materials.catalog.retry")}
+                  </button>
                 </div>
               ) : libraryCount === 0 ? (
                 <div className={styles.state}>

@@ -707,6 +707,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
       statements.push(env.DB.prepare("INSERT INTO exam_submission_workflow(id,submission_id,from_status,to_status,note,actor_user_id,created_at) VALUES (?,?,NULL,'received',?, ?,?)").bind(crypto.randomUUID(), id, longText(body.transcriptionNotes, 2000), actor(user), now));
     }
     await env.DB.batch(statements);
+    await audit(env, user, "material_submission_created", { id, type, anonymous, unitId: unitId || null });
     return json({ ok: true, id, anonymous, status: "pending" }, 201);
   }
   if (request.method === "PATCH") {

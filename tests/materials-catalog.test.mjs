@@ -8,6 +8,7 @@ import { buildMaterialApkg } from "../lib/anki/materials.ts";
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
 const component = await readFile(new URL("../components/material-catalog.tsx", import.meta.url), "utf8");
+const styles = await readFile(new URL("../components/material-catalog.module.css", import.meta.url), "utf8");
 const essential = JSON.parse(await readFile(new URL("../data/materials/anki/neuro-essential.json", import.meta.url), "utf8"));
 
 test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos anexos", async () => {
@@ -50,6 +51,25 @@ test("os anexos Anki são catalogados como dados textuais e expostos com filtros
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
   assert.match(component, /aria-pressed/);
+});
+
+test("a gestão do catálogo fica limitada a administradores e à direção", () => {
+  assert.match(worker, /function isManager\(user: MaterialsCatalogUser \| null\): boolean \{ return Boolean\(user && \(user\.role === "admin" \|\| user\.commissionDepartment === "management"\)\); \}/);
+  assert.doesNotMatch(worker, /user\.commissionDepartment === "management" \|\| user\.commissionPosition/);
+});
+
+test("o catálogo mantém os estados e a navegação de tabs acessíveis", () => {
+  assert.match(component, /role="tablist"/);
+  assert.match(component, /aria-controls=\{`material-panel-\$\{tab\}`\}/);
+  assert.match(component, /tabIndex=\{activeTab === tab \? 0 : -1\}/);
+  assert.match(component, /ArrowRight/);
+  assert.match(component, /role="tabpanel"/);
+  assert.match(component, /retryCatalog/);
+  assert.match(component, /cardsError/);
+  assert.match(component, /noCardTypes/);
+  assert.match(styles, /scrollbar-width:\s*none/);
+  assert.match(styles, /@media \(max-width: 560px\)/);
+  assert.match(styles, /resourceActions \.button \{ width: 100%/);
 });
 
 test("o builder cria um APKG com escolha múltipla, resposta curta, imagem e media", async () => {

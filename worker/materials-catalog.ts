@@ -57,7 +57,7 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}): Response 
 }
 function text(value: unknown, max: number): string { return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : ""; }
 function row(value: unknown): Record<string, unknown> { return value as Record<string, unknown>; }
-function isManager(user: MaterialsCatalogUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionDepartment === "management" || user.commissionPosition)); }
+function isManager(user: MaterialsCatalogUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionDepartment === "management")); }
 function unauthenticated(): Response { return json({ error: "Sessão inválida." }, 401); }
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
 function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = []) {

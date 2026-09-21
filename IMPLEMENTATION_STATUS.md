@@ -144,12 +144,16 @@ ser apagados sem autorização explícita do utilizador.
 | 21/09/2026 | Integração da pesquisa | Edifícios, salas e docentes ativos passam a integrar a pesquisa global com etiquetas bilingues |
 | 21/09/2026 | Validação consolidada | 311/311 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
 | 21/09/2026 | Nova tentativa remota da PR #97 | A integração Cloudflare voltou a falhar no commit `8df7c06e`; o build OpenNext local continua aprovado, reforçando o bloqueio de configuração/provisionamento remoto |
+| 21/09/2026 | Auditoria de qualidade/infra | Separada a compilação OpenNext das migrations D1 remotas; o destino da migration passou a ser explícito, o binding `MATERIALS_BUCKET` foi declarado no Worker e o fallback R2 ficou documentado |
+| 21/09/2026 | Aperfeiçoamento do diretório de Campus | Edifícios, salas, mapas, acessibilidade e docentes associados a unidades curriculares passaram a ter apresentação responsiva e editor administrativo acessível |
+| 21/09/2026 | Aperfeiçoamento de Materiais/Anki | Navegação por separadores com teclado, estados de erro e repetição, cancelamento de pedidos obsoletos, proteção contra seleções Anki vazias e adaptação móvel a 390 px |
+| 21/09/2026 | Validação consolidada após três frentes Luna Max | 318/318 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
 
 ## Bloqueios antes de `main`
 
 1. enviar os binários de Neuroanatomia para o bucket R2 `MATERIALS_BUCKET`;
 2. executar QA visual autenticado em desktop e mobile no ramo publicado;
-3. confirmar no painel Cloudflare a causa do build remoto falhado e o provisionamento do bucket R2;
+3. confirmar no painel Cloudflare o resultado do build após a separação das migrations e o provisionamento do bucket R2;
 4. aplicar as migrations D1 remotas 0056–0058;
 5. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
 

@@ -1,15 +1,16 @@
-.catalog { display: grid; gap: 18px; }
+.catalog { display: grid; gap: 18px; min-width: 0; }
 .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
-.tab { min-height: 38px; padding: 0 15px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+.tab { min-height: 40px; padding: 0 15px; border: 0; border-radius: 9px; color: var(--muted); background: transparent; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
 .tab:hover { color: var(--ink); background: var(--gold-soft); }
 .tabActive { color: #4c3a00; background: var(--gold-soft); box-shadow: inset 0 -2px 0 var(--gold); }
+.tab:focus-visible, .overviewCard button:focus-visible, .segmented button:focus-visible, .checkChips button:focus-visible, .notice button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .overviewGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .overviewCard { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: 132px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 .overviewCard > div { display: grid; gap: 3px; min-width: 0; }
 .overviewCard strong { font-size: 25px; letter-spacing: -.035em; }
 .overviewCard span:not(.overviewIcon) { color: var(--ink); font-size: 12px; font-weight: 800; }
 .overviewCard small { color: var(--muted); font-size: 10px; line-height: 1.4; }
-.overviewCard button { grid-column: 2; width: max-content; padding: 0; border: 0; color: var(--blue); background: transparent; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.overviewCard button { grid-column: 2; width: max-content; min-height: 34px; padding: 0 2px; border: 0; color: var(--blue); background: transparent; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
 .overviewIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; color: #695200; background: var(--gold-soft); }
 .overviewIcon svg { width: 20px; height: 20px; }
 .overviewNote, .examHint { display: flex; align-items: flex-start; gap: 11px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); background: var(--surface); }
@@ -32,7 +33,7 @@
 .resourceMain { display: grid; gap: 8px; min-width: 0; }
 .resourceHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .resourceLabel { color: #806500; font-size: 9px; font-weight: 850; letter-spacing: .02em; text-transform: uppercase; }
-.resource h3 { margin: 3px 0 0; color: var(--ink); font-size: 14px; line-height: 1.35; }
+.resource h3 { margin: 3px 0 0; color: var(--ink); font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
 .resource p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .badge { display: inline-flex; align-items: center; min-height: 23px; padding: 0 8px; border-radius: 999px; color: var(--muted); background: var(--line); font-size: 9px; font-weight: 800; white-space: nowrap; }
 .badgeVerified { color: var(--color-success-text); background: var(--color-success-soft); }
@@ -42,6 +43,8 @@
 .pending { color: var(--muted); font-size: 10px; font-weight: 700; }
 .empty { display: grid; min-height: 170px; place-items: center; align-content: center; gap: 8px; padding: 25px; color: var(--muted); font-size: 11px; text-align: center; }
 .empty svg { width: 22px; color: #aa8400; }
+.empty strong { color: var(--ink); font-size: 12px; }
+.empty .button { margin-top: 2px; }
 .ankiWorkspace { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); gap: 18px; align-items: start; }
 .ankiMain { display: grid; gap: 16px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 .segmented { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-subtle, #faf9f5); }
@@ -67,11 +70,14 @@
 .ankiAside p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .ankiAside strong { color: var(--ink); font-size: 22px; letter-spacing: -.03em; }
 .notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); font-size: 10px; font-weight: 700; }
+.notice > div { display: grid; min-width: 0; gap: 2px; }
+.notice > div span { overflow-wrap: anywhere; color: var(--muted); font-weight: 550; }
 .notice button { display: grid; width: 25px; height: 25px; place-items: center; border: 0; border-radius: 7px; color: inherit; background: transparent; cursor: pointer; }
 .notice button svg { width: 14px; }
 .noticeError { border-color: #e0a69f; color: #8b3229; background: #fff0ed; }
 .noticeSuccess { border-color: #a8ccae; color: var(--color-success-text); background: var(--color-success-soft); }
+.selectionHint { color: var(--color-warning) !important; font-weight: 750; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 850px) { .overviewGrid { grid-template-columns: 1fr; } .ankiWorkspace { grid-template-columns: 1fr; } .builderPreview { align-items: flex-start; flex-direction: column; } .cardTypeSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; } }
-@media (max-width: 560px) { .tabs { overflow-x: auto; flex-wrap: nowrap; } .tab { flex: 0 0 auto; } .toolbar { align-items: stretch; flex-direction: column; } .resultCount { align-self: flex-start; } .resource { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 13px; } .resourceIcon { width: 34px; height: 34px; } .resourceHeading { flex-direction: column; gap: 6px; } .cardTypeSummary { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; } .tabs::-webkit-scrollbar { display: none; } .tab { flex: 0 0 auto; } .toolbar { align-items: stretch; flex-direction: column; padding: 13px; } .toolbarField, .toolbarField:first-child { flex-basis: auto; min-width: 0; } .toolbarCheck { min-height: 40px; } .resultCount { align-self: flex-start; } .resource { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 13px; } .resourceIcon { width: 34px; height: 34px; } .resourceHeading { flex-direction: column; gap: 6px; } .resourceActions { align-items: stretch; flex-direction: column; } .resourceActions .button { width: 100%; justify-content: center; } .cardTypeSummary { grid-template-columns: 1fr; } .ankiMain, .ankiAside { padding: 14px; } .segmented { align-items: stretch; } .segmented .controlLabel { width: 100%; margin: 0 4px 2px; } .segmented button { flex: 1 1 0; } .downloadGenerated { width: 100%; justify-content: center; } .notice { align-items: flex-start; flex-direction: column; } .notice > .button { width: 100%; justify-content: center; } }

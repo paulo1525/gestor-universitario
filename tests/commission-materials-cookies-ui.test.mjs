@@ -27,6 +27,8 @@ test("a biblioteca de materiais tem filtro identificado, editor isolado e regist
   assert.match(materials, /className=\{styles\.materialHeader\}/);
   assert.match(materials, /className=\{styles\.cardActions\}/);
   assert.match(materials, /button--compact \$\{styles\.openMaterial\}/);
+  assert.match(materials, /loadError/);
+  assert.match(materials, /community\.materials\.catalog\.retry/);
   assert.match(materialStyles, /\.stateIcon/);
   assert.match(materialStyles, /\.materialGrid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(materialStyles, /\.material\s*\{[^}]*grid-template-columns:\s*112px minmax\(0, 1fr\)/s);

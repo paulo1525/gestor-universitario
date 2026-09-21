@@ -16,6 +16,9 @@ import { neuroParagraphs } from "@/lib/neuroanatomia-study";
 
 export interface Env {
   DB: D1Database;
+  // The binding is optional for local/preview databases so catalog endpoints
+  // can expose metadata while returning STORAGE_NOT_READY until R2 is ready.
+  MATERIALS_BUCKET?: R2Bucket;
   ASSETS: Fetcher;
   AUTH_RATE_LIMITER: RateLimit;
   APP_ORIGIN: string;
