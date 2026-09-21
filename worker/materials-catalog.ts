@@ -18,12 +18,21 @@ type ModuleChecker = (key: string) => Promise<boolean>;
 type ApiCard = {
   id: string;
   type: "multiple_choice" | "short_answer" | "image";
+  unitCode?: string;
+  unitName?: string;
   lesson: string;
   subtopic: string;
+  chapter?: string;
   question: string;
   answer: string;
   hint: string;
   source: string;
+  sourceLabel?: string;
+  sourcePage?: string;
+  sourceQuestion?: string;
+  assessment?: string;
+  session?: string;
+  academicYear?: string;
   imageKey: string | null;
   imageUrl: string | null;
   tags: string[];
@@ -60,7 +69,7 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     fileName: item.file_name,
     mimeType: item.mime_type,
     storage: { backend: item.storage_backend, state: item.storage_state, ready, size: item.byte_size, checksum: item.checksum_sha256 },
-    downloadUrl: ready
+    downloadUrl: ready && item.storage_backend !== "inline"
       ? externalUrl || `/api/material-catalog/${encodeURIComponent(String(item.id))}/download`
       : null,
     verification: item.verification_status,
