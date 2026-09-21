@@ -58,6 +58,11 @@ test("os anexos Anki são catalogados como dados textuais e expostos com filtros
   assert.match(component, /aria-pressed/);
 });
 
+test("a consulta do catálogo fornece os dois bindings do filtro de pesquisa", () => {
+  assert.match(worker, /const queryPattern = query \? `%\$\{query\}%` : "";/);
+  assert.match(worker, /kind && catalogKinds\.has\(kind\) \? kind : "", kind && catalogKinds\.has\(kind\) \? kind : "", queryPattern, queryPattern/);
+});
+
 test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", () => {
   assert.match(worker, /cache-control.*max-age=3600/);
   assert.match(worker, /if-none-match/);
