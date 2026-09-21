@@ -18,6 +18,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { SurfaceHeader } from "@/components/surface-header";
 import { useAuth } from "@/components/auth-context";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { useI18n } from "@/components/i18n-context";
@@ -206,17 +207,18 @@ export function CampusDirectory() {
   return <AuthGuard><ModuleGuard moduleKey="campus.directory"><AppShell active="campus" breadcrumb={t("campus.breadcrumb")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
-    <header className={`page-heading page-heading--simple ${styles.heading}`}>
-      <div>
-        <span className="eyebrow">{t("campus.eyebrow")}</span>
-        <h1>{t("campus.title")}</h1>
-        <p>{t("campus.intro")}</p>
-      </div>
-      {canManage && <div className={styles.actions}>
+    <SurfaceHeader
+      standalone
+      headingLevel="h1"
+      icon={<MapPinned />}
+      eyebrow={t("campus.eyebrow")}
+      title={t("campus.title")}
+      description={t("campus.intro")}
+      actions={canManage ? <div className={styles.actions}>
         <button className="button button--secondary button--compact" type="button" onClick={() => openEditor("building")}><Building2 aria-hidden="true" />{t("campus.newBuilding")}</button>
         <button className="button button--primary button--compact" type="button" onClick={() => openEditor("faculty")}><GraduationCap aria-hidden="true" />{t("campus.newFaculty")}</button>
-      </div>}
-    </header>
+      </div> : undefined}
+    />
 
     <section className={styles.summary} aria-label={t("campus.title")}>
       <div className={styles.summaryItem}><Building2 aria-hidden="true" /><span><strong>{counts.buildings}</strong><small>{t("campus.buildings")}</small></span></div>
@@ -239,6 +241,7 @@ export function CampusDirectory() {
     </section>}
 
     <section className={styles.panel} aria-label={t("campus.title")}>
+      <SurfaceHeader icon={<MapPinned />} title={t("campus.title")} />
       <div className={styles.toolbar}>
         <label className={styles.search} htmlFor="campus-directory-search"><span className="sr-only">{t("campus.search")}</span><Search aria-hidden="true" /><input id="campus-directory-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("campus.searchPlaceholder")} /></label>
         <div className={styles.tabs} role="tablist" aria-label={t("campus.title")}>
