@@ -320,7 +320,6 @@ export function PollsHub() {
                 <div>
                   <span className={styles.eyebrow}>{t("polls.eyebrow")}</span>
                   <h1>{t("polls.title")}</h1>
-                  <p>{t("polls.intro")}</p>
                 </div>
               </div>
               <div className={styles.heroStats}>
