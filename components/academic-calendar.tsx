@@ -460,8 +460,6 @@ export function AcademicCalendar() {
       </div>
     </header>
 
-    {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
-
     <section className={styles.calendarShell} aria-label={t("community.calendar.breadcrumb")}>
       <div className={styles.toolbar}>
         <div className={styles.monthNavigation}>
@@ -470,9 +468,12 @@ export function AcademicCalendar() {
           <button type="button" className={styles.todayButton} onClick={goToToday}>{t("community.calendar.today")}</button>
           <h2>{(() => { const parts = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).formatToParts(visibleMonth); const month = parts.find((part) => part.type === "month")?.value || ""; const year = parts.find((part) => part.type === "year")?.value || ""; return `${month.charAt(0).toLocaleUpperCase(locale)}${month.slice(1)} ${year}`.trim(); })()}</h2>
         </div>
-        <div className={styles.viewSwitch} aria-label={t("community.calendar.view")}>
-          <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />{t("community.calendar.month")}</button>
-          <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />{t("community.calendar.agenda")}</button>
+        <div className={styles.toolbarActions}>
+          {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
+          <div className={styles.viewSwitch} aria-label={t("community.calendar.view")}>
+            <button type="button" className={view === "month" ? styles.activeView : ""} onClick={() => setView("month")} aria-pressed={view === "month"}><LayoutGrid />{t("community.calendar.month")}</button>
+            <button type="button" className={view === "agenda" ? styles.activeView : ""} onClick={() => setView("agenda")} aria-pressed={view === "agenda"}><List />{t("community.calendar.agenda")}</button>
+          </div>
         </div>
       </div>
 
@@ -533,12 +534,11 @@ export function AcademicCalendar() {
     </section>
 
     {canManage && editor && <div className={styles.modalBackdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
-      <article className={`${styles.eventModal} ${styles.createModal}`} role="dialog" aria-modal="true" aria-labelledby="calendar-create-title" aria-describedby="calendar-create-context">
+      <article className={`${styles.eventModal} ${styles.createModal}`} role="dialog" aria-modal="true" aria-labelledby="calendar-create-title">
         <header className={styles.modalHeader}>
           <div className={styles.modalHeading}>
             <span className={styles.kicker}>Criar evento</span>
             <h2 id="calendar-create-title">Adicionar à agenda</h2>
-            <p id="calendar-create-context">As datas são apresentadas no fuso horário de Lisboa.</p>
           </div>
           <div className={styles.modalHeaderActions}><button type="button" className={styles.modalClose} disabled={saving} onClick={closeEditor} aria-label="Fechar criação de evento"><X /></button></div>
         </header>
