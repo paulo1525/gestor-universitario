@@ -180,7 +180,6 @@ export function CommissionDirectory() {
                 <div>
                   <span className="eyebrow">{t("community.directory.eyebrow")}</span>
                   <h1>{t("community.directory.breadcrumb")}</h1>
-                  <p>{t("community.directory.description")}</p>
                 </div>
               </div>
             </header>
