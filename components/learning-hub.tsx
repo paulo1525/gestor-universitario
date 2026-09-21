@@ -270,12 +270,16 @@ function SessionView({ data, step, progress, busy, onBusy, onUpdate, onNotice, o
 function Results({ data, onCatalogue, onRestart, busy }: { data: SessionData; onCatalogue: () => void; onRestart: () => void; busy: boolean }) {
   const percent = data.attempt.answeredCount ? Math.round((data.attempt.correctCount / data.attempt.answeredCount) * 100) : 0;
   return <section className={styles.results}>
-    <span className={styles.resultIcon}><CheckCircle2 /></span>
-    <span className="eyebrow">Percurso concluído</span>
-    <h1>{data.module.title}</h1>
-    <p>Terminaste os {data.module.exerciseCount} ciclos de explicação e aplicação.</p>
+    <SurfaceHeader
+      standalone
+      headingLevel="h1"
+      icon={<CheckCircle2 />}
+      eyebrow="Percurso concluído"
+      title={data.module.title}
+      description={`Terminaste os ${data.module.exerciseCount} ciclos de explicação e aplicação.`}
+      actions={<><button className="button button--secondary" type="button" onClick={onCatalogue}><BookOpenCheck />Outros percursos</button><button className="button button--primary" type="button" onClick={onRestart} disabled={busy}>{busy ? <LoaderCircle className={styles.spin} /> : <RotateCcw />}Repetir</button></>}
+    />
     <dl><div><dt>Respostas certas</dt><dd>{data.attempt.correctCount}/{data.attempt.answeredCount}</dd></div><div><dt>Precisão</dt><dd>{percent}%</dd></div></dl>
-    <footer><button className="button button--secondary" type="button" onClick={onCatalogue}><BookOpenCheck />Outros percursos</button><button className="button button--primary" type="button" onClick={onRestart} disabled={busy}>{busy ? <LoaderCircle className={styles.spin} /> : <RotateCcw />}Repetir</button></footer>
   </section>;
 }
 
