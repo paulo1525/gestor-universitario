@@ -1,6 +1,6 @@
 # Plano de implementação — expansão do Gestor Universitário
 
-Última atualização: 20 de setembro de 2026
+Última atualização: 21 de setembro de 2026
 
 ## Objetivo
 
@@ -48,17 +48,17 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 |---|---|---|---|---|
 | Auditoria da UI atual | Concluída | — | — | Captura pública concluída; áreas autenticadas aguardam ramo publicado |
 | Protótipos visuais | Concluídos | Desktop e mobile definidos | — | Referência aprovada pelo utilizador |
-| Informação das unidades curriculares | Parcial | Integrada | 300/300 no ramo funcional | Pendente no ramo consolidado |
+| Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
 | Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada | 300/300 no ramo funcional | Pendente no ramo consolidado |
-| Sumários por aula | Ausente | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
-| Bibliografia recomendada recortada | Ausente | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
-| Catálogo Anki | Ausente em Materiais | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
-| Gerador Anki personalizado | Parcial em Testes | Integrada | 303/303 no consolidado | Pendente no ramo publicado |
+| Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
+| Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor e notas | 306/306 no consolidado | Pendente no ramo publicado |
+| Catálogo Anki | Ausente em Materiais | Integrada | 306/306 no consolidado | Pendente no ramo publicado |
+| Gerador Anki personalizado | Parcial em Testes | Integrada; controlos acessíveis | 306/306 no consolidado | Pendente no ramo publicado |
 | Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Envio e transcrição de exames | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Mapa de salas | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Diretório de docentes | Ausente | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
-| Avisos críticos persistentes | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
+| Avisos críticos persistentes | Parcial | Integrada; confirmação permitida a estudantes elegíveis | 306/306 no consolidado | Pendente no ramo publicado |
 
 ## Direção visual aprovada
 
@@ -134,13 +134,19 @@ ser apagados sem autorização explícita do utilizador.
 | 20/09/2026 | Integração de Materiais e Anki | Catálogo, tabs, builder e fallback R2 integrados |
 | 20/09/2026 | Validação consolidada | 303/303 testes, TypeScript, ESLint e build Next.js aprovados |
 | 20/09/2026 | Publicação do ramo | Ramo enviado ao GitHub e PR draft #97 criada |
+| 21/09/2026 | Confirmação persistente de avisos | Estudantes elegíveis podem confirmar avisos publicados, visíveis e não expirados |
+| 21/09/2026 | Docentes nas unidades curriculares | API e página de detalhe apresentam docentes ativos, contactos e gabinete |
+| 21/09/2026 | Aperfeiçoamento de Materiais | Filtros, estados editoriais, metadados bibliográficos, URLs externas e acessibilidade integrados |
+| 21/09/2026 | Validação consolidada | 306/306 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
+| 21/09/2026 | Build remoto da PR #97 | A integração Cloudflare reportou falha após o commit remoto anterior; a causa não é reproduzível no build local e os logs detalhados exigem acesso ao painel Cloudflare |
 
 ## Bloqueios antes de `main`
 
 1. enviar os binários de Neuroanatomia para o bucket R2 `MATERIALS_BUCKET`;
 2. executar QA visual autenticado em desktop e mobile no ramo publicado;
-3. aplicar as migrations D1 remotas 0056–0058;
-4. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
+3. confirmar no painel Cloudflare a causa do build remoto falhado e o provisionamento do bucket R2;
+4. aplicar as migrations D1 remotas 0056–0058;
+5. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
 
 ## Próxima atualização prevista
 
