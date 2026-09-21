@@ -1,19 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft, Clock3, Cookie, LockKeyhole, Settings2, ShieldCheck } from "lucide-react";
 import styles from "./cookies.module.css";
+import { SurfaceHeader } from "@/components/surface-header";
 
 export default function CookiesPage() {
   return (
     <main className={styles.page}>
       <article className={styles.document}>
-        <header className={styles.hero}>
-          <span className={styles.heroIcon} aria-hidden="true"><Cookie /></span>
-          <div>
-            <span className="eyebrow">Gestor Universitário</span>
-            <h1>Política de Cookies</h1>
-            <p className={styles.updated}><Clock3 aria-hidden="true" />Última atualização: 31 de julho de 2026</p>
-          </div>
-        </header>
+        <SurfaceHeader headingLevel="h1" icon={<Cookie />} eyebrow="Gestor Universitário" title="Política de Cookies" description={<span className={styles.updated}><Clock3 aria-hidden="true" />Última atualização: 31 de julho de 2026</span>} />
 
         <div className={styles.introduction}>
           <ShieldCheck aria-hidden="true" />

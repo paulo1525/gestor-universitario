@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell, AppShellActive } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
@@ -263,19 +264,13 @@ export function UsefulLinks() {
       <ModuleGuard moduleKey="useful_links.library">
         <AppShell active={"useful_links" as AppShellActive} breadcrumb={t("links.breadcrumb")}>
           <div className={styles.page}>
-            <header className={styles.hero}>
-              <div className={styles.heroCopy}>
-                <span className={styles.heroIcon}><Link2 /></span>
-                <div><span className="eyebrow">{t("links.eyebrow")}</span><h1>{t("links.title")}</h1><p>{t("links.description")}</p></div>
-              </div>
-              {canManage && <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button>}
-            </header>
+            <SurfaceHeader standalone headingLevel="h1" icon={<Link2 />} eyebrow={t("links.eyebrow")} title={t("links.title")} description={t("links.description")} actions={canManage ? <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button> : undefined} />
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
             {canManage && formOpen && (
               <section className={styles.panel}>
-                <div className={styles.panelHeader}><div><h2>{t(editingId ? "links.edit" : "links.add")}</h2><p>{t("links.manageHint")}</p></div><ShieldCheck /></div>
+                <SurfaceHeader icon={<ShieldCheck />} title={t(editingId ? "links.edit" : "links.add")} description={t("links.manageHint")} />
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formGrid}>
                     <label className={styles.field}><span>{t("links.field.title")}</span><input value={form.title} onChange={(event) => setField("title", event.target.value)} maxLength={160} placeholder={t("links.titlePlaceholder")} required /></label>
@@ -293,7 +288,7 @@ export function UsefulLinks() {
             )}
 
             <section className={styles.panel}>
-              <div className={styles.panelHeader}><div><h2>{t("links.library")}</h2><p>{t("links.libraryHint")}</p></div>{!loading && <span className={styles.count}>{visible.length} {t(visible.length === 1 ? "links.result" : "links.results")}</span>}</div>
+              <SurfaceHeader icon={<Link2 />} title={t("links.library")} description={t("links.libraryHint")} meta={!loading ? `${visible.length} ${t(visible.length === 1 ? "links.result" : "links.results")}` : undefined} />
               <div className={styles.toolbar} aria-label={t("links.filters")}>
                 <div className={styles.filterGrid}>
                 <label className={`${styles.filterField} ${styles.search}`}><span><Search />{t("links.searchLabel")}</span><div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("links.search")} /></div></label>

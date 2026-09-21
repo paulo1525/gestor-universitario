@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Fragment, useEffect, useRef, useState, type MouseEvent } from "react";
 import { ArrowLeft, BookOpen, Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, Download, Expand, Highlighter, List, LocateFixed, LoaderCircle, MessageCircle, NotebookPen, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast } from "@/components/app-toast";
 import { ModuleGuard } from "@/components/module-guard";
 import { RichTextEditor, RichTextContent } from "@/components/rich-text-editor";
@@ -271,7 +272,7 @@ export function StudyDocument() {
       </div>
     </header>
     <main className={styles.reader} id="study-content">
-      <header className={styles.lessonHeading}><h1>Introdução à Neuroanatomia. Neurocrânio</h1></header>
+      <SurfaceHeader standalone headingLevel="h1" icon={<BookOpen />} eyebrow="Neuroanatomia · Aula Prática 1" title="Introdução à Neuroanatomia. Neurocrânio" />
       <article className={styles.document} aria-label="Texto da aula">
         {neuroSections.map((section, index) => <section className={styles.chapter} key={section.id}>
           <h2><button type="button" className={styles.sectionToggle} aria-expanded={openSections.has(section.id)} aria-controls={`${section.id}-section`} onClick={() => setOpenSections((current) => { const next = new Set(current); if (next.has(section.id)) next.delete(section.id); else next.add(section.id); return next; })}><span>{index === 0 ? "I" : "II"}.</span> {section.title}<ChevronDown aria-hidden="true" /></button></h2>

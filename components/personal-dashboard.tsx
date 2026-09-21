@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertCircle, BookOpen, BrainCircuit, CalendarDays, ChevronRight, ClipboardCheck, FileHeart, Inbox, LayoutDashboard, LoaderCircle, Megaphone, RefreshCw, Star, Vote } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { useAuth } from "@/components/auth-context";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/personal-dashboard.module.css";
@@ -47,13 +48,7 @@ export function PersonalDashboard() {
   const listPanel = (title: string, subtitle: string, href: string, Icon: typeof CalendarDays, items: Entry[], kind: "event" | "announcement" | "poll" | "request" | "material") => {
     const titleId = `dashboard-${kind}-title`;
     return <section className={styles.panel} data-kind={kind} aria-labelledby={titleId}>
-      <header className={styles.panelBar}>
-        <div className={styles.panelTitle}>
-          <span className={styles.panelIcon} aria-hidden="true"><Icon /></span>
-          <div><h2 id={titleId}>{title}</h2><p>{subtitle}</p></div>
-        </div>
-        <Link className={styles.viewAll} href={href}>{t("personalDashboard.viewAll")}<ChevronRight aria-hidden="true" /></Link>
-      </header>
+      <SurfaceHeader icon={<Icon />} title={title} description={subtitle} headingId={titleId} actions={<Link className={styles.viewAll} href={href}>{t("personalDashboard.viewAll")}<ChevronRight aria-hidden="true" /></Link>} />
       {items.length ? <div className={styles.list}>{items.slice(0, kind === "event" ? 5 : 4).map(item => {
         const date = formatDate(item.date, locale, kind !== "material");
         const { day, month } = formatDateParts(item.date, locale);
@@ -70,7 +65,7 @@ export function PersonalDashboard() {
     </section>;
   };
   return <AppShell active="overview" breadcrumb="Dashboard"><div className={styles.dashboard}>
-    <header className={styles.heading}><div className={styles.headingCopy}><span className={styles.headingIcon}><LayoutDashboard /></span><div><span className="eyebrow">{t("personalDashboard.eyebrow")}</span><h1>{firstName ? t("personalDashboard.greeting", { name: firstName }) : t("personalDashboard.title")}</h1><p>{t("personalDashboard.description")}</p></div></div></header>
+    <SurfaceHeader standalone headingLevel="h1" icon={<LayoutDashboard />} eyebrow={t("personalDashboard.eyebrow")} title={firstName ? t("personalDashboard.greeting", { name: firstName }) : t("personalDashboard.title")} description={t("personalDashboard.description")} />
     {loading ? <div className={`${styles.panel} ${styles.loading}`} aria-live="polite"><LoaderCircle className={styles.spinner} /><strong>{t("personalDashboard.loading")}</strong></div> : error ? <div className={`${styles.panel} ${styles.error}`} role="alert"><AlertCircle /><strong>{t("personalDashboard.loadError")}</strong><span>{error}</span><button className={styles.retry} type="button" onClick={() => void load()}><RefreshCw size={13} /> {t("personalDashboard.retry")}</button></div> : data && <><section className={styles.summaryGrid} aria-label={t("personalDashboard.eyebrow")}>{summaries.map(({ href, icon: Icon, label, value, help, tone }) => <Link href={href} className={styles.summaryCard} key={href} aria-label={`${label}: ${value}`}><span className={styles.summaryIcon} data-tone={tone} aria-hidden="true"><Icon /></span><span className={styles.summaryCopy}><span>{label}</span><strong>{value}</strong><small>{help}</small></span><ChevronRight className={styles.summaryArrow} aria-hidden="true" /></Link>)}</section><div className={styles.contentGrid}>
 <div className={styles.column}>{listPanel(t("personalDashboard.events.title"), t("personalDashboard.events.subtitle"), "/calendario", CalendarDays, data.events, "event")}{listPanel(t("personalDashboard.announcements.title"), t("personalDashboard.announcements.subtitle"), "/avisos", Megaphone, data.announcements, "announcement")}{listPanel(t("personalDashboard.polls.title"), t("personalDashboard.polls.subtitle"), "/inqueritos", Vote, data.polls, "poll")}</div>
 <aside className={styles.column}>

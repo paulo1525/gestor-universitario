@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, BookOpenCheck, ChevronDown, Download, RefreshCw, Search } from "lucide-react";
+import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/question-bank-section.module.css";
 
 type QuestionBankTopic = {
@@ -123,24 +124,17 @@ export function QuestionBankSection({ unitId, unitCode }: { unitId: string; unit
 
   return (
     <section className={styles.panel} aria-labelledby="question-bank-title" aria-busy={loading}>
-      <header className={styles.header}>
-        <div className={styles.titleWrap}>
-          <span className={styles.icon} aria-hidden="true"><BookOpenCheck /></span>
-          <div>
-            <span className="eyebrow">Banco de questões</span>
-            <h2 id="question-bank-title">Pratica {unitCode}</h2>
-            <p>Perguntas organizadas por capítulo, com respostas disponíveis para revisão autónoma.</p>
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          <a className={styles.link} href={exportHref} download="banco-neuroanatomia.json">
-            Exportar resultados <Download aria-hidden="true" />
-          </a>
-          <Link className={styles.link} href="/testes">
-            Abrir testes <ArrowRight aria-hidden="true" />
-          </Link>
-        </div>
-      </header>
+      <SurfaceHeader
+        icon={<BookOpenCheck />}
+        eyebrow="Banco de questões"
+        title={`Pratica ${unitCode}`}
+        description="Perguntas organizadas por capítulo, com respostas disponíveis para revisão autónoma."
+        headingId="question-bank-title"
+        actions={<div className={styles.headerActions}>
+          <a className={styles.link} href={exportHref} download="banco-neuroanatomia.json">Exportar resultados <Download aria-hidden="true" /></a>
+          <Link className={styles.link} href="/testes">Abrir testes <ArrowRight aria-hidden="true" /></Link>
+        </div>}
+      />
 
       <div className={styles.sourceNote}>
         <span>Fonte estruturada da unidade curricular</span>

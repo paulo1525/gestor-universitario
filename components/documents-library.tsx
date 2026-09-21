@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
@@ -216,15 +217,19 @@ export function DocumentsLibrary() {
       <ModuleGuard moduleKey="documents.library">
         <AppShell active="documents" breadcrumb="Documentos e atas">
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-          <section className={styles.hero}>
-            <div className={styles.heroIcon}><FileArchive /></div>
-            <div><span className="eyebrow">{"Arquivo da Comiss\u00e3o de Curso"}</span><h1>Documentos e atas</h1><p>{"Consulta atas, regulamentos, formul\u00e1rios e outros documentos \u00fateis."}</p></div>
-            {canManage && <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button>}
-          </section>
+          <SurfaceHeader
+            standalone
+            headingLevel="h1"
+            icon={<FileArchive />}
+            eyebrow="Arquivo da Comissão de Curso"
+            title="Documentos e atas"
+            description="Consulta atas, regulamentos, formulários e outros documentos úteis."
+            actions={canManage ? <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button> : undefined}
+          />
 
           {canManage && editor && (
             <form className={`${styles.panel} ${styles.form}`} onSubmit={save}>
-              <div className={styles.formHeading}><h2>Novo documento</h2><p>{"Define claramente quem poder\u00e1 consultar o ficheiro."}</p></div>
+              <SurfaceHeader icon={<FileArchive />} title="Novo documento" description="Define claramente quem poderá consultar o ficheiro." />
               <div className={styles.formGrid}>
                 <label className={styles.wide}><span><Type />{"T\u00edtulo"}</span><input required maxLength={180} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
                 <label><span><Tags />Tipo</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
@@ -247,11 +252,14 @@ export function DocumentsLibrary() {
           )}
 
           <section className={styles.panel}>
+            <SurfaceHeader
+              icon={<Filter />}
+              title="Pesquisar e filtrar"
+              description="Encontra rapidamente documentos, atas e regulamentos no arquivo."
+              meta={`${visible.length} ${visible.length === 1 ? "resultado" : "resultados"}`}
+              actions={filtersActive ? <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />Limpar</button> : undefined}
+            />
             <div className={styles.filterBar}>
-              <div className={styles.filterHeading}>
-                <div className={styles.filterTitle}><span><Filter /></span><div><strong>Pesquisar e filtrar</strong><small>Encontra rapidamente documentos, atas e regulamentos no arquivo.</small></div></div>
-                <div className={styles.filterActions}><span className={styles.resultCount}>{visible.length} {visible.length === 1 ? "resultado" : "resultados"}</span>{filtersActive && <span className={styles.activeFilters}>{activeFilterCount} {activeFilterCount === 1 ? "filtro ativo" : "filtros ativos"}</span>}{filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />Limpar</button>}</div>
-              </div>
               <div className={styles.filterControls}>
                 <label className={`${styles.filterField} ${styles.searchFilter}`}><span><Search />Pesquisa</span><div className={styles.searchControl}><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por título, descrição ou ficheiro…" /></div></label>
                 <label className={styles.filterField}><span><Tags />Tipo de documento</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>

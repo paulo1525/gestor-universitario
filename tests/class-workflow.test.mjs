@@ -211,7 +211,8 @@ test("editor lista preferências por ordem e integra o destino final",()=>{
 
 test("publicação aparece na página inicial",()=>{
   assert.match(dashboard,/classes\.dashboard\.yearClasses/);
-  assert.match(dashboard,/published-badge/);
+  assert.match(dashboard,/meta=\{placementsPublished \? t\("classes\.dashboard\.publishedBadge"\) : undefined\}/);
+  assert.doesNotMatch(dashboard,/published-badge/);
   assert.match(dashboard,/classes\.dashboard\.publishedBadge/);
   assert.match(dashboard,/classes\.dashboard\.pdf/);
   assert.match(dashboard,/placementsPublished && <Link/);
@@ -365,8 +366,10 @@ test("colocações usam uma ação principal compacta e a tabela administrativa"
   assert.match(preflight,/className="panel__header placement-preflight__header"/);
   assert.match(placements,/className={`panel placement-runbar placement-command-center/);
   assert.match(preferences,/className={`panel student-preferences/);
-  assert.match(preferences,/<header className="panel__header">/);
-  assert.match(csvImport,/className={`panel__header \$\{styles\.header\}`}/);
+  assert.match(preferences,/<SurfaceHeader/);
+  assert.match(preferences,/classes\.preferences\.title/);
+  assert.match(csvImport,/<SurfaceHeader/);
+  assert.match(csvImport,/classes\.import\.title/);
   assert.match(dashboard,/className="stats-grid classes-stats"/);
   assert.match(styles,/\.placement-workflow \{[\s\S]*?margin: 0 0 12px/);
   assert.match(styles,/\.placement-workflow > \.placement-preflight \{[\s\S]*?border-radius: var\(--radius-panel\)/);

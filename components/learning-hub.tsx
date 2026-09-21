@@ -22,6 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, type ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
@@ -159,10 +160,7 @@ export function LearningHub() {
 
 function Catalogue({ modules, loading, error, busy, onOpen, onRetry }: { modules: LearningModule[]; loading: boolean; error: string; busy: boolean; onOpen: (module: LearningModule) => void; onRetry: () => void }) {
   return <>
-    <header className={`page-heading page-heading--simple ${styles.pageHeader}`}>
-      <div><span className="eyebrow">Aprendizagem interativa</span><h1>Aprender por ciclos</h1><p>Uma explicação curta, um exercício relacionado — e depois o ciclo seguinte.</p></div>
-      <Link className="button button--secondary" href="/testes"><ArrowLeft />Testes</Link>
-    </header>
+    <SurfaceHeader standalone headingLevel="h1" icon={<GraduationCap />} eyebrow="Aprendizagem interativa" title="Aprender por ciclos" description="Uma explicação curta, um exercício relacionado, e depois o ciclo seguinte." actions={<Link className="button button--secondary" href="/testes"><ArrowLeft />Testes</Link>} />
     {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar os percursos" text="A carregar explicações e exercícios." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar os percursos" text={error} action={<button className="button button--secondary" type="button" onClick={onRetry}>Tentar novamente</button>} /> : !modules.length ? <State icon={<CircleHelp />} title="Ainda não há percursos publicados" text="Os primeiros conteúdos aparecerão aqui quando estiverem disponíveis." /> : <section className={styles.moduleList} aria-label="Percursos de aprendizagem">
       {modules.map((module) => {
         const completed = module.progress?.status === "completed";
@@ -272,12 +270,16 @@ function SessionView({ data, step, progress, busy, onBusy, onUpdate, onNotice, o
 function Results({ data, onCatalogue, onRestart, busy }: { data: SessionData; onCatalogue: () => void; onRestart: () => void; busy: boolean }) {
   const percent = data.attempt.answeredCount ? Math.round((data.attempt.correctCount / data.attempt.answeredCount) * 100) : 0;
   return <section className={styles.results}>
-    <span className={styles.resultIcon}><CheckCircle2 /></span>
-    <span className="eyebrow">Percurso concluído</span>
-    <h1>{data.module.title}</h1>
-    <p>Terminaste os {data.module.exerciseCount} ciclos de explicação e aplicação.</p>
+    <SurfaceHeader
+      standalone
+      headingLevel="h1"
+      icon={<CheckCircle2 />}
+      eyebrow="Percurso concluído"
+      title={data.module.title}
+      description={`Terminaste os ${data.module.exerciseCount} ciclos de explicação e aplicação.`}
+      actions={<><button className="button button--secondary" type="button" onClick={onCatalogue}><BookOpenCheck />Outros percursos</button><button className="button button--primary" type="button" onClick={onRestart} disabled={busy}>{busy ? <LoaderCircle className={styles.spin} /> : <RotateCcw />}Repetir</button></>}
+    />
     <dl><div><dt>Respostas certas</dt><dd>{data.attempt.correctCount}/{data.attempt.answeredCount}</dd></div><div><dt>Precisão</dt><dd>{percent}%</dd></div></dl>
-    <footer><button className="button button--secondary" type="button" onClick={onCatalogue}><BookOpenCheck />Outros percursos</button><button className="button button--primary" type="button" onClick={onRestart} disabled={busy}>{busy ? <LoaderCircle className={styles.spin} /> : <RotateCcw />}Repetir</button></footer>
   </section>;
 }
 

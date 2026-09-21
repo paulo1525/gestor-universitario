@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
@@ -451,14 +452,14 @@ export function AcademicCalendar() {
   return <AuthGuard><ModuleGuard moduleKey="calendar.events"><AppShell active="calendar" breadcrumb={t("community.calendar.breadcrumb")}>
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
-    <header className={styles.pageHeader}>
-      <div className={styles.headerIcon}><CalendarDays /></div>
-      <div>
-        <span className="eyebrow">{t("community.calendar.eyebrow")}</span>
-        <h1>{t("community.calendar.breadcrumb")}</h1>
-        <p>{t("community.calendar.description")}{canManage && t("community.calendar.manageHint")}</p>
-      </div>
-    </header>
+    <SurfaceHeader
+      standalone
+      headingLevel="h1"
+      icon={<CalendarDays />}
+      eyebrow={t("community.calendar.eyebrow")}
+      title={t("community.calendar.breadcrumb")}
+      description={<>{t("community.calendar.description")}{canManage && t("community.calendar.manageHint")}</>}
+    />
 
     {subscriptionEnabled && <ModuleGuard moduleKey="calendar.subscription"><CalendarSubscription units={units} /></ModuleGuard>}
 

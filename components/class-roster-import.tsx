@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Clipboard, LoaderCircle, Sparkles, Upload, X } from "lucide-react";
 import { AppToast } from "@/components/app-toast";
+import { SurfaceHeader } from "@/components/surface-header";
 import { FileUploadField } from "@/components/file-upload-field";
 import { useI18n } from "@/components/i18n-context";
 import { useEscapeKey } from "@/components/use-escape-key";
@@ -65,11 +66,13 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
   return <>
     {notice && <AppToast key={`${noticeError ? "error" : "success"}:${notice}`} kind={noticeError ? "error" : "success"} message={notice} onDismiss={() => setNotice("")} />}
     <section className={`panel ${styles.panel}`}>
-      <header className={`panel__header ${styles.header}`}>
-        <span className={`admin-settings__icon ${styles.icon}`}><Upload /></span>
-        <div className={styles.headerCopy}><span className="eyebrow">{t("classes.import.eyebrow")}</span><h2>{t("classes.import.title")}</h2><p>{t("classes.import.description")}</p></div>
-        <button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><Sparkles />{t("classes.import.aiHelpAction")}</button>
-      </header>
+      <SurfaceHeader
+        icon={<Upload />}
+        eyebrow={t("classes.import.eyebrow")}
+        title={t("classes.import.title")}
+        description={t("classes.import.description")}
+        actions={<button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><Sparkles />{t("classes.import.aiHelpAction")}</button>}
+      />
       <div className={styles.body}>
         <div className={styles.uploadColumn}>
           <FileUploadField accept=".csv,text/csv" emptyLabel={t("classes.import.emptyFile")} file={file} help={t("classes.import.fileHelp")} label={t("classes.import.fileLabel")} onChange={(event) => void selectFile(event.target.files?.[0])} onRemove={clearFile} />

@@ -5,7 +5,6 @@
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 28px;
   padding: 5px 2px;
@@ -49,39 +48,6 @@
   color: var(--muted);
   font-size: 11px;
   line-height: 1.6;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 9px;
-}
-
-.metrics > div {
-  display: grid;
-  min-width: 96px;
-  min-height: 72px;
-  align-content: center;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 4px 14px rgba(31, 29, 20, .035);
-}
-
-.metrics strong {
-  color: var(--ink);
-  font-size: 21px;
-  line-height: 1;
-  letter-spacing: -.03em;
-}
-
-.metrics span {
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 750;
-  line-height: 1.25;
 }
 
 .directory {
@@ -571,12 +537,7 @@
 
 @media (max-width: 1100px) {
   .hero {
-    grid-template-columns: 1fr;
     align-items: start;
-  }
-
-  .metrics {
-    width: min(430px, 100%);
   }
 }
 
@@ -591,15 +552,6 @@
 
   .hero h1 {
     font-size: 25px;
-  }
-
-  .metrics {
-    width: 100%;
-  }
-
-  .metrics > div {
-    min-width: 0;
-    padding: 11px;
   }
 
   .directoryHeader {
@@ -636,22 +588,6 @@
 @media (max-width: 440px) {
   .heroCopy {
     flex-direction: column;
-  }
-
-  .metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .metrics > div {
-    min-height: 66px;
-  }
-
-  .metrics strong {
-    font-size: 18px;
-  }
-
-  .metrics span {
-    font-size: 8px;
   }
 
   .directoryHeader {

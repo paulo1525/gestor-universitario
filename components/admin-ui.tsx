@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Children, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/admin-ui.module.css";
 
 export function AdminPage({ children }: { children: ReactNode }) {
@@ -8,24 +9,27 @@ export function AdminPage({ children }: { children: ReactNode }) {
 }
 
 export function AdminPageHeader({
+  icon,
   eyebrow,
   title,
   description,
   actions,
 }: {
+  icon?: ReactNode;
   eyebrow: string;
   title: string;
   description?: string;
   actions?: ReactNode;
 }) {
-  return <header className={styles.pageHeader}>
-    <div>
-      <span className="eyebrow">{eyebrow}</span>
-      <h1>{title}</h1>
-      {description && <p>{description}</p>}
-    </div>
-    {actions && <div className={styles.pageActions}>{actions}</div>}
-  </header>;
+  return <SurfaceHeader
+    standalone
+    headingLevel="h1"
+    icon={icon ?? <ShieldCheck />}
+    eyebrow={eyebrow}
+    title={title}
+    description={description}
+    actions={actions && <div className={styles.pageActions}>{actions}</div>}
+  />;
 }
 
 export function AdminMetricGrid({ label, children }: { label: string; children: ReactNode }) {
@@ -77,15 +81,13 @@ export function AdminSection({
   className?: string;
 }) {
   return <section className={`${styles.section}${className ? ` ${className}` : ""}`} data-platform-surface="section" data-content={children ? "true" : "false"}>
-    <header className={styles.sectionHeader} data-platform-surface-header>
-      {icon && <span className={styles.sectionIcon} aria-hidden="true">{icon}</span>}
-      <div className={styles.sectionHeading}>
-        {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-        <h2>{title}</h2>
-        {description && <p>{description}</p>}
-      </div>
-      {actions && <div className={styles.sectionActions}>{actions}</div>}
-    </header>
+    <SurfaceHeader
+      icon={icon ?? <ShieldCheck />}
+      eyebrow={eyebrow}
+      title={title}
+      description={description}
+      actions={actions && <div className={styles.sectionActions}>{actions}</div>}
+    />
     {children}
   </section>;
 }

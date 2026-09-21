@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
@@ -234,14 +235,7 @@ export function CurricularUnitCatalog() {
       <ModuleGuard moduleKey="curricular_units.catalog">
         <AppShell active="curricular_units" breadcrumb={t("community.units.breadcrumb")}>
           <div className={styles.page}>
-            <header className={`page-heading page-heading--simple ${styles.hero}`}>
-              <div className={styles.heroCopy}>
-                <div>
-                  <span className="eyebrow">{t("community.units.eyebrow")}</span>
-                  <h1>{t("community.units.title")}</h1>
-                </div>
-              </div>
-            </header>
+            <SurfaceHeader standalone headingLevel="h1" icon={<BookOpen />} eyebrow={t("community.units.eyebrow")} title={t("community.units.title")} description={t("community.units.description")} />
             {error && (
               <AppToast
                 kind="error"
@@ -251,18 +245,7 @@ export function CurricularUnitCatalog() {
               />
             )}
             <section className={`${styles.panel} ${styles.catalogPanel}`}>
-              <div className={styles.panelHeader}>
-                <div className={styles.panelTitle}>
-                  <span className={styles.panelIcon} aria-hidden="true"><BookOpen /></span>
-                  <h2>{t("community.units.catalog")}</h2>
-                </div>
-                {!loading && (
-                  <span className={styles.count}>
-                    {visible.length}{" "}
-                    {visible.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}
-                  </span>
-                )}
-              </div>
+              <SurfaceHeader icon={<BookOpen />} title={t("community.units.catalog")} meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}` : undefined} />
               {units.length > 0 && <div className={styles.catalogToolbar} aria-label={t("community.units.filters")}>
                   <label className={`${styles.filterField} ${styles.catalogSearch}`}>
                     <span><Search />{t("community.units.search")}</span>
@@ -474,28 +457,18 @@ export function CurricularUnitDetail({ id }: { id: string }) {
               data && (
                 <>
                   <section className={`${styles.panel} ${styles.detailHero}`}>
-                    <div>
-                      <span className={styles.unitCode}>{data.unit.code}</span>
-                      <h1>{data.unit.name}</h1>
-                      <p>
-                        {data.academicContent.profile?.description || data.unit.description ||
-                          t("community.units.detailDescription")}
-                      </p>
-                    </div>
-                    <div className={styles.detailStats}>
-                      <div className={styles.metric}>
-                        <span>{t("community.units.credits")}</span>
-                        <strong>{data.unit.ects} ECTS</strong>
-                      </div>
-                      <div className={styles.metric}>
-                        <span>{t("community.units.year")}</span>
-                        <strong>{data.unit.year}.º</strong>
-                      </div>
-                      <div className={styles.metric}>
-                        <span>{t("community.units.semester")}</span>
-                        <strong>{data.unit.semester}.º</strong>
-                      </div>
-                    </div>
+                    <SurfaceHeader
+                      headingLevel="h1"
+                      icon={<BookOpen />}
+                      eyebrow={data.unit.code}
+                      title={data.unit.name}
+                      description={data.academicContent.profile?.description || data.unit.description || t("community.units.detailDescription")}
+                      actions={<div className={styles.detailStats}>
+                        <div className={styles.metric}><span>{t("community.units.credits")}</span><strong>{data.unit.ects} ECTS</strong></div>
+                        <div className={styles.metric}><span>{t("community.units.year")}</span><strong>{data.unit.year}.º</strong></div>
+                        <div className={styles.metric}><span>{t("community.units.semester")}</span><strong>{data.unit.semester}.º</strong></div>
+                      </div>}
+                    />
                   </section>
                   {data.academicContent.profile && <AcademicContentPanel content={data.academicContent} locale={locale} />}
                   {data.unit.code === "NEURO" && <QuestionBankSection unitId={data.unit.id} unitCode={data.unit.code} />}
@@ -565,12 +538,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                         </div>
                       </section>}
                       {data.unit.representatives.length > 0 && <section className={styles.panel}>
-                        <div className={styles.panelHeader}>
-                          <div>
-                            <h2>{t("community.units.representative")}</h2>
-                            <p>{t("community.units.representativeDescription")}</p>
-                          </div>
-                        </div>
+                        <SurfaceHeader icon={<UserRound />} title={t("community.units.representative")} description={t("community.units.representativeDescription")} />
                         <div className={`${styles.sectionBody} ${styles.representativeList}`}>
                           {data.unit.representatives.map((representative) => <article className={styles.representativeCard} key={representative.id}>
                             <div className={styles.cardTop}>
@@ -639,16 +607,7 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
   const examLabels: Record<string, string> = { frequencia: "Frequência", normal: "Época normal", recurso: "Recurso", especial: "Época especial", melhoria: "Melhoria", outro: "Outro" };
   const sourceLabels: Record<string, string> = { oficial: "Oficial", recomendada: "Recomendada", regulamento: "Regulamento", bibliografia: "Bibliografia", outro: "Outra fonte" };
   return <section className={`${styles.panel} ${styles.academicPanel}`} aria-labelledby="academic-content-title">
-    <header className={styles.panelHeader}>
-      <div className={styles.panelTitle}>
-        <span className={styles.panelIcon} aria-hidden="true"><GraduationCap /></span>
-        <div>
-          <h2 id="academic-content-title">Informação académica{content.academicYear ? ` · ${content.academicYear}` : ""}</h2>
-          <p>Regras e recursos específicos do ano letivo selecionado.</p>
-        </div>
-      </div>
-      <ValidationBadge status={profile.status} />
-    </header>
+    <SurfaceHeader icon={<GraduationCap />} title={`Informação académica${content.academicYear ? ` · ${content.academicYear}` : ""}`} description="Regras e recursos específicos do ano letivo selecionado." headingId="academic-content-title" actions={<ValidationBadge status={profile.status} />} />
     <div className={styles.academicBlocks}>
       <article className={styles.academicBlock}>
         <header><h3>Descrição</h3><ValidationBadge status={profile.status} /></header>
@@ -695,12 +654,7 @@ function DetailSection({
   const count = Array.isArray(children) ? children.length : 1;
   return (
     <section className={styles.panel}>
-      <div className={styles.panelHeader}>
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-      </div>
+      <SurfaceHeader icon={<BookOpen />} title={title} description={description} />
       {count ? (
         <div className={styles.sectionBody}>{children}</div>
       ) : (

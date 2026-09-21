@@ -17,6 +17,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { SurfaceHeader } from "@/components/surface-header";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/commission-directory.module.css";
@@ -145,10 +146,6 @@ export function CommissionDirectory() {
       ),
     [departmentLabel, locale, members],
   );
-  const unitCount = useMemo(
-    () => new Set(members.flatMap((member) => member.units.map((unit) => unit.id))).size,
-    [members],
-  );
   const visible = useMemo(() => {
     const term = query.trim().toLocaleLowerCase(locale);
     return members.filter(
@@ -176,52 +173,24 @@ export function CommissionDirectory() {
       <ModuleGuard moduleKey="directory.members">
         <AppShell active="directory" breadcrumb={t("community.directory.breadcrumb")}>
           <div className={styles.page}>
-            <header className={styles.hero}>
-              <div className={styles.heroCopy}>
-                <span className={styles.heroIcon} aria-hidden="true">
-                  <Users />
-                </span>
-                <div>
-                  <span className="eyebrow">{t("community.directory.eyebrow")}</span>
-                  <h1>{t("community.directory.breadcrumb")}</h1>
-                  <p>{t("community.directory.description")}</p>
-                </div>
-              </div>
-              <div className={styles.metrics} aria-label={t("community.directory.summary")}>
-                <div>
-                  <strong>{members.length}</strong>
-                  <span>{t("community.directory.members")}</span>
-                </div>
-                <div>
-                  <strong>{departments.length}</strong>
-                  <span>{t("community.directory.departments")}</span>
-                </div>
-                <div>
-                  <strong>{unitCount}</strong>
-                  <span>{t("community.directory.units")}</span>
-                </div>
-              </div>
-            </header>
+            <SurfaceHeader
+              standalone
+              headingLevel="h1"
+              icon={<Users />}
+              eyebrow={t("community.directory.eyebrow")}
+              title={t("community.directory.breadcrumb")}
+              description={t("community.directory.description")}
+            />
 
             {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}
 
             <section className={styles.directory} aria-labelledby="diretorio-titulo">
-              <header className={styles.directoryHeader}>
-                <div className={styles.directoryTitle}>
-                  <span className={styles.sectionIcon} aria-hidden="true">
-                    <BadgeCheck />
-                  </span>
-                  <div>
-                    <h2 id="diretorio-titulo">{t("community.directory.title")}</h2>
-                    <p>{t("community.directory.sync")}</p>
-                  </div>
-                </div>
-                {!loading && (
-                  <span className={styles.count} aria-live="polite">
-                    {visible.length} {visible.length === 1 ? t("community.directory.member") : t("community.directory.memberPlural")}
-                  </span>
-                )}
-              </header>
+              <SurfaceHeader
+                icon={<BadgeCheck />}
+                title={t("community.directory.title")}
+                headingId="diretorio-titulo"
+                meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.directory.member") : t("community.directory.memberPlural")}` : undefined}
+              />
 
               <div className={styles.controls}>
                 <label className={styles.search}>

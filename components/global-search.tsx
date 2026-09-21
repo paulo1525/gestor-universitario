@@ -10,6 +10,7 @@ import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
+import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/community-suite.module.css";
 
 type Result = { id: string; type: string; title: string; description: string; href: string; meta?: string };
@@ -104,9 +105,10 @@ export function GlobalSearch() {
   };
 
   return <AuthGuard><ModuleGuard moduleKey="search.global"><AppShell active="search" breadcrumb={t("search.breadcrumb")}><div className={styles.page}>
-    <header className={styles.hero}><div className={styles.heroCopy}><span className={styles.heroIcon}><Search /></span><div><span className="eyebrow">{t("search.eyebrow")}</span><h1>{t("search.title")}</h1><p>{t("search.intro")}</p></div></div></header>
+    <SurfaceHeader standalone headingLevel="h1" icon={<Search />} eyebrow={t("search.eyebrow")} title={t("search.title")} description={t("search.intro")} />
     {error && <AppToast kind="error" message={error} onDismiss={() => setError("")} />}
     <section className={styles.panel}>
+      <SurfaceHeader icon={<Search />} title={t("search.title")} />
       <form className={styles.toolbar} onSubmit={submit} role="search"><label className={styles.search}><Search /><span className="sr-only">{t("search.term")}</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search.placeholder")} maxLength={160} /></label><button className="button button--primary" type="submit" disabled={!query.trim() || loading}>{loading ? <LoaderCircle className={styles.spin} /> : <Search />}{t("search.submit")}</button></form>
       {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /><strong>{t("search.loading")}</strong></div>
         : !submitted ? <div className={styles.state}><Search /><strong>{t("search.initial.title")}</strong><p>{t("search.initial.body")}</p></div>
