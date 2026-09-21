@@ -831,7 +831,6 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
   overflow: hidden;
   margin-bottom: var(--space-5);
   border: 1px solid var(--surface-card-border);
-  border-top: max(1px, var(--surface-header-accent-size)) solid var(--surface-header-accent);
   border-radius: var(--surface-card-radius);
   box-shadow: var(--surface-card-shadow);
 }
