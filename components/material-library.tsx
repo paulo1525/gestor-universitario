@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
@@ -742,32 +743,15 @@ export function MaterialLibrary() {
       <ModuleGuard moduleKey="materials.library">
         <AppShell active="materials" breadcrumb={t("community.materials.breadcrumb")}>
           <div className={styles.page}>
-            <header className={styles.hero}>
-              <div className={styles.heroCopy}>
-                <span className={styles.heroIcon} aria-hidden="true">
-                  <FolderOpen />
-                </span>
-                <div>
-                  <span className="eyebrow">{t("community.materials.eyebrow")}</span>
-                  <h1>{t("community.materials.title")}</h1>
-                  <p>{t("community.materials.description")}</p>
-                </div>
-              </div>
-              {submissionEnabled && <div className={styles.heroActions}>
-                <button
-                  className="button button--primary"
-                  type="button"
-                    onClick={() => {
-                      setActiveTab("exams");
-                      setEditor((value) => !value);
-                    }}
-                  >
-                    {editor ? <X /> : <Upload />}
-                    {editor ? t("community.materials.closeForm") : t("community.materials.share")}
-                  </button>
-              </div>
-              }
-            </header>
+            <SurfaceHeader
+              standalone
+              headingLevel="h1"
+              icon={<FolderOpen />}
+              eyebrow={t("community.materials.eyebrow")}
+              title={t("community.materials.title")}
+              description={t("community.materials.description")}
+              actions={submissionEnabled ? <div className={styles.heroActions}><button className="button button--primary" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button></div> : undefined}
+            />
             {notice && (
               <AppToast
                 kind={notice.kind}
@@ -784,15 +768,7 @@ export function MaterialLibrary() {
             />
             {submissionEnabled && activeTab === "exams" && editor && (
               <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div className={styles.panelHeading}>
-                    <span className={styles.panelIcon} aria-hidden="true"><UploadCloud /></span>
-                    <div>
-                      <h2>{t("community.materials.new")}</h2>
-                      <p>{t("community.materials.moderationInfo")}</p>
-                    </div>
-                  </div>
-                </div>
+                <SurfaceHeader icon={<UploadCloud />} title={t("community.materials.new")} description={t("community.materials.moderationInfo")} />
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formWorkspace}>
                     <div className={styles.formGrid}>
@@ -923,29 +899,12 @@ export function MaterialLibrary() {
               </section>
             )}
             {activeTab === "exams" && !editor && <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div className={styles.panelHeading}>
-                  <span className={styles.panelIcon} aria-hidden="true"><FolderOpen /></span>
-                  <div>
-                    <h2>
-                      {canModerate
-                        ? t("community.materials.libraryModeration")
-                        : t("community.materials.library")}
-                    </h2>
-                    <p>
-                      {canModerate
-                        ? t("community.materials.pendingFirst")
-                        : t("community.materials.approvedCommunity")}
-                    </p>
-                  </div>
-                </div>
-                {!loading && (
-                  <span className={styles.count}>
-                     {libraryCount}{" "}
-                     {libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}
-                  </span>
-                )}
-              </div>
+              <SurfaceHeader
+                icon={<FolderOpen />}
+                title={canModerate ? t("community.materials.libraryModeration") : t("community.materials.library")}
+                description={canModerate ? t("community.materials.pendingFirst") : t("community.materials.approvedCommunity")}
+                meta={!loading ? `${libraryCount} ${libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}` : undefined}
+              />
               <div className={styles.toolbar}>
                 <label className={styles.filterControl}>
                   <span className={styles.filterLabel}><Filter aria-hidden="true" />{t("community.materials.filter")}</span>
