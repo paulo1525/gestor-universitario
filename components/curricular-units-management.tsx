@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Award, BookOpen, CalendarRange, FileText, GraduationCap, Hash, LoaderCircle, Pencil, Plus, Save, Search, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { SurfaceHeader } from "@/components/surface-header";
 import { AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
 import { AppToast } from "@/components/app-toast";
 import { FormLabel } from "@/components/form-label";
@@ -213,12 +214,12 @@ export function CurricularUnitsManagement() {
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
     {view === "create" && <section className={`panel ${styles.editor}`} aria-labelledby="nova-unidade">
-      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><BookOpen /></span><div><span className="eyebrow">Plano curricular</span><h2 id="nova-unidade">{t("classes.units.new")}</h2></div></div></div>
+      <SurfaceHeader icon={<BookOpen />} eyebrow="Plano curricular" title={t("classes.units.new")} headingId="nova-unidade" />
       <UnitEditor form={createForm} setForm={setCreateForm} errors={createErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.create")} onSubmit={event => void save("create", event)} onCancel={() => { setView("list"); setCreateErrors({}); }} />
     </section>}
 
     {view === "edit" && editingId && <section className={`panel ${styles.editor}`} aria-labelledby="editar-unidade">
-      <div className={styles.editorHeading}><div><span className={styles.editorIcon}><Pencil /></span><div><span className="eyebrow">{editForm.code}</span><h2 id="editar-unidade">{t("classes.units.editing", { name: editForm.name })}</h2></div></div></div>
+      <SurfaceHeader icon={<Pencil />} eyebrow={editForm.code} title={t("classes.units.editing", { name: editForm.name })} headingId="editar-unidade" />
       <UnitEditor form={editForm} setForm={setEditForm} errors={editErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.saveChanges")} onSubmit={event => void save("edit", event)} onCancel={() => { setView("list"); setEditingId(null); setEditErrors({}); }} />
     </section>}
 
