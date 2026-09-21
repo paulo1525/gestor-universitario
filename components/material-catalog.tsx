@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { BookOpen, Check, Download, FileText, Image as ImageIcon, LoaderCircle, Package, Sparkles, X } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
+import { SurfaceHeader } from "@/components/surface-header";
 import { materialApkgBlob, buildMaterialApkg, type MaterialAnkiCard } from "@/lib/anki/materials";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-pdf";
 import { MaterialCompendiumExport } from "@/components/material-compendium-export";
@@ -112,13 +113,14 @@ export function MaterialCatalog({ activeTab, onTabChange }: { activeTab: Materia
         </>}
       </>}
       {(activeTab === "summaries" || activeTab === "bibliography") && <>
+        <SurfaceHeader icon={activeTab === "bibliography" ? <BookOpen /> : <FileText />} title={tabLabel(activeTab)} meta={`${visible.length} ${visible.length === 1 ? t("community.materials.catalog.result") : t("community.materials.catalog.results")}`} />
         <div className={styles.toolbar}>
           <label className={styles.toolbarField}><span>{t("community.materials.catalog.search")}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("community.materials.catalog.searchPlaceholder")} /></label>
           <label className={styles.toolbarField}><span>{t("community.materials.catalog.lesson")}</span><select value={lessonFilter} onChange={(event) => setLessonFilter(event.target.value)}><option value="">{t("community.materials.catalog.allLessons")}</option>{lessonOptions.map((code) => { const lesson = lessons.find((item) => item.code === code); return <option value={code} key={code}>{lesson ? `${lesson.code} · ${lesson.title}` : code}</option>; })}</select></label>
           <label className={styles.toolbarField}><span>{t("community.materials.catalog.editorialStatus")}</span><select value={verificationFilter} onChange={(event) => setVerificationFilter(event.target.value as typeof verificationFilter)}><option value="all">{t("community.materials.catalog.allStatuses")}</option><option value="verified">{t("community.materials.catalog.verified")}</option><option value="original">{t("community.materials.catalog.original")}</option><option value="pending">{t("community.materials.catalog.pending")}</option></select></label>
           <label className={styles.toolbarCheck}><input type="checkbox" checked={recommendedOnly} onChange={(event) => setRecommendedOnly(event.target.checked)} /><span>{t("community.materials.catalog.recommendedOnly")}</span></label>
           {resourceFiltersActive && <button className="button button--ghost button--compact" type="button" onClick={() => { setSearch(""); setLessonFilter(""); setVerificationFilter("all"); setRecommendedOnly(false); }}>{t("community.materials.catalog.clearFilters")}</button>}
-          <span className={styles.resultCount} aria-live="polite">{visible.length} {visible.length === 1 ? t("community.materials.catalog.result") : t("community.materials.catalog.results")}</span>
+          
         </div>
         <div className={styles.resourceList}>
           {loading ? <div className={styles.empty} role="status"><LoaderCircle className={styles.spin} />{t("community.materials.catalog.loading")}</div> : error ? <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? visible.map((item) => {
