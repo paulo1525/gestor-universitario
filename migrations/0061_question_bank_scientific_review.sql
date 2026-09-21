@@ -12,7 +12,6 @@
 
 UPDATE question_bank_items
 SET response_type = 'short_answer',
-    options_text = '',
     status = 'published',
     review_note = '',
     updated_at = unixepoch() * 1000
