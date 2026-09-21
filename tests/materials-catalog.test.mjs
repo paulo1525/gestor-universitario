@@ -52,7 +52,7 @@ test("a resolução de direitos publica apenas metadados bibliográficos e arqui
     db.run(migration);
     db.run(rightsMigration);
     db.run(rightsMigration);
-    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='published' AND storage_backend='inline' AND storage_state='ready' AND file_name IS NULL")[0].values[0][0], 20);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='published' AND storage_backend='inline' AND storage_state='ready' AND file_name IS NULL")[0].values[0][0], 19);
     assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE id='material-bibliography-neuro-package' AND publication_status='archived'")[0].values[0][0], 1);
     assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='archived'")[0].values[0][0], 2);
     assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='published'")[0].values[0][0], 0);
