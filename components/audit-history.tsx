@@ -151,9 +151,11 @@ export function AuditHistory() {
     </AdminSection>
     {selected && <div className="audit-modal-backdrop" data-app-modal-backdrop role="presentation" onClick={() => setSelected(null)}><section className="audit-modal" data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="audit-modal-title" onClick={event => event.stopPropagation()}>
       <header data-app-modal-header><div><span className="eyebrow">{t("admin.audit.record")}</span><h2 id="audit-modal-title">{actionLabel(selected.action, locale)}</h2></div><button type="button" data-app-modal-close aria-label={t("admin.audit.close")} onClick={() => setSelected(null)}><X size={18} /></button></header>
-      <dl><div><dt>{t("admin.audit.user")}</dt><dd>{(() => { const actor = personDisplay({ fullName: selected.actor_name, id: selected.actor_id, email: selected.actor_email, studentNumber: selected.actor_student_number }, { revealIdentifier: true, locale }); return <PersonName person={actor} />; })()}</dd></div><div><dt>{t("admin.audit.context")}</dt><dd>{selected.class_id ? classLabel(selected.class_id, locale) : t("admin.common.administration")}</dd></div><div><dt>{t("admin.audit.date")}</dt><dd>{new Date(selected.created_at).toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</dd></div></dl>
-      <h3>{t("admin.audit.actionDetails")}</h3>
-      {selectedDetails.length ? <dl>{selectedDetails.map((row, index) => <div key={`${row.label}-${index}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl> : <p>{t("admin.audit.noDetails")}</p>}
+      <div data-app-modal-body>
+        <dl><div><dt>{t("admin.audit.user")}</dt><dd>{(() => { const actor = personDisplay({ fullName: selected.actor_name, id: selected.actor_id, email: selected.actor_email, studentNumber: selected.actor_student_number }, { revealIdentifier: true, locale }); return <PersonName person={actor} />; })()}</dd></div><div><dt>{t("admin.audit.context")}</dt><dd>{selected.class_id ? classLabel(selected.class_id, locale) : t("admin.common.administration")}</dd></div><div><dt>{t("admin.audit.date")}</dt><dd>{new Date(selected.created_at).toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</dd></div></dl>
+        <h3>{t("admin.audit.actionDetails")}</h3>
+        {selectedDetails.length ? <dl>{selectedDetails.map((row, index) => <div key={`${row.label}-${index}`}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl> : <p>{t("admin.audit.noDetails")}</p>}
+      </div>
     </section></div>}
   </AdminPage></AppShell></AuthGuard>;
 }
