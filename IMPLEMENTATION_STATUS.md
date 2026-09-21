@@ -146,9 +146,9 @@ Universitário.
 
 ## Bloqueios antes de `main`
 
-1. obter resultado positivo dos checks obrigatórios da PR #100;
+1. obter resultado positivo dos checks obrigatórios da PR #109;
 2. validar que as migrations 0061–0062 são aplicadas no ambiente de produção pelo fluxo normal de publicação.
 
 ## Próxima atualização prevista
 
-A PR #100 conclui a revisão científica pendente e a substituição dos materiais protegidos; a atualização seguinte regista o resultado dos checks e do merge em `main`.
+A PR #109 consolida a revisão científica, a resolução de direitos e as alterações recentes de interface sobre a `main` atual; a atualização seguinte regista o resultado dos checks e do merge.
