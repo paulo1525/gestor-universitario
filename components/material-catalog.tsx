@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { BookOpen, Check, Download, FileText, Image as ImageIcon, LoaderCircle, Package, Sparkles, X } from "lucide-react";
+import { BookOpen, Check, Download, FileText, LoaderCircle, Package, Sparkles, X } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { materialApkgBlob, buildMaterialApkg, type MaterialAnkiCard } from "@/lib/anki/materials";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-pdf";
