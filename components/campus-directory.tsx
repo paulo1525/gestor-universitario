@@ -227,7 +227,7 @@ export function CampusDirectory() {
     </section>
 
     {buildingCards.length > 0 && <section className={styles.buildings} aria-labelledby="campus-buildings-title">
-      <header className={styles.sectionHeader}><div><span className="eyebrow">{t("campus.buildings")}</span><h2 id="campus-buildings-title">{t("campus.buildings")}</h2></div><span className={styles.sectionCount}>{counts.buildings}</span></header>
+      <SurfaceHeader icon={<Building2 />} title={t("campus.buildings")} headingId="campus-buildings-title" meta={counts.buildings} />
       <div className={styles.buildingGrid}>
         {buildingCards.map((building) => <article className={styles.buildingCard} key={building.id}>
           <span className={styles.buildingIcon} aria-hidden="true"><Building2 /></span>
