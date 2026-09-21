@@ -64,6 +64,11 @@ html[data-theme="forum"] {
   --surface-header-background: linear-gradient(180deg, #f6fafc, #eaf2f7);
   --surface-header-accent-size: 3px;
   --surface-header-accent: #36a5cf;
+  --surface-header-icon-color: #176f9f;
+  --surface-header-icon-background: #dceff8;
+  --surface-header-meta-color: #315e79;
+  --surface-header-meta-background: #e7f1f6;
+  --surface-header-meta-border: #b7c9d6;
 }
 
 html[data-theme="forum"] body {
@@ -509,6 +514,10 @@ html[data-theme="forum"] [data-platform-surface-header] {
   border-color: var(--surface-card-border);
   border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
   background: var(--surface-header-background);
+}
+
+html[data-theme="forum"] .surface-header--standalone {
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
 }
 
 html[data-theme="forum"] .panel__header::before {
