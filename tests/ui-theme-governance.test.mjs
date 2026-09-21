@@ -10,6 +10,7 @@ const files = {
   quizHub: await readFile(new URL("../components/quiz-hub.module.css", import.meta.url), "utf8"),
   quizAdmin: await readFile(new URL("../components/quiz-management.module.css", import.meta.url), "utf8"),
   unitsCatalog: await readFile(new URL("../components/curricular-unit-catalog.module.css", import.meta.url), "utf8"),
+  unitsCatalogComponent: await readFile(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8"),
   unitsAdmin: await readFile(new URL("../components/curricular-units-management.module.css", import.meta.url), "utf8"),
   adminUi: await readFile(new URL("../components/admin-ui.module.css", import.meta.url), "utf8"),
   adminHome: await readFile(new URL("../components/admin-console-home.tsx", import.meta.url), "utf8"),
@@ -131,7 +132,7 @@ test("new feature cards use the shared light surfaces and borders", () => {
 });
 
 test("the public curricular-unit catalogue follows the shared panel header anatomy", () => {
-  assert.match(files.unitsCatalog, /\.catalogPanel\s*\{[^}]*var\(--surface-header-accent-size\)[^}]*var\(--surface-header-accent\)/s);
-  assert.match(files.unitsCatalog, /\.panelIcon\s*\{[^}]*width:\s*40px[^}]*height:\s*40px/s);
+  assert.match(files.unitsCatalogComponent, /<SurfaceHeader icon=\{<BookOpen \/>\} title=\{t\("community\.units\.catalog"\)\}/);
+  assert.doesNotMatch(files.unitsCatalog, /\.catalogPanel\s*\{[^}]*--surface-header-accent-size/s);
   assert.match(files.unitsCatalog, /\.catalogToolbar\s*\{[^}]*grid-template-columns:/s);
 });
