@@ -750,7 +750,6 @@ export function MaterialLibrary() {
                 <div>
                   <span className="eyebrow">{t("community.materials.eyebrow")}</span>
                   <h1>{t("community.materials.title")}</h1>
-                  <p>{t("community.materials.description")}</p>
                 </div>
               </div>
               {submissionEnabled && <div className={styles.heroActions}>
