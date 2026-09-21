@@ -477,10 +477,6 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                     <div>
                       <span className={styles.unitCode}>{data.unit.code}</span>
                       <h1>{data.unit.name}</h1>
-                      <p>
-                        {data.academicContent.profile?.description || data.unit.description ||
-                          t("community.units.detailDescription")}
-                      </p>
                     </div>
                     <div className={styles.detailStats}>
                       <div className={styles.metric}>
