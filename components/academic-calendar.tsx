@@ -456,7 +456,6 @@ export function AcademicCalendar() {
       <div>
         <span className="eyebrow">{t("community.calendar.eyebrow")}</span>
         <h1>{t("community.calendar.breadcrumb")}</h1>
-        <p>{t("community.calendar.description")}{canManage && t("community.calendar.manageHint")}</p>
       </div>
     </header>
 
