@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowRight, BookOpen, CalendarDays, FileText, LoaderCircle, Megaphone, Search, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, CalendarDays, FileText, GraduationCap, LoaderCircle, MapPinned, Megaphone, Search, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
@@ -25,6 +25,9 @@ const labelKeys = {
   event: "search.type.event",
   poll: "search.type.poll",
   request: "search.type.request",
+  campus_building: "search.type.campusBuilding",
+  campus_room: "search.type.campusRoom",
+  faculty: "search.type.faculty",
 } as const;
 
 function normalize(item: ApiResult, fallbackTitle: string): Result {
@@ -44,6 +47,9 @@ function resultIcon(type: string) {
   if (type.includes("announcement")) return <Megaphone />;
   if (type.includes("unit")) return <BookOpen />;
   if (type.includes("member") || type.includes("user")) return <Users />;
+  if (type.includes("faculty")) return <GraduationCap />;
+  if (type.includes("building")) return <Building2 />;
+  if (type.includes("room") || type.includes("campus")) return <MapPinned />;
   if (type.includes("event")) return <CalendarDays />;
   return <FileText />;
 }

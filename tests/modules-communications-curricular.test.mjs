@@ -36,9 +36,9 @@ test("módulos e submódulos têm controlo persistente e exclusivo do administra
   assert.match(definitions, /parentKey: "classes"/);
   assert.match(definitions, /parentKey: "announcements"/);
   assert.match(definitions, /parentKey: "curricular_units"/);
-  assert.match(modules, /normalizeEmail\(user\.email\) !== PERMANENT_ADMIN_EMAIL/);
+  assert.match(modules, /isPrimaryAdmin\(user\)/);
   assert.match(modules, /app_module_updated/);
-  assert.match(moduleUi, /up202507850@up\.pt/);
+  assert.match(moduleUi, /principal_admin/);
   assert.match(moduleUi, /admin\.modules\.inheritedInactive/);
   assert.match(moduleUi, /expandedModules/);
   assert.match(moduleUi, /admin\.modules\.searchPlaceholder/);
@@ -75,8 +75,8 @@ test("o estado dos módulos é partilhado e não bloqueia novamente cada navega�
 });
 
 test("o gestor de módulos reais não aparece no ambiente de testes", () => {
-  assert.match(adminNavigation, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
-  assert.match(moduleUi, /!user\?\.testMode && user\?\.email\.toLowerCase\(\)/);
+  assert.match(adminNavigation, /!user\?\.testMode && user\?\.role === "admin" && user\.commissionPosition === "principal_admin"/);
+  assert.match(moduleUi, /!user\?\.testMode && user\?\.role === "admin" && user\.commissionPosition === "principal_admin"/);
 });
 
 test("qualquer membro com cargo CC pode publicar e o cargo fica registado no aviso", () => {
@@ -114,6 +114,16 @@ test("comunicados podem ser pesquisados, filtrados e paginados", () => {
   assert.match(announcementsUi, /paginatedAnnouncements/);
   assert.match(announcementsUi, /announcements\.pagination\.aria/);
   assert.match(announcementsUi, /announcements\.filters\.reset/);
+});
+
+test("qualquer estudante pode confirmar um aviso visível e a confirmação fica persistente", () => {
+  const acknowledgement = announcements.indexOf('if (request.method === "PATCH" && body?.action === "acknowledge")');
+  const publishingGate = announcements.indexOf('if (!canPublish) return json({ error: "A publicação está reservada');
+  assert.ok(acknowledgement >= 0, "o endpoint de confirmação deve existir");
+  assert.ok(publishingGate > acknowledgement, "a confirmação não pode ficar atrás da autorização de publicação");
+  assert.match(announcements, /announcement_acknowledgements/);
+  assert.match(announcements, /a\.audience_scope='all'/);
+  assert.match(announcements, /a\.expires_at IS NULL OR a\.expires_at>\?/);
 });
 
 test("a pesquisa global ocupa a barra superior e o diretório apresenta responsabilidades", () => {

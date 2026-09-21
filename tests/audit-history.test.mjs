@@ -8,6 +8,7 @@ const auditHistory = readFileSync("components/audit-history.tsx", "utf8");
 test("o histórico explica ações e detalhes administrativos nos dois idiomas", () => {
   for (const action of [
     "material_submission_moderated",
+    "material_submission_created",
     "course_request_updated",
     "course_request_deleted",
     "app_module_updated",

@@ -17,6 +17,8 @@ type QuizMode = "quick" | "exam" | "topic" | "unseen" | "mistakes";
 type Difficulty = "easy" | "medium" | "hard";
 type QuizOption = { id: string; text: string; position: number };
 type ParsedOption = QuizOption & { isCorrect: boolean };
+type QuestionBankResponseType = "short_answer" | "multiple_choice" | "case";
+type QuestionBankOption = { id: string; label: string; text: string; position: number; isCorrect: boolean };
 type QuizCommentReplyTo = { id: string; authorName: string; authorRole: string; isAdmin: boolean };
 type PublicQuizComment = { id: string; questionId: string; parentCommentId: string | null; parentId: string | null; replyTo: QuizCommentReplyTo | null; body: string; status: "published"; authorName: string; authorRole: string; isAdmin: boolean; createdAt: number; updatedAt: number };
 type PublicQuizCommentThread = PublicQuizComment & { replies: PublicQuizCommentThread[] };
@@ -28,6 +30,13 @@ const MINIMUM_TIMED_DURATION_SECONDS = 5 * SECONDS_PER_QUESTION;
 const TEST_QUESTION_COUNTS = new Set([5, 10, 15, 30, 50]);
 const DEFAULT_TEST_QUESTION_COUNT = 5;
 const ADMIN_QUESTION_PAGE_SIZES = new Set([10, 25, 50]);
+const QUESTION_BANK_PAGE_SIZES = new Set([10, 20, 50, 100, 200]);
+const QUESTION_BANK_MAX_EXPORT_ROWS = 2000;
+const QUESTION_BANK_CANONICAL_COLUMNS = [
+  "ID_Unico", "Capitulo_Numero", "Capitulo_Nome", "Subtema", "Ano_Letivo", "Tipo_Avaliacao", "Epoca",
+  "Numero_Pergunta", "Fonte_Original", "Pagina", "Enunciado", "Opcoes_Resposta", "Resposta_Indicada_Drive",
+  "Resposta_Validada", "Estado_Validacao", "Aviso_Erro_Discrepancia", "Justificacao_Anatomica_FMUP", "Grau_Confianca",
+] as const;
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
 
 function json(data: unknown, status = 200): Response {
@@ -55,6 +64,53 @@ function text(value: unknown, max: number): string {
 
 function longText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function questionBankOptions(questionId: string, responseType: string, value: unknown, indicatedAnswer: unknown): QuestionBankOption[] | null {
+  if (responseType !== "multiple_choice" || typeof value !== "string") return null;
+  const source = value.trim();
+  if (!source) return null;
+  const matches = [...source.matchAll(/(?:^|\n)\s*([A-Ea-e])\s*[).:\-]\s*([\s\S]*?)(?=\n\s*[A-Ea-e]\s*[).:\-]\s*|$)/g)]
+    .map((match, index) => ({ label: match[1].toLowerCase(), text: match[2].trim(), position: index + 1 }))
+    .filter((option) => option.text.length > 0);
+  if (matches.length < 2) return null;
+  const indicated = typeof indicatedAnswer === "string" ? indicatedAnswer.trim() : "";
+  const letter = indicated.match(/^\s*([A-Ea-e])\s*[).:\-]/)?.[1]?.toLowerCase() || "";
+  const indicatedText = indicated.replace(/^\s*[A-Ea-e]\s*[).:\-]\s*/i, "").trim().toLocaleLowerCase("pt-PT");
+  return matches.map((option) => ({
+    id: `${questionId}-option-${option.position}`,
+    label: option.label,
+    text: option.text,
+    position: option.position,
+    isCorrect: Boolean((letter && option.label === letter) || (indicatedText && option.text.toLocaleLowerCase("pt-PT") === indicatedText)),
+  }));
+}
+
+function questionBankCanonicalRow(item: Row, topic: { chapterNumber: string; title: string }, options: QuestionBankOption[] | null, includeSolutions: boolean) {
+  const answer = String(item.answer_text || "").trim();
+  const indicatedAnswer = String(item.answer_indicated || "").trim();
+  const prompt = String(item.prompt || "");
+  const optionsText = options?.map((option) => `${option.label}) ${option.text}`).join("\n") || null;
+  return {
+    ID_Unico: String(item.external_key || item.id || ""),
+    Capitulo_Numero: topic.chapterNumber,
+    Capitulo_Nome: topic.title,
+    Subtema: String(item.source_subtopic || ""),
+    Ano_Letivo: String(item.source_academic_year || ""),
+    Tipo_Avaliacao: String(item.source_assessment || ""),
+    Epoca: String(item.source_session || ""),
+    Numero_Pergunta: String(item.source_question || ""),
+    Fonte_Original: String(item.source_original || ""),
+    Pagina: String(item.source_page || ""),
+    Enunciado: prompt,
+    Opcoes_Resposta: optionsText,
+    Resposta_Indicada_Drive: includeSolutions ? indicatedAnswer : null,
+    Resposta_Validada: includeSolutions ? answer : null,
+    Estado_Validacao: String(item.validation_state || ""),
+    Aviso_Erro_Discrepancia: String(item.review_note || ""),
+    Justificacao_Anatomica_FMUP: String(item.anatomical_justification || ""),
+    Grau_Confianca: String(item.confidence || ""),
+  };
 }
 
 function record(value: unknown): Row | null {
@@ -209,6 +265,147 @@ async function catalog(request: Request, env: QuizEnv, user: QuizUser | null, en
   const units = unitsResult.results.map((item) => ({ id: item.id, code: item.code, name: item.name, ects: item.ects, year: item.study_year, semester: item.semester, questionCount: item.question_count }));
   const topics = topicsResult.results.map((item) => ({ ...topicDto(row(item)), unitCode: item.unit_code, unitName: item.unit_name }));
   return json({ units, topics, themes: topics, recommendedTopic: recommendation ? { id: recommendation.id, title: recommendation.title, unitId: recommendation.curricular_unit_id, unitCode: recommendation.unit_code, unitName: recommendation.unit_name, attemptedCount: recommendation.attempted_count, correctCount: recommendation.correct_count } : null });
+}
+
+async function questionBankCatalog(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("quizzes.practice")) return disabled();
+  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+
+  const unitId = text(url.searchParams.get("unitId"), 100);
+  if (!unitId) return json({ error: "Indique a unidade curricular." }, 400);
+  const unit = await activeUnit(env, unitId);
+  if (!unit) return json({ error: "A unidade curricular não foi encontrada." }, 404);
+
+  const sourceId = text(url.searchParams.get("sourceId"), 100);
+  const topicId = text(url.searchParams.get("topicId"), 100);
+  const subtopic = text(url.searchParams.get("subtopic"), 180);
+  const academicYear = text(url.searchParams.get("academicYear"), 100);
+  const assessment = text(url.searchParams.get("assessment"), 180);
+  const session = text(url.searchParams.get("session"), 180);
+  const pageFilter = text(url.searchParams.get("sourcePage"), 180);
+  const responseType = text(url.searchParams.get("responseType"), 30);
+  const imageFilter = text(url.searchParams.get("images"), 20).toLocaleLowerCase("pt-PT");
+  const solutionFilter = (text(url.searchParams.get("solutionFilter"), 20).toLocaleLowerCase("pt-PT") || "all");
+  const exportMode = url.searchParams.get("export") === "1";
+  const includeSolutions = url.searchParams.get("solutions") !== "without";
+  const query = text(url.searchParams.get("query") ?? url.searchParams.get("search"), 160);
+  const requestedPage = Number.parseInt(url.searchParams.get("page") || "1", 10);
+  const requestedPageSize = Number.parseInt(url.searchParams.get("pageSize") || (exportMode ? String(QUESTION_BANK_MAX_EXPORT_ROWS) : "10"), 10);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 100000) : 1;
+  const pageSize = exportMode ? Math.min(Math.max(requestedPageSize, 1), QUESTION_BANK_MAX_EXPORT_ROWS) : QUESTION_BANK_PAGE_SIZES.has(requestedPageSize) ? requestedPageSize : 10;
+  if (responseType && !["short_answer", "multiple_choice", "case"].includes(responseType)) return json({ error: "Tipo de pergunta inválido." }, 400);
+  if (imageFilter && !["all", "with", "without"].includes(imageFilter)) return json({ error: "Filtro de imagens inválido." }, 400);
+  if (!["all", "with", "without"].includes(solutionFilter)) return json({ error: "Filtro de soluções inválido." }, 400);
+  const publishedPredicate = "q.status='published' AND q.validation_state='VALIDADO' AND q.confidence='ALTO' AND trim(q.review_note)='' AND (q.response_type<>'multiple_choice' OR (lower(q.options_text) LIKE '%a)%' AND lower(q.options_text) LIKE '%b)%'))";
+  const where = ["q.curricular_unit_id=?", "cu.active=1", publishedPredicate];
+  const bindings: (string | number)[] = [unitId];
+  if (sourceId) { where.push("q.source_id=?"); bindings.push(sourceId); }
+  if (topicId) { where.push("q.topic_id=?"); bindings.push(topicId); }
+  if (subtopic) { where.push("q.source_subtopic=?"); bindings.push(subtopic); }
+  if (academicYear) { where.push("q.source_academic_year=?"); bindings.push(academicYear); }
+  if (assessment) { where.push("q.source_assessment=?"); bindings.push(assessment); }
+  if (session) { where.push("q.source_session=?"); bindings.push(session); }
+  if (pageFilter) { where.push("q.source_page=?"); bindings.push(pageFilter); }
+  if (responseType) { where.push("q.response_type=?"); bindings.push(responseType); }
+  if (imageFilter === "with") where.push("q.image_url<>''");
+  if (imageFilter === "without") where.push("q.image_url=''");
+  if (solutionFilter === "with") where.push("trim(q.answer_text)<>'' AND lower(trim(q.answer_text))<>'resolução validada fmup.'");
+  if (solutionFilter === "without") where.push("(trim(q.answer_text)='' OR lower(trim(q.answer_text))='resolução validada fmup.')");
+  if (query) {
+    const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+    where.push("(q.prompt LIKE ? ESCAPE '\\' COLLATE NOCASE OR t.title LIKE ? ESCAPE '\\' COLLATE NOCASE OR q.source_subtopic LIKE ? ESCAPE '\\' COLLATE NOCASE OR q.source_question LIKE ? ESCAPE '\\' COLLATE NOCASE OR q.source_assessment LIKE ? ESCAPE '\\' COLLATE NOCASE OR q.source_session LIKE ? ESCAPE '\\' COLLATE NOCASE)");
+    bindings.push(pattern, pattern, pattern, pattern, pattern, pattern);
+  }
+  const whereSql = ` WHERE ${where.join(" AND ")}`;
+  const fromSql = " FROM question_bank_items q JOIN question_bank_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id";
+  try {
+    const count = await env.DB.prepare(`SELECT COUNT(*) AS total${fromSql}${whereSql}`).bind(...bindings).first<Row>();
+    const total = Number(count?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const effectivePage = Math.min(page, totalPages);
+    const offset = (effectivePage - 1) * pageSize;
+    const [topicsResult, questionsResult, sourceRows, facetRows] = await Promise.all([
+      env.DB.prepare(`SELECT t.id,t.title,t.chapter_number,COUNT(q.id) AS question_count FROM question_bank_topics t LEFT JOIN question_bank_items q ON q.topic_id=t.id AND ${publishedPredicate} WHERE t.curricular_unit_id=? GROUP BY t.id ORDER BY t.sort_order,t.title COLLATE NOCASE`).bind(unitId).all(),
+      env.DB.prepare(`SELECT q.id,q.external_key,q.prompt,q.options_text,q.answer_indicated,q.answer_text,q.response_type,q.image_url,q.source_subtopic,q.source_academic_year,q.source_page,q.source_question,q.source_assessment,q.source_session,q.source_original,q.anatomical_justification,q.validation_state,q.review_note,q.confidence,t.id AS topic_id,t.title AS topic_title,t.chapter_number${fromSql}${whereSql} ORDER BY q.sort_order,q.id LIMIT ? OFFSET ?`).bind(...bindings, pageSize, offset).all(),
+      env.DB.prepare("SELECT id,label,source_kind,revision_label,source_row_count,imported_count,published_count,review_count,coverage_json,verification_status FROM question_bank_sources WHERE curricular_unit_id=? ORDER BY updated_at DESC").bind(unitId).all(),
+      env.DB.prepare(`SELECT q.source_id,q.source_subtopic,q.source_academic_year,q.source_assessment,q.source_session,q.source_page,q.response_type,q.image_url,q.answer_text,t.id AS topic_id,t.title AS topic_title,t.chapter_number FROM question_bank_items q JOIN question_bank_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE q.curricular_unit_id=? AND cu.active=1 AND ${publishedPredicate}`).bind(unitId).all(),
+    ]);
+    const topics = topicsResult.results.map((rawItem) => {
+      const item = row(rawItem);
+      return {
+        id: String(item.id),
+        title: String(item.title),
+        chapterNumber: String(item.chapter_number),
+        questionCount: Number(item.question_count || 0),
+      };
+    });
+    const questions = questionsResult.results.map((rawItem) => {
+      const item = row(rawItem);
+      const id = String(item.id);
+      const topic = { id: String(item.topic_id), title: String(item.topic_title), chapterNumber: String(item.chapter_number) };
+      const options = questionBankOptions(id, String(item.response_type), item.options_text, item.answer_indicated);
+      const answer = String(item.answer_text || "").trim();
+      const indicatedAnswer = String(item.answer_indicated || "").trim();
+      return {
+        id,
+        prompt: String(item.prompt),
+        options,
+        answer: includeSolutions ? answer : null,
+        indicatedAnswer: includeSolutions ? indicatedAnswer : null,
+        hasSolution: Boolean(answer && answer.toLocaleLowerCase("pt-PT") !== "resolução validada fmup."),
+        hasOptions: Boolean(options?.length),
+        hasImage: Boolean(String(item.image_url || "").trim()),
+        responseType: String(item.response_type) as QuestionBankResponseType,
+        imageUrl: String(item.image_url || "") || null,
+        topic,
+        source: {
+          subtopic: String(item.source_subtopic || ""),
+          academicYear: String(item.source_academic_year || ""),
+          page: String(item.source_page || ""),
+          question: String(item.source_question || ""),
+          assessment: String(item.source_assessment || ""),
+          session: String(item.source_session || ""),
+          original: String(item.source_original || ""),
+          indicatedAnswer: includeSolutions ? indicatedAnswer : null,
+          validatedAnswer: includeSolutions ? answer : null,
+          validationState: String(item.validation_state || ""),
+          warning: String(item.review_note || ""),
+          justification: String(item.anatomical_justification || ""),
+          confidence: String(item.confidence || ""),
+        },
+        sheet: questionBankCanonicalRow(item, topic, options, includeSolutions),
+      };
+    });
+    const facet = (field: string) => [...new Set(facetRows.results.map((item) => String(row(item)[field] || "")).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-PT"));
+    const source = sourceRows.results.map((rawItem) => {
+      const sourceRow = row(rawItem);
+      let coverage: unknown = null;
+      try { coverage = sourceRow.coverage_json ? JSON.parse(String(sourceRow.coverage_json)) : null; } catch { coverage = null; }
+      return { id: String(sourceRow.id), label: sourceRow.label, kind: sourceRow.source_kind, revision: sourceRow.revision_label, verificationStatus: sourceRow.verification_status, sourceRowCount: Number(sourceRow.source_row_count || 0), importedCount: Number(sourceRow.imported_count || 0), publishedCount: Number(sourceRow.published_count || 0), reviewCount: Number(sourceRow.review_count || 0), coverage };
+    });
+    const imageCounts = facetRows.results.reduce<{ with: number; without: number }>((counts, item) => { const key = String(row(item).image_url || "").trim() ? "with" : "without"; counts[key] += 1; return counts; }, { with: 0, without: 0 });
+    const solutionCounts = facetRows.results.reduce<{ with: number; without: number }>((counts, item) => { const key = String(row(item).answer_text || "").trim() && String(row(item).answer_text || "").toLocaleLowerCase("pt-PT") !== "resolução validada fmup." ? "with" : "without"; counts[key] += 1; return counts; }, { with: 0, without: 0 });
+    const realOptionsCount = questions.reduce((count, question) => count + (question.options?.length || 0), 0);
+    return json({
+      unit: { id: String(unit.id), code: String(unit.code), name: String(unit.name) },
+      topics,
+      questions,
+      pagination: { page: effectivePage, pageSize, total, totalPages, from: total ? offset + 1 : 0, to: Math.min(offset + questions.length, total) },
+      source: source[0] || null,
+      sources: source,
+      facets: { topics, subtopics: facet("source_subtopic"), academicYears: facet("source_academic_year"), assessments: facet("source_assessment"), sessions: facet("source_session"), pages: facet("source_page"), responseTypes: facet("response_type"), images: imageCounts, solutions: solutionCounts },
+      capabilities: {
+        filters: { source: true, topic: true, subtopic: true, academicYear: true, assessment: true, session: true, sourcePage: true, responseType: true, images: imageCounts.with > 0, solutions: true, query: true },
+        realOptions: realOptionsCount > 0,
+        export: { complete: exportMode && questions.length === total, columns: QUESTION_BANK_CANONICAL_COLUMNS },
+      },
+      export: { requested: exportMode, includeSolutions, total, complete: exportMode && questions.length === total, columns: QUESTION_BANK_CANONICAL_COLUMNS },
+      filters: { unitId, sourceId, topicId, subtopic, academicYear, assessment, session, sourcePage: pageFilter, responseType, images: imageFilter || "all", solutionFilter, includeSolutions, query },
+    });
+  } catch {
+    return json({ error: "O banco de questões ainda não está disponível.", code: "QUESTION_BANK_UNAVAILABLE" }, 503);
+  }
 }
 
 async function exportQuiz(env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -866,7 +1063,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return path === "/api/quizzes" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
+  return path === "/api/quizzes" || path === "/api/question-bank" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
 export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -886,6 +1083,7 @@ export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, 
     const body = await bodyJson(request); return body ? bulkAction(env, user, body) : json({ error: "Pedido JSON inválido." }, 400);
   }
   if (path === "/api/admin/quiz-comments" || path === "/api/admin/quizzes/comments") return adminCommentsDisabled(user);
+  if (path === "/api/question-bank") return questionBankCatalog(request, env, url, user, enabled);
   if (path === "/api/quizzes" && request.method === "GET") return catalog(request, env, user, enabled);
   if (path === "/api/quizzes/export") return request.method === "GET" ? exportQuiz(env, url, user, enabled) : json({ error: "Operação não suportada." }, 405);
   if (path === "/api/quiz-progress" || path === "/api/quizzes/progress") {

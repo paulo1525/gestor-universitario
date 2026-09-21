@@ -426,6 +426,31 @@
 
 .editButton svg { width: 14px; height: 14px; }
 
+.cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.contentButton {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--color-accent-text);
+  background: var(--gold-soft);
+  font-size: 8px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.contentButton svg { width: 13px; height: 13px; }
+
 .spin { animation: spin .8s linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -453,7 +478,8 @@
   .unitCard,
   .unitCard[data-has-representatives="false"] { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 14px; }
   .identity { grid-column: 1; }
-  .editButton { grid-column: 2; grid-row: 1; }
+  .cardActions { grid-column: 2; grid-row: 1; }
+  .cardActions .editButton { min-height: 34px; }
   .metric,
   .representative { grid-column: 1 / -1; padding-left: 44px; }
   .representative { grid-template-columns: 1fr 1fr; }

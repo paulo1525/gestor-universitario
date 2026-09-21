@@ -99,6 +99,22 @@
   line-height: 1.5;
 }
 
+.panelLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: var(--color-accent-text);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.panelLink svg {
+  width: 13px;
+  height: 13px;
+}
+
 .count {
   min-height: 28px;
   display: inline-flex;
@@ -350,6 +366,13 @@
   white-space: nowrap;
 }
 
+.metaRow a {
+  overflow: hidden;
+  color: var(--color-accent-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .linkHint {
   display: inline-flex;
   align-items: center;
@@ -428,6 +451,203 @@
 .sectionBody {
   display: grid;
   padding: 4px 20px 12px;
+}
+
+.academicPanel {
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
+}
+
+.validationBadge {
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 0 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.validationBadge svg {
+  width: 13px;
+  height: 13px;
+}
+
+.validationVerified {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+}
+
+.validationPending {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.academicBlocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 20px 8px;
+}
+
+.academicBlock {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle);
+}
+
+.academicBlock > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.academicBlock h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.academicText {
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.academicText :global(p) {
+  margin: 0 0 7px;
+}
+
+.academicText :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.academicEmpty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.academicFacts {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+}
+
+.academicFacts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.academicFacts dt,
+.academicFacts dd {
+  margin: 0;
+  font-size: 9px;
+}
+
+.academicFacts dt {
+  color: var(--muted);
+}
+
+.academicFacts dd {
+  color: var(--ink);
+  font-weight: 800;
+  text-align: right;
+}
+
+.academicRows {
+  display: grid;
+  gap: 8px;
+}
+
+.academicRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.academicRow:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.academicRow > div {
+  min-width: 0;
+}
+
+.academicRow strong,
+.academicRow small,
+.academicRow p {
+  display: block;
+}
+
+.academicRow strong {
+  color: var(--ink);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.academicRow small,
+.academicRow p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.academicRow > span {
+  flex: none;
+  color: var(--color-accent-text);
+  font-size: 8px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.academicRow a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  color: var(--color-accent-text);
+  font-size: 8px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.academicRow a svg {
+  width: 12px;
+  height: 12px;
+}
+
+.validationNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 11px 20px 15px;
+  color: var(--color-warning);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.validationNotice svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .listItem {
@@ -533,7 +753,8 @@
   .grid,
   .catalogGrid,
   .columns,
-  .detailHero { grid-template-columns: 1fr; }
+  .detailHero,
+  .academicBlocks { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -547,6 +768,8 @@
   .catalogToolbar { grid-template-columns: 1fr; }
   .clearFilters { width: 100%; }
   .detailHero { padding: 16px; }
+  .academicBlocks { padding-inline: 14px; }
+  .validationNotice { padding-inline: 14px; }
 }
 
 @media (max-width: 430px) {

@@ -5,7 +5,7 @@
   "compatibility_date": "2026-07-10",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "build": {
-    "command": "pnpm db:migrate:remote && pnpm cf:build"
+    "command": "pnpm cf:build"
   },
   "workers_dev": false,
   "preview_urls": true,
@@ -19,6 +19,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "MATERIALS_BUCKET",
+      "bucket_name": "gestor-universitario-materials"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -40,7 +46,6 @@
   "vars": {
     "APP_ORIGIN": "https://gestoruniversitario.cc",
     "EMAIL_FROM": "Gestor Universitário <no-reply@gestoruniversitario.cc>",
-    "BOOTSTRAP_ADMIN_EMAIL": "up202507850@up.pt",
     "TURNSTILE_SITE_KEY": "0x4AAAAAADzawlPGODPKIZld",
     "MAINTENANCE_MODE": "true"
   },

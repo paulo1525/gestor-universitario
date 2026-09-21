@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Award, BookOpen, CalendarRange, GraduationCap, Hash, LoaderCircle, Pencil, Plus, Save, Search, ShieldCheck, UserRound } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Award, BookOpen, CalendarRange, FileText, GraduationCap, Hash, LoaderCircle, Pencil, Plus, Save, Search, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
 import { AppToast } from "@/components/app-toast";
@@ -199,7 +200,7 @@ export function CurricularUnitsManagement() {
     setView("edit");
   };
 
-  if (user?.commissionDepartment !== "management" && user?.email.toLowerCase() !== "up202507850@up.pt") {
+  if (user?.commissionDepartment !== "management" && user?.commissionPosition !== "principal_admin") {
     return <main className="auth-loading"><ShieldCheck size={28} /><strong>{t("classes.units.accessDenied")}</strong></main>;
   }
 
@@ -231,7 +232,7 @@ export function CurricularUnitsManagement() {
           <div className={styles.metric}><span>{t("classes.units.credits")}</span><strong>{unit.ects.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} <small>ECTS</small></strong></div>
           <div className={styles.metric}><span>{t("classes.units.period")}</span><strong>{t("classes.units.yearValue", { year: unit.year })} <small>· {t("classes.units.semesterValue", { semester: unit.semester })}</small></strong></div>
           {unit.representativeUserIds.length > 0 && <div className={styles.representative}>{unit.representativeUserIds.map((representativeId) => { const representative = representativesById.get(representativeId); return representative ? <span className={styles.representativePerson} key={representative.id}><strong>{representative.fullName}</strong><small>{representative.email}</small></span> : null; })}</div>}
-          <button className={styles.editButton} type="button" onClick={() => beginEdit(unit)} aria-label={t("classes.units.editAria", { name: unit.name })}><Pencil />{t("classes.units.edit")}</button>
+          <div className={styles.cardActions}><Link className={styles.contentButton} href={`/admin/unidades-curriculares/${encodeURIComponent(unit.id)}/conteudo`}><FileText />Conteúdo</Link><button className={styles.editButton} type="button" onClick={() => beginEdit(unit)} aria-label={t("classes.units.editAria", { name: unit.name })}><Pencil />{t("classes.units.edit")}</button></div>
         </article>)}</div>}
     </AdminSection>}
   </AdminPage></AppShell>;

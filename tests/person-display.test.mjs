@@ -14,21 +14,21 @@ test("person names are reduced to first and last names", () => {
 });
 
 test("student numbers can be read from explicit values or institutional emails", () => {
-  assert.equal(studentNumberFromIdentity("202507850"), "202507850");
-  assert.equal(studentNumberFromIdentity(null, "up202507850@up.pt"), "202507850");
-  assert.equal(studentNumberFromIdentity(undefined, "202507850@edu.med.up.pt"), "202507850");
+  assert.equal(studentNumberFromIdentity("202500000"), "202500000");
+  assert.equal(studentNumberFromIdentity(null, "up202500000@up.pt"), "202500000");
+  assert.equal(studentNumberFromIdentity(undefined, "202500000@edu.med.up.pt"), "202500000");
   assert.equal(studentNumberFromIdentity(undefined, "nome@up.pt"), "");
 });
 
 test("identifiers are only exposed in tooltip and accessible text when authorized", () => {
-  const student = { fullName: "Maria do Carmo Silva", studentNumber: "202507850", email: "up202507850@up.pt" };
+  const student = { fullName: "Maria do Carmo Silva", studentNumber: "202500000", email: "up202500000@up.pt" };
   assert.deepEqual(personDisplay(student), { name: "Maria Silva", ariaLabel: "Maria Silva" });
   assert.deepEqual(personDisplay(student, { revealIdentifier: true }), {
     name: "Maria Silva",
-    identifier: "202507850",
+    identifier: "202500000",
     identifierKind: "student-number",
-    title: "N.º mecanográfico: 202507850",
-    ariaLabel: "Maria Silva, N.º mecanográfico 202507850",
+    title: "N.º mecanográfico: 202500000",
+    ariaLabel: "Maria Silva, N.º mecanográfico 202500000",
   });
 });
 
@@ -38,7 +38,7 @@ test("accounts without a student number do not expose another identifier", () =>
 });
 
 test("anonymous submissions never expose the supplied identity", () => {
-  assert.deepEqual(personDisplay({ anonymous: true, fullName: "Nome Secreto", studentNumber: "202507850", email: "up202507850@up.pt" }, { revealIdentifier: true }), {
+  assert.deepEqual(personDisplay({ anonymous: true, fullName: "Nome Secreto", studentNumber: "202500000", email: "up202500000@up.pt" }, { revealIdentifier: true }), {
     name: "Envio anónimo",
     ariaLabel: "Envio anónimo",
   });
