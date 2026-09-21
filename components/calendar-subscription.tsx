@@ -161,7 +161,6 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
     >
       <CalendarPlus aria-hidden="true" />
       {t("calendar.subscription.open")}
-      {items.length > 0 && <span className={styles.triggerCount}>{items.length}</span>}
     </button>
 
     {open && <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
