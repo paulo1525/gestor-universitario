@@ -275,10 +275,10 @@ export function CampusDirectory() {
       </div>}
     </section>
 
-    {editor && <div className={styles.dialog} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
-      <section className={styles.dialogPanel} role="dialog" aria-modal="true" aria-labelledby="campus-editor-title">
-        <header className={styles.dialogHeader}><div><span className="eyebrow">{t("campus.manage")}</span><h2 id="campus-editor-title">{editor === "building" ? t("campus.newBuilding") : t("campus.newFaculty")}</h2></div><button className={styles.dialogClose} type="button" onClick={closeEditor} disabled={saving} aria-label={t("common.close")}><X aria-hidden="true" /></button></header>
-        <form className={styles.dialogForm} onSubmit={save}>
+    {editor && <div className={styles.dialog} data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
+      <section className={styles.dialogPanel} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby="campus-editor-title">
+        <header className={styles.dialogHeader} data-app-modal-header><div><span className="eyebrow">{t("campus.manage")}</span><h2 id="campus-editor-title">{editor === "building" ? t("campus.newBuilding") : t("campus.newFaculty")}</h2></div><button className={styles.dialogClose} data-app-modal-close type="button" onClick={closeEditor} disabled={saving} aria-label={t("common.close")}><X aria-hidden="true" /></button></header>
+        <form className={styles.dialogForm} data-app-modal-body onSubmit={save}>
           <label htmlFor="campus-name">{t("campus.name")}<input id="campus-name" ref={firstFieldRef} required value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} /></label>
           {editor === "building" && <>
             <label htmlFor="campus-code">{t("campus.code")}<input id="campus-code" required value={form.code} onChange={event => setForm(current => ({ ...current, code: event.target.value }))} /></label>
@@ -291,7 +291,7 @@ export function CampusDirectory() {
             <label htmlFor="campus-title">{t("campus.titleField")}<input id="campus-title" value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} /></label>
             <label htmlFor="campus-office">{t("campus.office")}<input id="campus-office" value={form.office} onChange={event => setForm(current => ({ ...current, office: event.target.value }))} /></label>
           </>}
-          <footer><button className="button button--secondary" type="button" onClick={closeEditor} disabled={saving}>{t("campus.cancel")}</button><button className="button button--primary" type="submit" disabled={saving}>{saving && <LoaderCircle className={styles.spin} aria-hidden="true" />}{t("campus.save")}</button></footer>
+          <footer data-app-modal-footer><button className="button button--secondary" data-app-modal-action="secondary" type="button" onClick={closeEditor} disabled={saving}>{t("campus.cancel")}</button><button className="button button--primary" data-app-modal-action="primary" type="submit" disabled={saving}>{saving && <LoaderCircle className={styles.spin} aria-hidden="true" />}{t("campus.save")}</button></footer>
         </form>
       </section>
     </div>}
