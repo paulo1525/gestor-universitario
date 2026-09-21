@@ -5,11 +5,13 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  Building2,
   CalendarDays,
   CircleAlert,
   FileText,
   GraduationCap,
   LoaderCircle,
+  MapPinned,
   Megaphone,
   MessageSquareText,
   Search,
@@ -51,6 +53,9 @@ const typeLabelKeys: Record<string, MessageKey> = {
   event: "search.type.event",
   poll: "search.type.poll",
   request: "search.type.request",
+  campus_building: "search.type.campusBuilding",
+  campus_room: "search.type.campusRoom",
+  faculty: "search.type.faculty",
 };
 
 function normalize(item: ApiResult, fallbackTitle: string, fallbackDescription: string): SearchResult {
@@ -79,6 +84,9 @@ function resultIcon(type: string) {
   if (type.includes("announcement")) return <Megaphone />;
   if (type.includes("unit")) return <BookOpen />;
   if (type.includes("member") || type.includes("user")) return <Users />;
+  if (type.includes("faculty")) return <GraduationCap />;
+  if (type.includes("building")) return <Building2 />;
+  if (type.includes("room") || type.includes("campus")) return <MapPinned />;
   if (type.includes("event")) return <CalendarDays />;
   if (type.includes("poll")) return <BarChart3 />;
   if (type.includes("request")) return <MessageSquareText />;

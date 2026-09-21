@@ -1125,8 +1125,8 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
   if (query.length < 2) return json({ results: [] });
   const pattern = `%${query.replace(/[%_]/g, "")}%`;
   const cc = isCommission(user), visibility = cc ? "1=1" : "visibility!='cc'";
-  const [classesEnabled, linksEnabled] = await Promise.all([enabled("classes.rosters"), enabled("useful_links.library")]);
-  const [classes, units, events, docs, announcements, materialRows, members, linkRows] = await Promise.all([
+  const [classesEnabled, linksEnabled, campusEnabled] = await Promise.all([enabled("classes.rosters"), enabled("useful_links.library"), enabled("campus.directory")]);
+  const [classes, units, events, docs, announcements, materialRows, members, linkRows, campusRows] = await Promise.all([
     classesEnabled
       ? env.DB.prepare("SELECT id,'Turma' AS eyebrow,('Turma ' || id) AS title,('Ano letivo ' || academic_year || ' · ' || (SELECT COUNT(*) FROM class_students cs WHERE cs.class_id=classes.id AND cs.removed_at IS NULL) || ' estudantes') AS description,'class' AS type,updated_at AS date FROM classes WHERE (('Turma ' || id) LIKE ? OR CAST(id AS TEXT) LIKE ? OR academic_year LIKE ?) ORDER BY id LIMIT 20").bind(pattern, pattern, pattern).all()
       : Promise.resolve({ results: [] }),
@@ -1137,9 +1137,26 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
     env.DB.prepare("SELECT id,material_type AS eyebrow,title,description,'material' AS type,created_at AS date FROM material_submissions WHERE status='published' AND material_type!='exam_photo' AND (title LIKE ? OR description LIKE ?) LIMIT 20").bind(pattern, pattern).all(),
     env.DB.prepare("SELECT u.id,p.label AS eyebrow,u.full_name AS title,COALESCE(d.label,p.label) AS description,'member' AS type,u.updated_at AS date FROM users u JOIN commission_positions p ON p.code=u.commission_position LEFT JOIN commission_departments d ON d.code=u.commission_department WHERE u.status='active' AND (u.full_name LIKE ? OR p.label LIKE ? OR d.label LIKE ?) LIMIT 20").bind(pattern, pattern, pattern).all(),
     linksEnabled ? env.DB.prepare(`SELECT l.id,l.category AS eyebrow,l.title,l.description,'useful_link' AS type,l.updated_at AS date FROM useful_links l WHERE l.status='published' AND ${cc ? "1=1" : "l.visibility!='cc'"} AND (l.title LIKE ? OR l.description LIKE ? OR l.url LIKE ?) LIMIT 20`).bind(pattern, pattern, pattern).all() : Promise.resolve({ results: [] }),
+    campusEnabled ? env.DB.prepare(`
+      SELECT b.id,b.code AS eyebrow,b.name AS title,b.address AS description,'campus_building' AS type,b.updated_at AS date
+      FROM campus_buildings b
+      WHERE b.active=1 AND (b.name LIKE ? OR b.code LIKE ? OR b.address LIKE ?)
+      UNION ALL
+      SELECT r.id,r.code AS eyebrow,r.name AS title,(b.code || ' · ' || f.label) AS description,'campus_room' AS type,r.updated_at AS date
+      FROM campus_rooms r
+      JOIN campus_floors f ON f.id=r.floor_id AND f.active=1
+      JOIN campus_buildings b ON b.id=f.building_id AND b.active=1
+      WHERE r.active=1 AND (r.code LIKE ? OR r.name LIKE ? OR b.name LIKE ? OR b.code LIKE ?)
+      UNION ALL
+      SELECT f.id,f.title AS eyebrow,f.full_name AS title,COALESCE(f.office,f.email,f.notes,'') AS description,'faculty' AS type,f.updated_at AS date
+      FROM campus_faculty f
+      WHERE f.active=1 AND (f.full_name LIKE ? OR f.title LIKE ? OR f.email LIKE ? OR f.office LIKE ?)
+      LIMIT 60
+    `).bind(pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern).all() : Promise.resolve({ results: [] }),
   ]);
-  const hrefs: Record<string, (id: unknown) => string> = { class: (id) => `/turmas/${encodeURIComponent(String(id))}`, announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao", useful_link: () => "/links-uteis" };
-  const results = [...classes.results, ...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results, ...linkRows.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
+  const campusHref = () => `/salas-docentes?q=${encodeURIComponent(query)}`;
+  const hrefs: Record<string, (id: unknown) => string> = { class: (id) => `/turmas/${encodeURIComponent(String(id))}`, announcement: () => "/avisos", curricular_unit: (id) => `/unidades-curriculares/${encodeURIComponent(String(id))}`, event: () => "/calendario", document: () => "/documentos", material: () => "/materiais", member: () => "/comissao", useful_link: () => "/links-uteis", campus_building: campusHref, campus_room: campusHref, faculty: campusHref };
+  const results = [...classes.results, ...units.results, ...events.results, ...docs.results, ...announcements.results, ...materialRows.results, ...members.results, ...linkRows.results, ...campusRows.results].map((item) => { const row = rowObject(item); return { id: row.id, type: row.type, title: row.title, description: row.description, meta: row.eyebrow, href: hrefs[String(row.type)]?.(row.id) || "/pesquisa", date: row.date }; }).sort((a, b) => Number(b.date || 0) - Number(a.date || 0)).slice(0, 50);
   return json({ query, results });
 }
 
