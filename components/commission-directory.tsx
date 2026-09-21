@@ -145,10 +145,6 @@ export function CommissionDirectory() {
       ),
     [departmentLabel, locale, members],
   );
-  const unitCount = useMemo(
-    () => new Set(members.flatMap((member) => member.units.map((unit) => unit.id))).size,
-    [members],
-  );
   const visible = useMemo(() => {
     const term = query.trim().toLocaleLowerCase(locale);
     return members.filter(
@@ -187,20 +183,6 @@ export function CommissionDirectory() {
                   <p>{t("community.directory.description")}</p>
                 </div>
               </div>
-              <div className={styles.metrics} aria-label={t("community.directory.summary")}>
-                <div>
-                  <strong>{members.length}</strong>
-                  <span>{t("community.directory.members")}</span>
-                </div>
-                <div>
-                  <strong>{departments.length}</strong>
-                  <span>{t("community.directory.departments")}</span>
-                </div>
-                <div>
-                  <strong>{unitCount}</strong>
-                  <span>{t("community.directory.units")}</span>
-                </div>
-              </div>
             </header>
 
             {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}
@@ -213,7 +195,6 @@ export function CommissionDirectory() {
                   </span>
                   <div>
                     <h2 id="diretorio-titulo">{t("community.directory.title")}</h2>
-                    <p>{t("community.directory.sync")}</p>
                   </div>
                 </div>
                 {!loading && (
