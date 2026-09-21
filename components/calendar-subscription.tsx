@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { SurfaceHeader } from "@/components/surface-header";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/calendar-subscription.module.css";
 
@@ -148,17 +149,15 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
     : "";
 
   return <section className={styles.shell}>
-    <div className={styles.summary}>
-      <span className={styles.summaryIcon} aria-hidden="true"><CalendarPlus /></span>
-      <div className={styles.summaryCopy}>
-        <h2>{t("calendar.subscription.title")}</h2>
-        <p>{t("calendar.subscription.description")}</p>
-      </div>
-      <button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="calendar-subscription-panel">
+    <SurfaceHeader
+      icon={<CalendarPlus />}
+      title={t("calendar.subscription.title")}
+      description={t("calendar.subscription.description")}
+      actions={<button className={styles.toggle} type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="calendar-subscription-panel">
         {open ? <X aria-hidden="true" /> : <Settings2 aria-hidden="true" />}
         {t(open ? "calendar.subscription.close" : "calendar.subscription.open")}
-      </button>
-    </div>
+      </button>}
+    />
 
     {open && <div className={styles.body} id="calendar-subscription-panel">
       <div className={styles.setup}>
