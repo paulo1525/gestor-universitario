@@ -13,8 +13,7 @@
   min-width: 0;
 }
 
-.hero h1,
-.detailHero h1 {
+.hero h1 {
   margin: 5px 0 7px;
   color: var(--ink);
   font-size: var(--font-size-heading-1);
@@ -45,10 +44,6 @@
   border-radius: var(--surface-card-radius);
   background: var(--surface);
   box-shadow: var(--surface-card-shadow);
-}
-
-.catalogPanel {
-  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
 }
 
 .panelHeader {
@@ -422,23 +417,8 @@
 }
 
 .detailHero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, .45fr);
-  align-items: end;
-  gap: 20px;
-  padding: 20px;
-}
-
-.detailHero h1 {
-  margin-top: 8px;
-}
-
-.detailHero p {
-  max-width: 52rem;
-  margin: 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.55;
+  display: block;
+  padding: 0;
 }
 
 .columns {
@@ -451,10 +431,6 @@
 .sectionBody {
   display: grid;
   padding: 4px 20px 12px;
-}
-
-.academicPanel {
-  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
 }
 
 .validationBadge {
@@ -753,7 +729,6 @@
   .grid,
   .catalogGrid,
   .columns,
-  .detailHero,
   .academicBlocks { grid-template-columns: 1fr; }
 }
 
@@ -767,7 +742,6 @@
   .sectionBody { padding-inline: 14px; }
   .catalogToolbar { grid-template-columns: 1fr; }
   .clearFilters { width: 100%; }
-  .detailHero { padding: 16px; }
   .academicBlocks { padding-inline: 14px; }
   .validationNotice { padding-inline: 14px; }
 }
