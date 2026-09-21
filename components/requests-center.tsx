@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlignLeft, CheckCircle2, CircleDot, Eye, EyeOff, GraduationCap, Inbox, LoaderCircle, LockKeyhole, MessageSquareReply, MessageSquareText, Plus, Send, ShieldCheck, Tags, Trash2, TriangleAlert, UserRound, X, ShieldAlert } from "lucide-react";
+import { AlignLeft, CheckCircle2, CircleDot, Eye, EyeOff, GraduationCap, Inbox, LoaderCircle, LockKeyhole, MessageSquareReply, MessageSquareText, Plus, Send, ShieldCheck, Tags, Trash2, UserRound, X, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
