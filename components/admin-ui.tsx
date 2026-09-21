@@ -10,7 +10,6 @@ export function AdminPage({ children }: { children: ReactNode }) {
 export function AdminPageHeader({
   eyebrow,
   title,
-  description,
   actions,
 }: {
   eyebrow: string;
