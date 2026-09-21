@@ -138,7 +138,6 @@ function humanTitle(entryName) {
     .replace(/\.pdf$/i, "")
     .replaceAll("_", " ")
     .replace(/\s+-\s+/g, " · ")
-    .replace(/\bSNC\b/g, "SNC")
     .trim();
 }
 
