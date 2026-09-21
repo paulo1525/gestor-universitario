@@ -2,6 +2,7 @@
 
 import essentialSource from "@/data/materials/anki/neuro-essential.json";
 import completeSource from "@/data/materials/anki/neuro-complete.json";
+import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
 
 export type MaterialsCatalogUser = {
   id: string;
@@ -242,43 +243,164 @@ async function anki(request: Request, env: MaterialsCatalogEnv, url: URL, user: 
   return json({ variant, source: source.source, cards, cardCount: cards.length, totalCardCount: source.cards.length, lessons, subtopics: facets, capabilities: { customBuilder: true, storage: Boolean(env.MATERIALS_BUCKET) } });
 }
 
-async function objectDownload(env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string): Promise<Response> {
+type ByteRange = { offset: number; length: number };
+
+function parseByteRange(value: string | null, size: number): ByteRange | null | "invalid" {
+  if (!value) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+  if (!match || (!match[1] && !match[2]) || value.includes(",")) return "invalid";
+  const start = match[1] ? Number(match[1]) : null;
+  const end = match[2] ? Number(match[2]) : null;
+  if ((start !== null && (!Number.isSafeInteger(start) || start < 0)) || (end !== null && (!Number.isSafeInteger(end) || end < 0))) return "invalid";
+  if (size <= 0) return "invalid";
+  if (start === null) {
+    if (!end) return "invalid";
+    const length = Math.min(end, size);
+    return { offset: size - length, length };
+  }
+  if (start >= size) return "invalid";
+  const last = end === null ? size - 1 : Math.min(end, size - 1);
+  if (last < start) return "invalid";
+  return { offset: start, length: last - start + 1 };
+}
+
+function objectNotModified(request: Request, object: { httpEtag?: string; etag?: string; uploaded?: Date }): boolean {
+  const etag = object.httpEtag || object.etag || "";
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (ifNoneMatch) {
+    const normaliseTag = (value: string) => value.trim().replace(/^W\//i, "");
+    const matches = ifNoneMatch.split(",").map(normaliseTag);
+    if (matches.includes("*") || (etag && matches.includes(normaliseTag(etag)))) return true;
+    return false;
+  }
+  const ifModifiedSince = request.headers.get("if-modified-since");
+  if (!ifModifiedSince || !object.uploaded) return false;
+  const since = Date.parse(ifModifiedSince);
+  return Number.isFinite(since) && object.uploaded.getTime() <= since + 999;
+}
+
+function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; httpEtag?: string; etag?: string; uploaded?: Date; size: number }, fileName: string, mimeType: string, length: number, range: ByteRange | null, totalSize = object.size): Headers {
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  if (!headers.has("content-type")) headers.set("content-type", mimeType || "application/octet-stream");
+  headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName || "material")}`);
+  headers.set("cache-control", "private, max-age=3600, stale-while-revalidate=86400");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("accept-ranges", "bytes");
+  if (object.httpEtag || object.etag) headers.set("etag", object.httpEtag || object.etag || "");
+  if (object.uploaded) headers.set("last-modified", object.uploaded.toUTCString());
+  headers.set("content-length", String(length));
+  if (range) headers.set("content-range", `bytes ${range.offset}-${range.offset + range.length - 1}/${totalSize}`);
+  return headers;
+}
+
+async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string): Promise<Response> {
   if (!env.MATERIALS_BUCKET) return json({ error: "O armazenamento de materiais ainda não foi provisionado.", code: "STORAGE_NOT_READY" }, 409);
-  const object = await env.MATERIALS_BUCKET.get(key);
+  const method = request.method.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
+
+  const rangeHeader = request.headers.get("range");
+  const hasRange = rangeHeader !== null;
+  const hasCondition = request.headers.has("if-none-match") || request.headers.has("if-modified-since");
+  const needsMetadata = method === "HEAD" || hasRange || hasCondition;
+
+  // Metadata is enough for HEAD, conditional responses and invalid ranges. A
+  // second reservation is made only when a GET still needs the object body;
+  // malformed Range requests therefore cannot burn two Class B operations.
+  const reservation = await reserveR2ReadOperations(env.DB, 1);
+  if (reservation === "exhausted") return json({ error: "O limite mensal de downloads foi atingido. Tente novamente no próximo mês.", code: "R2_READ_BUDGET_EXHAUSTED" }, 429);
+  if (reservation === "unavailable") return json({ error: "Os downloads estão temporariamente indisponíveis.", code: "R2_READ_BUDGET_UNAVAILABLE" }, 503);
+
+  // Normal downloads perform a single streaming R2 get. Metadata is requested
+  // first for HEAD, conditional requests and byte ranges, where the total size
+  // is needed to build a correct Content-Range/416 response.
+  let metadata: R2Object | null = null;
+  if (needsMetadata) {
+    try {
+      metadata = await env.MATERIALS_BUCKET.head(key);
+    } catch {
+      return json({ error: "O armazenamento está temporariamente indisponível.", code: "STORAGE_UNAVAILABLE" }, 503);
+    }
+  }
+  if (metadata && objectNotModified(request, metadata)) {
+    const headers = downloadHeaders(metadata, fileName, mimeType, metadata.size, null);
+    headers.delete("content-length");
+    return new Response(null, { status: 304, headers });
+  }
+  if (needsMetadata && !metadata) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
+
+  const range = parseByteRange(rangeHeader, metadata?.size ?? 0);
+  if (range === "invalid") {
+    const headers = new Headers({ "content-range": `bytes */${metadata?.size ?? 0}`, "accept-ranges": "bytes", "cache-control": "private, max-age=60" });
+    return new Response(null, { status: 416, headers });
+  }
+
+  if (method === "HEAD") {
+    if (!metadata) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
+    const headers = downloadHeaders(metadata, fileName || key.split("/").pop() || "material", mimeType, range?.length ?? metadata.size, range, metadata.size);
+    return new Response(null, { status: range ? 206 : 200, headers });
+  }
+
+  if (needsMetadata) {
+    const bodyReservation = await reserveR2ReadOperations(env.DB, 1);
+    if (bodyReservation === "exhausted") return json({ error: "O limite mensal de downloads foi atingido. Tente novamente no próximo mês.", code: "R2_READ_BUDGET_EXHAUSTED" }, 429);
+    if (bodyReservation === "unavailable") return json({ error: "Os downloads estão temporariamente indisponíveis.", code: "R2_READ_BUDGET_UNAVAILABLE" }, 503);
+  }
+
+  // The R2 body is returned directly so the Worker keeps the download as a
+  // stream. For a ranged response, metadata.size is the complete object size;
+  // R2ObjectBody.size may describe only the selected range.
+  let object: R2ObjectBody | null = null;
+  try {
+    object = range
+      ? await env.MATERIALS_BUCKET.get(key, { range: { offset: range.offset, length: range.length } })
+      : await env.MATERIALS_BUCKET.get(key);
+  } catch {
+    return json({ error: "O armazenamento está temporariamente indisponível.", code: "STORAGE_UNAVAILABLE" }, 503);
+  }
   if (!object) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
-  const headers = new Headers({ "content-type": mimeType || "application/octet-stream", "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName || key.split("/").pop() || "material")}`, "cache-control": "private, max-age=300" });
-  object.writeHttpMetadata(headers); if (object.httpEtag) headers.set("etag", object.httpEtag);
-  return new Response(object.body, { headers });
+  const contentLength = range?.length ?? object.size;
+  const headers = downloadHeaders(object, fileName || key.split("/").pop() || "material", mimeType, contentLength, range, metadata?.size ?? object.size);
+  return new Response(object.body, { status: range ? 206 : 200, headers });
 }
 
 async function download(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
-  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
   const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
   if (!item) return json({ error: "Material não encontrado." }, 404);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este ficheiro está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
-  return objectDownload(env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
+  return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
 }
 
 async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.anki")) return disabled();
-  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
   const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status FROM material_anki_decks WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
   if (!item) return json({ error: "Baralho Anki não encontrado." }, 404);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este baralho está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
-  return objectDownload(env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
+  return objectDownload(request, env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
 }
 
 async function media(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.anki")) return disabled();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  // APKG media may contain atlas or book imagery. Keep the R2 path closed
+  // while every deck is still in the rights-review draft state, even if an
+  // object was uploaded accidentally before the catalogue was approved.
+  try {
+    const approvedDeck = await env.DB.prepare("SELECT 1 FROM material_anki_decks WHERE id IN ('anki-neuro-essential', 'anki-neuro-complete') AND publication_status='published' AND storage_state='ready' LIMIT 1").first();
+    if (!approvedDeck) return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
+  } catch {
+    return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
+  }
   const key = text(url.searchParams.get("key"), 180);
   const valid = [...new Set(Object.values(sources).flatMap((source) => source.cards.map((card) => card.imageKey).filter(Boolean)))].includes(key);
   if (!valid || !/^[A-Za-z0-9._-]+$/.test(key)) return json({ error: "Media Anki inválida." }, 400);
-  return objectDownload(env, `materials/neuroanatomia/anki/media/${key}`, key, "image/png");
+  return objectDownload(request, env, `materials/neuroanatomia/anki/media/${key}`, key, "image/png");
 }
 
 export function isMaterialsCatalogPath(pathname: string): boolean {

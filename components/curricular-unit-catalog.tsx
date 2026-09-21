@@ -24,6 +24,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { QuestionBankSection } from "@/components/question-bank-section";
 import { RichTextContent } from "@/components/rich-text-editor";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/curricular-unit-catalog.module.css";
@@ -497,6 +498,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                     </div>
                   </section>
                   {data.academicContent.profile && <AcademicContentPanel content={data.academicContent} locale={locale} />}
+                  {data.unit.code === "NEURO" && <QuestionBankSection unitId={data.unit.id} unitCode={data.unit.code} />}
                   <div className={styles.columns}>
                     <div className={styles.page}>
                       <DetailSection

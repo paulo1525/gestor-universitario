@@ -10,7 +10,7 @@ import { ModuleManagement } from "@/components/module-management";
 export function ModuleManagementPage() {
   const { user } = useAuth();
   const { t } = useI18n();
-  if (!user?.testMode && user?.email.toLowerCase() !== "up202507850@up.pt") return <main className="auth-loading"><ShieldCheck size={28}/><strong>{t("admin.modulesPage.accessDenied")}</strong></main>;
+  if (!user?.testMode && (user?.role !== "admin" || user?.commissionPosition !== "principal_admin")) return <main className="auth-loading"><ShieldCheck size={28}/><strong>{t("admin.modulesPage.accessDenied")}</strong></main>;
   return <AppShell active="modules" breadcrumb={t("admin.modulesPage.breadcrumb")}><AdminPage>
     <AdminPageHeader eyebrow={t("admin.modulesPage.eyebrow")} title={t("admin.modulesPage.title")} description={t("admin.modulesPage.description")} />
     <ModuleManagement />

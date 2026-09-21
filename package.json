@@ -32,6 +32,7 @@
     "@types/sql.js": "^1.4.11",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.10",
+    "pdf-lib": "1.17.1",
     "typescript": "5.9.3",
     "wrangler": "4.110.0"
   },

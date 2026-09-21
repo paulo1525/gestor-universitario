@@ -227,17 +227,40 @@ INSERT OR IGNORE INTO material_catalog_lessons (material_id, lesson_id, relevanc
   ('material-biblio-nolte-272-295', 'lesson-neuro-at5', 'primary', 6),
   ('material-biblio-nolte-272-295', 'lesson-neuro-ap3', 'primary', 6);
 
--- Pacotes APKG originais. Os checksums e tamanhos permitem validar o upload
--- posterior para R2 sem adicionar os binários ao repositório.
+-- Pacotes APKG originais. Os checksums e tamanhos permitem validar uma cópia
+-- posterior, mas os cartões de imagem permanecem em draft até revisão de
+-- direitos (incluem referências a Yokochi e recortes de páginas).
 INSERT OR IGNORE INTO material_anki_decks (id, curricular_unit_id, title, variant, description, file_name, mime_type, storage_backend, storage_key, storage_state, byte_size, checksum_sha256, card_count, media_count, source_file_name, publication_status, created_at, updated_at)
-SELECT 'anki-neuro-essential', cu.id, 'Neuroanatomia — Essencial', 'essential', 'AT1–AT5 e AP1–AP3, com resposta curta e cartões práticos de imagem.', 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'application/apkg', 'r2', 'materials/neuroanatomia/anki/Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'pending', 16777216, 'da717fcfdd2c34c3c6e8c7dd0d48dccf116ff8adb212453a80238af09477ff88', 1099, 29, 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'published', unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
+SELECT 'anki-neuro-essential', cu.id, 'Neuroanatomia — Essencial', 'essential', 'AT1–AT5 e AP1–AP3, com resposta curta e cartões práticos de imagem.', 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'application/apkg', 'r2', 'materials/neuroanatomia/anki/Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'pending', 16473756, 'da717fcfdd2c34c3c6e8c7dd0d48dccf116ff8adb212453a80238af09477ff88', 1099, 29, 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_ESSENCIAL_FINAL.apkg', 'published', unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
 INSERT OR IGNORE INTO material_anki_decks (id, curricular_unit_id, title, variant, description, file_name, mime_type, storage_backend, storage_key, storage_state, byte_size, checksum_sha256, card_count, media_count, source_file_name, publication_status, created_at, updated_at)
-SELECT 'anki-neuro-complete', cu.id, 'Neuroanatomia — Completo', 'complete', 'AT1–AT5 e AP1–AP3, com cobertura completa, resposta curta e cartões práticos de imagem.', 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'application/apkg', 'r2', 'materials/neuroanatomia/anki/Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'pending', 16777216, 'a59c4addb772d08f97d828de8e0ffa2291ce327aa25887a6154cdb488e07756f', 1620, 29, 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'published', unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
+SELECT 'anki-neuro-complete', cu.id, 'Neuroanatomia — Completo', 'complete', 'AT1–AT5 e AP1–AP3, com cobertura completa, resposta curta e cartões práticos de imagem.', 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'application/apkg', 'r2', 'materials/neuroanatomia/anki/Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'pending', 16543230, 'a59c4addb772d08f97d828de8e0ffa2291ce327aa25887a6154cdb488e07756f', 1620, 29, 'Neuroanatomia_AT1_AT5_AP1_AP3_PACK_COMPLETO_FINAL.apkg', 'published', unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
 INSERT OR IGNORE INTO material_anki_deck_lessons (deck_id, lesson_id, card_count) VALUES
   ('anki-neuro-essential', 'lesson-neuro-at1', 131), ('anki-neuro-essential', 'lesson-neuro-at2', 85), ('anki-neuro-essential', 'lesson-neuro-at3', 90), ('anki-neuro-essential', 'lesson-neuro-at4', 85), ('anki-neuro-essential', 'lesson-neuro-at5', 97), ('anki-neuro-essential', 'lesson-neuro-ap1', 257), ('anki-neuro-essential', 'lesson-neuro-ap2', 96), ('anki-neuro-essential', 'lesson-neuro-ap3', 104),
   ('anki-neuro-complete', 'lesson-neuro-at1', 208), ('anki-neuro-complete', 'lesson-neuro-at2', 176), ('anki-neuro-complete', 'lesson-neuro-at3', 103), ('anki-neuro-complete', 'lesson-neuro-at4', 85), ('anki-neuro-complete', 'lesson-neuro-at5', 97), ('anki-neuro-complete', 'lesson-neuro-ap1', 257), ('anki-neuro-complete', 'lesson-neuro-ap2', 96), ('anki-neuro-complete', 'lesson-neuro-ap3', 104);
 
 -- O pacote de bibliografia é mantido como recurso de catálogo, com estado de
--- armazenamento pendente até o administrador provisionar o bucket.
+-- armazenamento pendente e publicação bloqueada até revisão de direitos.
 INSERT OR IGNORE INTO material_catalog (id, curricular_unit_id, material_kind, title, description, file_name, mime_type, storage_backend, storage_key, storage_state, byte_size, checksum_sha256, verification_status, publication_status, version_group, version_number, is_recommended, created_at, updated_at)
-SELECT 'material-bibliography-neuro-package', cu.id, 'bibliography', 'Bibliografia de Neuroanatomia — pacote completo', 'Sumários originais, versões verificadas, excertos bibliográficos, mapa de páginas e notas de correção.', 'Bibliografia_Neuro_AT1_AT5_AP1_AP3_FINAL_WINDOWS_SAFE.zip', 'application/zip', 'r2', 'materials/neuroanatomia/bibliografia/Bibliografia_Neuro_AT1_AT5_AP1_AP3_FINAL_WINDOWS_SAFE.zip', 'pending', 192000000, '06082cc89302320f484e64c04d068a472ae0c8f9f3b796dee663a44ef4a3539f', 'verified', 'published', 'bibliography-neuro-package', 1, 1, unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
+SELECT 'material-bibliography-neuro-package', cu.id, 'bibliography', 'Bibliografia de Neuroanatomia — pacote completo', 'Sumários originais, versões verificadas, excertos bibliográficos, mapa de páginas e notas de correção.', 'Bibliografia_Neuro_AT1_AT5_AP1_AP3_FINAL_WINDOWS_SAFE.zip', 'application/zip', 'r2', 'materials/neuroanatomia/bibliografia/Bibliografia_Neuro_AT1_AT5_AP1_AP3_FINAL_WINDOWS_SAFE.zip', 'pending', 191131120, '06082cc89302320f484e64c04d068a472ae0c8f9f3b796dee663a44ef4a3539f', 'verified', 'published', 'bibliography-neuro-package', 1, 1, unixepoch() * 1000, unixepoch() * 1000 FROM curricular_units cu WHERE cu.code = 'NEURO' AND cu.active = 1;
+
+-- Os excertos de Gray, Lippincott e Nolte, o ZIP de bibliografia e os APKG
+-- com imagens de Yokochi/páginas recortadas ficam catalogados, mas em draft.
+-- A verificação de checksum/conteúdo não é uma autorização de publicação:
+-- estes objetos só podem passar a published depois de uma revisão de direitos.
+UPDATE material_catalog
+SET publication_status = 'draft', updated_at = unixepoch() * 1000
+WHERE id IN (
+  'material-biblio-gray41-227-236', 'material-biblio-gray41-416-428',
+  'material-biblio-gray41-477-480', 'material-biblio-gray41-534-537',
+  'material-biblio-gray41-620-623', 'material-biblio-gray41-624-627',
+  'material-biblio-gray41-711-714', 'material-biblio-gray41-762-768',
+  'material-biblio-gray42-442-464', 'material-biblio-lippincott-1-19',
+  'material-biblio-lippincott-24-29', 'material-biblio-lippincott-79-101',
+  'material-biblio-lippincott-102-109', 'material-biblio-lippincott-123-124',
+  'material-biblio-lippincott-130-135', 'material-biblio-nolte-1-38',
+  'material-biblio-nolte-61', 'material-biblio-nolte-233-244',
+  'material-biblio-nolte-272-295', 'material-bibliography-neuro-package'
+);
+UPDATE material_anki_decks
+SET publication_status = 'draft', updated_at = unixepoch() * 1000
+WHERE id IN ('anki-neuro-essential', 'anki-neuro-complete');

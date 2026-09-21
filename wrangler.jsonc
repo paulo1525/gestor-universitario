@@ -46,7 +46,6 @@
   "vars": {
     "APP_ORIGIN": "https://gestoruniversitario.cc",
     "EMAIL_FROM": "Gestor Universitário <no-reply@gestoruniversitario.cc>",
-    "BOOTSTRAP_ADMIN_EMAIL": "up202507850@up.pt",
     "TURNSTILE_SITE_KEY": "0x4AAAAAADzawlPGODPKIZld",
     "MAINTENANCE_MODE": "true"
   },

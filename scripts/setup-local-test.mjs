@@ -39,7 +39,7 @@ function runWrangler(args) {
 runWrangler(["d1", "migrations", "apply", database, "--local"]);
 
 const users = [
-  ["local-primary-admin", "up202507850@up.pt", "Administrador Principal Local", "admin", 0, null],
+  ["local-primary-admin", "up202500000@up.pt", "Administrador Principal Local", "admin", 0, null],
   ["local-admin", "up202500001@up.pt", "Administrador Local", "admin", 1, null],
   ["local-student-user", "up202500100@up.pt", "Ana Almeida", "student", 0, null],
   ...chaosStudents.map((student) => [student.userId, `up${student.studentNumber}@up.pt`, student.fullName, "student", 0, null]),
@@ -150,7 +150,8 @@ const statements = [
 ];
 
 for (const [id, email, name, role, adminOverride, representedClass] of users) {
-  statements.push(`INSERT INTO users (id,email,full_name,password_hash,password_salt,password_iterations,role,email_verified_at,password_changed_at,status,created_at,updated_at,admin_override,class_representative,represented_class,font_scale,commission_position,commission_department) VALUES (${sql(id)},${sql(email)},${sql(name)},${sql(passwordHash)},${sql(salt)},${iterations},${sql(role)},${now},${now},'active',${now},${now},${adminOverride},${representedClass ? 1 : 0},${representedClass ?? "NULL"},'normal',${role === "admin" ? "'principal_admin'" : "NULL"},${role === "admin" ? "'management'" : "NULL"})`);
+  const position = id === "local-primary-admin" ? "principal_admin" : role === "admin" ? "member" : null;
+  statements.push(`INSERT INTO users (id,email,full_name,password_hash,password_salt,password_iterations,role,email_verified_at,password_changed_at,status,created_at,updated_at,admin_override,class_representative,represented_class,font_scale,commission_position,commission_department) VALUES (${sql(id)},${sql(email)},${sql(name)},${sql(passwordHash)},${sql(salt)},${iterations},${sql(role)},${now},${now},'active',${now},${now},${adminOverride},${representedClass ? 1 : 0},${representedClass ?? "NULL"},'normal',${position ? sql(position) : "NULL"},${role === "admin" ? "'management'" : "NULL"})`);
 }
 statements.push(`INSERT INTO announcements (id,title,body,priority,status,author_user_id,author_name,author_position_code,author_position_label,published_at,expires_at,created_at,updated_at) VALUES ('local-announcement','Bem-vindos ao ambiente local','Este aviso urgente contém apenas informação fictícia para validar o destaque global dos comunicados.','urgent','published','local-primary-admin','Administrador Principal Local','principal_admin','Administrador Principal',${now},NULL,${now},${now})`);
 statements.push(`INSERT INTO curricular_units (id,code,name,ects,study_year,semester,representative_user_id,active,created_by,updated_by,created_at,updated_at) VALUES ('local-unit-anat2','ANAT2','Anatomia II',7.5,2,1,'local-primary-admin',1,'local-primary-admin','local-primary-admin',${now},${now})`);
@@ -240,7 +241,7 @@ writeFileSync(join(root, ".dev.vars"), [
 
 console.log("\nAmbiente local pronto em http://127.0.0.1:3000");
 console.log(`Administrador: up202500001@up.pt / ${password}`);
-console.log(`Administrador principal (módulos): up202507850@up.pt / ${password}`);
+console.log(`Administrador principal (módulos): up202500000@up.pt / ${password}`);
 console.log(`Representantes: up202500011@up.pt a up202500015@up.pt / ${password}`);
 console.log(`Estudante: up202500100@up.pt / ${password}`);
 console.log("Dados: 5 turmas, 14 estudantes fictícios por turma, incluindo 20 Pessoas Caos.");

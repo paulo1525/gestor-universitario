@@ -47,6 +47,9 @@
 .empty .button { margin-top: 2px; }
 .ankiWorkspace { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); gap: 18px; align-items: start; }
 .ankiMain { display: grid; gap: 16px; min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+.unitSelect { display: grid; gap: 6px; color: var(--ink); font-size: 10px; font-weight: 850; }
+.unitSelect select { width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-control); outline: none; color: var(--ink); background: var(--surface); font: inherit; font-size: 11px; }
+.unitSelect select:focus { border-color: var(--gold); box-shadow: var(--focus-ring-accent); }
 .segmented { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-subtle, #faf9f5); }
 .segmented button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font: inherit; font-size: 10px; font-weight: 850; cursor: pointer; }
 .segmented button:hover, .segmentActive { color: #4c3a00 !important; background: var(--gold-soft) !important; }

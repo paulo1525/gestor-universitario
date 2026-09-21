@@ -200,7 +200,7 @@ export function CurricularUnitsManagement() {
     setView("edit");
   };
 
-  if (user?.commissionDepartment !== "management" && user?.email.toLowerCase() !== "up202507850@up.pt") {
+  if (user?.commissionDepartment !== "management" && user?.commissionPosition !== "principal_admin") {
     return <main className="auth-loading"><ShieldCheck size={28} /><strong>{t("classes.units.accessDenied")}</strong></main>;
   }
 

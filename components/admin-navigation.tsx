@@ -109,8 +109,8 @@ export function AdminNavigation({ active, collapsed, onNavigate }: { active: App
   const copy = COPY[locale];
   const activeGroup = normalizedPathname === "/admin" ? null : normalizedPathname === "/admin/utilizadores" || normalizedPathname === "/admin/configuracao" ? "platform" : ACTIVE_GROUP[active] ?? null;
   const [openGroup, setOpenGroup] = useState<AdminGroupId | null>(activeGroup);
-  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === "up202507850@up.pt");
-  const canManageUnits = Boolean(access["curricular_units.management"] && (user?.commissionDepartment === "management" || user?.email.toLowerCase() === "up202507850@up.pt"));
+  const canManageModules = Boolean(!user?.testMode && user?.role === "admin" && user.commissionPosition === "principal_admin");
+  const canManageUnits = Boolean(access["curricular_units.management"] && (user?.commissionDepartment === "management" || user?.commissionPosition === "principal_admin"));
 
   const groups = useMemo<Array<{ id: AdminGroupId; label: string; icon: typeof Settings; items: AdminItem[] }>>(() => [
     {

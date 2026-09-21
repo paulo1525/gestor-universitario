@@ -10,7 +10,6 @@ import { adminDataLabel } from "@/lib/i18n-admin";
 import type { ResolvedModuleHomepage } from "@/lib/module-homepages";
 import styles from "./module-management.module.css";
 
-const MODULE_MANAGER_EMAIL = "up202507850@up.pt";
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   classes: UsersRound,
@@ -61,7 +60,7 @@ export function ModuleManagement() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { synchronize } = useModules();
-  const canManageModules = Boolean(!user?.testMode && user?.email.toLowerCase() === MODULE_MANAGER_EMAIL);
+  const canManageModules = Boolean(!user?.testMode && user?.role === "admin" && user.commissionPosition === "principal_admin");
   const [modules, setModules] = useState<ManagedModule[]>([]);
   const [home, setHome] = useState<ResolvedModuleHomepage | null>(null);
   const [loading, setLoading] = useState(true);

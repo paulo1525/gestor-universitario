@@ -23,7 +23,7 @@ export interface Env {
   AUTH_RATE_LIMITER: RateLimit;
   APP_ORIGIN: string;
   EMAIL_FROM: string;
-  BOOTSTRAP_ADMIN_EMAIL: string;
+  BOOTSTRAP_ADMIN_EMAIL?: string;
   AUTH_PEPPER: string;
   RESEND_API_KEY: string;
   TURNSTILE_SECRET_KEY: string;
@@ -67,7 +67,8 @@ const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const BROWSER_SESSION_SECONDS = 60 * 60 * 12;
 const CODE_SECONDS = 60 * 10;
 const EMAIL_PATTERN = /^up\d{9}@(up\.pt|edu\.med\.up\.pt)$/i;
-const PERMANENT_ADMIN_EMAIL = "up202507850@up.pt";
+const isPrimaryAdmin = (user: { commissionPosition: string | null; role: string }) =>
+  user.commissionPosition === "principal_admin" && user.role === "admin";
 const encoder = new TextEncoder();
 
 function json(data: unknown, status = 200, extraHeaders?: HeadersInit): Response {
@@ -260,7 +261,7 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   const hash = await derivePassword(password as string, salt, env.AUTH_PEPPER, PASSWORD_ITERATIONS);
   const code = makeCode();
   const userId = existing?.id ?? crypto.randomUUID();
-  const role = email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? "admin" : "student";
+  const role = Boolean(env.BOOTSTRAP_ADMIN_EMAIL && email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()) ? "admin" : "student";
   await env.DB.batch([
     env.DB.prepare("INSERT INTO users (id, email, full_name, password_hash, password_salt, password_iterations, role, status, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, role=excluded.role, status='pending', updated_at=excluded.updated_at WHERE users.email_verified_at = 0").bind(userId, email, fullName, hash, salt, PASSWORD_ITERATIONS, role, now, now, now),
     env.DB.prepare("INSERT INTO pending_registrations (email, full_name, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at").bind(email, fullName, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now),
@@ -297,7 +298,7 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   const user = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND email_verified_at = 0").bind(email).first<{ id: string }>();
   if (!user) return json({ error: "Não foi possível concluir o registo. A conta poderá já estar validada." }, 409);
   const userId = user.id;
-  const role = email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase() ? "admin" : "student";
+  const role = Boolean(env.BOOTSTRAP_ADMIN_EMAIL && email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()) ? "admin" : "student";
   try {
     await env.DB.batch([
       env.DB.prepare("UPDATE users SET full_name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, role = ?, status = 'active', email_verified_at = ?, password_changed_at = ?, updated_at = ? WHERE id = ? AND email_verified_at = 0").bind(pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, userId),
@@ -356,9 +357,7 @@ async function ensureOperationalSchemaLegacy(env: Env): Promise<void> {
     env.DB.prepare("INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('classes_close_at', '2026-07-12T22:00:00.000Z', ?)").bind(now),
     ...Array.from({ length: 20 }, (_, index) => env.DB.prepare("INSERT OR IGNORE INTO classes (id, updated_at) VALUES (?, ?)").bind(index + 1, now)),
   ]);
-  await env.DB.prepare("UPDATE users SET commission_position = COALESCE(commission_position, 'principal_admin'), role = 'admin' WHERE email = ?")
-    .bind(PERMANENT_ADMIN_EMAIL).run();
-  await env.DB.prepare("UPDATE users SET class_representative = 1, represented_class = 17 WHERE email = ?").bind(PERMANENT_ADMIN_EMAIL).run();
+  await env.DB.prepare("UPDATE users SET role = 'admin' WHERE commission_position = 'principal_admin'").run();
 }
 
 async function sendPasswordResetEmail(env:Env,email:string,code:string):Promise<void>{
@@ -492,7 +491,7 @@ async function currentUser(request: Request, env: Env): Promise<CurrentUser | nu
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);
   const base={ id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, studyYear: row.study_year, commissionDepartment: row.commission_department, commissionPosition: row.commission_position, commissionPositionLabel: row.commission_position_label };
   const previewId=cookieValue(request,"gu_preview_user");
-  if(row.email.toLowerCase()===PERMANENT_ADMIN_EMAIL&&previewId){
+  if(row.commission_position === "principal_admin" && row.role === "admin" && previewId){
     const target=await env.DB.prepare("SELECT users.id,users.email,users.full_name,users.role,users.font_scale,users.class_representative,users.represented_class,users.study_year,users.commission_department,users.commission_position,commission_positions.label AS commission_position_label FROM users LEFT JOIN commission_positions ON commission_positions.code=users.commission_position WHERE users.id=? AND users.status='active'").bind(previewId).first<{id:string;email:string;full_name:string;role:string;font_scale:string;class_representative:number;represented_class:number|null;study_year:number|null;commission_department:string|null;commission_position:string|null;commission_position_label:string|null}>();
     if(target)return {id:target.id,email:target.email,fullName:target.full_name,role:target.role,fontScale:target.font_scale,classRepresentative:target.class_representative===1,representedClass:target.represented_class,studyYear:target.study_year,commissionDepartment:target.commission_department,commissionPosition:target.commission_position,commissionPositionLabel:target.commission_position_label,preview:true,actorId:row.id};
   }
@@ -501,8 +500,8 @@ async function currentUser(request: Request, env: Env): Promise<CurrentUser | nu
 
 async function handlePreviewUser(request:Request,env:Env):Promise<Response>{
   const token=cookieValue(request,SESSION_COOKIE); if(!token)return json({error:"Sessão inválida."},401);
-  const real=await env.DB.prepare("SELECT u.email FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(await sha256(`${token}:${env.AUTH_PEPPER}`),Date.now()).first<{email:string}>();
-  if(real?.email.toLowerCase()!==PERMANENT_ADMIN_EMAIL)return json({error:"Esta função está reservada ao administrador principal."},403);
+  const real=await env.DB.prepare("SELECT u.role,u.commission_position FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(await sha256(`${token}:${env.AUTH_PEPPER}`),Date.now()).first<{role:string;commission_position:string|null}>();
+  if(real?.role !== "admin" || real.commission_position !== "principal_admin")return json({error:"Esta função está reservada ao administrador principal."},403);
   const body=await parseJson(request),userId=typeof body?.userId==="string"?body.userId:"";
   if(userId&&!(await env.DB.prepare("SELECT id FROM users WHERE id=? AND status='active'").bind(userId).first()))return json({error:"Utilizador inválido."},404);
   const cookie=userId?`gu_preview_user=${userId}; Path=/; Secure; SameSite=Strict; Max-Age=14400`:`gu_preview_user=; Path=/; Secure; SameSite=Strict; Max-Age=0`;
@@ -541,7 +540,7 @@ async function configuredHomeModuleKey(env: Env): Promise<string | null> {
 
 function homepageProfile(user: CurrentUser) {
   return {
-    canManageModules: normalizeEmail(user.email) === PERMANENT_ADMIN_EMAIL,
+    canManageModules: isPrimaryAdmin(user),
     preferenceOnly: user.role === "student" && !user.classRepresentative && !user.preview,
   };
 }
@@ -573,7 +572,7 @@ async function moduleResponse(env: Env, user: CurrentUser) {
 }
 
 async function handleAdminModules(request: Request, env: Env, user: CurrentUser): Promise<Response> {
-  if (normalizeEmail(user.email) !== PERMANENT_ADMIN_EMAIL) return json({ error: "A gestão de módulos está reservada ao administrador principal." }, 403);
+  if (!isPrimaryAdmin(user)) return json({ error: "A gestão de módulos está reservada ao administrador principal." }, 403);
   if (request.method === "GET") return json(await moduleResponse(env, user));
   const body = await parseJson(request);
   const moduleKey = String(body?.moduleKey || "");
@@ -597,7 +596,7 @@ async function handleAdminModules(request: Request, env: Env, user: CurrentUser)
 }
 
 async function handleAdminHomeModule(request: Request, env: Env, user: CurrentUser): Promise<Response> {
-  if (normalizeEmail(user.email) !== PERMANENT_ADMIN_EMAIL) return json({ error: "A gestão de módulos está reservada ao administrador principal." }, 403);
+  if (!isPrimaryAdmin(user)) return json({ error: "A gestão de módulos está reservada ao administrador principal." }, 403);
   const body = await parseJson(request);
   if (!body || !Object.hasOwn(body, "moduleKey")) return json({ error: "Página inicial inválida." }, 400);
   const requested = body.moduleKey === null || body.moduleKey === "" ? null : String(body.moduleKey);
@@ -619,7 +618,7 @@ function moduleDisabled(): Response {
 }
 
 function isManagementCore(user: CurrentUser): boolean {
-  return normalizeEmail(user.email) === PERMANENT_ADMIN_EMAIL || user.commissionDepartment === "management";
+  return isPrimaryAdmin(user) || user.commissionDepartment === "management";
 }
 
 async function maintenanceConfig(env: Env): Promise<{ maintenanceMode: boolean; maintenanceMessage: string }> {
@@ -652,10 +651,12 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
   if (commissionPosition && !["principal_admin", "president", "vice_president", "treasurer", "member"].includes(commissionPosition)) return json({ error: "Cargo da Comissão inválido." }, 400);
   if (commissionDepartment && !["management", "studies", "curricular_units", "recreation_image"].includes(commissionDepartment)) return json({ error: "Departamento da Comissão inválido." }, 400);
   if (classRepresentative && (!representedClass || representedClass < 1 || representedClass > 20)) return json({ error: "Selecione uma turma válida entre 1 e 20." }, 400);
-  const target = await env.DB.prepare("SELECT id, email, status, email_verified_at FROM users WHERE id = ?").bind(id).first<{ id: string; email: string; status: string; email_verified_at: number }>();
+  const target = await env.DB.prepare("SELECT id, email, status, email_verified_at, commission_position FROM users WHERE id = ?").bind(id).first<{ id: string; email: string; status: string; email_verified_at: number; commission_position: string | null }>();
   if (!target) return json({ error: "Utilizador não encontrado." }, 404);
   if (adminOverride && !commissionPosition) return json({ error: "Só pode atribuir acesso administrativo a membros da CC com cargo definido." }, 400);
-  const isPermanentAdmin = target.email.toLowerCase() === PERMANENT_ADMIN_EMAIL;
+  const isPermanentAdmin = target.commission_position === "principal_admin";
+  if (commissionPosition === "principal_admin" && !isPermanentAdmin) return json({ error: "O cargo de administrador principal já está reservado." }, 403);
+  if (isPermanentAdmin && (commissionPosition !== "principal_admin" || status !== "active" || id !== admin.id)) return json({ error: "Não é possível retirar ou suspender o administrador principal." }, 403);
   const effectiveAdminOverride = isPermanentAdmin ? false : adminOverride;
   const role = isPermanentAdmin || commissionDepartment === "management" || (effectiveAdminOverride && commissionPosition)
     ? "admin"

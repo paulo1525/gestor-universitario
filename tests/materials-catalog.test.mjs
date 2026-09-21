@@ -7,6 +7,7 @@ import { buildMaterialApkg } from "../lib/anki/materials.ts";
 
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
+const artifactScript = await readFile(new URL("../scripts/prepare-material-artifacts.mjs", import.meta.url), "utf8");
 const component = await readFile(new URL("../components/material-catalog.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/material-catalog.module.css", import.meta.url), "utf8");
 const essential = JSON.parse(await readFile(new URL("../data/materials/anki/neuro-essential.json", import.meta.url), "utf8"));
@@ -29,6 +30,10 @@ test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos
     assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE verification_status='original'")[0].values[0][0], 9);
     assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE verification_status='verified'")[0].values[0][0], 4 + 20);
     assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE storage_state='pending'")[0].values[0][0], 33);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='published'")[0].values[0][0], 0);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='draft'")[0].values[0][0], 20);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='published'")[0].values[0][0], 0);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='draft'")[0].values[0][0], 2);
   } finally {
     db.close();
   }
@@ -51,6 +56,23 @@ test("os anexos Anki são catalogados como dados textuais e expostos com filtros
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
   assert.match(component, /aria-pressed/);
+});
+
+test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", () => {
+  assert.match(worker, /cache-control.*max-age=3600/);
+  assert.match(worker, /if-none-match/);
+  assert.match(worker, /content-range/);
+  assert.match(worker, /range \? 206 : 200/);
+  assert.match(worker, /request\.method !== "HEAD"/);
+  assert.match(worker, /id IN \('anki-neuro-essential', 'anki-neuro-complete'\) AND publication_status='published' AND storage_state='ready'/);
+  assert.match(worker, /A media Anki aguarda revisão de direitos/);
+  assert.match(artifactScript, /MIMED/);
+  assert.match(artifactScript, /with-summary-covers/);
+  assert.match(artifactScript, /logo-comissao-curso-fmup-2025-2031-transparente\.png/);
+  assert.match(artifactScript, /da717fcfdd2c34c3c6e8c7dd0d48dccf116ff8adb212453a80238af09477ff88/);
+  assert.match(artifactScript, /uploadStatus: "blocked"/);
+  assert.match(artifactScript, /uploadStatus !== "blocked"/);
+  assert.match(artifactScript, /uploadStatus: "review-required"/);
 });
 
 test("a gestão do catálogo fica limitada a administradores e à direção", () => {

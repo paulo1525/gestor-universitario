@@ -558,7 +558,7 @@ test("as janelas históricas permanecem no esquema mas não são expostas na adm
 
 test("o exemplo de número mecanográfico é neutro",()=>{
   assert.match(detail,/placeholder="202500000"/);
-  assert.doesNotMatch(detail,/placeholder="202507850"/);
+  assert.doesNotMatch(detail,/placeholder="202[0-9]{3}850"/);
 });
 
 test("reposição de palavra-passe expira, limita tentativas e revoga sessões",()=>{

@@ -1,0 +1,35 @@
+.panel { display: grid; gap: 14px; padding: 17px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-subtle, #faf9f5); }
+.heading { display: flex; align-items: flex-start; gap: 11px; }
+.icon { display: grid; width: 39px; height: 39px; flex: 0 0 auto; place-items: center; border-radius: 11px; color: #695200; background: var(--gold-soft); }
+.icon svg { width: 19px; height: 19px; }
+.eyebrow { color: #806500; font-size: 9px; font-weight: 850; letter-spacing: .02em; }
+.heading h2 { margin: 3px 0 0; color: var(--ink); font-size: 17px; line-height: 1.3; }
+.heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.filters { display: grid; gap: 13px; }
+.filterBlock { display: grid; gap: 5px; }
+.label { color: var(--ink); font-size: 10px; font-weight: 850; }
+.chips, .chipsScrollable { display: flex; flex-wrap: wrap; gap: 7px; }
+.chipsScrollable { max-height: 106px; overflow-y: auto; padding-right: 3px; }
+.chips button, .chipsScrollable button { min-height: 31px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font: inherit; font-size: 9px; font-weight: 800; cursor: pointer; }
+.chips button:hover, .chipsScrollable button:hover { border-color: #d8bc44; color: #5c4700; }
+.chips .chipActive, .chipsScrollable .chipActive { border-color: #d5bd52; color: #594500; background: var(--gold-soft); }
+.muted { color: var(--muted); font-size: 10px; }
+.checkbox { display: flex; align-items: flex-start; gap: 8px; color: var(--ink); font-size: 10px; }
+.checkbox input { width: 16px; height: 16px; margin-top: 1px; accent-color: var(--gold); }
+.checkbox span { display: grid; gap: 3px; }
+.bankControls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.bankControls .button { white-space: nowrap; }
+.checkbox strong { font-size: 10px; }
+.checkbox small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.options { display: flex; align-items: end; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 2px; }
+.selectField { display: grid; min-width: 175px; gap: 5px; color: var(--ink); font-size: 10px; font-weight: 850; }
+.selectField select { min-height: 35px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-size: 10px; }
+.summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid #eadb92; border-radius: 10px; color: #594500; background: #fffdf1; font-size: 9px; font-weight: 800; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions .button { justify-content: center; }
+.error { margin: 0; padding: 9px 11px; border: 1px solid #e0a69f; border-radius: 9px; color: #8b3229; background: #fff0ed; font-size: 10px; line-height: 1.45; }
+.note { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.note svg { width: 14px; flex: 0 0 auto; margin-top: 1px; color: #967300; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 560px) { .panel { padding: 14px; } .bankControls { align-items: stretch; flex-direction: column; } .bankControls .button { width: 100%; justify-content: center; } .options { align-items: stretch; flex-direction: column; } .selectField { min-width: 0; } .actions { flex-direction: column; } .actions .button { width: 100%; } }

@@ -19,7 +19,6 @@ export type HubUser = {
 type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket };
 type ModuleChecker = (key: string) => Promise<boolean>;
 
-const PRIMARY_ADMIN = "up202507850@up.pt";
 const MATERIAL_MIMES = new Set([
   "image/jpeg", "image/png", "image/webp", "application/pdf", "text/plain",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -55,7 +54,7 @@ function longText(value: unknown, max: number): string {
 function actor(user: HubUser): string { return user.actorId || user.id; }
 function isCommission(user: HubUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionPosition)); }
 function canManageCore(user: HubUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionDepartment === "management")); }
-function isPrimary(user: HubUser | null): boolean { return user?.email.toLowerCase().replace("@edu.med.up.pt", "@up.pt") === PRIMARY_ADMIN; }
+function isPrimary(user: HubUser | null): boolean { return user?.role === "admin" && user.commissionPosition === "principal_admin"; }
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
 function unauthenticated(): Response { return json({ error: "Sessão inválida." }, 401); }
 function forbidden(): Response { return json({ error: "Acesso reservado a membros da Comissão de Curso." }, 403); }
