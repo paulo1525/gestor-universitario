@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "r
 import { BookOpen, Download, FileText, Highlighter, LoaderCircle, Package, Sparkles } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { SurfaceHeader } from "@/components/surface-header";
-import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-pdf";
+import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
 import { MaterialPdfReader } from "@/components/material-pdf-reader";
 import styles from "@/components/material-catalog.module.css";
 

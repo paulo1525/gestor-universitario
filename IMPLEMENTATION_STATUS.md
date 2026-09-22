@@ -48,7 +48,7 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 |---|---|---|---|---|
 | Auditoria da UI atual | Concluída | — | — | Captura pública concluída; áreas autenticadas aguardam ramo publicado |
 | Protótipos visuais | Concluídos | Desktop e mobile definidos | — | Referência aprovada pelo utilizador |
-| Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
+| Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe e capas editoriais nos cartões das 11 UCs do 2.º ano | 338/338 no ramo de orquestração | Pendente no ramo publicado |
 | Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada; eventos ligam à UC e pesquisam o local no diretório | 311/311 no consolidado | Pendente no ramo publicado |
 | Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
 | Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor, notas e leitor PDF com realces privados | 337/337 no ramo recriado | Pendente no ramo publicado |
@@ -65,6 +65,7 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 - navegação preta, superfícies claras e dourado usado apenas para foco, seleção e ações principais;
 - cabeçalhos com hierarquia tipográfica forte e elevada legibilidade;
 - painéis brancos, bordas discretas, raios e sombras retirados dos tokens globais;
+- capas verticais das UCs com fundo marfim, ilustração anatómica em azul-acinzentado e apontamentos dourados, reutilizadas no catálogo e nos PDFs sem duplicar artefactos;
 - Materiais organizado por `Visão geral`, `Sumários`, `Bibliografia`, `Anki` e `Exames`;
 - configurador Anki com tipos de cartão, aulas/tópicos, opções e resumo da seleção;
 - versão móvel com cabeçalho compacto, separadores deslocáveis, cartões empilhados e navegação inferior;
@@ -153,6 +154,8 @@ explícita do utilizador.
 | 22/09/2026 | Retoma após integração da PR #97 | Ramo `feat/implementation-orchestration` recriado a partir de `main` no commit `28232ac`; recursos temporários preservados |
 | 22/09/2026 | Downloads de baixo custo e leitor PDF | Removida a geração de PDF/APKG da interface de Materiais; downloads passam a usar apenas artefactos preparados e o leitor guarda realces privados na D1 através da migration 0063 |
 | 22/09/2026 | Validação do leitor e downloads | 337/337 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com um aviso preexistente em `components/documents-library.tsx` |
+| 22/09/2026 | Capas das unidades curriculares | As 11 capas verticais do 2.º ano passam a aparecer nos cartões das UCs; o registo visual foi separado do gerador PDF para não carregar processamento binário no catálogo |
+| 22/09/2026 | Validação das capas no catálogo | 338/338 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com o aviso preexistente em `components/documents-library.tsx` |
 
 ## Bloqueios antes de `main`
 
@@ -163,6 +166,7 @@ explícita do utilizador.
 5. aplicar a migration D1 0063 apenas depois de revisão e imediatamente antes da integração correspondente;
 6. validar o alinhamento dos realces em PDFs com diferentes proporções no Chrome autenticado, em computador e telemóvel;
 7. confirmar que cada pacote pré-gerado tem checksum, versão e autorização de direitos antes de marcar o objeto como `ready`.
+8. validar no Chrome autenticado o recorte das 11 capas nos cartões das UCs em desktop e a 390 px.
 
 ## Próxima atualização prevista
 

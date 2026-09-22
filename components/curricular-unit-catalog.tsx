@@ -1,6 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -28,6 +29,7 @@ import { ModuleGuard } from "@/components/module-guard";
 import { QuestionBankSection } from "@/components/question-bank-section";
 import { RichTextContent } from "@/components/rich-text-editor";
 import { useI18n } from "@/components/i18n-context";
+import { resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
 import styles from "@/components/curricular-unit-catalog.module.css";
 
 type ApiRepresentative = {
@@ -273,8 +275,9 @@ export function CurricularUnitCatalog() {
                 </div>
               ) : (
                 <div className={`${styles.grid} ${styles.catalogGrid}`}>
-                  {visible.map((item) => (
-                    <Link
+                  {visible.map((item) => {
+                    const compendiumUnit = resolveMaterialCompendiumUnit(item.id) || resolveMaterialCompendiumUnit(item.code) || resolveMaterialCompendiumUnit(item.name);
+                    return <Link
                       className={`${styles.card} ${styles.catalogCard}`}
                       href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}
                       key={item.id}
@@ -285,35 +288,42 @@ export function CurricularUnitCatalog() {
                           {t("community.units.yearSemester", { year: item.year, semester: item.semester })}
                         </span>
                       </div>
-                      <div>
-                        <h3>{item.name}</h3>
-                        {item.description && <p>{item.description}</p>}
+                      <div className={styles.catalogCardBody}>
+                        {compendiumUnit && <span className={styles.unitCover} aria-hidden="true">
+                          <Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="(max-width: 430px) 68px, 88px" />
+                        </span>}
+                        <div className={styles.catalogCardContent}>
+                          <div className={styles.catalogCopy}>
+                            <h3>{item.name}</h3>
+                            {item.description && <p>{item.description}</p>}
+                          </div>
+                          <div className={styles.metrics}>
+                            <div className={styles.metric}>
+                              <span>{t("community.units.credits")}</span>
+                              <strong>
+                                {item.ects.toLocaleString(locale)} ECTS
+                              </strong>
+                            </div>
+                            <div className={styles.metric}>
+                              <span>{t("community.units.year")}</span>
+                              <strong>{item.year}.º</strong>
+                            </div>
+                            <div className={styles.metric}>
+                              <span>{t("community.units.semester")}</span>
+                              <strong>{item.semester}.º</strong>
+                            </div>
+                          </div>
+                          {item.representatives.length > 0 && <div className={styles.metaRow}>
+                            <UserRound />
+                            <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
+                          </div>}
+                          <span className={styles.linkHint}>
+                            {t("community.units.openArea")} <ArrowRight />
+                          </span>
+                        </div>
                       </div>
-                      <div className={styles.metrics}>
-                        <div className={styles.metric}>
-                          <span>{t("community.units.credits")}</span>
-                          <strong>
-                            {item.ects.toLocaleString(locale)} ECTS
-                          </strong>
-                        </div>
-                        <div className={styles.metric}>
-                          <span>{t("community.units.year")}</span>
-                          <strong>{item.year}.º</strong>
-                        </div>
-                        <div className={styles.metric}>
-                          <span>{t("community.units.semester")}</span>
-                          <strong>{item.semester}.º</strong>
-                        </div>
-                      </div>
-                      {item.representatives.length > 0 && <div className={styles.metaRow}>
-                        <UserRound />
-                        <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
-                      </div>}
-                      <span className={styles.linkHint}>
-                        {t("community.units.openArea")} <ArrowRight />
-                      </span>
                     </Link>
-                  ))}
+                  })}
                 </div>
               )}
             </section>
