@@ -313,9 +313,9 @@
 
 .unitCover {
   position: relative;
-  min-height: 124px;
+  aspect-ratio: 1055 / 1492;
   overflow: hidden;
-  align-self: stretch;
+  align-self: start;
   border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--line));
   border-radius: 8px;
   background: #f4f0e5;
@@ -334,7 +334,7 @@
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .catalogCopy p {
@@ -798,7 +798,6 @@
   .detailStats { grid-template-columns: 1fr; }
   .card { min-height: auto; }
   .catalogCardBody { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
-  .unitCover { min-height: 96px; }
   .listItem { grid-template-columns: 34px minmax(0, 1fr); }
   .listItem a { grid-column: 2; }
 }

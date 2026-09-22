@@ -13,6 +13,7 @@
 .colors { display: flex; gap: 6px; margin-left: auto; }
 .colors button { width: 27px; height: 27px; border: 2px solid var(--surface); border-radius: 999px; background: var(--highlight-color); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
 .colors button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.originalLink { color: var(--ink); font-size: 11px; font-weight: 750; text-underline-offset: 3px; white-space: nowrap; }
 .colors button[data-color="gold"], .highlight[data-color="gold"], .highlightList article > span[data-color="gold"] { --highlight-color: rgb(238 196 48 / 48%); }
 .colors button[data-color="blue"], .highlight[data-color="blue"], .highlightList article > span[data-color="blue"] { --highlight-color: rgb(67 157 210 / 38%); }
 .colors button[data-color="green"], .highlight[data-color="green"], .highlightList article > span[data-color="green"] { --highlight-color: rgb(69 173 119 / 38%); }
@@ -21,8 +22,10 @@
 .drawButton svg { width: 16px; }
 .drawButtonActive { color: #fff; background: #171717; border-color: #171717; }
 .workspace { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 280px; }
-.pageStage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #2d3033; }
-.pageStage iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.pageStage { position: relative; display: grid; min-width: 0; min-height: 0; overflow: hidden; place-items: center; background: #2d3033; }
+.pageSurface { position: relative; max-width: 100%; max-height: 100%; background: #fff; box-shadow: 0 3px 16px rgb(0 0 0 / 25%); }
+.pageSurface canvas { display: block; }
+.pdfStatus { position: absolute; z-index: 4; top: 12px; left: 12px; margin: 0; border-radius: var(--radius-control); padding: 8px 12px; color: #fff; background: #171717; font-size: 12px; }
 .overlay { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
 .overlayDrawing { cursor: crosshair; pointer-events: auto; touch-action: none; }
 .highlight { position: absolute; border-radius: 2px; background: var(--highlight-color); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--highlight-color) 80%, #000); pointer-events: none; }

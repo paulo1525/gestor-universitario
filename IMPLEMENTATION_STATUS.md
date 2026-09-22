@@ -160,18 +160,22 @@ autorização explícita do utilizador.
 | 22/09/2026 | Validação final da PR #109 consolidada | 347/347 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados; avisos duplicados de tradução removidos |
 | 22/09/2026 | Capas das unidades curriculares | As 11 capas verticais do 2.º ano passam a aparecer nos cartões das UCs; o registo visual foi separado do gerador PDF para não carregar processamento binário no catálogo |
 | 22/09/2026 | Validação das capas no catálogo | 338/338 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com o aviso preexistente em `components/documents-library.tsx` |
+| 22/09/2026 | Retoma local isolada da PR #109 | Setup D1 corrigido para criar um administrador fictício antes da migration 0034; sequência canónica até 0063 e seed local concluídos, sem alterações remotas |
+| 22/09/2026 | QA local de capas e leitor PDF | As 11 capas verificadas no Chrome a 1440, 1024, 768 e 390 px; recorte A4 corrigido. PDF fictício vertical e horizontal renderizado em desktop/mobile com realces ancorados à página; rota e ficheiro de QA removidos |
+| 22/09/2026 | Consulta D1 remota, sem escrita | `wrangler d1 migrations list --remote` confirmou que apenas 0061, 0062 e 0063 estão pendentes; as anteriores constam como aplicadas |
+| 22/09/2026 | Consulta R2 remota, sem escrita | Bucket `gestor-universitario-materials` confirmado; não foram carregados ou publicados artefactos protegidos |
+| 22/09/2026 | Validação final local do diff | 347/347 testes, TypeScript, ESLint e build Next.js aprovados. O build OpenNext compilou Next.js mas parou no Windows com `EPERM` ao criar symlink no bundle; requer nova validação no CI após envio autorizado |
+| 22/09/2026 | Leitor PDF acessível e estável | O modal retém e restitui o foco; renders de página são serializados e a camada de realces fica inativa enquanto a página seguinte é desenhada. 347/347 testes, TypeScript, lint e build Next.js x64 aprovados |
 
 ## Bloqueios antes de `main`
 
 1. gerar e enviar para o R2 apenas novos artefactos cuja distribuição esteja autorizada; os binários originais protegidos permanecem arquivados;
 2. executar QA visual autenticado em desktop e mobile no ramo publicado;
-3. confirmar no painel Cloudflare o resultado do build após a separação das migrations e o provisionamento do bucket R2;
-4. aplicar as migrations D1 remotas 0056–0058;
-5. aplicar a migration D1 0063 apenas depois de revisão e imediatamente antes da integração correspondente;
-6. validar o alinhamento dos realces em PDFs com diferentes proporções no Chrome autenticado, em computador e telemóvel;
-7. confirmar que cada pacote pré-gerado tem checksum, versão e autorização de direitos antes de marcar o objeto como `ready`;
-8. concluir os checks obrigatórios da PR #109 e confirmar o build remoto da Cloudflare.
-8. validar no Chrome autenticado o recorte das 11 capas nos cartões das UCs em desktop e a 390 px.
+3. o bucket R2 está provisionado e o Workers Build remoto da PR #109 passou no commit `15b30c3`; alterações locais posteriores exigirão novos checks após publicação autorizada;
+4. aplicar as migrations D1 remotas 0061–0063 apenas após testes/build, commit e push autorizados; consulta remota confirmou que são as únicas pendentes;
+5. confirmar que cada pacote pré-gerado tem checksum, versão e autorização de direitos antes de marcar o objeto como `ready`;
+6. concluir os checks obrigatórios da PR #109 após eventual atualização autorizada e confirmar o build remoto da Cloudflare;
+7. validar realces persistidos sobre um PDF autorizado no R2 no Chrome autenticado; o QA local com PDF fictício confirmou apenas geometria e responsividade.
 
 ## Próxima atualização prevista
 

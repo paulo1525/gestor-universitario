@@ -51,7 +51,8 @@ test("the curricular-unit catalog reuses prepared A4 covers without importing PD
   assert.doesNotMatch(catalog, /material-compendium-pdf/);
   assert.match(catalog, /<Image src=\{compendiumUnit\.coverUrl\}/);
   assert.match(styles, /\.unitCover\s*\{[^}]*border[^}]*background/s);
-  assert.match(styles, /\.unitCover img\s*\{[^}]*object-fit:\s*cover/s);
+  assert.match(styles, /\.unitCover\s*\{[^}]*aspect-ratio:\s*1055\s*\/\s*1492/s);
+  assert.match(styles, /\.unitCover img\s*\{[^}]*object-fit:\s*contain/s);
 });
 
 test("compendium PDF contains the uniform cover and respects solution visibility", async () => {

@@ -1,8 +1,8 @@
 -- Resolução dos bloqueios de direitos dos materiais de Neuroanatomia.
 --
 -- Os APKG binários com imagens/recortes de obras protegidas deixam de ser
--- candidatos a publicação. A aplicação passa a gerar APKG no navegador a
--- partir de cartões moderados, sem reutilizar os binários protegidos.
+-- candidatos a publicação. Um novo pacote só poderá ser disponibilizado
+-- depois de preparado, moderado e autorizado, sem reutilizar estes binários.
 --
 -- Os excertos bibliográficos deixam de representar ficheiros distribuíveis:
 -- conservam-se apenas a referência e os intervalos de páginas. O ZIP agregado
@@ -10,7 +10,7 @@
 
 UPDATE material_anki_decks
 SET publication_status = 'archived',
-    description = 'Pacote binário original arquivado por conter media/recortes sem autorização de distribuição. Substituído pela geração local de um APKG a partir do banco moderado.',
+    description = 'Pacote binário original arquivado por conter media/recortes sem autorização de distribuição. Um novo pacote exigirá preparação e autorização antes de ser disponibilizado.',
     updated_at = unixepoch() * 1000
 WHERE id IN ('anki-neuro-essential', 'anki-neuro-complete');
 
