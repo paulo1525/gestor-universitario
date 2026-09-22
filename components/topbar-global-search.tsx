@@ -243,9 +243,9 @@ export function TopbarGlobalSearch() {
       }}
       onFocus={() => { if (query.trim()) setOpen(true); }}
       onKeyDown={handleKeyDown}
-      placeholder={t("search.placeholder")}
+      placeholder={t("search.topbarPlaceholder")}
       maxLength={160}
-      aria-label={t("search.placeholder")}
+      aria-label={t("search.topbarPlaceholder")}
     />
     <kbd>Ctrl K</kbd>
     <button type="submit" aria-label={t("search.openFull")}><Search /></button>
@@ -253,7 +253,7 @@ export function TopbarGlobalSearch() {
     {panelVisible && <div className="topbar-search-popover" onPointerDown={event => event.preventDefault()}>
       <div className="topbar-search-results" id={listboxId} role="listbox" aria-label={t("search.suggestions")}>
         {value.length < 2 ? <div className="topbar-search-state"><Search /><span>{t("search.minimumCharacters")}</span></div>
-          : loading ? <div className="topbar-search-state" role="status"><LoaderCircle className="spin" /><span>{t("search.loading")}</span></div>
+          : loading ? <div className="topbar-search-state" role="status"><LoaderCircle className="spin" /><span>{t("search.topbarLoading")}</span></div>
           : error ? <div className="topbar-search-state topbar-search-state--error" role="status"><CircleAlert /><span>{error}</span></div>
           : results.length === 0 ? <div className="topbar-search-state"><Search /><span>{t("search.noResults", { query: value })}</span></div>
           : groups.map((group, groupIndex) => <section className="topbar-search-group" role="group" aria-labelledby={`${listboxId}-group-${groupIndex}`} key={group.label}>

@@ -179,7 +179,6 @@ export function CommissionDirectory() {
               icon={<Users />}
               eyebrow={t("community.directory.eyebrow")}
               title={t("community.directory.breadcrumb")}
-              description={t("community.directory.description")}
             />
 
             {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}

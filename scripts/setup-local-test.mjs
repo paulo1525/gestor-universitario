@@ -1,11 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { pbkdf2Sync } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const database = "gestor-universitario-prod";
+const localPersistPath = join(root, ".wrangler", "state");
 const pepper = "gestor-universitario-local-test-pepper-2026";
 const password = "TesteLocal!2026";
 const salt = "Z2VzdG9yLWxvY2FsLXRlc3Q=";
@@ -30,12 +31,33 @@ function sql(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function runWrangler(args) {
+function runWrangler(args, configPath = null) {
   const pnpm = process.env.PNPM_BIN || "corepack";
   const command = pnpm === "corepack" ? [pnpm, "pnpm", "exec", "wrangler", ...args] : [pnpm, "exec", "wrangler", ...args];
+  command.push("--persist-to", localPersistPath);
+  if (configPath) command.push("--config", configPath);
   execFileSync(command[0], command.slice(1), { cwd: root, stdio: "inherit", shell: true });
 }
 
+// 0034 intentionally requires a technical administrator. Bootstrap its schema
+// and a fictitious local actor before applying the canonical migrations.
+const bootstrapRoot = join(root, ".wrangler", "tmp");
+mkdirSync(bootstrapRoot, { recursive: true });
+const bootstrapMigrations = mkdtempSync(join(bootstrapRoot, "migration-bootstrap-"));
+for (const entry of readdirSync(join(root, "migrations"))) {
+  if (/^\d{4}_/.test(entry) && Number(entry.slice(0, 4)) <= 33) {
+    copyFileSync(join(root, "migrations", entry), join(bootstrapMigrations, entry));
+  }
+}
+const bootstrapConfig = join(bootstrapMigrations, "wrangler.jsonc");
+writeFileSync(bootstrapConfig, JSON.stringify({
+  name: "gestor-universitario-local-bootstrap",
+  d1_databases: [{ binding: "DB", database_name: database, database_id: "73ec72ce-ac47-431d-92bb-11dc556b4384", migrations_dir: bootstrapMigrations }],
+}, null, 2), "utf8");
+runWrangler(["d1", "migrations", "apply", database, "--local"], bootstrapConfig);
+const bootstrapAdminSql = join(bootstrapRoot, "migration-admin.sql");
+writeFileSync(bootstrapAdminSql, "INSERT OR IGNORE INTO users (id,email,password_hash,password_salt,password_iterations,role,email_verified_at,password_changed_at,created_at,updated_at) VALUES ('local-migration-admin','local-migration-admin@invalid.local','bootstrap','bootstrap',1,'admin',unixepoch()*1000,unixepoch()*1000,unixepoch()*1000,unixepoch()*1000);\n", "utf8");
+runWrangler(["d1", "execute", database, "--local", "--file", bootstrapAdminSql]);
 runWrangler(["d1", "migrations", "apply", database, "--local"]);
 
 const users = [

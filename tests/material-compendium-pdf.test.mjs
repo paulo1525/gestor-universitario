@@ -4,8 +4,10 @@ import { readFile, writeFile } from "node:fs/promises";
 import ts from "typescript";
 
 const moduleUri = (code) => "data:text/javascript;base64," + Buffer.from(ts.transpileModule(code, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText).toString("base64");
-const pdfUri = moduleUri((await readFile(new URL("../lib/material-compendium-pdf.ts", import.meta.url), "utf8")).replaceAll('"jspdf"', JSON.stringify(import.meta.resolve("jspdf"))));
-const { MATERIAL_COMPENDIUM_UNITS, buildMaterialCompendiumPdf, loadMaterialQuestionBank, resolveMaterialCompendiumUnit } = await import(pdfUri);
+const unitsUri = moduleUri(await readFile(new URL("../lib/material-compendium-units.ts", import.meta.url), "utf8"));
+const pdfUri = moduleUri((await readFile(new URL("../lib/material-compendium-pdf.ts", import.meta.url), "utf8")).replaceAll('"jspdf"', JSON.stringify(import.meta.resolve("jspdf"))).replaceAll('"@/lib/material-compendium-units"', JSON.stringify(unitsUri)));
+const { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } = await import(unitsUri);
+const { buildMaterialCompendiumPdf, loadMaterialQuestionBank } = await import(pdfUri);
 
 test("question bank loader follows the published pagination contract", async () => {
   const requested = [];
@@ -27,12 +29,30 @@ test("question bank loader follows the published pagination contract", async () 
   assert.ok(requested.every((url) => new URL(url, "https://example.test").searchParams.get("pageSize") === "50"));
 });
 
-test("the second-year unit registry resolves every prepared cover", () => {
+test("the second-year unit registry resolves every prepared portrait cover", async () => {
   assert.equal(MATERIAL_COMPENDIUM_UNITS.length, 11);
   assert.equal(resolveMaterialCompendiumUnit("DECIDES II")?.coverUrl, "/decides-ii-compendio-cover-v2.png");
   assert.equal(resolveMaterialCompendiumUnit("curricular-mi251")?.shortTitle, "Histologia II. Embriologia");
   assert.equal(resolveMaterialCompendiumUnit("Imunologia Básica · Compêndio personalizado")?.code, "IMUNO BAS");
   assert.notEqual(resolveMaterialCompendiumUnit("DECIDES I")?.coverUrl, resolveMaterialCompendiumUnit("DECIDES II")?.coverUrl);
+  assert.equal(new Set(MATERIAL_COMPENDIUM_UNITS.map((unit) => unit.coverUrl)).size, MATERIAL_COMPENDIUM_UNITS.length);
+  for (const unit of MATERIAL_COMPENDIUM_UNITS) {
+    const bytes = await readFile(new URL(`../public${unit.coverUrl}`, import.meta.url));
+    const width = bytes.readUInt32BE(16);
+    const height = bytes.readUInt32BE(20);
+    assert.ok(width / height > 0.64 && width / height < 0.72, `${unit.code} cover must remain suitable for an A4 portrait crop`);
+  }
+});
+
+test("the curricular-unit catalog reuses prepared A4 covers without importing PDF generation", async () => {
+  const catalog = await readFile(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../components/curricular-unit-catalog.module.css", import.meta.url), "utf8");
+  assert.match(catalog, /from "@\/lib\/material-compendium-units"/);
+  assert.doesNotMatch(catalog, /material-compendium-pdf/);
+  assert.match(catalog, /<Image src=\{compendiumUnit\.coverUrl\}/);
+  assert.match(styles, /\.unitCover\s*\{[^}]*border[^}]*background/s);
+  assert.match(styles, /\.unitCover\s*\{[^}]*aspect-ratio:\s*1055\s*\/\s*1492/s);
+  assert.match(styles, /\.unitCover img\s*\{[^}]*object-fit:\s*contain/s);
 });
 
 test("compendium PDF contains the uniform cover and respects solution visibility", async () => {

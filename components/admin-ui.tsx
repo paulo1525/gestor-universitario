@@ -12,7 +12,6 @@ export function AdminPageHeader({
   icon,
   eyebrow,
   title,
-  description,
   actions,
 }: {
   icon?: ReactNode;
@@ -27,7 +26,6 @@ export function AdminPageHeader({
     icon={icon ?? <ShieldCheck />}
     eyebrow={eyebrow}
     title={title}
-    description={description}
     actions={actions && <div className={styles.pageActions}>{actions}</div>}
   />;
 }

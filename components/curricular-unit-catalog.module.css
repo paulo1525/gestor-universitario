@@ -291,7 +291,53 @@
   line-height: 1.35;
 }
 
-.card > div > p {
+.catalogCardBody {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 13px;
+  flex: 1;
+}
+
+.catalogCardContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.catalogCardContent:only-child {
+  grid-column: 1 / -1;
+}
+
+.unitCover {
+  position: relative;
+  aspect-ratio: 1055 / 1492;
+  overflow: hidden;
+  align-self: start;
+  border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--line));
+  border-radius: 8px;
+  background: #f4f0e5;
+}
+
+.unitCover::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, white 58%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+}
+
+.unitCover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.catalogCopy p {
   display: -webkit-box;
   overflow: hidden;
   margin: 4px 0 0;
@@ -751,6 +797,7 @@
   .metrics,
   .detailStats { grid-template-columns: 1fr; }
   .card { min-height: auto; }
+  .catalogCardBody { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
   .listItem { grid-template-columns: 34px minmax(0, 1fr); }
   .listItem a { grid-column: 2; }
 }

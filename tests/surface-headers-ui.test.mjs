@@ -84,7 +84,6 @@ test("pesquisa, filtros e separadores não substituem o título das superfícies
 
 test("ferramentas e secções aninhadas reutilizam o mesmo cabeçalho", () => {
   for (const path of [
-    "components/calendar-subscription.tsx",
     "components/class-roster-import.tsx",
     "components/material-compendium-export.tsx",
     "components/question-bank-section.tsx",
@@ -92,6 +91,9 @@ test("ferramentas e secções aninhadas reutilizam o mesmo cabeçalho", () => {
   ]) {
     assert.match(read(path), /<SurfaceHeader/, `${path} deve usar SurfaceHeader`);
   }
+
+  assert.match(read("components/calendar-subscription.tsx"), /className=\{styles\.trigger\}/);
+  assert.match(read("components/calendar-subscription.tsx"), /role="dialog"/);
 
   assert.match(read("app/cookies/page.tsx"), /<SurfaceHeader/);
   assert.match(read("app/regulamento-distribuicao/page.tsx"), /<SurfaceHeader/);

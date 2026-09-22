@@ -160,7 +160,6 @@ export function DocumentsLibrary() {
   );
 
   const filtersActive = Boolean(query.trim() || typeFilter !== "all" || unitFilter !== "all");
-  const activeFilterCount = [query.trim(), typeFilter !== "all", unitFilter !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setTypeFilter("all"); setUnitFilter("all"); };
 
   const save = async (event: FormEvent) => {
@@ -223,7 +222,6 @@ export function DocumentsLibrary() {
             icon={<FileArchive />}
             eyebrow="Arquivo da Comissão de Curso"
             title="Documentos e atas"
-            description="Consulta atas, regulamentos, formulários e outros documentos úteis."
             actions={canManage ? <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button> : undefined}
           />
 

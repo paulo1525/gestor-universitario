@@ -1,7 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import essentialSource from "@/data/materials/anki/neuro-essential.json";
-import completeSource from "@/data/materials/anki/neuro-complete.json";
 import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
 
 export type MaterialsCatalogUser = {
@@ -17,41 +15,32 @@ export type MaterialsCatalogEnv = {
 };
 
 type ModuleChecker = (key: string) => Promise<boolean>;
-type MaterialCard = {
-  id: string;
-  type: "short" | "image";
-  deck: string;
-  lesson: string;
-  subtopic: string;
-  question: string;
-  answer: string;
-  hint: string;
-  source: string;
-  imageKey: string | null;
-  tags: string[];
-};
-type CardSource = { source: { label: string; file: string; noteCount: number }; cards: MaterialCard[] };
 type ApiCard = {
   id: string;
   type: "multiple_choice" | "short_answer" | "image";
+  unitCode?: string;
+  unitName?: string;
   lesson: string;
   subtopic: string;
+  chapter?: string;
   question: string;
   answer: string;
   hint: string;
   source: string;
+  sourceLabel?: string;
+  sourcePage?: string;
+  sourceQuestion?: string;
+  assessment?: string;
+  session?: string;
+  academicYear?: string;
   imageKey: string | null;
   imageUrl: string | null;
   tags: string[];
   options?: Array<{ text: string; isCorrect: boolean }>;
 };
 
-const sources: Record<string, CardSource> = {
-  essential: essentialSource as CardSource,
-  complete: completeSource as CardSource,
-};
 const catalogKinds = new Set(["summary", "bibliography", "anki", "exam", "other"]);
-const cardTypes = new Set(["multiple_choice", "short_answer", "image", "short"]);
+const cardTypes = new Set(["short_answer", "short"]);
 
 function json(data: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers } });
@@ -80,8 +69,11 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     fileName: item.file_name,
     mimeType: item.mime_type,
     storage: { backend: item.storage_backend, state: item.storage_state, ready, size: item.byte_size, checksum: item.checksum_sha256 },
-    downloadUrl: ready
+    downloadUrl: ready && item.storage_backend !== "inline"
       ? externalUrl || `/api/material-catalog/${encodeURIComponent(String(item.id))}/download`
+      : null,
+    viewUrl: ready && item.mime_type === "application/pdf" && !externalUrl
+      ? `/api/material-catalog/${encodeURIComponent(String(item.id))}/view`
       : null,
     verification: item.verification_status,
     status: item.publication_status,
@@ -110,84 +102,80 @@ function mapDeck(item: Record<string, unknown>, lessonRows: Array<Record<string,
     lessons: lessonRows.filter((lesson) => String(lesson.deck_id) === String(item.id)).map((lesson) => ({ id: lesson.lesson_id, code: lesson.code, title: lesson.title, cardCount: Number(lesson.card_count || 0) })),
   };
 }
-function sourceForVariant(value: string): CardSource | null { return sources[value] || null; }
-function cardType(value: MaterialCard["type"]): "short_answer" | "image" { return value === "image" ? "image" : "short_answer"; }
-function normaliseCards(source: CardSource, lessons: string[], subtopics: string[], types: string[]): Array<Record<string, unknown>> {
-  const wantedLessons = new Set(lessons.filter(Boolean).map((value) => value.toUpperCase()));
+async function reviewedQuestionBankCards(
+  env: MaterialsCatalogEnv,
+  unitId: string,
+  unitCode: string,
+  subtopics: string[],
+  types: string[],
+): Promise<ApiCard[]> {
+  const wantedTypes = new Set(types.filter(Boolean).map((value) => value === "short" ? "short_answer" : value));
+  if (wantedTypes.size && !wantedTypes.has("short_answer")) return [];
   const wantedSubtopics = new Set(subtopics.filter(Boolean).map((value) => value.toLocaleLowerCase("pt-PT")));
-  const wantedTypes = new Set(types.filter(Boolean).map((value) => value === "short" ? "short_answer" : value));
-  return source.cards.filter((card) => (!wantedLessons.size || wantedLessons.has(card.lesson.toUpperCase())) && (!wantedSubtopics.size || wantedSubtopics.has(card.subtopic.toLocaleLowerCase("pt-PT"))) && (!wantedTypes.size || wantedTypes.has(cardType(card.type)))).map((card) => ({
-    id: card.id,
-    type: cardType(card.type),
-    lesson: card.lesson,
-    subtopic: card.subtopic,
-    question: card.question,
-    answer: card.answer,
-    hint: card.hint,
-    source: card.source,
-    imageKey: card.imageKey,
-    imageUrl: card.imageKey ? `/api/material-anki/media?key=${encodeURIComponent(card.imageKey)}` : null,
-    tags: card.tags,
-  }));
-}
-
-function stripMarkup(value: unknown): string {
-  return text(typeof value === "string" ? value.replace(/<[^>]*>/g, " ") : "", 360);
-}
-
-async function multipleChoiceCards(env: MaterialsCatalogEnv, lessons: string[], subtopics: string[], types: string[]): Promise<ApiCard[]> {
-  const wantedTypes = new Set(types.filter(Boolean).map((value) => value === "short" ? "short_answer" : value));
-  if (wantedTypes.size && !wantedTypes.has("multiple_choice")) return [];
   try {
-    const questionResult = await env.DB.prepare(`
-      SELECT q.id,q.prompt,q.image_url,q.explanation,t.title AS topic_title,cu.code AS unit_code
-      FROM quiz_questions q
-      JOIN quiz_topics t ON t.id=q.topic_id
+    const result = await env.DB.prepare(`
+      SELECT
+        q.id,
+        q.prompt,
+        q.answer_text,
+        q.source_subtopic,
+        q.source_academic_year,
+        q.source_page,
+        q.source_question,
+        q.source_assessment,
+        q.source_session,
+        t.title AS topic_title,
+        t.chapter_number,
+        cu.code AS unit_code,
+        cu.name AS unit_name
+      FROM question_bank_items q
+      JOIN question_bank_topics t ON t.id=q.topic_id
       JOIN curricular_units cu ON cu.id=q.curricular_unit_id
-      WHERE q.status='published' AND q.deleted_at IS NULL AND lower(cu.code)=lower('NEURO')
-      ORDER BY q.id
+      WHERE q.status='published'
+        AND trim(q.review_note)=''
+        AND trim(q.answer_text)<>''
+        AND (?='' OR q.curricular_unit_id=?)
+        AND (?='' OR lower(cu.code)=lower(?))
+      ORDER BY q.sort_order,q.id
       LIMIT 2000
-    `).all();
-    const questionRows = questionResult.results.map(row);
-    if (!questionRows.length) return [];
-    const ids = questionRows.map((item) => String(item.id));
-    const placeholders = ids.map(() => "?").join(",");
-    const optionResult = await env.DB.prepare(`SELECT question_id,option_text,is_correct,position FROM quiz_question_options WHERE question_id IN (${placeholders}) ORDER BY question_id,position`).bind(...ids).all();
-    const optionsByQuestion = new Map<string, Array<{ text: string; isCorrect: boolean }>>();
-    for (const option of optionResult.results.map(row)) {
-      const questionId = String(option.question_id);
-      const values = optionsByQuestion.get(questionId) || [];
-      values.push({ text: text(option.option_text, 360), isCorrect: Number(option.is_correct || 0) === 1 });
-      optionsByQuestion.set(questionId, values);
-    }
-    const wantedLessons = new Set(lessons.filter(Boolean).map((value) => value.toUpperCase()));
-    const wantedSubtopics = new Set(subtopics.filter(Boolean).map((value) => value.toLocaleLowerCase("pt-PT")));
-    return questionRows.flatMap((item): ApiCard[] => {
-      const topic = text(item.topic_title, 180);
-      const lesson = (topic.match(/\b(?:AT|AP)\d+\b/i)?.[0] || "").toUpperCase();
-      if (wantedLessons.size && !wantedLessons.has(lesson)) return [];
+    `).bind(unitId, unitId, unitCode, unitCode).all();
+    return result.results.map(row).flatMap((item): ApiCard[] => {
+      const topic = text(item.source_subtopic, 180) || text(item.topic_title, 180) || "Neuroanatomia";
       if (wantedSubtopics.size && !wantedSubtopics.has(topic.toLocaleLowerCase("pt-PT"))) return [];
-      const options = optionsByQuestion.get(String(item.id)) || [];
-      if (options.length < 2) return [];
-      const answer = options.find((option) => option.isCorrect)?.text || "";
+      const code = text(item.unit_code, 40) || unitCode;
+      const chapter = text(item.chapter_number, 40);
+      const sourcePage = text(item.source_page, 80);
+      const sourceQuestion = text(item.source_question, 120);
+      const assessment = text(item.source_assessment, 160);
+      const session = text(item.source_session, 160);
+      const academicYear = text(item.source_academic_year, 80);
+      const sourceParts = ["Banco de perguntas revisto", academicYear, assessment, session, sourcePage, sourceQuestion].filter(Boolean);
       return [{
-        id: `quiz-${String(item.id)}`,
-        type: "multiple_choice",
-        lesson,
-        subtopic: topic || "Neuroanatomia",
-        question: text(item.prompt, 1200),
-        answer,
-        hint: stripMarkup(item.explanation),
-        source: `Banco de testes · ${topic || "Neuroanatomia"}`,
+        id: `question-bank-${String(item.id)}`,
+        type: "short_answer",
+        unitCode: code,
+        unitName: text(item.unit_name, 160),
+        lesson: "",
+        subtopic: topic,
+        chapter,
+        question: text(item.prompt, 2400),
+        answer: text(item.answer_text, 2400),
+        hint: "",
+        source: sourceParts.join(" · "),
+        sourceLabel: "Banco de perguntas revisto",
+        sourcePage,
+        sourceQuestion,
+        assessment,
+        session,
+        academicYear,
         imageKey: null,
-        imageUrl: typeof item.image_url === "string" && item.image_url ? item.image_url : null,
-        tags: ["NEURO", lesson, topic, "multiple_choice"].filter(Boolean),
-        options,
+        imageUrl: null,
+        tags: [code, chapter ? `capitulo-${chapter}` : "", topic, "short_answer"].filter(Boolean),
       }];
     });
   } catch {
-    // Catalog access should remain available when the optional question-bank tables
-    // are not present in a local/preview database.
+    // Mantém o catálogo utilizável em previews locais onde a migration do
+    // banco de perguntas ainda não exista.
     return [];
   }
 }
@@ -231,17 +219,28 @@ async function anki(request: Request, env: MaterialsCatalogEnv, url: URL, user: 
   if (!await enabled("materials.anki")) return disabled();
   if (!user) return unauthenticated();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
-  const variant = text(url.searchParams.get("variant"), 20) || "essential", source = sourceForVariant(variant);
-  if (!source) return json({ error: "Pacote Anki não encontrado." }, 404);
-  const lessonValues = url.searchParams.getAll("lesson").concat((url.searchParams.get("lessons") || "").split(",")).map((value) => text(value, 20)).filter(Boolean);
+  const variant = text(url.searchParams.get("variant"), 20) || "reviewed";
+  if (variant !== "reviewed") return json({ error: "Pacote Anki legado indisponível; use a versão revista.", code: "LEGACY_ANKI_RETIRED" }, 410);
+  const unitId = text(url.searchParams.get("unitId"), 100);
+  const unitCode = text(url.searchParams.get("unitCode"), 40) || "NEURO";
   const subtopics = url.searchParams.getAll("subtopic").concat((url.searchParams.get("subtopics") || "").split("\n")).map((value) => text(value, 180)).filter(Boolean);
   const types = url.searchParams.getAll("type").concat((url.searchParams.get("types") || "").split(",")).map((value) => text(value, 30)).filter(Boolean);
   if (types.some((value) => !cardTypes.has(value))) return json({ error: "Tipo de cartão inválido." }, 400);
-  const staticCards = normaliseCards(source, lessonValues, subtopics, types) as ApiCard[];
-  const cards = [...await multipleChoiceCards(env, lessonValues, subtopics, types), ...staticCards];
-  const lessons = [...new Set(cards.map((card) => card.lesson))].sort().map((code) => ({ code, cardCount: cards.filter((card) => card.lesson === code).length }));
-  const facets = [...new Set(cards.map((card) => `${card.lesson}\u0000${card.subtopic}\u0000${card.type}`))].map((key) => { const [lesson, subtopic, type] = key.split("\u0000"); return { lesson, subtopic, type, cardCount: cards.filter((card) => card.lesson === lesson && card.subtopic === subtopic && card.type === type).length }; });
-  return json({ variant, source: source.source, cards, cardCount: cards.length, totalCardCount: source.cards.length, lessons, subtopics: facets, capabilities: { customBuilder: true, storage: Boolean(env.MATERIALS_BUCKET) } });
+  const cards = await reviewedQuestionBankCards(env, unitId, unitCode, subtopics, types);
+  const facets = [...new Set(cards.map((card) => `${card.subtopic}\u0000${card.type}`))].map((key) => {
+    const [subtopic, type] = key.split("\u0000");
+    return { lesson: "", subtopic, type, cardCount: cards.filter((card) => card.subtopic === subtopic && card.type === type).length };
+  });
+  return json({
+    variant,
+    source: { label: "question-bank-reviewed", file: null, noteCount: cards.length },
+    cards,
+    cardCount: cards.length,
+    totalCardCount: cards.length,
+    lessons: [],
+    subtopics: facets,
+    capabilities: { customBuilder: true, storage: false, media: false, protectedBinaryPackages: false },
+  });
 }
 
 type ByteRange = { offset: number; length: number };
@@ -280,11 +279,11 @@ function objectNotModified(request: Request, object: { httpEtag?: string; etag?:
   return Number.isFinite(since) && object.uploaded.getTime() <= since + 999;
 }
 
-function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; httpEtag?: string; etag?: string; uploaded?: Date; size: number }, fileName: string, mimeType: string, length: number, range: ByteRange | null, totalSize = object.size): Headers {
+function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; httpEtag?: string; etag?: string; uploaded?: Date; size: number }, fileName: string, mimeType: string, length: number, range: ByteRange | null, totalSize = object.size, disposition: "attachment" | "inline" = "attachment"): Headers {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   if (!headers.has("content-type")) headers.set("content-type", mimeType || "application/octet-stream");
-  headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName || "material")}`);
+  headers.set("content-disposition", `${disposition}; filename*=UTF-8''${encodeURIComponent(fileName || "material")}`);
   headers.set("cache-control", "private, max-age=3600, stale-while-revalidate=86400");
   headers.set("x-content-type-options", "nosniff");
   headers.set("accept-ranges", "bytes");
@@ -295,7 +294,7 @@ function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; ht
   return headers;
 }
 
-async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string): Promise<Response> {
+async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string, disposition: "attachment" | "inline" = "attachment"): Promise<Response> {
   if (!env.MATERIALS_BUCKET) return json({ error: "O armazenamento de materiais ainda não foi provisionado.", code: "STORAGE_NOT_READY" }, 409);
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
@@ -324,7 +323,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
     }
   }
   if (metadata && objectNotModified(request, metadata)) {
-    const headers = downloadHeaders(metadata, fileName, mimeType, metadata.size, null);
+    const headers = downloadHeaders(metadata, fileName, mimeType, metadata.size, null, metadata.size, disposition);
     headers.delete("content-length");
     return new Response(null, { status: 304, headers });
   }
@@ -338,7 +337,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
 
   if (method === "HEAD") {
     if (!metadata) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
-    const headers = downloadHeaders(metadata, fileName || key.split("/").pop() || "material", mimeType, range?.length ?? metadata.size, range, metadata.size);
+    const headers = downloadHeaders(metadata, fileName || key.split("/").pop() || "material", mimeType, range?.length ?? metadata.size, range, metadata.size, disposition);
     return new Response(null, { status: range ? 206 : 200, headers });
   }
 
@@ -361,7 +360,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
   }
   if (!object) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
   const contentLength = range?.length ?? object.size;
-  const headers = downloadHeaders(object, fileName || key.split("/").pop() || "material", mimeType, contentLength, range, metadata?.size ?? object.size);
+  const headers = downloadHeaders(object, fileName || key.split("/").pop() || "material", mimeType, contentLength, range, metadata?.size ?? object.size, disposition);
   return new Response(object.body, { status: range ? 206 : 200, headers });
 }
 
@@ -375,6 +374,59 @@ async function download(request: Request, env: MaterialsCatalogEnv, id: string, 
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
 }
 
+async function viewPdf(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
+  const item = await env.DB.prepare("SELECT file_name,mime_type,storage_backend,storage_key,storage_state FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  if (!item || item.mime_type !== "application/pdf") return json({ error: "PDF não encontrado." }, 404);
+  if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este PDF ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
+  return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material.pdf"), "application/pdf", "inline");
+}
+
+function finiteCoordinate(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : null;
+}
+
+async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  const material = await env.DB.prepare("SELECT id FROM material_catalog WHERE id=? AND mime_type='application/pdf' AND publication_status='published'").bind(id).first();
+  if (!material) return json({ error: "PDF não encontrado." }, 404);
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at FROM material_pdf_highlights WHERE user_id=? AND material_id=? ORDER BY page_number,created_at").bind(user.id, id).all();
+    return json({ highlights: result.results.map((item) => { const value = row(item); return { id: value.id, page: value.page_number, x: value.x, y: value.y, width: value.width, height: value.height, color: value.color, selectedText: value.selected_text, note: value.note, createdAt: value.created_at, updatedAt: value.updated_at }; }) });
+  }
+  let body: Record<string, unknown> | null = null;
+  try { body = await request.json() as Record<string, unknown>; } catch { return json({ error: "Pedido inválido." }, 400); }
+  const highlightId = text(body.id, 100);
+  if (request.method === "DELETE") {
+    if (!highlightId) return json({ error: "Realce inválido." }, 400);
+    const result = await env.DB.prepare("DELETE FROM material_pdf_highlights WHERE id=? AND user_id=? AND material_id=?").bind(highlightId, user.id, id).run();
+    if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
+    return json({ ok: true });
+  }
+  if (request.method !== "POST" && request.method !== "PUT") return json({ error: "Operação não suportada." }, 405);
+  const page = Number(body.page), x = finiteCoordinate(body.x), y = finiteCoordinate(body.y), width = finiteCoordinate(body.width), height = finiteCoordinate(body.height);
+  const color = text(body.color, 12) || "gold", selectedText = text(body.selectedText, 1200), note = text(body.note, 800);
+  if (!Number.isInteger(page) || page < 1 || page > 10000 || x === null || y === null || width === null || height === null || width <= 0 || height <= 0 || x + width > 1.001 || y + height > 1.001 || !["gold", "blue", "green", "rose"].includes(color)) return json({ error: "Coordenadas do realce inválidas." }, 400);
+  const now = Date.now();
+  if (request.method === "PUT") {
+    if (!highlightId) return json({ error: "Realce inválido." }, 400);
+    const result = await env.DB.prepare("UPDATE material_pdf_highlights SET page_number=?,x=?,y=?,width=?,height=?,color=?,selected_text=?,note=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?")
+      .bind(page, x, y, width, height, color, selectedText || null, note || null, now, highlightId, user.id, id).run();
+    if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
+    return json({ highlight: { id: highlightId, page, x, y, width, height, color, selectedText, note, updatedAt: now } });
+  }
+  const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM material_pdf_highlights WHERE user_id=? AND material_id=?").bind(user.id, id).first<{ total: number }>();
+  if (Number(count?.total || 0) >= 500) return json({ error: "Este PDF atingiu o limite de 500 realces." }, 409);
+  const finalId = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(finalId, user.id, id, page, x, y, width, height, color, selectedText || null, note || null, now, now).run();
+  return json({ highlight: { id: finalId, page, x, y, width, height, color, selectedText, note, createdAt: now, updatedAt: now } }, 201);
+}
+
 async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.anki")) return disabled();
@@ -385,37 +437,21 @@ async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: stri
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
 }
 
-async function media(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
-  if (!await enabled("materials.anki")) return disabled();
-  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
-  // APKG media may contain atlas or book imagery. Keep the R2 path closed
-  // while every deck is still in the rights-review draft state, even if an
-  // object was uploaded accidentally before the catalogue was approved.
-  try {
-    const approvedDeck = await env.DB.prepare("SELECT 1 FROM material_anki_decks WHERE id IN ('anki-neuro-essential', 'anki-neuro-complete') AND publication_status='published' AND storage_state='ready' LIMIT 1").first();
-    if (!approvedDeck) return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
-  } catch {
-    return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
-  }
-  const key = text(url.searchParams.get("key"), 180);
-  const valid = [...new Set(Object.values(sources).flatMap((source) => source.cards.map((card) => card.imageKey).filter(Boolean)))].includes(key);
-  if (!valid || !/^[A-Za-z0-9._-]+$/.test(key)) return json({ error: "Media Anki inválida." }, 400);
-  return objectDownload(request, env, `materials/neuroanatomia/anki/media/${key}`, key, "image/png");
-}
-
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+\/download$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path) || path === "/api/material-anki/media";
+  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+\/(download|view|highlights)$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (path === "/api/material-catalog") return user ? catalog(request, env, url, user, enabled) : unauthenticated();
   if (path === "/api/material-anki") return user ? anki(request, env, url, user, enabled) : unauthenticated();
-  if (path === "/api/material-anki/media") return user ? media(request, env, url, user, enabled) : unauthenticated();
   const item = path.match(/^\/api\/material-catalog\/([^/]+)\/download$/);
   if (item) return user ? download(request, env, decodeURIComponent(item[1]), user, enabled) : unauthenticated();
+  const viewer = path.match(/^\/api\/material-catalog\/([^/]+)\/view$/);
+  if (viewer) return user ? viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled) : unauthenticated();
+  const highlights = path.match(/^\/api\/material-catalog\/([^/]+)\/highlights$/);
+  if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);
   if (deck) return user ? ankiDownload(request, env, decodeURIComponent(deck[1]), user, enabled) : unauthenticated();
   return json({ error: "Operação não suportada." }, 405);

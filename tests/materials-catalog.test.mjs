@@ -6,11 +6,13 @@ import initSqlJs from "sql.js/dist/sql-asm.js";
 import { buildMaterialApkg } from "../lib/anki/materials.ts";
 
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
+const rightsMigration = await readFile(new URL("../migrations/0062_material_rights_substitution.sql", import.meta.url), "utf8");
+const highlightsMigration = await readFile(new URL("../migrations/0063_material_pdf_highlights.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
 const artifactScript = await readFile(new URL("../scripts/prepare-material-artifacts.mjs", import.meta.url), "utf8");
 const component = await readFile(new URL("../components/material-catalog.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/material-catalog.module.css", import.meta.url), "utf8");
-const essential = JSON.parse(await readFile(new URL("../data/materials/anki/neuro-essential.json", import.meta.url), "utf8"));
+const pdfReader = await readFile(new URL("../components/material-pdf-reader.tsx", import.meta.url), "utf8");
 
 test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos anexos", async () => {
   const SQL = await initSqlJs();
@@ -39,20 +41,39 @@ test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos
   }
 });
 
-test("os anexos Anki são catalogados como dados textuais e expostos com filtros e fallback R2", () => {
-  assert.equal(essential.source.noteCount, 1099);
-  assert.equal(essential.cards.length, 1099);
-  assert.ok(essential.cards.every((card) => ["short", "image"].includes(card.type)));
+test("a resolução de direitos publica apenas metadados bibliográficos e arquiva os APKG binários", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE app_module_settings (module_key TEXT PRIMARY KEY,enabled INTEGER,updated_by TEXT,updated_at INTEGER);
+      CREATE TABLE curricular_units (id TEXT PRIMARY KEY,code TEXT,active INTEGER);
+      INSERT INTO curricular_units VALUES ('unit-neuro','NEURO',1);
+    `);
+    db.run(migration);
+    db.run(rightsMigration);
+    db.run(rightsMigration);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND publication_status='published' AND storage_backend='inline' AND storage_state='ready' AND file_name IS NULL")[0].values[0][0], 19);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE id='material-bibliography-neuro-package' AND publication_status='archived'")[0].values[0][0], 1);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='archived'")[0].values[0][0], 2);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='published'")[0].values[0][0], 0);
+  } finally {
+    db.close();
+  }
+});
+
+test("os downloads preparados não expõem os pacotes protegidos", () => {
   assert.match(worker, /material-catalog/);
   assert.match(worker, /material-anki/);
+  assert.doesNotMatch(worker, /neuro-essential\.json|neuro-complete\.json/);
   assert.match(worker, /STORAGE_NOT_READY/);
-  assert.match(worker, /multipleChoiceCards/);
-  assert.match(worker, /externalUrl/);
-  assert.match(worker, /unitCode/);
-  assert.match(component, /Visão geral|catalog\.tab\.overview/);
-  assert.match(component, /Essencial/);
-  assert.match(component, /Completo/);
-  assert.match(component, /multiple_choice/);
+  assert.match(worker, /WHERE id=\? AND publication_status='published'/);
+  assert.match(worker, /item\.storage_state !== "ready"/);
+  assert.match(component, /Download preparado/);
+  assert.match(component, /servido diretamente do armazenamento/);
+  assert.match(component, /Referência bibliográfica apenas/);
+  assert.doesNotMatch(component, /buildMaterialApkg|materialApkgBlob|URL\.createObjectURL|MaterialCompendiumExport/);
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
   assert.match(component, /aria-pressed/);
@@ -69,8 +90,7 @@ test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", ()
   assert.match(worker, /content-range/);
   assert.match(worker, /range \? 206 : 200/);
   assert.match(worker, /request\.method !== "HEAD"/);
-  assert.match(worker, /id IN \('anki-neuro-essential', 'anki-neuro-complete'\) AND publication_status='published' AND storage_state='ready'/);
-  assert.match(worker, /A media Anki aguarda revisão de direitos/);
+  assert.doesNotMatch(worker, /material-anki\/media/);
   assert.match(artifactScript, /MIMED/);
   assert.match(artifactScript, /with-summary-covers/);
   assert.match(artifactScript, /logo-comissao-curso-fmup-2025-2031-transparente\.png/);
@@ -78,6 +98,32 @@ test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", ()
   assert.match(artifactScript, /uploadStatus: "blocked"/);
   assert.match(artifactScript, /uploadStatus !== "blocked"/);
   assert.match(artifactScript, /uploadStatus: "review-required"/);
+});
+
+test("os PDFs abrem em modo inline e os realces privados persistem na D1", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE material_catalog (id TEXT PRIMARY KEY);
+      INSERT INTO users VALUES ('user-1');
+      INSERT INTO material_catalog VALUES ('pdf-1');
+    `);
+    db.run(highlightsMigration);
+    db.run(highlightsMigration);
+    db.run("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,created_at,updated_at) VALUES('h-1','user-1','pdf-1',2,.1,.2,.3,.04,'gold',1,1)");
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_pdf_highlights")[0].values[0][0], 1);
+  } finally {
+    db.close();
+  }
+  assert.match(worker, /content-disposition.*disposition/);
+  assert.match(worker, /material_pdf_highlights/);
+  assert.match(worker, /\/view/);
+  assert.match(worker, /\/highlights/);
+  assert.match(component, /Abrir e realçar/);
+  assert.match(pdfReader, /Camada de realces/);
+  assert.match(pdfReader, /page, \.\.\.shape, color, note/);
 });
 
 test("a gestão do catálogo fica limitada a administradores e à direção", () => {
@@ -92,8 +138,7 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", () =>
   assert.match(component, /ArrowRight/);
   assert.match(component, /role="tabpanel"/);
   assert.match(component, /retryCatalog/);
-  assert.match(component, /cardsError/);
-  assert.match(component, /noCardTypes/);
+  assert.match(component, /Download preparado/);
   assert.match(styles, /scrollbar-width:\s*none/);
   assert.match(styles, /@media \(max-width: 560px\)/);
   assert.match(styles, /resourceActions \.button \{ width: 100%/);

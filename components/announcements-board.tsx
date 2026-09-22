@@ -267,7 +267,6 @@ export function AnnouncementsBoard() {
       icon={<Megaphone />}
       eyebrow={t("announcements.eyebrow")}
       title={t("announcements.title")}
-      description={t("announcements.intro")}
       actions={canPublish ? <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button> : undefined}
     />
 

@@ -749,7 +749,6 @@ export function MaterialLibrary() {
               icon={<FolderOpen />}
               eyebrow={t("community.materials.eyebrow")}
               title={t("community.materials.title")}
-              description={t("community.materials.description")}
               actions={submissionEnabled ? <div className={styles.heroActions}><button className="button button--primary" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button></div> : undefined}
             />
             {notice && (

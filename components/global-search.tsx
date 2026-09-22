@@ -105,7 +105,7 @@ export function GlobalSearch() {
   };
 
   return <AuthGuard><ModuleGuard moduleKey="search.global"><AppShell active="search" breadcrumb={t("search.breadcrumb")}><div className={styles.page}>
-    <SurfaceHeader standalone headingLevel="h1" icon={<Search />} eyebrow={t("search.eyebrow")} title={t("search.title")} description={t("search.intro")} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<Search />} eyebrow={t("search.eyebrow")} title={t("search.title")} />
     {error && <AppToast kind="error" message={error} onDismiss={() => setError("")} />}
     <section className={styles.panel}>
       <SurfaceHeader icon={<Search />} title={t("search.title")} />
