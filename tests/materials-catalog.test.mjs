@@ -6,10 +6,12 @@ import initSqlJs from "sql.js/dist/sql-asm.js";
 import { buildMaterialApkg } from "../lib/anki/materials.ts";
 
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
+const highlightsMigration = await readFile(new URL("../migrations/0063_material_pdf_highlights.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
 const artifactScript = await readFile(new URL("../scripts/prepare-material-artifacts.mjs", import.meta.url), "utf8");
 const component = await readFile(new URL("../components/material-catalog.tsx", import.meta.url), "utf8");
 const styles = await readFile(new URL("../components/material-catalog.module.css", import.meta.url), "utf8");
+const pdfReader = await readFile(new URL("../components/material-pdf-reader.tsx", import.meta.url), "utf8");
 const essential = JSON.parse(await readFile(new URL("../data/materials/anki/neuro-essential.json", import.meta.url), "utf8"));
 
 test("a migration 0057 cria um catálogo idempotente e conserva os metadados dos anexos", async () => {
@@ -52,7 +54,7 @@ test("os anexos Anki são catalogados como dados textuais e expostos com filtros
   assert.match(component, /Visão geral|catalog\.tab\.overview/);
   assert.match(component, /Essencial/);
   assert.match(component, /Completo/);
-  assert.match(component, /multiple_choice/);
+  assert.match(component, /Download preparado/);
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
   assert.match(component, /aria-pressed/);
@@ -78,6 +80,34 @@ test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", ()
   assert.match(artifactScript, /uploadStatus: "blocked"/);
   assert.match(artifactScript, /uploadStatus !== "blocked"/);
   assert.match(artifactScript, /uploadStatus: "review-required"/);
+  assert.doesNotMatch(component, /buildMaterialApkg|materialApkgBlob|URL\.createObjectURL|MaterialCompendiumExport/);
+  assert.match(component, /servido diretamente do armazenamento/);
+});
+
+test("os PDFs abrem em modo inline e os realces privados persistem na D1", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE material_catalog (id TEXT PRIMARY KEY);
+      INSERT INTO users VALUES ('user-1');
+      INSERT INTO material_catalog VALUES ('pdf-1');
+    `);
+    db.run(highlightsMigration);
+    db.run(highlightsMigration);
+    db.run("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,created_at,updated_at) VALUES('h-1','user-1','pdf-1',2,.1,.2,.3,.04,'gold',1,1)");
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_pdf_highlights")[0].values[0][0], 1);
+  } finally {
+    db.close();
+  }
+  assert.match(worker, /content-disposition.*disposition/);
+  assert.match(worker, /material_pdf_highlights/);
+  assert.match(worker, /\/view/);
+  assert.match(worker, /\/highlights/);
+  assert.match(component, /Abrir e realçar/);
+  assert.match(pdfReader, /Camada de realces/);
+  assert.match(pdfReader, /page, \.\.\.shape, color, note/);
 });
 
 test("a gestão do catálogo fica limitada a administradores e à direção", () => {
@@ -92,8 +122,7 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", () =>
   assert.match(component, /ArrowRight/);
   assert.match(component, /role="tabpanel"/);
   assert.match(component, /retryCatalog/);
-  assert.match(component, /cardsError/);
-  assert.match(component, /noCardTypes/);
+  assert.match(component, /Download preparado/);
   assert.match(styles, /scrollbar-width:\s*none/);
   assert.match(styles, /@media \(max-width: 560px\)/);
   assert.match(styles, /resourceActions \.button \{ width: 100%/);

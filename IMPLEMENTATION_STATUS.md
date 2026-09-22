@@ -1,6 +1,6 @@
 # Plano de implementação — expansão do Gestor Universitário
 
-Última atualização: 21 de setembro de 2026
+Última atualização: 22 de setembro de 2026
 
 ## Objetivo
 
@@ -37,7 +37,7 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 
 | Ramo | Âmbito | Estado |
 |---|---|---|
-| `feat/implementation-orchestration` | Auditoria, protótipos, integração e validação final | Em curso |
+| `feat/implementation-orchestration` | Auditoria, protótipos, integração e validação final | Recriado sobre a `main` após a integração da PR #97; em curso |
 | `feat/academic-content-plan` | Informação das unidades curriculares e calendário | Integrado |
 | `feat/materials-anki-plan` | Materiais, sumários, bibliografia e Anki | Integrado |
 | `feat/community-campus-plan` | Dúvidas, exames, salas, docentes e avisos críticos | Integrado |
@@ -51,9 +51,9 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 | Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
 | Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada; eventos ligam à UC e pesquisam o local no diretório | 311/311 no consolidado | Pendente no ramo publicado |
 | Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
-| Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor e notas | 306/306 no consolidado | Pendente no ramo publicado |
-| Catálogo Anki | Ausente em Materiais | Integrada | 306/306 no consolidado | Pendente no ramo publicado |
-| Gerador Anki personalizado | Parcial em Testes | Integrada; controlos acessíveis | 306/306 no consolidado | Pendente no ramo publicado |
+| Bibliografia recomendada recortada | Ausente | Integrada; páginas impressas/físicas, autor, notas e leitor PDF com realces privados | 337/337 no ramo recriado | Pendente no ramo publicado |
+| Catálogo Anki | Ausente em Materiais | Integrado; downloads diretos de artefactos pré-gerados | 337/337 no ramo recriado | Pendente no ramo publicado |
+| Gerador Anki personalizado | Parcial em Testes | Retirado da interface de Materiais para evitar geração intensiva no dispositivo | 337/337 no ramo recriado | Substituído por pacotes versionados |
 | Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Envio e transcrição de exames | Parcial | Integrada; transições sequenciais e idempotentes validadas | 311/311 no consolidado | Pendente no ramo publicado |
 | Mapa de salas | Ausente | Integrada; resultados incluídos na pesquisa global | 311/311 no consolidado | Pendente no ramo publicado |
@@ -72,13 +72,13 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 
 ## Recursos temporários no ramo de trabalho
 
-Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia foram copiados para
-`temporary-resources/neuroanatomia/` no checkout local. O ZIP de bibliografia foi
+Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia permanecem preservados
+em `temporary-resources/neuroanatomia/` no checkout local. O ZIP de bibliografia foi
 dividido em partes inferiores a 100 MB e inclui instruções de reconstrução e
-checksums em `README.md`. O manifesto está no GitHub; os binários permanecem no
-commit local `023ffe9` até serem enviados para o bucket R2 `MATERIALS_BUCKET`,
-porque o conector GitHub não suporta esta transferência. Estes recursos não podem
-ser apagados sem autorização explícita do utilizador.
+checksums em `README.md`. Apenas o manifesto é versionado; os binários continuam
+fora do GitHub até existir autorização de direitos e um carregamento controlado no
+bucket R2 `MATERIALS_BUCKET`. Estes recursos não podem ser apagados sem autorização
+explícita do utilizador.
 
 ## Conteúdo inicial de Neuroanatomia
 
@@ -102,6 +102,8 @@ ser apagados sem autorização explícita do utilizador.
 
 - D1 guarda metadados, estados, relações e histórico.
 - Ficheiros grandes devem usar armazenamento de objetos; não devem ser convertidos em data URLs na D1.
+- PDFs e pacotes Anki são pré-gerados, versionados e transmitidos diretamente do R2; pedidos de estudantes não executam geração binária.
+- Realces de PDF são uma camada privada na D1, identificada por utilizador, material, página e coordenadas normalizadas; o PDF original nunca é alterado.
 - Originais, versões verificadas e versões históricas nunca são substituídos silenciosamente.
 - Materiais submetidos continuam sujeitos a moderação.
 - Informação académica não confirmada aparece como `A validar`.
@@ -148,6 +150,9 @@ ser apagados sem autorização explícita do utilizador.
 | 21/09/2026 | Aperfeiçoamento do diretório de Campus | Edifícios, salas, mapas, acessibilidade e docentes associados a unidades curriculares passaram a ter apresentação responsiva e editor administrativo acessível |
 | 21/09/2026 | Aperfeiçoamento de Materiais/Anki | Navegação por separadores com teclado, estados de erro e repetição, cancelamento de pedidos obsoletos, proteção contra seleções Anki vazias e adaptação móvel a 390 px |
 | 21/09/2026 | Validação consolidada após três frentes Luna Max | 318/318 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
+| 22/09/2026 | Retoma após integração da PR #97 | Ramo `feat/implementation-orchestration` recriado a partir de `main` no commit `28232ac`; recursos temporários preservados |
+| 22/09/2026 | Downloads de baixo custo e leitor PDF | Removida a geração de PDF/APKG da interface de Materiais; downloads passam a usar apenas artefactos preparados e o leitor guarda realces privados na D1 através da migration 0063 |
+| 22/09/2026 | Validação do leitor e downloads | 337/337 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com um aviso preexistente em `components/documents-library.tsx` |
 
 ## Bloqueios antes de `main`
 
@@ -155,8 +160,10 @@ ser apagados sem autorização explícita do utilizador.
 2. executar QA visual autenticado em desktop e mobile no ramo publicado;
 3. confirmar no painel Cloudflare o resultado do build após a separação das migrations e o provisionamento do bucket R2;
 4. aplicar as migrations D1 remotas 0056–0058;
-5. retirar o estado draft da PR #97 apenas depois dos checks obrigatórios.
+5. aplicar a migration D1 0063 apenas depois de revisão e imediatamente antes da integração correspondente;
+6. validar o alinhamento dos realces em PDFs com diferentes proporções no Chrome autenticado, em computador e telemóvel;
+7. confirmar que cada pacote pré-gerado tem checksum, versão e autorização de direitos antes de marcar o objeto como `ready`.
 
 ## Próxima atualização prevista
 
-O documento será atualizado após a publicação do ramo, a validação visual autenticada e a decisão de integração em `main`.
+O documento será atualizado após a publicação do ramo, o build completo, a validação visual autenticada do leitor PDF e a decisão de integração em `main`.
