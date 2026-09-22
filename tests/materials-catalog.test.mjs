@@ -7,6 +7,7 @@ import { buildMaterialApkg } from "../lib/anki/materials.ts";
 
 const migration = await readFile(new URL("../migrations/0057_materials_catalog_anki.sql", import.meta.url), "utf8");
 const rightsMigration = await readFile(new URL("../migrations/0062_material_rights_substitution.sql", import.meta.url), "utf8");
+const authorizedMigration = await readFile(new URL("../migrations/0064_publish_authorized_neuro_materials.sql", import.meta.url), "utf8");
 const highlightsMigration = await readFile(new URL("../migrations/0063_material_pdf_highlights.sql", import.meta.url), "utf8");
 const worker = await readFile(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8");
 const artifactScript = await readFile(new URL("../scripts/prepare-material-artifacts.mjs", import.meta.url), "utf8");
@@ -63,6 +64,27 @@ test("a resolução de direitos publica apenas metadados bibliográficos e arqui
   }
 });
 
+test("a autorização de redistribuição repõe os downloads verificados", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE app_module_settings (module_key TEXT PRIMARY KEY,enabled INTEGER,updated_by TEXT,updated_at INTEGER);
+      CREATE TABLE curricular_units (id TEXT PRIMARY KEY,code TEXT,active INTEGER);
+      INSERT INTO curricular_units VALUES ('unit-neuro','NEURO',1);
+    `);
+    db.run(migration);
+    db.run(rightsMigration);
+    db.run(authorizedMigration);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE publication_status='published' AND storage_backend='r2' AND storage_state='ready'")[0].values[0][0], 33);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_catalog WHERE material_kind='bibliography' AND checksum_sha256 IS NOT NULL")[0].values[0][0], 20);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_anki_decks WHERE publication_status='published' AND storage_state='ready'")[0].values[0][0], 2);
+  } finally {
+    db.close();
+  }
+});
+
 test("os downloads preparados não expõem os pacotes protegidos", () => {
   assert.match(worker, /material-catalog/);
   assert.match(worker, /material-anki/);
@@ -95,8 +117,8 @@ test("downloads de artefactos pré-gerados suportam cache HTTP e intervalos", ()
   assert.match(artifactScript, /with-summary-covers/);
   assert.match(artifactScript, /logo-comissao-curso-fmup-2025-2031-transparente\.png/);
   assert.match(artifactScript, /da717fcfdd2c34c3c6e8c7dd0d48dccf116ff8adb212453a80238af09477ff88/);
-  assert.match(artifactScript, /uploadStatus: "blocked"/);
-  assert.match(artifactScript, /uploadStatus !== "blocked"/);
+  assert.match(artifactScript, /uploadStatus: "ready"/);
+  assert.match(artifactScript, /stageCatalogEntries/);
   assert.match(artifactScript, /uploadStatus: "review-required"/);
 });
 

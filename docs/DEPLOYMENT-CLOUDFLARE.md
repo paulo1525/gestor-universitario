@@ -40,20 +40,18 @@ como pronto, confirme o tamanho e o SHA-256 indicados no catálogo. O upload é
 uma operação externa ao repositório e não deve adicionar binários grandes ao
 Git.
 
-### Gate de direitos dos artefactos
+### Autorização e preparação dos artefactos
 
-O script `scripts/prepare-material-artifacts.mjs` valida os checksums locais,
-mas não carrega objetos. O manifesto marca como `blocked` os dois APKG (cada
-um contém imagens identificadas como Yokochi e recortes de páginas) e o ZIP de
-bibliografia (excertos de Gray, Lippincott e Nolte). Estes três artefactos não
-devem ser enviados para R2 nem passar a `published` sem autorização de direitos.
-Os PDFs de capa derivados dos sumários ficam como `review-required` e também
-exigem confirmação antes do upload. A migration 0057 mantém os excertos, o ZIP
-e os APKG catalogados em `draft`, mesmo quando os checksums estão verificados.
+O autor confirmou autorização para redistribuir os elementos incluídos nos
+dois APKG e no ZIP de bibliografia, incluindo as imagens Yokochi e os excertos
+de Gray, Lippincott e Nolte. O script `scripts/prepare-material-artifacts.mjs`
+valida os checksums, extrai de forma determinística os 32 ficheiros individuais
+catalogados e marca estes artefactos como `ready`; o upload continua a ser uma
+operação separada e explícita. Os PDFs de capa derivados permanecem opcionais
+e `review-required`, porque não fazem parte do conjunto autorizado original.
 
-Só devem ser carregados artefactos que o manifesto identifique como
-`review-required` depois de a comissão confirmar a autorização correspondente.
-Não carregar atlas, imagens de atlas, páginas de livros ou dados pessoais.
+Nunca carregar ficheiros fora do manifesto, versões com checksum divergente,
+referências MIMED ou dados pessoais.
 
 ## Ordem de uma versão
 

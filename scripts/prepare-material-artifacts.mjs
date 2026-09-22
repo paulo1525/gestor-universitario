@@ -9,14 +9,13 @@
  *   node scripts/prepare-material-artifacts.mjs --check-only
  *   node scripts/prepare-material-artifacts.mjs --with-summary-covers
  *
- * The bibliography ZIP and the APKGs are checksum-validated but blocked from
- * staging because they contain protected excerpts or images. Summary cover
- * PDFs are opt-in because they create new derivatives from the local source
- * package and must be reviewed before publication.
+ * The bibliography ZIP and APKGs are staged after checksum validation. The
+ * package author confirmed redistribution rights for their included media.
+ * Summary cover PDFs remain opt-in derivatives requiring separate review.
  */
 
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -36,8 +35,7 @@ const expected = [
     storageKey: `materials/neuroanatomia/anki/${ESSENTIAL}`,
     kind: "anki",
     mimeType: "application/apkg",
-    uploadStatus: "blocked",
-    rightsReason: "Contém 17 imagens identificadas como Yokochi e recortes de páginas; requer autorização de direitos.",
+    uploadStatus: "ready",
     bytes: 16473756,
     sha256: "da717fcfdd2c34c3c6e8c7dd0d48dccf116ff8adb212453a80238af09477ff88",
   },
@@ -46,8 +44,7 @@ const expected = [
     storageKey: `materials/neuroanatomia/anki/${COMPLETE}`,
     kind: "anki",
     mimeType: "application/apkg",
-    uploadStatus: "blocked",
-    rightsReason: "Contém 17 imagens identificadas como Yokochi e recortes de páginas; requer autorização de direitos.",
+    uploadStatus: "ready",
     bytes: 16543230,
     sha256: "a59c4addb772d08f97d828de8e0ffa2291ce327aa25887a6154cdb488e07756f",
   },
@@ -56,8 +53,7 @@ const expected = [
     storageKey: `materials/neuroanatomia/bibliografia/${PACKAGE}`,
     kind: "bibliography-package",
     mimeType: "application/zip",
-    uploadStatus: "blocked",
-    rightsReason: "Inclui excertos de Gray, Lippincott e Nolte; não carregar sem autorização de direitos.",
+    uploadStatus: "ready",
     bytes: 191131120,
     sha256: "06082cc89302320f484e64c04d068a472ae0c8f9f3b796dee663a44ef4a3539f",
   },
@@ -112,24 +108,45 @@ async function validateAndCopySource(sourceDir, outputDir, item, checkOnly) {
   // 190 MB bibliography bundle on every validation run.
   if (FORBIDDEN.test(bytes.toString("latin1"))) throw new Error(`${item.sourceName}: o pacote contém uma referência MIMED e foi recusado.`);
   const destination = assertInside(outputDir, join(outputDir, item.storageKey.replaceAll("/", sep)));
-  if (!checkOnly && item.uploadStatus === "blocked") {
-    // Remove stale copies produced by an older version of this script so a
-    // later operator cannot mistake them for upload candidates.
-    try {
-      await unlink(destination);
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
-    }
-  } else if (!checkOnly) {
+  if (!checkOnly) {
     await mkdir(dirname(destination), { recursive: true });
     await copyFile(sourcePath, destination);
   }
   return {
     ...item,
     sourcePath: item.sourceName,
-    outputPath: item.uploadStatus === "blocked" ? null : relative(outputDir, destination).replaceAll(sep, "/"),
+    outputPath: relative(outputDir, destination).replaceAll(sep, "/"),
     ...actual,
   };
+}
+
+async function stageCatalogEntries(sourceDir, outputDir, checkOnly) {
+  const catalogSql = await readFile("migrations/0057_materials_catalog_anki.sql", "utf8");
+  const catalogEntries = catalogSql.split("\n").map((line) => {
+    const match = line.match(/SELECT '(material-(?:summary|biblio)-[^']+)',.*? '([^']+\.(?:pdf|txt))', '(?:application\/pdf|text\/plain)', 'r2', '(materials\/neuroanatomia\/[^']+)'/);
+    return match && { id: match[1], sourceName: match[2], storageKey: match[3] };
+  }).filter(Boolean);
+  if (catalogEntries.length !== 32) throw new Error(`Esperados 32 ficheiros individuais no catálogo; encontrados ${catalogEntries.length}.`);
+  const archive = unzipSync(await readFile(join(sourceDir, PACKAGE)));
+  const results = [];
+  for (const item of catalogEntries) {
+    const candidates = Object.entries(archive)
+      .filter(([name]) => name.split(/[\\/]/).at(-1) === item.sourceName)
+      .sort(([left], [right]) => left.localeCompare(right, "en"));
+    if (candidates.length === 0) throw new Error(`Ficheiro não encontrado no ZIP: ${item.sourceName}`);
+    // Repeated bibliography files can differ only in PDF metadata because the
+    // package generator emitted a copy per lesson. Always select the first
+    // archive path lexicographically so staging is reproducible.
+    const digest = sha256(candidates[0][1]);
+    assertSafeName(item.sourceName);
+    const destination = assertInside(outputDir, join(outputDir, item.storageKey.replaceAll("/", sep)));
+    if (!checkOnly) {
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, candidates[0][1]);
+    }
+    results.push({ id: item.id, sourcePath: candidates[0][0], outputPath: relative(outputDir, destination).replaceAll(sep, "/"), storageKey: item.storageKey, kind: item.id.startsWith("material-summary") ? "summary" : "bibliography", mimeType: item.sourceName.endsWith(".txt") ? "text/plain" : "application/pdf", uploadStatus: "ready", bytes: candidates[0][1].byteLength, sha256: digest });
+  }
+  return results;
 }
 
 function humanTitle(entryName) {
@@ -216,20 +233,21 @@ function assertStagingBudget(entries) {
 const options = parseArgs(process.argv.slice(2));
 const staged = [];
 for (const item of expected) staged.push(await validateAndCopySource(options.sourceDir, options.outputDir, item, options.checkOnly));
+staged.push(...await stageCatalogEntries(options.sourceDir, options.outputDir, options.checkOnly));
 if (options.withSummaryCovers) staged.push(...await createSummaryCovers(options.sourceDir, options.outputDir, options.checkOnly));
 const stagingBudget = assertStagingBudget(staged);
 
 const manifest = {
   schema: 1,
   generatedAt: new Date().toISOString(),
-  sourcePolicy: "Downloads local; referências MIMED recusadas; bibliografia e APKGs com imagens protegidas apenas validados e bloqueados, nunca staged.",
+  sourcePolicy: "Downloads local; referências MIMED recusadas; autor confirmou autorização para redistribuir os elementos incluídos nos APKG/ZIP.",
   stagingPolicy: {
     maxBytes: MAX_STAGING_BYTES,
     maxObjects: MAX_STAGING_OBJECTS,
     stagedBytes: stagingBudget.totalBytes,
     stagedObjects: stagingBudget.objectCount,
     blockedObjects: stagingBudget.blockedObjects,
-    uploadRequirements: "Carregar apenas artefactos com uploadStatus=review-required depois da revisão de direitos. Artefactos blocked nunca devem ser carregados. Confirmar bucket R2 Standard, privado, quota e custo; este script não faz upload.",
+    uploadRequirements: "Carregar apenas artefactos com uploadStatus=ready; derivados review-required exigem revisão separada. Confirmar bucket R2 Standard, privado, quota e custo; este script não faz upload.",
   },
   cacheControl: "private, max-age=3600, stale-while-revalidate=86400",
   artifacts: staged,
