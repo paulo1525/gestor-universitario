@@ -2,7 +2,7 @@
 -- que possui autorização para redistribuir todos os elementos incluídos.
 -- Os objetos são carregados e verificados no R2 antes desta migration remota.
 
-CREATE TEMP TABLE _authorized_neuro_artifacts (
+CREATE TABLE _migration_0064_authorized_neuro_artifacts (
   id TEXT PRIMARY KEY,
   file_name TEXT NOT NULL,
   mime_type TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TEMP TABLE _authorized_neuro_artifacts (
   checksum_sha256 TEXT NOT NULL
 );
 
-INSERT INTO _authorized_neuro_artifacts VALUES
+INSERT INTO _migration_0064_authorized_neuro_artifacts VALUES
 ('material-summary-original-at1','AT1_-_Neurocranio._Ossificacao_-_ORIGINAL.pdf','application/pdf','materials/neuroanatomia/sumarios/originais/AT1_-_Neurocranio._Ossificacao_-_ORIGINAL.pdf',87365,'02b7ef1a8210f319fcad00314554c3acc12c376cd563cb60d736cf6f32e05404'),
 ('material-summary-original-at2','AT2_-_Ontogenia_do_SNC._Neuronio_e_sinapse_-_ORIGINAL.pdf','application/pdf','materials/neuroanatomia/sumarios/originais/AT2_-_Ontogenia_do_SNC._Neuronio_e_sinapse_-_ORIGINAL.pdf',110909,'ac08a32e82b8adb2848af46d3d2fb4975acc11eb59cdf57022639227a3bef286'),
 ('material-summary-original-at3','AT3_-_Medula_espinhal._Meninges_raquidianas_-_ORIGINAL.pdf','application/pdf','materials/neuroanatomia/sumarios/originais/AT3_-_Medula_espinhal._Meninges_raquidianas_-_ORIGINAL.pdf',143734,'19e87d5515cb3bf4f6d014e1527efc2c1e2eb5f8c885401528d470d2032737b7'),
@@ -46,20 +46,20 @@ INSERT INTO _authorized_neuro_artifacts VALUES
 ('material-biblio-nolte-272-295','Nolte7_p272-295.pdf','application/pdf','materials/neuroanatomia/bibliografia/Nolte7_p272-295.pdf',18315392,'ccde30650a425c226deaf4479fff1b0b1f2724658e1499716707b3c5f1ee0f16');
 
 UPDATE material_catalog
-SET file_name = (SELECT file_name FROM _authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
-    mime_type = (SELECT mime_type FROM _authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
+SET file_name = (SELECT file_name FROM _migration_0064_authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
+    mime_type = (SELECT mime_type FROM _migration_0064_authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
     storage_backend = 'r2',
-    storage_key = (SELECT storage_key FROM _authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
+    storage_key = (SELECT storage_key FROM _migration_0064_authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
     storage_state = 'ready',
-    byte_size = (SELECT byte_size FROM _authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
-    checksum_sha256 = (SELECT checksum_sha256 FROM _authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
+    byte_size = (SELECT byte_size FROM _migration_0064_authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
+    checksum_sha256 = (SELECT checksum_sha256 FROM _migration_0064_authorized_neuro_artifacts a WHERE a.id = material_catalog.id),
     verification_status = 'verified',
     publication_status = 'published',
     description = CASE WHEN material_kind = 'bibliography'
       THEN 'Excerto bibliográfico recomendado e autorizado para distribuição.'
       ELSE description END,
     updated_at = unixepoch() * 1000
-WHERE id IN (SELECT id FROM _authorized_neuro_artifacts);
+WHERE id IN (SELECT id FROM _migration_0064_authorized_neuro_artifacts);
 
 UPDATE material_anki_decks
 SET storage_state = 'ready', publication_status = 'published',
@@ -76,4 +76,4 @@ SET storage_state = 'ready', publication_status = 'published',
     updated_at = unixepoch() * 1000
 WHERE id = 'material-bibliography-neuro-package';
 
-DROP TABLE _authorized_neuro_artifacts;
+DROP TABLE _migration_0064_authorized_neuro_artifacts;
