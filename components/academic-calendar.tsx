@@ -539,7 +539,6 @@ export function AcademicCalendar() {
           <div className={styles.modalHeading}>
             <span className={styles.kicker}>Criar evento</span>
             <h2 id="calendar-create-title">Adicionar à agenda</h2>
-            
           </div>
           <div className={styles.modalHeaderActions}><button type="button" className={styles.modalClose} data-app-modal-close disabled={saving} onClick={closeEditor} aria-label="Fechar criação de evento"><X /></button></div>
         </header>

@@ -77,7 +77,7 @@ export function RequestsCenter() {
       description={t("requests.delete.intro")}
       subject={deleteTarget?.subject}
       subjectLabel={t("requests.delete.selected")}
-      warning={t("requests.delete.warning")}
+      warning={deleteError || t("requests.delete.warning")}
       confirmLabel={t(deletingId ? "requests.delete.deleting" : "requests.delete.confirm")}
       cancelLabel={t("requests.delete.cancel")}
       busy={Boolean(deletingId)}

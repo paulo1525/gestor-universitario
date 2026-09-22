@@ -5,10 +5,10 @@ import { Download, FileDown, Image as ImageIcon, LoaderCircle } from "lucide-rea
 import {
   buildMaterialCompendiumPdf,
   loadMaterialQuestionBank,
-  resolveMaterialCompendiumUnit,
   type MaterialCompendiumEntry,
   type MaterialCompendiumType,
 } from "@/lib/material-compendium-pdf";
+import { resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
 import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/material-compendium-export.module.css";
 

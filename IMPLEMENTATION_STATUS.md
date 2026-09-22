@@ -1,6 +1,6 @@
 # Plano de implementação — expansão do Gestor Universitário
 
-Última atualização: 21 de setembro de 2026
+Última atualização: 22 de setembro de 2026
 
 ## Objetivo
 
@@ -37,7 +37,7 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 
 | Ramo | Âmbito | Estado |
 |---|---|---|
-| `feat/implementation-orchestration` | Auditoria, protótipos, integração e validação final | Em curso |
+| `release/consolidate-site-changes` | Consolidação final das alterações pendentes na PR #109 | Em validação sobre a `main` após as PRs #105 e #108 |
 | `feat/academic-content-plan` | Informação das unidades curriculares e calendário | Integrado |
 | `feat/materials-anki-plan` | Materiais, sumários, bibliografia e Anki | Integrado |
 | `feat/community-campus-plan` | Dúvidas, exames, salas, docentes e avisos críticos | Integrado |
@@ -48,12 +48,12 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 |---|---|---|---|---|
 | Auditoria da UI atual | Concluída | — | — | Captura pública concluída; áreas autenticadas aguardam ramo publicado |
 | Protótipos visuais | Concluídos | Desktop e mobile definidos | — | Referência aprovada pelo utilizador |
-| Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe | 306/306 no consolidado | Pendente no ramo publicado |
+| Informação das unidades curriculares | Parcial | Integrada; docentes associados visíveis no detalhe e capas editoriais nos cartões das 11 UCs do 2.º ano | 338/338 no ramo de orquestração | Pendente no ramo publicado |
 | Calendário e ligações às unidades curriculares | Implementado parcialmente | Integrada; eventos ligam à UC e pesquisam o local no diretório | 311/311 no consolidado | Pendente no ramo publicado |
 | Sumários por aula | Ausente | Integrada; filtros por aula, estado e recomendação | 306/306 no consolidado | Pendente no ramo publicado |
-| Bibliografia recomendada | Ausente | Integrada como referências e intervalos de páginas; excertos protegidos não são distribuídos | Testes de direitos atualizados | Pendente no ramo publicado |
-| Catálogo Anki | Ausente em Materiais | Integrado; pacotes binários protegidos arquivados | Testes de direitos atualizados | Pendente no ramo publicado |
-| Gerador Anki personalizado | Parcial em Testes | Integrado; gera APKG localmente a partir do banco moderado, sem media bibliográfica protegida | Testes atualizados | Pendente no ramo publicado |
+| Bibliografia recomendada | Ausente | Metadados e páginas integrados; o leitor PDF com realces privados só abre ficheiros autorizados e prontos no R2 | 347/347 no consolidado | Pendente no ramo publicado |
+| Catálogo Anki | Ausente em Materiais | Downloads diretos de artefactos pré-gerados, publicados e prontos | 347/347 no consolidado | Pendente no ramo publicado |
+| Gerador Anki personalizado | Parcial em Testes | Retirado da interface de Materiais para evitar geração intensiva no dispositivo | 347/347 no consolidado | Substituído por pacotes versionados |
 | Dúvidas anónimas | Parcial | Integrada | Validação funcional concluída | Pendente no ramo consolidado |
 | Envio e transcrição de exames | Parcial | Integrada; transições sequenciais e idempotentes validadas | 311/311 no consolidado | Pendente no ramo publicado |
 | Mapa de salas | Ausente | Integrada; resultados incluídos na pesquisa global | 311/311 no consolidado | Pendente no ramo publicado |
@@ -65,41 +65,52 @@ Não é permitido publicar diretamente com `wrangler deploy`. A produção é at
 - navegação preta, superfícies claras e dourado usado apenas para foco, seleção e ações principais;
 - cabeçalhos com hierarquia tipográfica forte e elevada legibilidade;
 - painéis brancos, bordas discretas, raios e sombras retirados dos tokens globais;
+- capas verticais das UCs com fundo marfim, ilustração anatómica em azul-acinzentado e apontamentos dourados, reutilizadas no catálogo e nos PDFs sem duplicar artefactos;
 - Materiais organizado por `Visão geral`, `Sumários`, `Bibliografia`, `Anki` e `Exames`;
 - configurador Anki com tipos de cartão, aulas/tópicos, opções e resumo da seleção;
 - versão móvel com cabeçalho compacto, separadores deslocáveis, cartões empilhados e navegação inferior;
 - a inspiração aprovada orienta a composição, mantendo os componentes, tokens e regras de acessibilidade do produto.
 
-## Materiais de Neuroanatomia e direitos
+## Recursos temporários no ramo de trabalho
 
-Os dois APKG binários que incluíam imagens/recortes sem autorização de distribuição
-ficam arquivados e fora do fluxo de download. Os dados JSON derivados desses
-pacotes foram retirados da árvore atual. O gerador Anki cria agora um novo APKG
-no navegador a partir de perguntas publicadas no banco moderado, sem reutilizar
-media bibliográfica protegida.
+Os pacotes Anki e o arquivo de bibliografia de Neuroanatomia permanecem preservados
+em `temporary-resources/neuroanatomia/` no checkout local. O ZIP de bibliografia foi
+dividido em partes inferiores a 100 MB e inclui instruções de reconstrução e
+checksums em `README.md`. Apenas o manifesto é versionado. Os binários originais
+permanecem arquivados e fora do fluxo de publicação por conterem media ou recortes
+sem autorização de distribuição. Estes recursos não podem ser apagados sem
+autorização explícita do utilizador.
 
-O ZIP bibliográfico agregado fica arquivado. As referências bibliográficas
-continuam disponíveis no catálogo apenas como metadados, incluindo obra, edição,
-autor e intervalos de páginas; os excertos não são distribuídos pelo Gestor
-Universitário.
+## Conteúdo inicial de Neuroanatomia
 
-## Banco de perguntas de Neuroanatomia
+### Anki
 
-- 1 207 registos importados;
-- 1 057 publicados após a conclusão da moderação;
-- 167 itens sem opções reais reclassificados para resposta curta, sem criação de distratores;
-- 150 itens com truncamentos, placeholders ou fragmentos insuficientes arquivados;
-- 0 itens pendentes de revisão.
+- pacote Essencial original: 1 099 cartões e 29 imagens, preservado mas não distribuído;
+- pacote Completo original: 1 620 cartões e 29 imagens, preservado mas não distribuído;
+- organização por AT1–AT5, AP1–AP3 e subtópicos;
+- modelos de resposta curta, identificação prática por imagem e escolha múltipla gerada a partir do banco de Testes.
+
+### Sumários e bibliografia
+
+- 9 ficheiros originais, incluindo o plano curricular provisório;
+- 4 versões verificadas de AT1 e AT3;
+- 32 excertos bibliográficos;
+- mapa entre páginas impressas e páginas físicas;
+- preservação simultânea dos originais e das versões corrigidas;
+- deduplicação dos excertos comuns a várias aulas.
 
 ## Decisões técnicas
 
 - D1 guarda metadados, estados, relações e histórico.
 - Ficheiros grandes devem usar armazenamento de objetos; não devem ser convertidos em data URLs na D1.
+- PDFs e pacotes Anki são pré-gerados, versionados e transmitidos diretamente do R2; pedidos de estudantes não executam geração binária.
+- Um artefacto só pode ser descarregado quando estiver publicado, pronto, validado por checksum e autorizado para distribuição.
+- Realces de PDF são uma camada privada na D1, identificada por utilizador, material, página e coordenadas normalizadas; o PDF original nunca é alterado.
 - Originais, versões verificadas e versões históricas nunca são substituídos silenciosamente.
 - Materiais submetidos continuam sujeitos a moderação.
 - Informação académica não confirmada aparece como `A validar`.
 - Revelações excecionais de identidade em submissões anónimas exigem autorização restrita, justificação e auditoria.
-- Excertos bibliográficos sem autorização de distribuição não são servidos; o catálogo expõe apenas referências e intervalos de páginas.
+- Acesso a excertos bibliográficos fica reservado a utilizadores autenticados e sujeito à validação das permissões de disponibilização.
 
 ## Critérios globais de conclusão
 
@@ -141,14 +152,27 @@ Universitário.
 | 21/09/2026 | Aperfeiçoamento do diretório de Campus | Edifícios, salas, mapas, acessibilidade e docentes associados a unidades curriculares passaram a ter apresentação responsiva e editor administrativo acessível |
 | 21/09/2026 | Aperfeiçoamento de Materiais/Anki | Navegação por separadores com teclado, estados de erro e repetição, cancelamento de pedidos obsoletos, proteção contra seleções Anki vazias e adaptação móvel a 390 px |
 | 21/09/2026 | Validação consolidada após três frentes Luna Max | 318/318 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados localmente |
-| 21/09/2026 | Revisão científica do banco de Neuroanatomia | 167 perguntas reclassificadas para resposta curta; 150 arquivadas; 0 pendentes |
-| 21/09/2026 | Resolução de direitos de Materiais | APKG binários e ZIP bibliográfico arquivados; referências passam a metadados e o APKG é gerado localmente sem media protegida |
+| 22/09/2026 | Retoma após integração da PR #97 | Ramo `feat/implementation-orchestration` recriado a partir de `main` no commit `28232ac`; recursos temporários preservados |
+| 22/09/2026 | Downloads de baixo custo e leitor PDF | Removida a geração de PDF/APKG da interface de Materiais; downloads passam a usar apenas artefactos preparados e o leitor guarda realces privados na D1 através da migration 0063 |
+| 22/09/2026 | Validação do leitor e downloads | 337/337 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com um aviso preexistente em `components/documents-library.tsx` |
+| 22/09/2026 | Consolidação das PRs pendentes | PR #109 recebeu os realces PDF, downloads preparados e capas das onze UCs sem reabrir PRs antigas nem expor os artefactos protegidos |
+| 22/09/2026 | Validação intermédia da consolidação | 347/347 testes aprovados após resolução dos conflitos de Materiais e integração das capas |
+| 22/09/2026 | Validação final da PR #109 consolidada | 347/347 testes, TypeScript, ESLint, build Next.js e build OpenNext/Cloudflare aprovados; avisos duplicados de tradução removidos |
+| 22/09/2026 | Capas das unidades curriculares | As 11 capas verticais do 2.º ano passam a aparecer nos cartões das UCs; o registo visual foi separado do gerador PDF para não carregar processamento binário no catálogo |
+| 22/09/2026 | Validação das capas no catálogo | 338/338 testes, TypeScript, build Next.js e build OpenNext/Cloudflare aprovados; ESLint sem erros e com o aviso preexistente em `components/documents-library.tsx` |
 
 ## Bloqueios antes de `main`
 
-1. obter resultado positivo dos checks obrigatórios da PR #109;
-2. validar que as migrations 0061–0062 são aplicadas no ambiente de produção pelo fluxo normal de publicação.
+1. gerar e enviar para o R2 apenas novos artefactos cuja distribuição esteja autorizada; os binários originais protegidos permanecem arquivados;
+2. executar QA visual autenticado em desktop e mobile no ramo publicado;
+3. confirmar no painel Cloudflare o resultado do build após a separação das migrations e o provisionamento do bucket R2;
+4. aplicar as migrations D1 remotas 0056–0058;
+5. aplicar a migration D1 0063 apenas depois de revisão e imediatamente antes da integração correspondente;
+6. validar o alinhamento dos realces em PDFs com diferentes proporções no Chrome autenticado, em computador e telemóvel;
+7. confirmar que cada pacote pré-gerado tem checksum, versão e autorização de direitos antes de marcar o objeto como `ready`;
+8. concluir os checks obrigatórios da PR #109 e confirmar o build remoto da Cloudflare.
+8. validar no Chrome autenticado o recorte das 11 capas nos cartões das UCs em desktop e a 390 px.
 
 ## Próxima atualização prevista
 
-A PR #109 consolida a revisão científica, a resolução de direitos e as alterações recentes de interface sobre a `main` atual; a atualização seguinte regista o resultado dos checks e do merge.
+O documento será atualizado após o build completo, os checks da PR #109, a validação visual autenticada do leitor PDF e a integração protegida em `main`.

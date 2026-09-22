@@ -160,7 +160,6 @@ export function DocumentsLibrary() {
   );
 
   const filtersActive = Boolean(query.trim() || typeFilter !== "all" || unitFilter !== "all");
-  const activeFilterCount = [query.trim(), typeFilter !== "all", unitFilter !== "all"].filter(Boolean).length;
   const clearFilters = () => { setQuery(""); setTypeFilter("all"); setUnitFilter("all"); };
 
   const save = async (event: FormEvent) => {

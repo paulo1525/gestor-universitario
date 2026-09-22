@@ -72,6 +72,9 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     downloadUrl: ready && item.storage_backend !== "inline"
       ? externalUrl || `/api/material-catalog/${encodeURIComponent(String(item.id))}/download`
       : null,
+    viewUrl: ready && item.mime_type === "application/pdf" && !externalUrl
+      ? `/api/material-catalog/${encodeURIComponent(String(item.id))}/view`
+      : null,
     verification: item.verification_status,
     status: item.publication_status,
     source: item.source_id ? { id: item.source_id, title: item.source_title, edition: item.source_edition, author: item.source_author } : null,
@@ -276,11 +279,11 @@ function objectNotModified(request: Request, object: { httpEtag?: string; etag?:
   return Number.isFinite(since) && object.uploaded.getTime() <= since + 999;
 }
 
-function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; httpEtag?: string; etag?: string; uploaded?: Date; size: number }, fileName: string, mimeType: string, length: number, range: ByteRange | null, totalSize = object.size): Headers {
+function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; httpEtag?: string; etag?: string; uploaded?: Date; size: number }, fileName: string, mimeType: string, length: number, range: ByteRange | null, totalSize = object.size, disposition: "attachment" | "inline" = "attachment"): Headers {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   if (!headers.has("content-type")) headers.set("content-type", mimeType || "application/octet-stream");
-  headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(fileName || "material")}`);
+  headers.set("content-disposition", `${disposition}; filename*=UTF-8''${encodeURIComponent(fileName || "material")}`);
   headers.set("cache-control", "private, max-age=3600, stale-while-revalidate=86400");
   headers.set("x-content-type-options", "nosniff");
   headers.set("accept-ranges", "bytes");
@@ -291,7 +294,7 @@ function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; ht
   return headers;
 }
 
-async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string): Promise<Response> {
+async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string, disposition: "attachment" | "inline" = "attachment"): Promise<Response> {
   if (!env.MATERIALS_BUCKET) return json({ error: "O armazenamento de materiais ainda não foi provisionado.", code: "STORAGE_NOT_READY" }, 409);
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
@@ -320,7 +323,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
     }
   }
   if (metadata && objectNotModified(request, metadata)) {
-    const headers = downloadHeaders(metadata, fileName, mimeType, metadata.size, null);
+    const headers = downloadHeaders(metadata, fileName, mimeType, metadata.size, null, metadata.size, disposition);
     headers.delete("content-length");
     return new Response(null, { status: 304, headers });
   }
@@ -334,7 +337,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
 
   if (method === "HEAD") {
     if (!metadata) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
-    const headers = downloadHeaders(metadata, fileName || key.split("/").pop() || "material", mimeType, range?.length ?? metadata.size, range, metadata.size);
+    const headers = downloadHeaders(metadata, fileName || key.split("/").pop() || "material", mimeType, range?.length ?? metadata.size, range, metadata.size, disposition);
     return new Response(null, { status: range ? 206 : 200, headers });
   }
 
@@ -357,7 +360,7 @@ async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: s
   }
   if (!object) return json({ error: "Ficheiro ainda não disponível no armazenamento.", code: "MATERIAL_NOT_FOUND" }, 404);
   const contentLength = range?.length ?? object.size;
-  const headers = downloadHeaders(object, fileName || key.split("/").pop() || "material", mimeType, contentLength, range, metadata?.size ?? object.size);
+  const headers = downloadHeaders(object, fileName || key.split("/").pop() || "material", mimeType, contentLength, range, metadata?.size ?? object.size, disposition);
   return new Response(object.body, { status: range ? 206 : 200, headers });
 }
 
@@ -371,6 +374,59 @@ async function download(request: Request, env: MaterialsCatalogEnv, id: string, 
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
 }
 
+async function viewPdf(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
+  const item = await env.DB.prepare("SELECT file_name,mime_type,storage_backend,storage_key,storage_state FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  if (!item || item.mime_type !== "application/pdf") return json({ error: "PDF não encontrado." }, 404);
+  if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este PDF ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
+  return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material.pdf"), "application/pdf", "inline");
+}
+
+function finiteCoordinate(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : null;
+}
+
+async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  const material = await env.DB.prepare("SELECT id FROM material_catalog WHERE id=? AND mime_type='application/pdf' AND publication_status='published'").bind(id).first();
+  if (!material) return json({ error: "PDF não encontrado." }, 404);
+  if (request.method === "GET") {
+    const result = await env.DB.prepare("SELECT id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at FROM material_pdf_highlights WHERE user_id=? AND material_id=? ORDER BY page_number,created_at").bind(user.id, id).all();
+    return json({ highlights: result.results.map((item) => { const value = row(item); return { id: value.id, page: value.page_number, x: value.x, y: value.y, width: value.width, height: value.height, color: value.color, selectedText: value.selected_text, note: value.note, createdAt: value.created_at, updatedAt: value.updated_at }; }) });
+  }
+  let body: Record<string, unknown> | null = null;
+  try { body = await request.json() as Record<string, unknown>; } catch { return json({ error: "Pedido inválido." }, 400); }
+  const highlightId = text(body.id, 100);
+  if (request.method === "DELETE") {
+    if (!highlightId) return json({ error: "Realce inválido." }, 400);
+    const result = await env.DB.prepare("DELETE FROM material_pdf_highlights WHERE id=? AND user_id=? AND material_id=?").bind(highlightId, user.id, id).run();
+    if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
+    return json({ ok: true });
+  }
+  if (request.method !== "POST" && request.method !== "PUT") return json({ error: "Operação não suportada." }, 405);
+  const page = Number(body.page), x = finiteCoordinate(body.x), y = finiteCoordinate(body.y), width = finiteCoordinate(body.width), height = finiteCoordinate(body.height);
+  const color = text(body.color, 12) || "gold", selectedText = text(body.selectedText, 1200), note = text(body.note, 800);
+  if (!Number.isInteger(page) || page < 1 || page > 10000 || x === null || y === null || width === null || height === null || width <= 0 || height <= 0 || x + width > 1.001 || y + height > 1.001 || !["gold", "blue", "green", "rose"].includes(color)) return json({ error: "Coordenadas do realce inválidas." }, 400);
+  const now = Date.now();
+  if (request.method === "PUT") {
+    if (!highlightId) return json({ error: "Realce inválido." }, 400);
+    const result = await env.DB.prepare("UPDATE material_pdf_highlights SET page_number=?,x=?,y=?,width=?,height=?,color=?,selected_text=?,note=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?")
+      .bind(page, x, y, width, height, color, selectedText || null, note || null, now, highlightId, user.id, id).run();
+    if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
+    return json({ highlight: { id: highlightId, page, x, y, width, height, color, selectedText, note, updatedAt: now } });
+  }
+  const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM material_pdf_highlights WHERE user_id=? AND material_id=?").bind(user.id, id).first<{ total: number }>();
+  if (Number(count?.total || 0) >= 500) return json({ error: "Este PDF atingiu o limite de 500 realces." }, 409);
+  const finalId = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(finalId, user.id, id, page, x, y, width, height, color, selectedText || null, note || null, now, now).run();
+  return json({ highlight: { id: finalId, page, x, y, width, height, color, selectedText, note, createdAt: now, updatedAt: now } }, 201);
+}
+
 async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.anki")) return disabled();
@@ -381,37 +437,21 @@ async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: stri
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
 }
 
-async function media(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
-  if (!await enabled("materials.anki")) return disabled();
-  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
-  // APKG media may contain atlas or book imagery. Keep the R2 path closed
-  // while every deck is still in the rights-review draft state, even if an
-  // object was uploaded accidentally before the catalogue was approved.
-  try {
-    const approvedDeck = await env.DB.prepare("SELECT 1 FROM material_anki_decks WHERE id IN ('anki-neuro-essential', 'anki-neuro-complete') AND publication_status='published' AND storage_state='ready' LIMIT 1").first();
-    if (!approvedDeck) return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
-  } catch {
-    return json({ error: "A media Anki aguarda revisão de direitos.", code: "STORAGE_NOT_READY" }, 409);
-  }
-  const key = text(url.searchParams.get("key"), 180);
-  const valid = [...new Set(Object.values(sources).flatMap((source) => source.cards.map((card) => card.imageKey).filter(Boolean)))].includes(key);
-  if (!valid || !/^[A-Za-z0-9._-]+$/.test(key)) return json({ error: "Media Anki inválida." }, 400);
-  return objectDownload(request, env, `materials/neuroanatomia/anki/media/${key}`, key, "image/png");
-}
-
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+\/download$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path) || path === "/api/material-anki/media";
+  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+\/(download|view|highlights)$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (path === "/api/material-catalog") return user ? catalog(request, env, url, user, enabled) : unauthenticated();
   if (path === "/api/material-anki") return user ? anki(request, env, url, user, enabled) : unauthenticated();
-  if (path === "/api/material-anki/media") return user ? media(request, env, url, user, enabled) : unauthenticated();
   const item = path.match(/^\/api\/material-catalog\/([^/]+)\/download$/);
   if (item) return user ? download(request, env, decodeURIComponent(item[1]), user, enabled) : unauthenticated();
+  const viewer = path.match(/^\/api\/material-catalog\/([^/]+)\/view$/);
+  if (viewer) return user ? viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled) : unauthenticated();
+  const highlights = path.match(/^\/api\/material-catalog\/([^/]+)\/highlights$/);
+  if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);
   if (deck) return user ? ankiDownload(request, env, decodeURIComponent(deck[1]), user, enabled) : unauthenticated();
   return json({ error: "Operação não suportada." }, 405);
