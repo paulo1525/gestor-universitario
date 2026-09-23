@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, Check, CheckCircle2, Clock3, Eye, FlaskConical, LoaderCircle, Save, Search, Settings, ShieldCheck, Users } from "lucide-react";
+import { Ban, Check, CheckCircle2, Clock3, Eye, FlaskConical, LoaderCircle, Save, Settings, ShieldCheck, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { useAuth } from "@/components/auth-context";
@@ -11,6 +11,7 @@ import { richTextPlainText } from "@/lib/announcement-content";
 import { adminDataLabel } from "@/lib/i18n-admin";
 import { setTestMode, TEST_MODE_AVAILABLE } from "@/lib/test-mode";
 import styles from "@/components/admin-control.module.css";
+import { FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { AdminDataRegion, AdminEmptyState, AdminMetric, AdminMetricGrid, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
 
 type Role = "student" | "representative" | "admin";
@@ -141,7 +142,7 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
   return <AppShell active="admin" breadcrumb={viewCopy.title}><AdminPage>
     {maintenanceNotice && <AppToast key={`${maintenanceNoticeError ? "error" : "success"}:${maintenanceNotice}`} kind={maintenanceNoticeError ? "error" : "success"} message={maintenanceNotice} onDismiss={() => setMaintenanceNotice("")} />}
     {userNotice && <AppToast key={`${userNoticeError ? "error" : "success"}:${userNotice}`} kind={userNoticeError ? "error" : "success"} message={userNotice} onDismiss={() => setUserNotice("")} />}
-    <AdminPageHeader eyebrow={viewCopy.eyebrow} title={viewCopy.title} description={viewCopy.description} />
+    <AdminPageHeader eyebrow={viewCopy.eyebrow} title={viewCopy.title} />
 
     {view === "settings" ? <div className={styles.settingsStack}>
       {TEST_MODE_AVAILABLE && <AdminSection
@@ -149,14 +150,14 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
         icon={<FlaskConical />}
         eyebrow={t("admin.control.testEyebrow")}
         title={t("admin.control.testTitle")}
-        description={sessionUser.testMode ? t("admin.control.testActiveDescription") : t("admin.control.testDescription")}
+       
         actions={<label className={`switch ${styles.sectionSwitch}`}><input type="checkbox" checked={Boolean(sessionUser.testMode)} onChange={(event) => { setTestMode(event.target.checked); window.location.href = event.target.checked ? "/" : "/admin/configuracao"; }} /><span><strong>{sessionUser.testMode ? t("admin.control.testActive") : t("admin.control.testEnable")}</strong><small>{sessionUser.testMode ? t("admin.control.testDisableHint") : t("admin.control.testEnableHint")}</small></span></label>}
       />}
       <AdminSection
         icon={<Settings />}
         eyebrow={t("admin.control.configuration")}
         title={t("admin.control.availability")}
-        description={t("admin.control.availabilityDescription")}
+       
         actions={<label className={`switch ${styles.sectionSwitch}`}><input type="checkbox" checked={maintenance} disabled={loading} onChange={(event) => setMaintenance(event.target.checked)} /><span><strong>{maintenance ? t("admin.control.maintenanceActive") : t("admin.control.siteAvailable")}</strong><small>{maintenance ? t("admin.control.publicSuspended") : t("admin.control.publicAllowed")}</small></span></label>}
       >
         <div className={styles.editorBody}>
@@ -172,10 +173,10 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
         <AdminMetric icon={<Ban />} label={t("admin.control.blocked")} value={blockedUsers} tone={blockedUsers ? "warning" : "neutral"} loading={loading} loadingLabel={t("admin.control.loadingUsers")} />
       </AdminMetricGrid>
 
-      <AdminSection className={styles.userSection} icon={<Users />} eyebrow={t("admin.control.accounts")} title={t("admin.control.usersPermissions")} description={viewCopy.description}>
+      <AdminSection className={styles.userSection} icon={<Users />} eyebrow={t("admin.control.accounts")} title={t("admin.control.userList")}>
         <AdminToolbar className={styles.userToolbar} label={t("admin.control.searchUsers")}>
-          <label className={styles.userSearch}><span className={styles.filterLabel}><Search />{t("admin.control.searchUsers")}</span><span className={styles.searchControl}><Search /><input type="search" placeholder={t("admin.control.searchUsers")} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} /></span></label>
-          <label className={styles.statusField}><span className={styles.filterLabel}>{t("admin.control.status")}</span><select className={styles.statusFilter} value={filter} onChange={(event) => { setFilter(event.target.value as Status | "all"); setPage(1); }}><option value="all">{t("admin.control.allStatuses")}</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <FilterSearch label={t("admin.control.searchUsers")} value={query} onChange={(value) => { setQuery(value); setPage(1); }} placeholder={t("admin.control.searchUsers")} />
+          <FilterSelect label={t("admin.control.status")} value={filter} onChange={(value) => { setFilter(value as Status | "all"); setPage(1); }} options={[{ value: "all", label: t("admin.control.allStatuses") }, ...Object.entries(statusLabels).map(([value, label]) => ({ value, label }))]} />
         </AdminToolbar>
         {loading ? <AdminEmptyState className={styles.loadingState} icon={<LoaderCircle className="spin" />} title={t("admin.control.loadingUsers")} /> : visible.length ? <>
           <AdminDataRegion className={`admin-table-wrap ${styles.userTableRegion}`} label={t("admin.control.usersPermissions")}><table><thead><tr><th>{t("admin.control.user")}</th><th>{t("admin.control.role")}</th><th>{t("admin.control.committeeRole")}</th><th>{t("admin.control.department")}</th><th>{t("admin.control.adminAccess")}</th><th>{t("admin.control.status")}</th><th>{t("admin.control.lastAccess")}</th><th>{t("admin.control.actions")}</th></tr></thead><tbody>{pagedUsers.map((user) => <tr key={user.id}>

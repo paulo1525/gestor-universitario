@@ -128,7 +128,7 @@ export function QuestionBankSection({ unitId, unitCode }: { unitId: string; unit
         icon={<BookOpenCheck />}
         eyebrow="Banco de questões"
         title={`Pratica ${unitCode}`}
-        description="Perguntas organizadas por capítulo, com respostas disponíveis para revisão autónoma."
+       
         headingId="question-bank-title"
         actions={<div className={styles.headerActions}>
           <a className={styles.link} href={exportHref} download="banco-neuroanatomia.json">Exportar resultados <Download aria-hidden="true" /></a>

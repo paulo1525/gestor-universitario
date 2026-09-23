@@ -2,7 +2,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
 
-import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -36,6 +35,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { PageTabs } from "@/components/page-tabs";
 import { SurfaceHeader } from "@/components/surface-header";
 import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
@@ -349,7 +349,7 @@ export function QuizHub() {
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
   const [answerFormat, setAnswerFormat] = useState<AnswerFormat>(() => readQuizPreferences().answerFormat ?? "multiple_choice");
   const [shortAnswerMode, setShortAnswerMode] = useState<ShortAnswerMode>(() => readQuizPreferences().shortAnswerMode ?? "type_and_check");
-  const [screen, setScreen] = useState<Screen>("catalogue");
+  const [screen, setScreen] = useState<Screen>(() => typeof window !== "undefined" && window.location.hash === "#estatisticas" ? "statistics" : "catalogue");
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -462,6 +462,7 @@ export function QuizHub() {
   }, [clearingStatistics, loadCatalogue, loadStatistics]);
 
   useEffect(() => { void loadCatalogue(); }, [loadCatalogue]);
+  useEffect(() => { if (window.location.hash === "#estatisticas") void loadStatistics(); }, [loadStatistics]);
   useEffect(() => {
     if (!selectedUnit) return;
     setSelectedTopicIds((current) => {
@@ -973,6 +974,10 @@ export function QuizHub() {
   </AuthGuard>;
 }
 
+function TestsTabs({ active, onPractice, onStatistics }: { active: "practice" | "statistics"; onPractice?: () => void; onStatistics?: () => void }) {
+  return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "learn", label: "Aprender matéria", icon: <GraduationCap />, href: "/testes/aprender" }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }]} />;
+}
+
 function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
   exportingAnki: boolean;
@@ -990,7 +995,8 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
   const countOptions = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<BrainCircuit />} eyebrow="Testes" title="Escolhe uma disciplina" actions={<div className={styles.statisticsActions}><Link className={styles.statisticsButton} href="/testes/aprender"><GraduationCap />Aprender matéria</Link><button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />Estatísticas</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<BrainCircuit />} eyebrow="Testes" title="Escolhe uma disciplina" />
+    <TestsTabs active="practice" onStatistics={onStatistics} />
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
     {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar a tua sessão" text="A carregar disciplinas e perguntas." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
       <section className={styles.unitCatalogue} aria-label="Disciplinas">
@@ -1026,8 +1032,8 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
 }
 
 function StatisticsView({ statistics, loading, error, totalAvailableQuestions, clearing, onBack, onRetry, onClear }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; clearing: boolean; onBack: () => void; onRetry: () => void; onClear: () => void }) {
-  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button>} /><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
-  if (error || !statistics) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button>} /><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
+  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
+  if (error || !statistics) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
   const { summary } = statistics;
   const accuracy = Math.round((summary.accuracy ?? 0) * 100);
   const recentAccuracy = Math.round((summary.recentAccuracy ?? 0) * 100);
@@ -1041,7 +1047,7 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
     { label: "Últimos 10 testes", percent: recentAccuracy, value: `${statistics.recentAttempts.length} concluídos` },
   ];
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<div className={styles.statisticsActions}><button className={`${styles.statisticsButton} ${styles.statisticsDangerButton}`} type="button" onClick={onClear} disabled={clearing}><Trash2 />Limpar estatísticas</button><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} />
     <section className={styles.statisticsLead}>
       <article className={styles.readinessCard}><div><span className={styles.statisticsKicker}><BarChart3 />Preparação global</span><div className={styles.statisticsRing} style={{ "--score": `${accuracy}%` } as CSSProperties}><strong>{accuracy}%</strong><small>acerto</small></div></div><div><h2>{summary.completedCount ? `${summary.completedCount} ${summary.completedCount === 1 ? "teste concluído" : "testes concluídos"}` : "Começa a construir o teu histórico"}</h2><p>{readiness}</p></div></article>
       <article className={styles.timeCard}><span className={styles.statisticsKicker}><Clock3 />Tempo de testes</span><dl><div><dt>Tempo total</dt><dd>{humanDuration(summary.totalDurationSeconds)}</dd></div><div><dt>Média por teste</dt><dd>{humanDuration(summary.averageDurationSeconds)}</dd></div></dl></article>
@@ -1051,7 +1057,7 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
     </section>
     <div className={styles.statisticsDetailGrid}>
       <section className={styles.statisticsPanel} aria-labelledby="desempenho-temas"><SurfaceHeader icon={<Trophy />} eyebrow="Desempenho por tema" title="Onde deves concentrar a revisão" headingId="desempenho-temas" />{statistics.topics.length ? <div className={styles.topicStatistics}>{statistics.topics.slice(0, 8).map((topic) => { const score = Math.round((topic.accuracy ?? 0) * 100); return <div key={`${topic.unitId}-${topic.topicId}`}><div><span className={styles.unitCode}>{topic.unitCode}</span><strong>{topic.title}</strong><small>{topic.correctCount}/{topic.answeredCount} certas</small></div><div className={styles.topicBar} aria-label={`${score}% de acerto`}><span style={{ width: `${score}%` }} /></div><b>{score}%</b></div>; })}</div> : <p className={styles.statisticsEmpty}>Ainda não há temas avaliados em testes concluídos.</p>}</section>
-      <section className={styles.statisticsPanel} aria-labelledby="tentativas-recentes"><SurfaceHeader icon={<TimerReset />} eyebrow="Histórico recente" title="Últimos testes concluídos" headingId="tentativas-recentes" />{statistics.recentAttempts.length ? <div className={styles.recentAttempts}>{statistics.recentAttempts.map((item) => { const score = Math.round((item.accuracy ?? 0) * 100); return <article key={item.id}><div><span className={styles.unitCode}>{item.unitCode}</span><strong>{modeTitle(item.mode)}</strong><small>{humanDate(item.completedAt)} · {humanDuration(item.durationSeconds)}</small></div><span className={score >= 50 ? styles.passedAttempt : styles.reviewAttempt}><b>{score}%</b><small>{item.correctCount}/{item.questionCount}</small></span></article>; })}</div> : <p className={styles.statisticsEmpty}>Os testes concluídos aparecerão aqui.</p>}</section>
+      <section className={styles.statisticsPanel} aria-labelledby="tentativas-recentes"><SurfaceHeader icon={<TimerReset />} eyebrow="Histórico recente" title="Últimos testes concluídos" headingId="tentativas-recentes" actions={<button className={`${styles.statisticsButton} ${styles.statisticsDangerButton}`} type="button" onClick={onClear} disabled={clearing}><Trash2 />Limpar estatísticas</button>} />{statistics.recentAttempts.length ? <div className={styles.recentAttempts}>{statistics.recentAttempts.map((item) => { const score = Math.round((item.accuracy ?? 0) * 100); return <article key={item.id}><div><span className={styles.unitCode}>{item.unitCode}</span><strong>{modeTitle(item.mode)}</strong><small>{humanDate(item.completedAt)} · {humanDuration(item.durationSeconds)}</small></div><span className={score >= 50 ? styles.passedAttempt : styles.reviewAttempt}><b>{score}%</b><small>{item.correctCount}/{item.questionCount}</small></span></article>; })}</div> : <p className={styles.statisticsEmpty}>Os testes concluídos aparecerão aqui.</p>}</section>
     </div>
   </>;
 }
@@ -1128,7 +1134,7 @@ function ResultsView({ attempt, correctCount, percent, recommendation, onRestart
   const total = attempt.questions.length;
   const displayedCorrect = attempt.totalCorrect !== null && Number.isFinite(attempt.totalCorrect) ? attempt.totalCorrect : correctCount;
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} actions={<div className={styles.statisticsActions}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} meta={`${percent}%`} />
     <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p><button type="button" onClick={onRestart}>Praticar <ArrowRight /></button></section>
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
     <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{question.imageUrl && <figure className={styles.reviewImage}><img src={question.imageUrl} alt={question.imageAlt} loading="lazy" /></figure>}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>

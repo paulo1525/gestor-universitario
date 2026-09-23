@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Clock3,
   FileText,
-  Filter,
   LayoutGrid,
   List,
   LoaderCircle,
@@ -22,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -271,7 +271,6 @@ export function AcademicCalendar() {
     const date = validDate(item.startsAt);
     return date && date >= today;
   }).slice(0, 5), [filtered, today]);
-  const activeFilterCount = Number(typeFilter !== "all") + Number(unitFilter !== "all");
   const descriptionLength = richTextPlainText(form.description).length;
 
   const selectDay = (date: Date) => {
@@ -477,12 +476,10 @@ export function AcademicCalendar() {
         </div>
       </div>
 
-      <div className={styles.filters}>
-        <div className={styles.filterTitle}><Filter /><span>{t("community.calendar.filters")}</span>{activeFilterCount > 0 && <strong>{activeFilterCount}</strong>}</div>
-        <label><span className={styles.srOnly}>{t("community.calendar.filterType")}</span><select value={typeFilter} onChange={event => setTypeFilter(event.target.value)}><option value="all">{t("community.calendar.allTypes")}</option>{Object.entries(eventLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-        <label><span className={styles.srOnly}>{t("community.calendar.filterUnit")}</span><select value={unitFilter} onChange={event => setUnitFilter(event.target.value)}><option value="all">{t("community.calendar.allUnits")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
-        {activeFilterCount > 0 && <button type="button" className={styles.clearFilters} onClick={() => { setTypeFilter("all"); setUnitFilter("all"); }}>{t("community.calendar.clear")}</button>}
-      </div>
+      <FilterBar label={t("community.calendar.filters")}>
+        <FilterSelect label={t("community.calendar.filterType")} value={typeFilter} onChange={setTypeFilter} options={[{ value: "all", label: t("community.calendar.allTypes") }, ...Object.entries(eventLabels).map(([key, label]) => ({ value: key, label }))]} />
+        <FilterSelect label={t("community.calendar.filterUnit")} value={unitFilter} onChange={setUnitFilter} options={[{ value: "all", label: t("community.calendar.allUnits") }, ...units.map(unit => ({ value: unit.id, label: `${unit.code} · ${unit.name}` }))]} />
+      </FilterBar>
 
       {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} /><span>{t("community.calendar.loading")}</span></div> : view === "month" ? <div className={styles.calendarLayout}>
         <div className={styles.monthView}>

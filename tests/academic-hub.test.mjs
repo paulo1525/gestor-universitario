@@ -96,7 +96,7 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
 
 test("o catálogo público de UCs mantém o estado vazio curto e sem filtros inúteis", () => {
   assert.match(unitCatalog, /styles\.panelIcon/);
-  assert.match(unitCatalog, /units\.length > 0 && <div className=\{styles\.catalogToolbar\}/);
+  assert.match(unitCatalog, /units\.length > 0 && <FilterBar label=\{t\("community\.units\.filters"\)\}>/);
   assert.match(unitCatalog, /community\.units\.emptyInitial/);
   assert.doesNotMatch(unitCatalog, /community\.units\.emptyDescription/);
   assert.doesNotMatch(unitCatalog, /community\.units\.filtersHint/);

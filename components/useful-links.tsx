@@ -5,20 +5,16 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Archive,
   ExternalLink,
-  Eye,
-  Flag,
-  GraduationCap,
   Link2,
   LoaderCircle,
   Pencil,
   Plus,
-  Search,
   ShieldCheck,
-  Tags,
   Trash2,
   X,
 } from "lucide-react";
 import { AppShell, AppShellActive } from "@/components/app-shell";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -264,13 +260,13 @@ export function UsefulLinks() {
       <ModuleGuard moduleKey="useful_links.library">
         <AppShell active={"useful_links" as AppShellActive} breadcrumb={t("links.breadcrumb")}>
           <div className={styles.page}>
-            <SurfaceHeader standalone headingLevel="h1" icon={<Link2 />} eyebrow={t("links.eyebrow")} title={t("links.title")} actions={canManage ? <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button> : undefined} />
+            <SurfaceHeader standalone headingLevel="h1" icon={<Link2 />} eyebrow={t("links.eyebrow")} title={t("links.title")} />
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
             {canManage && formOpen && (
               <section className={styles.panel}>
-                <SurfaceHeader icon={<ShieldCheck />} title={t(editingId ? "links.edit" : "links.add")} description={t("links.manageHint")} />
+                <SurfaceHeader icon={<ShieldCheck />} title={t(editingId ? "links.edit" : "links.add")} />
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formGrid}>
                     <label className={styles.field}><span>{t("links.field.title")}</span><input value={form.title} onChange={(event) => setField("title", event.target.value)} maxLength={160} placeholder={t("links.titlePlaceholder")} required /></label>
@@ -288,19 +284,16 @@ export function UsefulLinks() {
             )}
 
             <section className={styles.panel}>
-              <SurfaceHeader icon={<Link2 />} title={t("links.library")} description={t("links.libraryHint")} meta={!loading ? `${visible.length} ${t(visible.length === 1 ? "links.result" : "links.results")}` : undefined} />
-              <div className={styles.toolbar} aria-label={t("links.filters")}>
-                <div className={styles.filterGrid}>
-                <label className={`${styles.filterField} ${styles.search}`}><span><Search />{t("links.searchLabel")}</span><div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("links.search")} /></div></label>
-                <label className={styles.filterField}><span><Flag />{t("links.field.priority")}</span><select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="all">{t("links.allPriorities")}</option>{priorities.map((value) => <option key={value} value={value}>{t(`links.priority.${value}`)}</option>)}</select></label>
-                <label className={styles.filterField}><span><Tags />{t("links.field.category")}</span><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">{t("links.allCategories")}</option>{categories.map((value) => <option key={value} value={value}>{t(`links.category.${value}`)}</option>)}</select></label>
-                <label className={styles.filterField}><span><GraduationCap />{t("links.field.unit")}</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">{t("links.allUnits")}</option><option value="general">{t("links.noUnit")}</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
-                {canManage && <label className={styles.filterField}><span><Eye />{t("links.field.visibility")}</span><select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value)}><option value="all">{t("links.allVisibilities")}</option>{visibilities.map((value) => <option key={value} value={value}>{t(`links.visibility.${value}`)}</option>)}</select></label>}
-                {canManage && <label className={styles.filterField}><span><Archive />{t("links.field.status")}</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">{t("links.allStatuses")}</option>{statuses.map((value) => <option key={value} value={value}>{t(`links.status.${value}`)}</option>)}</select></label>}
-                {filtersActive && <button className={styles.clear} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}
-                </div>
-              </div>
-              {loading ? <div className={styles.state} aria-live="polite"><LoaderCircle className={styles.spin} /><strong>{t("links.loading")}</strong></div> : visible.length === 0 ? <div className={styles.state}><Link2 /><strong>{t("links.empty")}</strong><p>{t("links.emptyHint")}</p>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}</div> : (
+              <SurfaceHeader icon={<Link2 />} title={t("links.library")} meta={!loading ? `${visible.length} ${t(visible.length === 1 ? "links.result" : "links.results")}` : undefined} actions={canManage ? <button className="button button--primary" type="button" onClick={formOpen ? closeForm : create}>{formOpen ? <X /> : <Plus />}{t(formOpen ? "links.closeForm" : "links.add")}</button> : undefined} />
+              <FilterBar label={t("links.filters")}>
+                <FilterSearch label={t("links.searchLabel")} value={query} onChange={setQuery} placeholder={t("links.search")} />
+                <FilterSelect label={t("links.field.priority")} value={priorityFilter} onChange={setPriorityFilter} options={[{ value: "all", label: t("links.allPriorities") }, ...priorities.map((value) => ({ value, label: t(`links.priority.${value}`) }))]} />
+                <FilterSelect label={t("links.field.category")} value={categoryFilter} onChange={setCategoryFilter} options={[{ value: "all", label: t("links.allCategories") }, ...categories.map((value) => ({ value, label: t(`links.category.${value}`) }))]} />
+                <FilterSelect label={t("links.field.unit")} value={unitFilter} onChange={setUnitFilter} options={[{ value: "all", label: t("links.allUnits") }, { value: "general", label: t("links.noUnit") }, ...units.map((unit) => ({ value: unit.id, label: `${unit.code} · ${unit.name}` }))]} />
+                {canManage && <FilterSelect label={t("links.field.visibility")} value={visibilityFilter} onChange={setVisibilityFilter} options={[{ value: "all", label: t("links.allVisibilities") }, ...visibilities.map((value) => ({ value, label: t(`links.visibility.${value}`) }))]} />}
+                {canManage && <FilterSelect label={t("links.field.status")} value={statusFilter} onChange={setStatusFilter} options={[{ value: "all", label: t("links.allStatuses") }, ...statuses.map((value) => ({ value, label: t(`links.status.${value}`) }))]} />}
+              </FilterBar>
+              {loading ? <div className={styles.state} aria-live="polite"><LoaderCircle className={styles.spin} /><strong>{t("links.loading")}</strong></div> : visible.length === 0 ? <div className={styles.state}><Link2 /><strong>{t(filtersActive ? "links.empty" : "links.emptyNone")}</strong>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("links.clearFilters")}</button>}</div> : (
                 <div className={styles.grid}>
                   {visible.map((item) => (
                     <article className={`${styles.card} ${styles[`priority_${item.priority}`]}`} key={item.id}>

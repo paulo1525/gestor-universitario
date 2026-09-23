@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Award, BookOpen, CalendarRange, FileText, GraduationCap, Hash, LoaderCircle, Pencil, Plus, Save, Search, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { SurfaceHeader } from "@/components/surface-header";
-import { AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
+import { AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
+import { FilterSearch } from "@/components/filter-bar";
 import { AppToast } from "@/components/app-toast";
 import { FormLabel } from "@/components/form-label";
 import { useAuth } from "@/components/auth-context";
@@ -206,27 +207,27 @@ export function CurricularUnitsManagement() {
   }
 
   const pageTitle = view === "create" ? t("classes.units.new") : view === "edit" ? t("classes.units.editing", { name: editForm.name }) : t("classes.units.title");
-  const pageAction = view === "list" ? <button className="button button--primary" type="button" onClick={() => { setView("create"); setNotice(null); }} disabled={loading}><Plus />{t("classes.units.add")}</button> : <button className="button button--secondary" type="button" onClick={() => { setView("list"); setEditingId(null); setCreateErrors({}); setEditErrors({}); }}><ArrowLeft />Voltar à lista</button>;
+  const pageAction = view === "list" ? <button className="button button--primary button--compact" type="button" onClick={() => { setView("create"); setNotice(null); }} disabled={loading}><Plus />{t("classes.units.add")}</button> : <button className="button button--secondary button--compact" type="button" onClick={() => { setView("list"); setEditingId(null); setCreateErrors({}); setEditErrors({}); }}><ArrowLeft />Voltar à lista</button>;
 
   return <AppShell active="curricular_units_management" breadcrumb={t("classes.units.breadcrumb")}><AdminPage>
-    <AdminPageHeader eyebrow={t("classes.units.eyebrow")} title={pageTitle} description={view === "list" ? t("classes.units.description") : t("classes.units.required")} actions={pageAction} />
+    <AdminPageHeader eyebrow={t("classes.units.eyebrow")} title={pageTitle} />
 
     {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
     {view === "create" && <section className={`panel ${styles.editor}`} aria-labelledby="nova-unidade">
-      <SurfaceHeader icon={<BookOpen />} eyebrow="Plano curricular" title={t("classes.units.new")} headingId="nova-unidade" />
+      <SurfaceHeader icon={<BookOpen />} eyebrow="Plano curricular" title={t("classes.units.new")} headingId="nova-unidade" actions={pageAction} />
       <UnitEditor form={createForm} setForm={setCreateForm} errors={createErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.create")} onSubmit={event => void save("create", event)} onCancel={() => { setView("list"); setCreateErrors({}); }} />
     </section>}
 
     {view === "edit" && editingId && <section className={`panel ${styles.editor}`} aria-labelledby="editar-unidade">
-      <SurfaceHeader icon={<Pencil />} eyebrow={editForm.code} title={t("classes.units.editing", { name: editForm.name })} headingId="editar-unidade" />
+      <SurfaceHeader icon={<Pencil />} eyebrow={editForm.code} title={t("classes.units.editing", { name: editForm.name })} headingId="editar-unidade" actions={pageAction} />
       <UnitEditor form={editForm} setForm={setEditForm} errors={editErrors} representatives={representatives} saving={saving} submitLabel={t("classes.units.saveChanges")} onSubmit={event => void save("edit", event)} onCancel={() => { setView("list"); setEditingId(null); setEditErrors({}); }} />
     </section>}
 
-    {view === "list" && <AdminSection className={styles.list} icon={<BookOpen />} eyebrow={t("classes.units.plan")} title={t("classes.units.registered")} description={!loading && !loadError ? `${units.length} ${units.length === 1 ? t("classes.units.countOne") : t("classes.units.countMany")}` : undefined} actions={<label className={styles.unitSearch}><span className="sr-only">Pesquisar</span><span className={styles.searchControl}><Search /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquisar por nome ou código" /></span></label>}>
+    {view === "list" && <AdminSection className={styles.list} actions={pageAction} icon={<BookOpen />} eyebrow={t("classes.units.plan")} title={t("classes.units.registered")}><AdminToolbar label="Pesquisar unidades curriculares"><FilterSearch label="Pesquisar" value={query} onChange={setQuery} placeholder="Pesquisar por nome ou código" /></AdminToolbar>
       {loading ? <div className={styles.state} role="status"><LoaderCircle className={styles.spin} /><strong>{t("classes.units.loading")}</strong></div>
         : loadError ? <div className={`${styles.state} ${styles.errorState}`} role="alert"><strong>{loadError}</strong><button className="button button--secondary button--compact" type="button" onClick={() => void load()}>{t("classes.units.retry")}</button></div>
-        : units.length === 0 ? <div className={styles.state}><BookOpen /><strong>{t("classes.units.empty")}</strong><p>{t("classes.units.emptyDescription")}</p><button className="button button--secondary button--compact" type="button" onClick={() => setView("create")}><Plus />{t("classes.units.addFirst")}</button></div>
+        : units.length === 0 ? <div className={styles.state}><BookOpen /><strong>{t("classes.units.empty")}</strong><button className="button button--secondary button--compact" type="button" onClick={() => setView("create")}><Plus />{t("classes.units.addFirst")}</button></div>
         : visibleUnits.length === 0 ? <div className={styles.state}><Search /><strong>Sem resultados.</strong><p>Experimente pesquisar por outro nome ou código.</p></div>
         : <div className={styles.unitGrid}><div className={styles.unitTableHeader} data-has-representatives={visibleUnits.some(unit => unit.representativeUserIds.length) ? "true" : "false"} aria-hidden="true"><span>Unidade curricular</span><span>{t("classes.units.credits")}</span><span>{t("classes.units.period")}</span>{visibleUnits.some(unit => unit.representativeUserIds.length) && <span>Comissão de Curso</span>}<span /></div>{visibleUnits.map(unit => <article className={styles.unitCard} data-has-representatives={unit.representativeUserIds.length ? "true" : "false"} key={unit.id}>
           <div className={styles.identity}><span className={styles.code}>{unit.code}</span><h3>{unit.name}</h3></div>

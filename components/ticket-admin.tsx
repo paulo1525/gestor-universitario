@@ -2,8 +2,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, CircleDot, Filter, LoaderCircle, MessageSquareText, Search, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
+import { Check, ChevronDown, CircleDot, LoaderCircle, MessageSquareText, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
 import { AuthGuard } from "@/components/auth-guard";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -96,14 +97,11 @@ export function TicketAdmin() {
   }
 
   return <AuthGuard requireAdmin><AppShell active="tickets" breadcrumb={t("classes.tickets.breadcrumb")}><AdminPage>
-    <AdminPageHeader eyebrow={t("classes.tickets.eyebrow")} title={t("classes.tickets.title")} description={t("classes.tickets.description")} />
-    <AdminSection className={styles.panel} icon={<Ticket />} title={t("classes.tickets.listTitle")} description={t("classes.tickets.listDescription")}>
+    <AdminPageHeader eyebrow={t("classes.tickets.eyebrow")} title={t("classes.tickets.title")} />
+    <AdminSection className={styles.panel} icon={<Ticket />} title={t("classes.tickets.listTitle")}>
       <AdminToolbar className={styles.toolbar} label={t("classes.tickets.filter")}>
-        <span />
-        <div className={styles.controls}>
-          <label className={styles.search}><Search /><span className="sr-only">{t("classes.tickets.search")}</span><input type="search" aria-label={t("classes.tickets.search")} placeholder={t("classes.tickets.searchPlaceholder")} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-          <label className={styles.filter}><Filter /><span className="sr-only">{t("classes.tickets.filter")}</span><select aria-label={t("classes.tickets.filter")} value={filter} onChange={(event) => setFilter(event.target.value as FilterValue)}>{filterOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-        </div>
+        <FilterSearch label={t("classes.tickets.search")} value={query} onChange={setQuery} placeholder={t("classes.tickets.searchPlaceholder")} />
+        <FilterSelect label={t("classes.tickets.filter")} value={filter} onChange={(value) => setFilter(value as FilterValue)} defaultValue="pending" options={filterOptions.map((option) => ({ value: option.value, label: option.label }))} />
       </AdminToolbar>
       {notice && <p className="admin-notice" role="status">{notice}</p>}
       <div className={styles.summary} aria-live="polite"><span>{t("classes.tickets.visibleSummary", { visible: visible.length, total: counts.all })}</span><span>{t("classes.tickets.statusSummary", { pending: counts.pending, resolved: counts.resolved })}</span></div>
@@ -138,7 +136,7 @@ export function TicketAdmin() {
             </div>
           </div>}
         </article>;
-      })}{!visible.length && <AdminEmptyState icon={<Ticket />} title={query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")} description={query ? t("classes.tickets.searchHint") : t("classes.tickets.emptyHint")} />}</div>
+      })}{!visible.length && <AdminEmptyState icon={<Ticket />} title={query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")} />}</div>
     </AdminSection>
     <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow={t("classes.tickets.eyebrow")} title={locale === "en" ? "Delete this request?" : "Eliminar este pedido?"} description={t("classes.tickets.deleteConfirm")} subject={deleteTarget?.student_name || deleteTarget?.created_by_name} subjectLabel={locale === "en" ? "Request concerning" : "Pedido relativo a"} warning={locale === "en" ? "The request and its administrative history will be permanently removed." : "O pedido e o respetivo histórico administrativo serão removidos definitivamente."} confirmLabel={locale === "en" ? "Delete request" : "Eliminar pedido"} cancelLabel={locale === "en" ? "Cancel" : "Cancelar"} busy={Boolean(deleteTarget && saving === deleteTarget.id)} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) void remove(deleteTarget); }} />
   </AdminPage></AppShell></AuthGuard>;

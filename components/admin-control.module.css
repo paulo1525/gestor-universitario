@@ -55,83 +55,25 @@
   padding-block: 14px;
 }
 
-.userSearch {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
 
-.filterLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
-  font-weight: 850;
-}
 
-.filterLabel svg {
-  width: 14px;
-  height: 14px;
-  color: var(--color-info);
-}
 
-.searchControl {
-  position: relative;
-  display: block;
-}
 
-.searchControl > svg {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  width: 16px;
-  height: 16px;
-  color: var(--color-text-muted);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
 
-.searchControl input {
-  width: 100%;
-  min-height: var(--control-height);
-  padding: 0 12px 0 40px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  outline: 0;
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: var(--font-size-small);
-}
 
-.statusField {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-}
 
-.statusFilter {
-  min-width: 170px;
-  min-height: var(--control-height);
-  padding: 0 34px 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
-  font-size: var(--font-size-small);
-}
 
-.statusFilter:focus-visible {
-  outline: 0;
-  box-shadow: var(--focus-ring);
-}
 
-.searchControl:focus-within input,
-.statusFilter:focus-visible {
-  border-color: var(--color-focus);
-}
+
+
+
+
+
+
+
+
+
+
 
 .loadingState {
   min-height: 260px;
@@ -208,10 +150,7 @@
     grid-template-columns: 1fr;
   }
 
-  .sectionFooter :global(.button),
-  .userSearch,
-  .statusField,
-  .statusFilter {
+  .sectionFooter :global(.button) {
     width: 100%;
     max-width: none;
   }

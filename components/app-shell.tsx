@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
+import { ChevronLeft, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
 import adminNavigationStyles from "@/components/admin-navigation.module.css";
@@ -99,7 +99,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
   return <div className={`app-shell${sidebarCollapsed ? " app-shell--sidebar-collapsed" : ""}${focusMode ? " app-shell--focus" : ""}`}>
     <a className="skip-link" href="#conteudo-principal">{t("shell.skipToContent")}</a>
     <aside className={`sidebar${administrativeContext ? ` ${adminNavigationStyles.adminSidebar}` : ""}${sidebarCollapsed ? " sidebar--collapsed" : ""}${open ? " sidebar--open" : ""}`}>
-      <button className="sidebar__collapse" type="button" onClick={toggleSidebar} aria-label={t(sidebarCollapsed ? "shell.expandMenu" : "shell.collapseMenu")} aria-expanded={!sidebarCollapsed} aria-controls="primary-sidebar-navigation">
+      <button className="sidebar__collapse" type="button" onClick={toggleSidebar} aria-label={t(sidebarCollapsed ? "shell.expandMenu" : "shell.collapseMenu")} title={t(sidebarCollapsed ? "shell.expandMenu" : "shell.collapseMenu")} aria-expanded={!sidebarCollapsed} aria-controls="primary-sidebar-navigation">
         {sidebarCollapsed ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
       </button>
       <div className="brand"><span className="brand__logo-frame"><Image className="brand__logo" src="/logo-comissao-curso-fmup-2025-2031-transparente.png" alt={t("shell.brandAlt")} width={58} height={58} priority /></span><div><span className="brand__name">{t("shell.brandName")}</span><span className="brand__context">{administrativeContext ? locale === "en" ? "Administration panel" : "Painel administrativo" : t("shell.brandContext")}</span></div><button className="icon-button sidebar__close" onClick={() => setOpen(false)} aria-label={t("shell.closeMenu")}><X /></button></div>

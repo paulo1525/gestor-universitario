@@ -70,7 +70,7 @@ export function ClassRosterImport({ onImported }: { onImported?: () => void | Pr
         icon={<Upload />}
         eyebrow={t("classes.import.eyebrow")}
         title={t("classes.import.title")}
-        description={t("classes.import.description")}
+       
         actions={<button type="button" className={styles.helpButton} onClick={() => setShowPrompt(true)} aria-label={t("classes.import.aiHelpAria")} title={t("classes.import.aiHelpAria")}><Sparkles />{t("classes.import.aiHelpAction")}</button>}
       />
       <div className={styles.body}>

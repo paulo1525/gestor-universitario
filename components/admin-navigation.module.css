@@ -49,13 +49,13 @@
 }
 
 .profileAdminLink strong {
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 .profileAdminLink small {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 8px;
+  font-size: var(--font-size-caption);
   font-weight: 520;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -72,7 +72,7 @@
   padding: 0 11px;
   border-radius: var(--radius-control);
   color: var(--sidebar-text);
-  font-size: 11px;
+  font-size: var(--font-size-body);
   font-weight: 720;
   text-decoration: none;
 }
@@ -150,7 +150,7 @@
   border-radius: var(--radius-control);
   color: var(--sidebar-text-muted);
   background: transparent;
-  font-size: 10px;
+  font-size: var(--font-size-small);
   font-weight: 820;
   letter-spacing: .055em;
   text-align: left;
@@ -210,7 +210,7 @@
   position: relative;
   min-height: 38px;
   padding-left: 10px;
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 .item::before {

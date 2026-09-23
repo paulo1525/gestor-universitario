@@ -7,12 +7,10 @@ import {
   Eye,
   FileArchive,
   FileText,
-  Filter,
   GraduationCap,
   LoaderCircle,
   LockKeyhole,
   Plus,
-  Search,
   Tags,
   Trash2,
   Type,
@@ -20,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -222,12 +221,12 @@ export function DocumentsLibrary() {
             icon={<FileArchive />}
             eyebrow="Arquivo da Comissão de Curso"
             title="Documentos e atas"
-            actions={canManage ? <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button> : undefined}
+           
           />
 
           {canManage && editor && (
             <form className={`${styles.panel} ${styles.form}`} onSubmit={save}>
-              <SurfaceHeader icon={<FileArchive />} title="Novo documento" description="Define claramente quem poderá consultar o ficheiro." />
+              <SurfaceHeader icon={<FileArchive />} title="Novo documento" />
               <div className={styles.formGrid}>
                 <label className={styles.wide}><span><Type />{"T\u00edtulo"}</span><input required maxLength={180} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
                 <label><span><Tags />Tipo</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
@@ -251,21 +250,16 @@ export function DocumentsLibrary() {
 
           <section className={styles.panel}>
             <SurfaceHeader
-              icon={<Filter />}
-              title="Pesquisar e filtrar"
-              description="Encontra rapidamente documentos, atas e regulamentos no arquivo."
-              meta={`${visible.length} ${visible.length === 1 ? "resultado" : "resultados"}`}
-              actions={filtersActive ? <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />Limpar</button> : undefined}
-            />
-            <div className={styles.filterBar}>
-              <div className={styles.filterControls}>
-                <label className={`${styles.filterField} ${styles.searchFilter}`}><span><Search />Pesquisa</span><div className={styles.searchControl}><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por título, descrição ou ficheiro…" /></div></label>
-                <label className={styles.filterField}><span><Tags />Tipo de documento</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-                <label className={styles.filterField}><span><GraduationCap />Unidade curricular</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">Todas as unidades curriculares</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"\u00b7"} {unit.name}</option>)}</select></label>
-              </div>
-            </div>
+              icon={<FileArchive />}
+              title="Arquivo"
+              meta={`${visible.length} ${visible.length === 1 ? "documento" : "documentos"}`} actions={canManage ? <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button> : undefined} />
+            <FilterBar label="Filtrar documentos">
+              <FilterSearch label="Pesquisar" value={query} onChange={setQuery} placeholder="Título, descrição ou ficheiro…" />
+              <FilterSelect label="Tipo de documento" value={typeFilter} onChange={setTypeFilter} options={[{ value: "all", label: "Todos os tipos" }, ...Object.entries(typeLabels).map(([key, label]) => ({ value: key, label }))]} />
+              <FilterSelect label="Unidade curricular" value={unitFilter} onChange={setUnitFilter} options={[{ value: "all", label: "Todas as unidades curriculares" }, ...units.map((unit) => ({ value: unit.id, label: `${unit.code} · ${unit.name}` }))]} />
+            </FilterBar>
             {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} />{"A carregar arquivo\u2026"}</div>
-              : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{filtersActive ? "Não existem documentos com estes filtros" : "Ainda não existem documentos"}</strong><span>{filtersActive ? "Experimenta limpar os filtros ou pesquisar outros termos." : "Os documentos publicados aparecerão aqui."}</span>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />Limpar filtros</button>}</div>
+              : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{filtersActive ? "Não existem documentos com estes filtros" : "Ainda não existem documentos"}</strong>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />Limpar filtros</button>}</div>
                 : <div className={styles.cardGrid}>{visible.map((item) => { const author = personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage }); return <article className={styles.fileCard} key={item.id}>
                   <div className={styles.fileIcon}>{item.type === "minutes" ? <FileArchive /> : <FileText />}</div>
                     <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} <PersonName person={author} /> {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>

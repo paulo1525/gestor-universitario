@@ -42,7 +42,7 @@ export function StudentPreferencePanel() {
       icon={<CheckCircle2 />}
       eyebrow={t("classes.preferences.eyebrow")}
       title={t("classes.preferences.title", { id: data.student.classId })}
-      description={data.settings.groupLabel || t("classes.preferences.window")}
+     
       actions={<div className="student-preferences__header-actions">{helpButton("overview", t("classes.preferences.helpFill"))}<span className={`preference-state ${submitted && !editing ? "is-submitted" : locked ? "is-locked" : moving ? "is-move" : "is-stay"}`}>{state}</span></div>}
     />
     {locked && <div className="student-preferences__deadline-closed"><LockKeyhole size={17} /><span><strong>{beforeOpen ? t("classes.preferences.notAvailable") : t("classes.preferences.state.closed")}</strong><small>{beforeOpen && opensAt ? t("classes.preferences.opensAt", { date: format(opensAt) }) : submitted ? t("classes.preferences.savedLocked") : t("classes.preferences.closedEmpty")}</small></span></div>}

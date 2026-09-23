@@ -17,6 +17,7 @@ import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { FilterBar, FilterSearch, FilterSegmented } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
@@ -190,48 +191,10 @@ export function CommissionDirectory() {
                 headingId="diretorio-titulo"
                 meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.directory.member") : t("community.directory.memberPlural")}` : undefined}
               />
-
-              <div className={styles.controls}>
-                <label className={styles.search}>
-                  <Search aria-hidden="true" />
-                  <span className="sr-only">{t("community.directory.search")}</span>
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("community.directory.searchPlaceholder")}
-                  />
-                </label>
-                <div className={styles.filterRow}>
-                  <div className={styles.departmentTabs} role="group" aria-label={t("community.directory.filter")}>
-                    <button
-                      type="button"
-                      className={department === "all" ? styles.activeTab : ""}
-                      aria-pressed={department === "all"}
-                      onClick={() => setDepartment("all")}
-                    >
-                      {t("community.directory.all")}
-                    </button>
-                    {departments.map((value) => (
-                      <button
-                        type="button"
-                        className={department === value ? styles.activeTab : ""}
-                        aria-pressed={department === value}
-                        onClick={() => setDepartment(value)}
-                        key={value}
-                      >
-                        {departmentLabel(value)}
-                      </button>
-                    ))}
-                  </div>
-                  {filtersActive && (
-                    <button className={styles.clearFilters} type="button" onClick={clearFilters}>
-                      <X aria-hidden="true" />
-                      {t("community.directory.clear")}
-                    </button>
-                  )}
-                </div>
-              </div>
+              <FilterBar label={t("community.directory.filter")}>
+                <FilterSearch label={t("community.directory.search")} value={query} onChange={setQuery} placeholder={t("community.directory.searchPlaceholder")} />
+                <FilterSegmented label={t("community.directory.filter")} value={department} onChange={setDepartment} options={[{ value: "all" as typeof department, label: t("community.directory.all") }, ...departments.map((value) => ({ value, label: departmentLabel(value) }))]} />
+              </FilterBar>
 
               {loading ? (
                 <div className={styles.state}>
@@ -246,11 +209,13 @@ export function CommissionDirectory() {
                     <Search />
                   </span>
                   <strong>{t("community.directory.empty")}</strong>
-                  <p>{t("community.directory.emptyHint")}</p>
-                  <button className={styles.emptyAction} type="button" onClick={clearFilters}>
-                    <X aria-hidden="true" />
-                    {t("community.directory.clear")}
-                  </button>
+                  
+                  {filtersActive && (
+                    <button className={styles.emptyAction} type="button" onClick={clearFilters}>
+                      <X aria-hidden="true" />
+                      {t("community.directory.clear")}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className={styles.grid}>

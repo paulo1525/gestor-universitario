@@ -136,8 +136,8 @@ export function AuditHistory() {
   const selectedDetails = selected ? detailRows(selected.details, locale, auditCopy) : [];
 
   return <AuthGuard requireAdmin><AppShell active="audit" breadcrumb={t("admin.audit.breadcrumb")}><AdminPage>
-    <AdminPageHeader eyebrow={t("admin.audit.eyebrow")} title={t("admin.audit.title")} description={t("admin.audit.description")} />
-    <AdminSection icon={<History />} title={t("admin.audit.recent")} description={t("admin.audit.recentDescription")} actions={<label className="search-field audit-search"><Search size={16} /><span className="sr-only">{t("admin.audit.search")}</span><input type="search" placeholder={t("admin.audit.search")} value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label>}>
+    <AdminPageHeader eyebrow={t("admin.audit.eyebrow")} title={t("admin.audit.title")} />
+    <AdminSection icon={<History />} title={t("admin.audit.recent")} actions={<label className="search-field audit-search"><Search size={16} /><span className="sr-only">{t("admin.audit.search")}</span><input type="search" placeholder={t("admin.audit.search")} value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} /></label>}>
       {error && <AppToast key={error} kind="error" message={error} onDismiss={() => setError("")} />}
       {pagedActions.length ? <AdminDataRegion label={t("admin.audit.recent")}><div className="audit-list">
         {pagedActions.map(action => { const actor = personDisplay({ fullName: action.actor_name, id: action.actor_id, email: action.actor_email, studentNumber: action.actor_student_number }, { revealIdentifier: true, locale }); return <article className="audit-row" key={`${action.class_id || "admin"}-${action.id}`}>

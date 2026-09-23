@@ -11,8 +11,8 @@ html[data-theme="forum"] {
   --color-surface-raised: #ffffff;
   --color-text: #172330;
   --color-text-soft: #2c3e50;
-  --color-text-muted: #607487;
-  --color-text-subtle: #7b8c9c;
+  --color-text-muted: #56697b;
+  --color-text-subtle: #5d6f80;
   --color-text-disabled: #95a3af;
   --color-text-inverse: #ffffff;
   --color-border: #cfdae3;
@@ -58,8 +58,8 @@ html[data-theme="forum"] {
   --surface-card-border: var(--color-border-strong);
   --surface-card-radius: var(--radius-panel);
   --surface-card-shadow: var(--shadow-panel);
-  --surface-header-min-height: 58px;
-  --surface-header-padding-block: 10px;
+  --surface-header-min-height: 48px;
+  --surface-header-padding-block: 8px;
   --surface-header-padding-inline: 14px;
   --surface-header-background: linear-gradient(180deg, #f6fafc, #eaf2f7);
   --surface-header-accent-size: 3px;
@@ -111,23 +111,12 @@ html[data-theme="forum"] .brand__logo-frame {
 }
 
 html[data-theme="forum"] .brand__name {
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
   letter-spacing: -.01em;
 }
 
 html[data-theme="forum"] .brand__context {
   color: #91bfd5;
-}
-
-html[data-theme="forum"] .sidebar__collapse {
-  border-color: var(--sidebar-border);
-  color: var(--sidebar-text);
-  background: #193a58;
-}
-
-html[data-theme="forum"] .sidebar__collapse:hover {
-  color: var(--sidebar-text-strong);
-  background: #214766;
 }
 
 html[data-theme="forum"] .nav-list {
@@ -143,7 +132,7 @@ html[data-theme="forum"] .nav-section {
 html[data-theme="forum"] .nav-label {
   padding: 0 10px 5px;
   color: var(--sidebar-label);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   letter-spacing: .13em;
 }
 
@@ -154,7 +143,7 @@ html[data-theme="forum"] .nav-list a {
   border: 1px solid transparent;
   border-radius: 4px;
   color: var(--sidebar-text);
-  font-size: 11px;
+  font-size: var(--font-size-body);
 }
 
 html[data-theme="forum"] .nav-list a > svg {
@@ -163,12 +152,12 @@ html[data-theme="forum"] .nav-list a > svg {
 }
 
 html[data-theme="forum"] .nav-list a strong {
-  font-size: 11px;
+  font-size: var(--font-size-body);
 }
 
 html[data-theme="forum"] .nav-list a small {
   color: var(--sidebar-text-muted);
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] .nav-list a:hover {
@@ -392,18 +381,18 @@ html[data-theme="forum"] .main-content {
   padding-top: 26px;
 }
 
-html[data-theme="forum"] h1 {
+/* Heading colours belong to light content surfaces only; dark surfaces such as
+   the authentication aside keep their own inverse colour. */
+html[data-theme="forum"] :where(.workspace, .auth-card) h1 {
   color: #173b58;
-  font-size: clamp(23px, 2vw, 30px);
   letter-spacing: -.025em;
 }
 
-html[data-theme="forum"] h2 {
+html[data-theme="forum"] :where(.workspace, .auth-card) h2 {
   color: #204b69;
 }
 
-html[data-theme="forum"] h3,
-html[data-theme="forum"] h4 {
+html[data-theme="forum"] :where(.workspace, .auth-card) :is(h3, h4) {
   color: #294d66;
 }
 
@@ -516,9 +505,6 @@ html[data-theme="forum"] [data-platform-surface-header] {
   background: var(--surface-header-background);
 }
 
-html[data-theme="forum"] .surface-header--standalone {
-  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
-}
 
 html[data-theme="forum"] .panel__header::before {
   display: none;
@@ -709,7 +695,7 @@ html[data-theme="forum"] th {
   border-color: #b9cad6;
   color: #315e79;
   background: linear-gradient(180deg, #edf5f9, #dfeaf1);
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] td {
@@ -948,14 +934,14 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="monthNavigation"] > b
   width: 36px;
   height: 36px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="viewSwitch"] button {
   min-height: 34px;
   padding: 6px 9px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="filters"] {
@@ -964,26 +950,26 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="filters"] {
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="filterTitle"] {
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="filters"] select {
   min-height: 36px;
   padding-block: 6px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="clearFilters"] {
   min-height: 34px;
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="weekHeader"] span {
   min-height: 34px;
   padding-inline: 7px;
   color: #496b80;
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1;
 }
 
@@ -991,7 +977,7 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="dayNumber"] {
   width: 24px;
   height: 24px;
   margin-bottom: 3px;
-  font-size: 11px;
+  font-size: var(--font-size-body);
   line-height: 1;
 }
 
@@ -999,24 +985,24 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="eventPill"] {
   min-height: 20px;
   padding: 3px 5px;
   border-radius: 3px;
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   line-height: 1.15;
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="moreEvents"] {
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="dayPanel"] {
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="dayPanelHeading"] span {
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="dayPanelHeading"] strong {
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
   line-height: 1.25;
 }
 
@@ -1026,17 +1012,17 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="dayEventCard"] {
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="dayEventCard"] strong {
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="dayEventCard"] small,
 html[data-theme="forum"] [class*="calendarShell"] [class*="eventTime"] {
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="upcoming"] > span {
   padding-block: 7px 4px;
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="upcoming"] button {
@@ -1045,11 +1031,11 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="upcoming"] button {
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="upcoming"] time {
-  font-size: 8px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="calendarShell"] [class*="upcoming"] strong {
-  font-size: 9px;
+  font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] [class*="agendaItem"] > time strong {
@@ -1057,7 +1043,7 @@ html[data-theme="forum"] [class*="agendaItem"] > time strong {
 }
 
 html[data-theme="forum"] [class*="agendaBody"] h3 {
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
 }
 
 html[data-theme="forum"] [class*="eventModal"] [class*="modalHeading"] h2 {
@@ -1066,7 +1052,7 @@ html[data-theme="forum"] [class*="eventModal"] [class*="modalHeading"] h2 {
 
 html[data-theme="forum"] [class*="eventModal"] [class*="modalMeta"] p,
 html[data-theme="forum"] [class*="eventModal"] [class*="modalDescription"] {
-  font-size: 10px;
+  font-size: var(--font-size-small);
 }
 
 @media (max-width: 760px) {

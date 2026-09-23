@@ -10,7 +10,7 @@ const cookies = readFileSync(new URL("../app/cookies/page.tsx", import.meta.url)
 const cookieStyles = readFileSync(new URL("../app/cookies/cookies.module.css", import.meta.url), "utf8");
 
 test("o diretório expõe filtros acessíveis, limpeza contextual e cartões sem overflow", () => {
-  assert.match(directory, /aria-pressed=\{department === "all"\}/);
+  assert.match(directory, /<FilterSegmented label=\{t\("community\.directory\.filter"\)\} value=\{department\}/);
   assert.match(directory, /filtersActive &&/);
   assert.match(directory, /<ul className=\{styles\.unitList\}>/);
   assert.match(directoryStyles, /grid-template-columns:\s*repeat\(auto-fit, minmax\(min\(320px, 100%\), 1fr\)\)/);
@@ -19,7 +19,7 @@ test("o diretório expõe filtros acessíveis, limpeza contextual e cartões sem
 });
 
 test("a biblioteca de materiais tem filtro identificado, editor isolado e registos compactos", () => {
-  assert.match(materials, /className=\{styles\.filterLabel\}/);
+  assert.match(materials, /<FilterSelect label=\{t\("community\.materials\.filter"\)\} value=\{filter\}/);
   assert.match(materials, /filter !== "all" &&/);
   assert.match(materials, /setFilter\("all"\)/);
   assert.match(materials, /className=\{styles\.formWorkspace\}/);
@@ -33,7 +33,7 @@ test("a biblioteca de materiais tem filtro identificado, editor isolado e regist
   assert.match(materialStyles, /\.materialGrid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(materialStyles, /\.material\s*\{[^}]*grid-template-columns:\s*112px minmax\(0, 1fr\)/s);
   assert.match(materialStyles, /\.formWorkspace\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.4fr\) minmax\(320px, \.6fr\)/s);
-  assert.match(materialStyles, /\.feedbackButton, \.versionActions button, \.materialBody \.cardActions > \.openMaterial\s*\{[^}]*min-height:\s*34px;[^}]*padding:\s*0 9px;[^}]*border-radius:\s*9px;[^}]*font-size:\s*9px/s);
+  assert.match(materialStyles, /\.feedbackButton, \.versionActions button, \.materialBody \.cardActions > \.openMaterial\s*\{[^}]*min-height:\s*34px;[^}]*padding:\s*0 9px;[^}]*border-radius:\s*9px;[^}]*font-size:\s*var\(--font-size-caption\)/s);
   assert.match(materialStyles, /\.feedbackButton svg, \.versionActions svg, \.materialBody \.cardActions > \.openMaterial svg\s*\{[^}]*width:\s*14px;[^}]*height:\s*14px/s);
   assert.doesNotMatch(materialStyles, /grid-template-rows:\s*155px 1fr/);
 });

@@ -220,7 +220,7 @@ export function MaterialCompendiumExport({ cards, unitId, unitCode, unitName, le
       icon={<FileDown />}
       eyebrow={<>PDF PERSONALIZADO · {unitLabel}</>}
       title="Compêndio para estudar"
-      description="Escolhe aulas, capítulos e os campos de avaliação disponíveis. A montagem acontece no teu navegador."
+     
       headingId="material-compendium-title"
     />
     <div className={styles.bankControls}><label className={styles.checkbox}><input type="checkbox" checked={includeQuestionBank} onChange={(event) => setIncludeQuestionBank(event.target.checked)} disabled={!unitId} /><span><strong>Incluir banco de questões</strong><small>{bankStatus}</small></span></label>{includeQuestionBank && unitId && !questionBankLoaded && <button className="button button--ghost button--compact" type="button" onClick={() => void loadBank().catch((reason) => setQuestionBankError(reason instanceof Error ? reason.message : "Não foi possível carregar as opções do banco."))} disabled={questionBankLoading}>{questionBankLoading ? <LoaderCircle className={styles.spin} /> : null}{questionBankLoading ? "A carregar…" : "Carregar opções do banco"}</button>}</div>

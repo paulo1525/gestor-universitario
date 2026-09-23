@@ -70,9 +70,9 @@ test("pesquisa, filtros e separadores não substituem o título das superfícies
   const checks = [
     ["components/global-search.tsx", /<section className=\{styles\.panel\}>\s*<SurfaceHeader[\s\S]*?<form className=\{styles\.toolbar\}/],
     ["components/campus-directory.tsx", /<section className=\{styles\.panel\}[^>]*>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/notifications-center.tsx", /<section className=\{styles\.panel\}>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/polls-hub.tsx", /<section className=\{styles\.workspace\}>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/material-catalog.tsx", /<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
+    ["components/notifications-center.tsx", /<section className=\{styles\.panel\}>\s*<SurfaceHeader[\s\S]*?<FilterBar /],
+    ["components/polls-hub.tsx", /<section className=\{styles\.workspace\}>\s*<SurfaceHeader[\s\S]*?<FilterBar /],
+    ["components/material-catalog.tsx", /<SurfaceHeader[\s\S]*?<FilterBar /],
     ["components/placement-workbench.tsx", /title="Estudantes e resultados"[\s\S]*?actions=\{<label className="search-field"/],
     ["components/turmas-dashboard.tsx", /<SurfaceHeader[\s\S]*?className="search-field"/],
   ];

@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -237,7 +238,7 @@ export function CurricularUnitCatalog() {
       <ModuleGuard moduleKey="curricular_units.catalog">
         <AppShell active="curricular_units" breadcrumb={t("community.units.breadcrumb")}>
           <div className={styles.page}>
-            <SurfaceHeader standalone headingLevel="h1" icon={<BookOpen />} eyebrow={t("community.units.eyebrow")} title={t("community.units.title")} description={t("community.units.description")} />
+            <SurfaceHeader standalone headingLevel="h1" icon={<BookOpen />} eyebrow={t("community.units.eyebrow")} title={t("community.units.title")} />
             {error && (
               <AppToast
                 kind="error"
@@ -248,20 +249,10 @@ export function CurricularUnitCatalog() {
             )}
             <section className={`${styles.panel} ${styles.catalogPanel}`}>
               <SurfaceHeader icon={<BookOpen />} title={t("community.units.catalog")} meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}` : undefined} />
-              {units.length > 0 && <div className={styles.catalogToolbar} aria-label={t("community.units.filters")}>
-                  <label className={`${styles.filterField} ${styles.catalogSearch}`}>
-                    <span><Search />{t("community.units.search")}</span>
-                    <div><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("community.units.searchPlaceholder")} /></div>
-                  </label>
-                  <label className={styles.filterField}>
-                    <span><GraduationCap />{t("community.units.filterYear")}</span>
-                    <select value={year} onChange={(event) => setYear(event.target.value)}>
-                      <option value="all">{t("community.units.allYears")}</option>
-                      {[1, 2, 3, 4, 5, 6].map((value) => <option value={value} key={value}>{t("community.units.yearOption", { year: value })}</option>)}
-                    </select>
-                  </label>
-                  {filtersActive && <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}
-              </div>}
+              {units.length > 0 && <FilterBar label={t("community.units.filters")}>
+                <FilterSearch label={t("community.units.search")} value={query} onChange={setQuery} placeholder={t("community.units.searchPlaceholder")} />
+                <FilterSelect label={t("community.units.filterYear")} value={year} onChange={setYear} options={[{ value: "all", label: t("community.units.allYears") }, ...[1, 2, 3, 4, 5, 6].map((value) => ({ value: String(value), label: t("community.units.yearOption", { year: value }) }))]} />
+              </FilterBar>}
               {loading ? (
                 <div className={styles.state}>
                   <LoaderCircle className={styles.spin} />
@@ -485,7 +476,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                     <div className={styles.page}>
                       <DetailSection
                         title={t("community.units.upcoming")}
-                        description={t("community.units.upcomingDescription")}
+                       
                         empty={t("community.units.upcomingEmpty")}
                       >
                         {data.events.map((item) => (
@@ -505,7 +496,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       </DetailSection>
                       <DetailSection
                         title={t("community.units.notices")}
-                        description={t("community.units.noticesDescription")}
+                       
                         empty={t("community.units.noticesEmpty")}
                       >
                         {data.announcements.map((item) => (
@@ -547,7 +538,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                         </div>
                       </section>}
                       {data.unit.representatives.length > 0 && <section className={styles.panel}>
-                        <SurfaceHeader icon={<UserRound />} title={t("community.units.representative")} description={t("community.units.representativeDescription")} />
+                        <SurfaceHeader icon={<UserRound />} title={t("community.units.representative")} />
                         <div className={`${styles.sectionBody} ${styles.representativeList}`}>
                           {data.unit.representatives.map((representative) => <article className={styles.representativeCard} key={representative.id}>
                             <div className={styles.cardTop}>
@@ -563,7 +554,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                       </section>}
                       <DetailSection
                         title={t("community.units.documents")}
-                        description={t("community.units.documentsDescription")}
+                       
                         empty={t("community.units.documentsEmpty")}
                       >
                         {[...data.documents, ...data.materials].map((item) => (
@@ -616,7 +607,7 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
   const examLabels: Record<string, string> = { frequencia: "Frequência", normal: "Época normal", recurso: "Recurso", especial: "Época especial", melhoria: "Melhoria", outro: "Outro" };
   const sourceLabels: Record<string, string> = { oficial: "Oficial", recomendada: "Recomendada", regulamento: "Regulamento", bibliografia: "Bibliografia", outro: "Outra fonte" };
   return <section className={`${styles.panel} ${styles.academicPanel}`} aria-labelledby="academic-content-title">
-    <SurfaceHeader icon={<GraduationCap />} title={`Informação académica${content.academicYear ? ` · ${content.academicYear}` : ""}`} description="Regras e recursos específicos do ano letivo selecionado." headingId="academic-content-title" actions={<ValidationBadge status={profile.status} />} />
+    <SurfaceHeader icon={<GraduationCap />} title={`Informação académica${content.academicYear ? ` · ${content.academicYear}` : ""}`} headingId="academic-content-title" actions={<ValidationBadge status={profile.status} />} />
     <div className={styles.academicBlocks}>
       <article className={styles.academicBlock}>
         <header><h3>Descrição</h3><ValidationBadge status={profile.status} /></header>
@@ -651,19 +642,17 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
 
 function DetailSection({
   title,
-  description,
   empty,
   children,
 }: {
   title: string;
-  description: string;
   empty: string;
   children: React.ReactNode;
 }) {
   const count = Array.isArray(children) ? children.length : 1;
   return (
     <section className={styles.panel}>
-      <SurfaceHeader icon={<BookOpen />} title={title} description={description} />
+      <SurfaceHeader icon={<BookOpen />} title={title} />
       {count ? (
         <div className={styles.sectionBody}>{children}</div>
       ) : (

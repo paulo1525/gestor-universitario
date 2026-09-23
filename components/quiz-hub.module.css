@@ -105,7 +105,7 @@
 
 .statisticsDangerButton:hover,
 .statisticsDangerButton:focus-visible {
-  color: #8d2f2a;
+  color: var(--color-danger-text);
   border-color: #bf5c55;
   background: #fff3f1;
 }
@@ -244,7 +244,7 @@
 
 .statisticsPanel { overflow: hidden; }
 .statisticsPanel > header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-header-background); }
-.statisticsPanel > header h2 { margin-top: 4px; font-size: 13px; }
+.statisticsPanel > header h2 { margin-top: 4px; font-size: var(--font-size-body-emphasis); }
 
 .topicStatistics,
 .recentAttempts { display: grid; }
@@ -283,7 +283,7 @@
 .recentAttempts article strong { overflow: hidden; color: var(--ink); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
 .recentAttempts article small { grid-column: 2; color: var(--muted); font-size: .75rem; }
 .recentAttempts article > span { min-width: 64px; display: grid; justify-items: end; gap: 2px; }
-.recentAttempts article > span b { font-size: 12px; }
+.recentAttempts article > span b { font-size: var(--font-size-body-emphasis); }
 .recentAttempts article > span small { grid-column: auto; }
 .passedAttempt b { color: var(--green); }
 .reviewAttempt b { color: var(--color-accent-text); }
@@ -319,7 +319,7 @@
 .resumeCard h2 {
   margin: 0 0 2px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
 }
 
 .resumeCard p {
@@ -405,7 +405,7 @@
 .unitCardHeader:hover,
 .unitCardHeader:focus-visible { background: var(--color-surface-subtle); }
 .unitCardHeader > span:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
-.unitCardHeader strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.unitCardHeader strong { overflow: hidden; font-size: var(--font-size-body-emphasis); text-overflow: ellipsis; white-space: nowrap; }
 .unitCardHeader small { color: var(--muted); font-size: .75rem; }
 .unitCardHeader > svg { width: 17px; color: var(--muted); transition: transform .15s ease; }
 .unitCardHeader[aria-expanded="true"] > svg { transform: rotate(180deg); }
@@ -921,7 +921,7 @@
 .summaryUnit strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1180,7 +1180,7 @@
 .sessionIdentity strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: var(--font-size-body-emphasis);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1227,7 +1227,7 @@
 
 .timer strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-body-emphasis);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2272,7 +2272,7 @@
 .replyContext {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 7px !important;
+  font-size: var(--font-size-caption) !important;
 }
 
 .roleBadge {

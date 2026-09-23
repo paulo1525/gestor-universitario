@@ -29,7 +29,7 @@ Uma página nova deve parecer parte destas áreas à primeira vista. Uma inspira
 Usar as primitivas exportadas por `components/admin-ui.tsx` antes de criar estrutura local:
 
 1. `AdminPage` define o ritmo vertical e a largura de trabalho.
-2. `AdminPageHeader` contém uma eyebrow, um único `h1`, descrição curta opcional e no máximo uma ação primária.
+2. `AdminPageHeader` contém apenas uma eyebrow e um único `h1`: sem descrição e sem botões. As ações pertencem à secção onde atuam.
 3. `AdminMetricGrid` e `AdminMetric` apresentam apenas números ou estados que ajudam a decidir a próxima ação.
 4. `AdminSection` agrupa uma tarefa coerente; `AdminNavigationList` representa destinos e não cartões promocionais.
 5. `AdminToolbar` reúne pesquisa, filtros e ações em lote numa única faixa.
@@ -111,7 +111,7 @@ Para coleções de dados extensas, preferir uma tabela ou linhas dentro de um ú
 ## Cabeçalhos e hierarquia
 
 - O fundo da área de trabalho mantém-se claro.
-- O cabeçalho da página é simples e sem contentor decorativo: eyebrow dourada, `h1`, descrição e ação primária à direita.
+- O cabeçalho da página é simples e sem contentor decorativo: eyebrow dourada e `h1`. Nunca leva botões, ícone nem descrição; as ações vivem no cabeçalho da secção a que dizem respeito e a navegação entre vistas da mesma área usa `PageTabs` (`components/page-tabs.tsx`).
 - A ação principal usa o componente de botão existente.
 - As secções usam painéis brancos com cabeçalho de 72–78 px e separador inferior.
 - Os números de resumo usam o padrão `stat-card`/`admin-stats`, não banners personalizados.
@@ -134,12 +134,23 @@ Gradientes funcionais, como uma barra de progresso ou um gráfico circular, pode
 
 ## Formulários e ações
 
-- Labels sempre visíveis; placeholders não substituem labels.
+- Em formulários, labels sempre visíveis; placeholders não substituem labels. Nos filtros (`components/filter-bar.tsx`) a label fica associada ao controlo mas visualmente oculta, porque o placeholder ou a opção "Todos…" já identifica o filtro.
 - Altura, borda, raio e foco devem reutilizar os controlos existentes.
 - A ação primária aparece uma vez por contexto; ações secundárias são visivelmente menos fortes.
 - Desativado, a carregar, sucesso e erro devem ser distinguíveis sem depender apenas da cor.
 - Operações destrutivas exigem confirmação e linguagem explícita.
 - Em mobile, ações deixam de competir horizontalmente e podem ocupar a largura disponível.
+
+## Texto na interface
+
+- Não explicar a interface: sem descrições por baixo de títulos de secção, sem linhas de ajuda que descrevem o que um controlo faz e sem segunda linha em estados vazios.
+- Só se mantém texto auxiliar quando informa uma regra ou uma consequência que o estudante não pode adivinhar (privacidade, anonimato, moderação, campos obrigatórios, limites de ficheiros). Nesse caso usa-se uma única linha discreta (`.surface-note`).
+- `SurfaceHeader`, `AdminSection` e `AdminPageHeader` não aceitam `description` de propósito.
+
+## Escala tipográfica
+
+- Escala compacta definida pelos tokens `--font-size-*` em `app/globals.css`; nenhum texto abaixo de 10px.
+- Tamanhos fixos em CSS Modules são proibidos: usar sempre os tokens (verificado em `tests/filter-bar-governance.test.mjs`).
 
 ## Responsividade e acessibilidade
 

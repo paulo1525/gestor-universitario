@@ -67,7 +67,7 @@ test("as rotas corrigem no servidor e não expõem respostas antes da tentativa"
 });
 
 test("a interface mantém o ciclo explicação, exercício e feedback", () => {
-  assert.match(quizHub, /href="\/testes\/aprender"/);
+  assert.match(quizHub, /href: "\/testes\/aprender"/);
   assert.match(hub, /Explicação \{explanationNumber\}/);
   assert.match(hub, /Exercício \{exerciseNumber\}/);
   assert.match(hub, /multiple_choice/);

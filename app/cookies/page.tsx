@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Clock3, Cookie, LockKeyhole, Settings2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Cookie, LockKeyhole, Settings2, ShieldCheck } from "lucide-react";
 import styles from "./cookies.module.css";
 import { SurfaceHeader } from "@/components/surface-header";
 
@@ -7,7 +7,7 @@ export default function CookiesPage() {
   return (
     <main className={styles.page}>
       <article className={styles.document}>
-        <SurfaceHeader headingLevel="h1" icon={<Cookie />} eyebrow="Gestor Universitário" title="Política de Cookies" description={<span className={styles.updated}><Clock3 aria-hidden="true" />Última atualização: 31 de julho de 2026</span>} />
+        <SurfaceHeader headingLevel="h1" icon={<Cookie />} eyebrow="Gestor Universitário" title="Política de Cookies" />
 
         <div className={styles.introduction}>
           <ShieldCheck aria-hidden="true" />

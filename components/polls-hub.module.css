@@ -1,17 +1,19 @@
-.page{display:grid;gap:18px;max-width:1480px;margin:0 auto;padding:2px}
+.page{display:grid;gap: var(--space-5);max-width:1480px;margin:0 auto;padding:2px}
+/* The wrapper gap already separates the page header from the content. */
+.page > :global(.surface-header--standalone) { margin-bottom: 0; }
 .hero{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:24px;padding:4px 2px}
 .hero:after{display:none}
 .heroContent{position:relative;z-index:1;display:flex;align-items:flex-start;gap:17px;min-width:0}
 .heroIcon{display:none}
 .heroIcon svg{width:25px}
-.eyebrow{display:block;margin-bottom:5px;color:#806207;font-size:10px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}
+.eyebrow{display:block;margin-bottom:5px;color:var(--color-accent-text);font-size:var(--font-size-small);font-weight:900;letter-spacing:.11em;text-transform:uppercase}
 .hero h1{margin:5px 0 7px;font-size:clamp(27px,3vw,38px);line-height:1.15;letter-spacing:-.035em}
-.hero p{max-width:680px;margin:7px 0 0;color:#68665f;font-size:12px;line-height:1.6}
-.heroStats{position:relative;z-index:1;display:flex;gap:9px}
-.heroStats span{min-width:92px;display:grid;gap:2px;padding:11px 13px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:#747169;font-size:10px;box-shadow:0 2px 8px rgba(20,20,16,.025)}
-.heroStats strong{color:#292821;font-size:18px}
+.hero p{max-width:680px;margin:7px 0 0;color:var(--color-text-muted);font-size:var(--font-size-body-emphasis);line-height:1.6}
+
+
+
 .primaryButton,.secondaryButton,.voteButton,.editButton,.textButton,.closeButton{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;cursor:pointer;font:inherit;font-weight:850;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,background .15s ease}
-.primaryButton{position:relative;z-index:1;min-height:42px;padding:0 16px;border-radius:11px;color:#201b08;background:#f2ce36;box-shadow:0 8px 20px rgba(156,116,0,.14);font-size:11px}
+.primaryButton{position:relative;z-index:1;min-height:42px;padding:0 16px;border-radius:11px;color:#201b08;background:#f2ce36;box-shadow:0 8px 20px rgba(156,116,0,.14);font-size:var(--font-size-body)}
 .primaryButton:hover,.voteButton:hover{transform:translateY(-1px);box-shadow:0 11px 24px rgba(156,116,0,.2)}
 .primaryButton svg,.secondaryButton svg,.voteButton svg,.editButton svg,.textButton svg{width:15px;height:15px}
 .primaryButton:disabled,.voteButton:disabled{opacity:.62;cursor:wait;transform:none}
@@ -19,70 +21,70 @@
 .editor{border-color:#dfcf86}
 .editorHeader{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:var(--surface-header-min-height);padding:var(--surface-header-padding-block) var(--surface-header-padding-inline);border-top:var(--surface-header-accent-size) solid var(--surface-header-accent);border-bottom:1px solid var(--surface-card-border);background:var(--surface-header-background)}
 .editorHeader h2{margin:0;font-size:17px;letter-spacing:-.02em}
-.editorHeader p{max-width:750px;margin:5px 0 0;color:#6e6b62;font-size:12px;line-height:1.6}
-.closeButton{width:35px;height:35px;flex:0 0 auto;border:1px solid #dedbd0;border-radius:10px;color:#55534c;background:#fff}
+.editorHeader p{max-width:750px;margin:5px 0 0;color:var(--color-text-muted);font-size:var(--font-size-body-emphasis);line-height:1.6}
+.closeButton{width:35px;height:35px;flex:0 0 auto;border:1px solid #dedbd0;border-radius:10px;color:var(--color-text-muted);background:#fff}
 .closeButton svg{width:15px}
 .editorBody{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.72fr)}
 .editorMain{display:grid;align-content:start;gap:17px;padding:24px 25px;border-right:1px solid #e8e6df}
 .editorAside{display:grid;align-content:start;gap:14px;padding:24px;background:#fbfbf8}
-.field{display:grid;gap:7px;color:#4f4d46;font-size:11px;font-weight:850}
+.field{display:grid;gap:7px;color:var(--color-text-soft);font-size:var(--font-size-body);font-weight:850}
 .field>span{display:flex;align-items:center;gap:5px}
-.field small{color:#908e86;font-size:10px;font-weight:500}
-.field input,.field textarea,.field select{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #d9d7cf;border-radius:10px;outline:0;color:#24231f;background:#fff;font:inherit;font-size:12px;font-weight:500;transition:border-color .15s,box-shadow .15s}
+.field small{color:var(--color-text-subtle);font-size:var(--font-size-small);font-weight:500}
+.field input,.field textarea,.field select{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #d9d7cf;border-radius:10px;outline:0;color:var(--color-text);background:#fff;font:inherit;font-size:var(--font-size-body-emphasis);font-weight:500;transition:border-color .15s,box-shadow .15s}
 .field textarea{min-height:105px;resize:vertical;line-height:1.6}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:#b99011;box-shadow:0 0 0 3px rgba(230,195,61,.18)}
 .optionsHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:2px}
 .optionsHeading>div{display:grid;gap:3px}
-.optionsHeading strong{font-size:12px}
-.optionsHeading small{color:#858279;font-size:10px}
-.textButton{min-height:32px;padding:0 10px;border:1px solid #dedbd0;border-radius:9px;color:#715707;background:#fff;font-size:11px}
+.optionsHeading strong{font-size:var(--font-size-body-emphasis)}
+.optionsHeading small{color:var(--color-text-subtle);font-size:var(--font-size-small)}
+.textButton{min-height:32px;padding:0 10px;border:1px solid #dedbd0;border-radius:9px;color:var(--color-accent-text);background:#fff;font-size:var(--font-size-body)}
 .textButton:disabled{opacity:.45;cursor:not-allowed}
 .optionEditor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .optionInput{display:grid;grid-template-columns:30px minmax(0,1fr) 32px;align-items:center;overflow:hidden;border:1px solid #ddd9ce;border-radius:10px;background:#fff}
-.optionInput>span{display:grid;place-items:center;height:100%;color:#715706;background:#fff6cf;font-size:11px;font-weight:900}
-.optionInput input{min-width:0;height:43px;padding:0 10px;border:0;outline:0;font:inherit;font-size:12px}
-.optionInput input:disabled{color:#65635c;background:#f7f7f4}
-.optionInput button{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;color:#8e403a;background:transparent;cursor:pointer}
+.optionInput>span{display:grid;place-items:center;height:100%;color:var(--color-accent-text);background:#fff6cf;font-size:var(--font-size-body);font-weight:900}
+.optionInput input{min-width:0;height:43px;padding:0 10px;border:0;outline:0;font:inherit;font-size:var(--font-size-body-emphasis)}
+.optionInput input:disabled{color:var(--color-text-muted);background:#f7f7f4}
+.optionInput button{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;color:var(--color-danger-text);background:transparent;cursor:pointer}
 .optionInput button:hover{background:#fff0ed}
 .optionInput button svg{width:13px}
 .privacyCard,.toggleCard{display:flex;align-items:flex-start;gap:10px;padding:13px;border:1px solid #e1ddca;border-radius:12px;background:#fff}
-.privacyCard>svg{width:19px;flex:0 0 auto;color:#806000}
+.privacyCard>svg{width:19px;flex:0 0 auto;color:var(--color-accent-text)}
 .privacyCard div,.toggleCard span{display:grid;gap:3px}
-.privacyCard strong,.toggleCard strong{font-size:11px}
-.privacyCard small,.toggleCard small{color:#77746c;font-size:10px;line-height:1.6}
+.privacyCard strong,.toggleCard strong{font-size:var(--font-size-body)}
+.privacyCard small,.toggleCard small{color:var(--color-text-muted);font-size:var(--font-size-small);line-height:1.6}
 .toggleCard{cursor:pointer}
 .toggleCard input{width:16px;height:16px;margin:1px 0 0;accent-color:#aa8200}
 .disabled{opacity:.62;cursor:not-allowed}
 .editorActions{display:flex;justify-content:flex-end;gap:8px;padding-top:5px}
-.secondaryButton{min-height:40px;padding:0 14px;border:1px solid #d9d6cc;border-radius:10px;color:#4e4d47;background:#fff;font-size:11px}
-.toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 17px;border-bottom:1px solid #e6e4dd;background:#fcfcfa}
-.toolbarActions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex:0 1 auto;min-width:0}
-.toolbarActions :global(.button){flex:0 0 auto;white-space:nowrap}
-.tabs{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:2px}
-.tabs button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 11px;border:0;border-radius:9px;color:#706e66;background:transparent;cursor:pointer;font:inherit;font-size:11px;font-weight:800;white-space:nowrap}
-.tabs button:hover{background:#f3f2ed}
-.tabs button span{min-width:20px;padding:3px 5px;border-radius:999px;color:#69675f;background:#ecebe6;font-size:10px}
-.tabs .activeTab{color:#5b4600;background:#fff2b5}
-.tabs .activeTab span{color:#fff;background:#8c6c00}
-.search{width:min(280px,35%);min-width:190px;display:flex;align-items:center;gap:8px;padding:0 11px;border:1px solid #dedcd4;border-radius:10px;background:#fff}
-.search svg{width:15px;flex:0 0 auto;color:#7d7b73}
-.search input{width:100%;min-width:0;height:38px;border:0;outline:0;background:transparent;font:inherit;font-size:11px}
+.secondaryButton{min-height:40px;padding:0 14px;border:1px solid #d9d6cc;border-radius:10px;color:var(--color-text-soft);background:#fff;font-size:var(--font-size-body)}
+
+
+
+
+
+
+
+
+
+
+
+
 .pollList{display:grid;background:var(--surface)}
 .pollCard{display:grid;gap:17px;padding:20px 22px;border:0;border-bottom:1px solid var(--surface-card-border);border-radius:0;background:var(--surface);box-shadow:none}
 .pollCard:last-child{border-bottom:0}
 .pollHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
 .pollTitleBlock{min-width:0}
 .statusLine{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:9px}
-.status,.anonymous,.multiple{display:inline-flex;align-items:center;gap:5px;min-height:23px;padding:0 8px;border-radius:7px;font-size:10px;font-weight:850}
+.status,.anonymous,.multiple{display:inline-flex;align-items:center;gap:5px;min-height:23px;padding:0 8px;border-radius:7px;font-size:var(--font-size-small);font-weight:850}
 .status svg,.anonymous svg{width:11px}
-.status_active{color:#256240;background:#e2f4e8}.status_draft{color:#6f5707;background:#fff1b5}.status_closed{color:#605e57;background:#ecece8}.status_archived{color:#6d596c;background:#f1e9f0}
-.anonymous{color:#425d72;background:#e8f2f8}.multiple{color:#6a536d;background:#f1e8f2}
+.status_active{color:var(--color-success-text);background:#e2f4e8}.status_draft{color:var(--color-accent-text);background:#fff1b5}.status_closed{color:var(--color-text-muted);background:#ecece8}.status_archived{color:var(--color-text-muted);background:#f1e9f0}
+.anonymous{color:#425d72;background:#e8f2f8}.multiple{color:var(--color-text-muted);background:#f1e8f2}
 .pollCard h2{margin:0;font-size:15px;line-height:1.3;letter-spacing:-.015em}
-.pollCard p{max-width:940px;margin:6px 0 0;color:#706e67;font-size:12px;line-height:1.6}
-.editButton{min-height:35px;padding:0 11px;flex:0 0 auto;border:1px solid #dcd9ce;border-radius:9px;color:#67510a;background:#fff;font-size:11px}
+.pollCard p{max-width:940px;margin:6px 0 0;color:var(--color-text-muted);font-size:var(--font-size-body-emphasis);line-height:1.6}
+.editButton{min-height:35px;padding:0 11px;flex:0 0 auto;border:1px solid #dcd9ce;border-radius:9px;color:var(--color-accent-text);background:#fff;font-size:var(--font-size-body)}
 .editButton:hover{border-color:#c4a432;background:#fffdf3}
 .pollActions{display:flex;align-items:center;gap:6px;flex:0 0 auto}
-.deleteButton{min-height:35px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #ead4d1;border-radius:9px;color:#9d3a32;background:#fffafa;font:inherit;font-size:10px;font-weight:800;cursor:pointer}
+.deleteButton{min-height:35px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #ead4d1;border-radius:9px;color:var(--color-danger-text);background:#fffafa;font:inherit;font-size:var(--font-size-small);font-weight:800;cursor:pointer}
 .deleteButton:hover{border-color:#d59c96;background:#fff0ee}
 .deleteButton svg{width:14px;height:14px}
 .optionList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
@@ -95,49 +97,49 @@
 .choiceMark svg{display:block;width:12px;height:12px;margin:0;transform:translateY(-1.5px)}
 .voteOption:has(input[type=radio]) .choiceMark{border-radius:50%}
 .selected .choiceMark{border-color:#a77f00;color:#fff;background:#a77f00}
-.optionLabel{font-size:12px;font-weight:700;line-height:1.6}
-.voteOption>strong{color:#6e5707;font-size:11px}
+.optionLabel{font-size:var(--font-size-body-emphasis);font-weight:700;line-height:1.6}
+.voteOption>strong{color:var(--color-accent-text);font-size:var(--font-size-body)}
 .pollFooter{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-top:14px;border-top:1px solid #e8e6df}
-.pollMeta{display:flex;align-items:center;gap:15px;flex-wrap:wrap;color:#77756d;font-size:10px}
+.pollMeta{display:flex;align-items:center;gap:15px;flex-wrap:wrap;color:var(--color-text-muted);font-size:var(--font-size-small)}
 .pollMeta span{display:inline-flex;align-items:center;gap:5px}
 .pollMeta svg{width:13px}
-.pollMeta .voted{color:#2d7149;font-weight:800}
-.voteButton{min-height:39px;padding:0 15px;border-radius:10px;color:#231d08;background:#f1ce38;font-size:11px}
-.empty{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;padding:35px;color:#8a877e;text-align:center;background:#fafaf7}
-.empty>svg{width:27px;color:#98740b}.empty strong{color:#44433d;font-size:12px}.empty p{margin:0;font-size:12px;line-height:1.6}
+.pollMeta .voted{color:var(--color-success-text);font-weight:800}
+.voteButton{min-height:39px;padding:0 15px;border-radius:10px;color:#231d08;background:#f1ce38;font-size:var(--font-size-body)}
+.empty{min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;padding:35px;color:var(--color-text-subtle);text-align:center;background:#fafaf7}
+.empty>svg{width:27px;color:var(--color-accent-text)}.empty strong{color:var(--color-text-soft);font-size:var(--font-size-body-emphasis)}.empty p{margin:0;font-size:var(--font-size-body-emphasis);line-height:1.6}
 .spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 .confirmBackdrop{position:fixed;z-index:320;inset:0;display:grid;place-items:center;padding:20px;overflow-y:auto;overscroll-behavior:contain;background:var(--color-overlay);backdrop-filter:blur(5px);-webkit-overflow-scrolling:touch}
 .confirmDialog{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);display:grid;grid-template-columns:42px minmax(0,1fr);gap:14px;overflow-y:auto;overscroll-behavior:contain;padding:22px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 28px 90px rgba(0,0,0,.26);-webkit-overflow-scrolling:touch}
 .confirmIcon{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;color:#a83d34;background:#fff0ee}
 .confirmIcon svg{width:20px}
 .confirmDialog h2{margin:2px 0 7px;font-size:18px}
-.confirmDialog p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+.confirmDialog p{margin:0;color:var(--muted);font-size:var(--font-size-body);line-height:1.6}
 .confirmDialog footer{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;padding-top:6px}
-.dangerButton{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;border:1px solid #b8443a;border-radius:10px;color:#fff;background:#b8443a;font:inherit;font-size:11px;font-weight:850;cursor:pointer}
+.dangerButton{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 14px;border:1px solid #b8443a;border-radius:10px;color:#fff;background:#b8443a;font:inherit;font-size:var(--font-size-body);font-weight:850;cursor:pointer}
 .dangerButton:hover{background:#9f342c}.dangerButton:disabled{opacity:.6;cursor:wait}.dangerButton svg{width:15px}
-@media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) auto}.heroStats{display:none}.editorBody{grid-template-columns:minmax(0,1.3fr) minmax(280px,.75fr)}}
-@media(max-width:820px){.hero{grid-template-columns:1fr;gap:18px;padding:4px 2px}.hero .primaryButton{width:max-content}.editorBody{grid-template-columns:1fr}.editorMain{border-right:0;border-bottom:1px solid #e8e6df}.toolbar{align-items:stretch;flex-direction:column}.toolbarActions{width:100%}.search{width:100%;min-width:0}.optionList{grid-template-columns:1fr}}
-@media(max-width:560px){.heroContent{flex-direction:column}.hero h1{font-size:23px}.editorHeader,.editorMain,.editorAside{padding:18px}.optionEditor{grid-template-columns:1fr}.toolbarActions{align-items:stretch;flex-direction:column}.toolbarActions :global(.button){width:100%;justify-content:center}.pollCard{padding:16px}.pollHeader,.pollFooter{align-items:stretch;flex-direction:column}.pollActions{width:100%}.editButton,.deleteButton,.voteButton{flex:1;justify-content:center}.pollMeta{display:grid;gap:8px}.editorActions{align-items:stretch;flex-direction:column-reverse}.editorActions button{width:100%}.confirmDialog{grid-template-columns:1fr}.confirmDialog footer{grid-column:auto;align-items:stretch;flex-direction:column-reverse}.confirmDialog footer button{width:100%}}
+@media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) auto}.editorBody{grid-template-columns:minmax(0,1.3fr) minmax(280px,.75fr)}}
+@media(max-width:820px){.hero{grid-template-columns:1fr;gap:18px;padding:4px 2px}.hero .primaryButton{width:max-content}.editorBody{grid-template-columns:1fr}.editorMain{border-right:0;border-bottom:1px solid #e8e6df}.optionList{grid-template-columns:1fr}}
+@media(max-width:560px){.heroContent{flex-direction:column}.hero h1{font-size:23px}.editorHeader,.editorMain,.editorAside{padding:18px}.optionEditor{grid-template-columns:1fr}.pollCard{padding:16px}.pollHeader,.pollFooter{align-items:stretch;flex-direction:column}.pollActions{width:100%}.editButton,.deleteButton,.voteButton{flex:1;justify-content:center}.pollMeta{display:grid;gap:8px}.editorActions{align-items:stretch;flex-direction:column-reverse}.editorActions button{width:100%}.confirmDialog{grid-template-columns:1fr}.confirmDialog footer{grid-column:auto;align-items:stretch;flex-direction:column-reverse}.confirmDialog footer button{width:100%}}
 
 /* Componentes de votação no mesmo sistema visual e prontos para temas. */
 .primaryButton,.voteButton { color:#201b08; background:var(--gold); }
 .editor,.workspace,.pollCard { border-color:var(--surface-card-border); background:var(--surface); }
 .editorHeader { border-color:var(--surface-card-border); background:var(--surface-header-background); }
-.editorMain,.editorAside,.toolbar { border-color:var(--line); }
-.editorAside,.toolbar,.empty { background:#fafaf7; }
-.field input,.field textarea,.field select,.optionInput,.privacyCard,.toggleCard,.secondaryButton,.textButton,.closeButton,.search,.editButton,.voteOption {
+.editorMain, .editorAside { border-color:var(--line); }
+.editorAside, .empty { background:#fafaf7; }
+.field input, .field textarea, .field select, .optionInput, .privacyCard, .toggleCard, .secondaryButton, .textButton, .closeButton, .editButton, .voteOption {
   border-color:var(--line);
   background:var(--surface);
 }
 .field input,.field textarea,.field select { color:var(--ink); }
-.field input:focus,.field textarea:focus,.field select:focus,.search:focus-within {
+.field input:focus, .field textarea:focus, .field select:focus {
   border-color:#c3a01e;
   box-shadow:0 0 0 3px rgba(246,201,69,.2);
 }
-.optionInput>span,.tabs .activeTab,.status_draft { color:#654f00; background:var(--gold-soft); }
-.tabs .activeTab span { color:#231c00; background:var(--gold); }
+.optionInput>span, .status_draft { color:var(--color-accent-text); background:var(--gold-soft); }
+
 .voteOption.selected { border-color:#d0aa22; background:#fffaf0; }
 .resultBar { background:linear-gradient(90deg,rgba(246,201,69,.28),rgba(246,201,69,.08)); }
 .selected .choiceMark { border-color:#a77f00; background:#a77f00; }
 .status_active { background:var(--green-soft); }
-.empty>svg { color:#98740b; }
+.empty>svg { color:var(--color-accent-text); }

@@ -11,13 +11,13 @@ import {
   LoaderCircle,
   Mail,
   MapPinned,
-  Search,
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
+import { FilterBar, FilterSearch } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { useAuth } from "@/components/auth-context";
 import { useEscapeKey } from "@/components/use-escape-key";
@@ -213,10 +213,7 @@ export function CampusDirectory() {
       icon={<MapPinned />}
       eyebrow={t("campus.eyebrow")}
       title={t("campus.title")}
-      actions={canManage ? <div className={styles.actions}>
-        <button className="button button--secondary button--compact" type="button" onClick={() => openEditor("building")}><Building2 aria-hidden="true" />{t("campus.newBuilding")}</button>
-        <button className="button button--primary button--compact" type="button" onClick={() => openEditor("faculty")}><GraduationCap aria-hidden="true" />{t("campus.newFaculty")}</button>
-      </div> : undefined}
+     
     />
 
     <section className={styles.summary} aria-label={t("campus.title")}>
@@ -240,14 +237,19 @@ export function CampusDirectory() {
     </section>}
 
     <section className={styles.panel} aria-label={t("campus.title")}>
-      <SurfaceHeader icon={<MapPinned />} title={t("campus.title")} />
+      <SurfaceHeader icon={<MapPinned />} title={t("campus.directory")} actions={canManage ? <div className={styles.actions}>
+        <button className="button button--secondary button--compact" type="button" onClick={() => openEditor("building")}><Building2 aria-hidden="true" />{t("campus.newBuilding")}</button>
+        <button className="button button--primary button--compact" type="button" onClick={() => openEditor("faculty")}><GraduationCap aria-hidden="true" />{t("campus.newFaculty")}</button>
+      </div> : undefined} />
       <div className={styles.toolbar}>
-        <label className={styles.search} htmlFor="campus-directory-search"><span className="sr-only">{t("campus.search")}</span><Search aria-hidden="true" /><input id="campus-directory-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t("campus.searchPlaceholder")} /></label>
         <div className={styles.tabs} role="tablist" aria-label={t("campus.title")}>
           <button id="campus-rooms-tab" role="tab" type="button" aria-selected={tab === "rooms"} aria-controls="campus-rooms-panel" className={tab === "rooms" ? styles.activeTab : ""} onClick={() => setTab("rooms")}>{t("campus.rooms")} <b>{counts.rooms}</b></button>
           <button id="campus-faculty-tab" role="tab" type="button" aria-selected={tab === "faculty"} aria-controls="campus-faculty-panel" className={tab === "faculty" ? styles.activeTab : ""} onClick={() => setTab("faculty")}>{t("campus.faculty")} <b>{counts.faculty}</b></button>
         </div>
       </div>
+      <FilterBar label={t("campus.search")}>
+        <FilterSearch label={t("campus.search")} value={query} onChange={setQuery} placeholder={t("campus.searchPlaceholder")} />
+      </FilterBar>
 
       {loading ? <div className={styles.empty} role="status" aria-live="polite"><LoaderCircle className={styles.spin} aria-hidden="true" /><span>{t("community.common.loading")}</span></div> : tab === "rooms" ? <div id="campus-rooms-panel" role="tabpanel" aria-labelledby="campus-rooms-tab" tabIndex={0}>
         {rooms.length ? <div className={styles.list}>{rooms.map(room => {

@@ -48,7 +48,7 @@ export function PersonalDashboard() {
   const listPanel = (title: string, subtitle: string, href: string, Icon: typeof CalendarDays, items: Entry[], kind: "event" | "announcement" | "poll" | "request" | "material") => {
     const titleId = `dashboard-${kind}-title`;
     return <section className={styles.panel} data-kind={kind} aria-labelledby={titleId}>
-      <SurfaceHeader icon={<Icon />} title={title} description={subtitle} headingId={titleId} actions={<Link className={styles.viewAll} href={href}>{t("personalDashboard.viewAll")}<ChevronRight aria-hidden="true" /></Link>} />
+      <SurfaceHeader icon={<Icon />} title={title} headingId={titleId} actions={<Link className={styles.viewAll} href={href}>{t("personalDashboard.viewAll")}<ChevronRight aria-hidden="true" /></Link>} />
       {items.length ? <div className={styles.list}>{items.slice(0, kind === "event" ? 5 : 4).map(item => {
         const date = formatDate(item.date, locale, kind !== "material");
         const { day, month } = formatDateParts(item.date, locale);

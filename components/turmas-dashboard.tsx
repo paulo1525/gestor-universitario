@@ -35,7 +35,7 @@ export function TurmasDashboard() {
       icon={<Users />}
       eyebrow={placementsPublished ? t("classes.dashboard.yearClasses") : t("classes.dashboard.current")}
       title={placementsPublished ? t("classes.dashboard.finalClasses") : preferenceOnly ? t("classes.dashboard.baseClasses") : t("classes.dashboard.status")}
-      description={placementsPublished ? t("classes.dashboard.finalDescription") : preferenceOnly ? t("classes.dashboard.baseDescription") : t("classes.dashboard.statusDescription")}
+     
       meta={placementsPublished ? t("classes.dashboard.publishedBadge") : undefined}
       actions={<div className="overview-panel__tools"><label className="search-field"><Search size={18} /><span className="sr-only">{t("classes.dashboard.search")}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("classes.dashboard.searchPlaceholder")} /></label>{placementsPublished && <Link className="button button--secondary overview-panel__pdf" href="/api/classes/public-pdf" prefetch={false} download><Download />{t("classes.dashboard.pdf")}</Link>}</div>}
     />

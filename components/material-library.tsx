@@ -16,7 +16,6 @@ import {
   Check,
   Download,
   FileText,
-  Filter,
   FolderOpen,
   Image as ImageIcon,
   LoaderCircle,
@@ -31,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -749,7 +749,6 @@ export function MaterialLibrary() {
               icon={<FolderOpen />}
               eyebrow={t("community.materials.eyebrow")}
               title={t("community.materials.title")}
-              actions={submissionEnabled ? <div className={styles.heroActions}><button className="button button--primary" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button></div> : undefined}
             />
             {notice && (
               <AppToast
@@ -759,6 +758,7 @@ export function MaterialLibrary() {
               />
             )}{" "}
             <MaterialCatalog
+              tabActions={submissionEnabled ? <button className="button button--secondary button--compact" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button> : undefined}
               activeTab={activeTab}
               onTabChange={(tab) => {
                 setActiveTab(tab);
@@ -767,7 +767,7 @@ export function MaterialLibrary() {
             />
             {submissionEnabled && activeTab === "exams" && editor && (
               <section className={styles.panel}>
-                <SurfaceHeader icon={<UploadCloud />} title={t("community.materials.new")} description={t("community.materials.moderationInfo")} />
+                <SurfaceHeader icon={<UploadCloud />} title={t("community.materials.new")} /><p className="surface-note">{t("community.materials.moderationInfo")}</p>
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formWorkspace}>
                     <div className={styles.formGrid}>
@@ -839,7 +839,7 @@ export function MaterialLibrary() {
                         </div>
                         <div className={styles.privateNotice} role="note">
                           <ShieldCheck />
-                          <span><strong>{t("community.materials.privateTitle")}</strong><small>{t("community.materials.privateNotice")}</small></span>
+                          <small>{t("community.materials.privateNotice")}</small>
                         </div>
                         <MultiFileUploadField
                           accept="image/jpeg,image/png,image/webp"
@@ -901,27 +901,12 @@ export function MaterialLibrary() {
               <SurfaceHeader
                 icon={<FolderOpen />}
                 title={canModerate ? t("community.materials.libraryModeration") : t("community.materials.library")}
-                description={canModerate ? t("community.materials.pendingFirst") : t("community.materials.approvedCommunity")}
+               
                 meta={!loading ? `${libraryCount} ${libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}` : undefined}
               />
-              <div className={styles.toolbar}>
-                <label className={styles.filterControl}>
-                  <span className={styles.filterLabel}><Filter aria-hidden="true" />{t("community.materials.filter")}</span>
-                  <select
-                    className={styles.select}
-                    value={filter}
-                    onChange={(event) => setFilter(event.target.value)}
-                  >
-                    <option value="all">{t("community.materials.all")}</option>
-                    {favoritesEnabled && <option value="favorites">{t("community.materials.favorites")}</option>}
-                    {Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => (
-                      <option value={value} key={value}>
-                        {t(key)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              <FilterBar label={t("community.materials.filter")}>
+                <FilterSelect label={t("community.materials.filter")} value={filter} onChange={setFilter} options={[{ value: "all", label: t("community.materials.all") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), ...Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => ({ value, label: t(key) }))]} />
+              </FilterBar>
               {loading ? (
                 <div className={styles.state}>
                   <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
@@ -941,7 +926,7 @@ export function MaterialLibrary() {
                 <div className={styles.state}>
                   <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
                   <strong>{t("community.materials.empty")}</strong>
-                  <p>{t("community.materials.emptyHint")}</p>
+                  
                   {filter !== "all" && (
                     <button className={styles.emptyAction} type="button" onClick={() => setFilter("all")}>
                       <X aria-hidden="true" />

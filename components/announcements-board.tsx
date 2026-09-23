@@ -5,6 +5,7 @@ import { AlignLeft, Archive, Bold, CalendarClock, ChevronLeft, ChevronRight, Fla
 import { AppShell } from "@/components/app-shell";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
@@ -267,7 +268,7 @@ export function AnnouncementsBoard() {
       icon={<Megaphone />}
       eyebrow={t("announcements.eyebrow")}
       title={t("announcements.title")}
-      actions={canPublish ? <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button> : undefined}
+     
     />
 
     {canPublish && editorOpen && <form id="announcement-editor" className={`panel ${styles.editor}`} onSubmit={publish}>
@@ -296,14 +297,13 @@ export function AnnouncementsBoard() {
     </form>}
 
     {!editorOpen && <section className={`panel ${styles.feed}`} aria-busy={loading}>
-      <SurfaceHeader icon={<Megaphone />} title={t("announcements.feed.title")} meta={hasFilters ? t("announcements.feed.countFiltered", { visible: filteredAnnouncements.length, total: announcements.length }) : t(filteredAnnouncements.length === 1 ? "announcements.feed.countOne" : "announcements.feed.countMany", { count: filteredAnnouncements.length })} />
-      <div className={styles.filters} aria-label={t("announcements.filters.aria")}>
-        <label className={styles.searchField}><FormLabel icon={Search}>{t("announcements.filters.search")}</FormLabel><div><Search /><input type="search" value={searchQuery} onChange={event => { setSearchQuery(event.target.value); setPage(1); }} placeholder={t("announcements.filters.placeholder")} /></div></label>
-        <label><FormLabel icon={Flag}>{t("announcements.filters.priority")}</FormLabel><select value={priorityFilter} onChange={event => { setPriorityFilter(event.target.value as Priority | "all"); setPage(1); }}><option value="all">{t("announcements.filters.allPriorities")}</option><option value="urgent">{priorityLabels.urgent}</option><option value="important">{priorityLabels.important}</option><option value="normal">{priorityLabels.normal}</option></select></label>
-        <label><FormLabel icon={UserRound}>{t("announcements.filters.author")}</FormLabel><select value={authorFilter} onChange={event => { setAuthorFilter(event.target.value); setPage(1); }}><option value="all">{t("announcements.filters.allAuthors")}</option>{authors.map(author => <option value={author} key={author}>{author}</option>)}</select></label>
-        <button className={styles.resetFilters} type="button" onClick={resetFilters} disabled={!hasFilters}><RotateCcw />{t("announcements.filters.reset")}</button>
-      </div>
-      {loading ? <div className={styles.loading}><LoaderCircle className={styles.spinner} /><strong>{t("announcements.loading")}</strong></div> : announcements.length === 0 ? <div className={styles.empty}><Megaphone /><strong>{t("announcements.empty.title")}</strong></div> : filteredAnnouncements.length === 0 ? <div className={styles.empty}><Search /><strong>{t("announcements.noResults.title")}</strong><span>{t("announcements.noResults.body")}</span><button className="button" type="button" onClick={resetFilters}><RotateCcw />{t("announcements.filters.reset")}</button></div> : <>
+      <SurfaceHeader icon={<Megaphone />} title={t("announcements.feed.title")} meta={hasFilters ? t("announcements.feed.countFiltered", { visible: filteredAnnouncements.length, total: announcements.length }) : t(filteredAnnouncements.length === 1 ? "announcements.feed.countOne" : "announcements.feed.countMany", { count: filteredAnnouncements.length })} actions={canPublish ? <button className={`button button--compact ${editorOpen ? "button--secondary" : "button--primary"}`} type="button" onClick={() => setEditorOpen(current => !current)} aria-expanded={editorOpen} aria-controls="announcement-editor">{editorOpen ? <X /> : <Plus />}{editorOpen ? t("announcements.closeEditor") : t("announcements.new")}</button> : undefined} />
+      <FilterBar label={t("announcements.filters.aria")} onClearAll={() => setPage(1)}>
+        <FilterSearch label={t("announcements.filters.search")} value={searchQuery} onChange={value => { setSearchQuery(value); setPage(1); }} placeholder={t("announcements.filters.placeholder")} />
+        <FilterSelect label={t("announcements.filters.priority")} value={priorityFilter} onChange={value => { setPriorityFilter(value as Priority | "all"); setPage(1); }} options={[{ value: "all", label: t("announcements.filters.allPriorities") }, { value: "urgent", label: priorityLabels.urgent }, { value: "important", label: priorityLabels.important }, { value: "normal", label: priorityLabels.normal }]} />
+        <FilterSelect label={t("announcements.filters.author")} value={authorFilter} onChange={value => { setAuthorFilter(value); setPage(1); }} options={[{ value: "all", label: t("announcements.filters.allAuthors") }, ...authors.map(author => ({ value: author, label: author }))]} />
+      </FilterBar>
+      {loading ? <div className={styles.loading}><LoaderCircle className={styles.spinner} /><strong>{t("announcements.loading")}</strong></div> : announcements.length === 0 ? <div className={styles.empty}><Megaphone /><strong>{t("announcements.empty.title")}</strong></div> : filteredAnnouncements.length === 0 ? <div className={styles.empty}><Search /><strong>{t("announcements.noResults.title")}</strong><button className="button" type="button" onClick={resetFilters}><RotateCcw />{t("announcements.filters.reset")}</button></div> : <>
       <div className={styles.resultsSummary} aria-live="polite"><span>{t("announcements.summary.range", { from: Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredAnnouncements.length), to: Math.min(currentPage * PAGE_SIZE, filteredAnnouncements.length), total: filteredAnnouncements.length })}</span><span>{t("announcements.summary.page", { page: currentPage, pages: totalPages })}</span></div>
       <div className={styles.list}>
         {paginatedAnnouncements.map(item => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber }, { revealIdentifier: canViewAuthorIdentifiers, locale }); return <article className={`${styles.card} ${styles[`priority_${item.priority}`]} ${item.status === "archived" ? styles.archived : ""}`} key={item.id}>

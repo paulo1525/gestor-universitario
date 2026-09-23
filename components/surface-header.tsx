@@ -6,7 +6,6 @@ export function SurfaceHeader({
   icon,
   eyebrow,
   title,
-  description,
   meta,
   actions,
   headingLevel = "h2",
@@ -17,7 +16,6 @@ export function SurfaceHeader({
   icon?: ReactNode;
   eyebrow?: ReactNode;
   title: ReactNode;
-  description?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
   headingLevel?: HeadingLevel;
@@ -36,7 +34,6 @@ export function SurfaceHeader({
       <div className="surface-header__heading">
         {eyebrow && <span className="eyebrow">{eyebrow}</span>}
         <Heading id={headingId}>{title}</Heading>
-        {description && <p>{description}</p>}
       </div>
       {(meta || actions) && (
         <div className="surface-header__aside">

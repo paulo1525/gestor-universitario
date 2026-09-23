@@ -134,5 +134,6 @@ test("new feature cards use the shared light surfaces and borders", () => {
 test("the public curricular-unit catalogue follows the shared panel header anatomy", () => {
   assert.match(files.unitsCatalogComponent, /<SurfaceHeader icon=\{<BookOpen \/>\} title=\{t\("community\.units\.catalog"\)\}/);
   assert.doesNotMatch(files.unitsCatalog, /\.catalogPanel\s*\{[^}]*--surface-header-accent-size/s);
-  assert.match(files.unitsCatalog, /\.catalogToolbar\s*\{[^}]*grid-template-columns:/s);
+  assert.match(files.unitsCatalogComponent, /<FilterBar label=\{t\("community\.units\.filters"\)\}>/);
+  assert.doesNotMatch(files.unitsCatalog, /\.catalogToolbar/);
 });

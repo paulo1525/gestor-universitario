@@ -16,7 +16,6 @@ import {
   LockKeyhole,
   MessageSquareText,
   Plus,
-  Search,
   Send,
   ShieldCheck,
   Trash2,
@@ -25,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSearch, FilterSegmented } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
@@ -320,8 +320,9 @@ export function PollsHub() {
               headingLevel="h1"
               icon={<Vote />}
               eyebrow={t("polls.eyebrow")}
-              title={t("polls.title")}
-              actions={<div className={styles.heroStats}><span><strong>{counts.active}</strong> {t("polls.stats.ongoing")}</span><span><strong>{polls.reduce((sum, poll) => sum + poll.totalVotes, 0)}</strong> {t("polls.stats.participations")}</span></div>}
+              title={t("polls.breadcrumb")}
+              meta={`${counts.active} ${t("polls.stats.ongoing")} · ${polls.reduce((sum, poll) => sum + poll.totalVotes, 0)} ${t("polls.stats.participations")}`}
+             
             />
 
             {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
@@ -332,7 +333,7 @@ export function PollsHub() {
                   icon={<Vote />}
                   eyebrow={editor === "edit" ? t("polls.editor.management") : t("polls.editor.new")}
                   title={editor === "edit" ? t("polls.editor.edit") : t("polls.editor.create")}
-                  description={optionsLocked ? t("polls.editor.lockedIntro") : t("polls.editor.intro")}
+                 
                   headingId="poll-editor-title"
                   actions={<button className={styles.closeButton} type="button" onClick={closeEditor} aria-label={t("polls.editor.close")}><X /></button>}
                 />
@@ -354,8 +355,8 @@ export function PollsHub() {
                     {editor === "edit" && <label className={styles.field}><FormLabel icon={CircleDot}>{t("polls.editor.status")}</FormLabel><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PollForm["status"] }))}><option value="draft">{t("polls.status.draft")}</option><option value="published">{t("polls.editor.statusPublished")}</option><option value="closed">{t("polls.status.closed")}</option><option value="archived">{t("polls.status.archived")}</option></select></label>}
                     <label className={styles.field}><FormLabel icon={CalendarClock} optional>{t("polls.editor.endsAt")}</FormLabel><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
                     <label className={styles.field}><FormLabel icon={Eye}>{t("polls.editor.results")}</FormLabel><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">{t("polls.editor.afterVote")}</option><option value="always">{t("polls.editor.always")}</option><option value="after_close">{t("polls.editor.afterClose")}</option><option value="cc">{t("polls.editor.onlyCommittee")}</option></select></label>
-                    <div className={styles.privacyCard}><ShieldCheck /><div><strong>{t("polls.editor.anonymous")}</strong><small>{t("polls.editor.anonymousHelp")}</small></div></div>
-                    <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>{t("polls.editor.multiple")}</strong><small>{t("polls.editor.multipleHelp")}</small></span></label>
+                    <div className={styles.privacyCard}><ShieldCheck /><div><strong>{t("polls.editor.anonymous")}</strong></div></div>
+                    <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>{t("polls.editor.multiple")}</strong></span></label>
                     <div className={styles.editorActions}><button className={styles.secondaryButton} type="button" onClick={closeEditor}>{t("polls.editor.cancel")}</button><button className={styles.primaryButton} type="submit" disabled={submitting}>{submitting ? <LoaderCircle className={styles.spin} /> : <Send />}{submitting ? t("polls.editor.saving") : editor === "edit" ? t("polls.editor.save") : t("polls.editor.publish")}</button></div>
                   </aside>
                 </form>
@@ -363,18 +364,13 @@ export function PollsHub() {
             )}
 
             <section className={styles.workspace}>
-              <SurfaceHeader icon={<Vote />} title={t("polls.title")} meta={`${visible.length}`} />
-              <div className={styles.toolbar}>
-                <div className={styles.tabs} role="tablist" aria-label={t("polls.filters.aria")}>
-                  {(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"]) ] as Filter[]).map((value) => <button key={value} type="button" className={filter === value ? styles.activeTab : ""} onClick={() => setFilter(value)}>{value === "all" ? t("polls.filters.all") : statusLabels[value]}<span>{counts[value]}</span></button>)}
-                </div>
-                <div className={styles.toolbarActions}>
-                  <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("polls.filters.search")} /></label>
-                  {canManage && !editor && <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button>}
-                </div>
-              </div>
+              <SurfaceHeader icon={<Vote />} title={t("polls.list.title")} meta={`${visible.length}`} actions={canManage && !editor ? <button className="button button--primary button--compact" type="button" onClick={openCreate}><Plus /> {t("polls.new")}</button> : undefined} />
+              <FilterBar label={t("polls.filters.aria")}>
+                <FilterSearch label={t("filters.search")} value={query} onChange={setQuery} placeholder={t("polls.filters.search")} />
+                <FilterSegmented label={t("polls.filters.state")} value={filter} onChange={setFilter} options={(["all", "active", ...(canManage ? ["draft", "closed", "archived"] : ["closed"])] as Filter[]).map((value) => ({ value, label: value === "all" ? t("polls.filters.all") : statusLabels[value], count: counts[value] }))} />
+              </FilterBar>
 
-              {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>{t("polls.loading")}</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>{t("polls.empty.title")}</strong><p>{t("polls.empty.body")}</p></div> : <div className={styles.pollList}>
+              {loading ? <div className={styles.empty}><LoaderCircle className={styles.spin} /><strong>{t("polls.loading")}</strong></div> : visible.length === 0 ? <div className={styles.empty}><BarChart3 /><strong>{t("polls.empty.title")}</strong></div> : <div className={styles.pollList}>
                 {visible.map((poll) => {
                   const selected = choices[poll.id] ?? poll.selectedOptionIds;
                   const showResults = poll.hasVoted || poll.status === "closed" || canManage;

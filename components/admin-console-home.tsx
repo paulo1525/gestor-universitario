@@ -61,7 +61,7 @@ export function AdminConsoleHome() {
       <AdminPageHeader
         eyebrow={t("admin.home.eyebrow")}
         title={t("admin.home.title")}
-        description={t("admin.home.description")}
+       
       />
 
       <AdminMetricGrid label={t("admin.home.statusLabel")}>
@@ -97,20 +97,20 @@ export function AdminConsoleHome() {
         <AdminSection
           icon={<BookOpen />}
           title={t("admin.home.academicContent")}
-          description={t("admin.home.academicContentDescription")}
+         
         >
           <AdminNavigationList label={t("admin.home.academicContent")}>
             <AdminNavigationItem
               href="/admin/unidades-curriculares"
               icon={<BookOpen />}
               title={t("admin.home.curricularUnits")}
-              description={t("admin.home.curricularUnitsDescription")}
+             
             />
             <AdminNavigationItem
               href="/admin/testes"
               icon={<ClipboardCheck />}
               title={t("admin.home.quizzes")}
-              description={t("admin.home.quizzesDescription")}
+             
             />
           </AdminNavigationList>
         </AdminSection>
@@ -118,14 +118,14 @@ export function AdminConsoleHome() {
         <AdminSection
           icon={<Users />}
           title={t("admin.home.peopleAccess")}
-          description={t("admin.home.peopleAccessDescription")}
+         
         >
           <AdminNavigationList label={t("admin.home.peopleAccess")}>
             <AdminNavigationItem
               href="/admin/utilizadores"
               icon={<Users />}
               title={t("admin.home.userManagement")}
-              description={t("admin.home.userManagementDescription")}
+             
               meta={snapshot?.pendingUsers ? t(snapshot.pendingUsers === 1 ? "admin.home.pendingMetaOne" : "admin.home.pendingMetaMany", { count: snapshot.pendingUsers }) : undefined}
             />
           </AdminNavigationList>
@@ -134,20 +134,20 @@ export function AdminConsoleHome() {
         <AdminSection
           icon={<Activity />}
           title={t("admin.home.monitoring")}
-          description={t("admin.home.monitoringDescription")}
+         
         >
           <AdminNavigationList label={t("admin.home.monitoring")}>
             <AdminNavigationItem
               href="/admin/dashboard"
               icon={<Activity />}
               title={t("admin.home.indicators")}
-              description={t("admin.home.indicatorsDescription")}
+             
             />
             <AdminNavigationItem
               href="/admin/historico"
               icon={<ShieldCheck />}
               title={t("admin.home.activityLog")}
-              description={t("admin.home.activityLogDescription")}
+             
             />
           </AdminNavigationList>
         </AdminSection>
@@ -155,20 +155,20 @@ export function AdminConsoleHome() {
         <AdminSection
           icon={<Settings />}
           title={t("admin.home.platform")}
-          description={t("admin.home.platformDescription")}
+         
         >
           <AdminNavigationList label={t("admin.home.platform")}>
             <AdminNavigationItem
               href="/admin/configuracao"
               icon={<Settings />}
               title={t("admin.home.configuration")}
-              description={t("admin.home.configurationDescription")}
+             
             />
             <AdminNavigationItem
               href="/admin/modulos"
               icon={<Boxes />}
               title={t("admin.home.modules")}
-              description={t("admin.home.modulesDescription")}
+             
             />
           </AdminNavigationList>
         </AdminSection>
