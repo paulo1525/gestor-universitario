@@ -32,6 +32,8 @@ export function AuthForm() {
   const [siteKey, setSiteKey] = useState("");
   const [token, setToken] = useState("");
   const [remember, setRemember] = useState(true);
+  // next/script keeps the first onLoad callback, so readiness is state rather than a captured closure.
+  const [turnstileReady, setTurnstileReady] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const widget = useRef("");
   const { user, refresh } = useAuth();
@@ -53,7 +55,7 @@ export function AuthForm() {
   }, [t]);
 
   const render = useCallback(() => {
-    if (siteKey === "1x00000000000000000000AA" || !siteKey || !window.turnstile || !container.current || widget.current || ["verify", "reset-confirm"].includes(mode)) return;
+    if (siteKey === "1x00000000000000000000AA" || !siteKey || !turnstileReady || !window.turnstile || !container.current || widget.current || ["verify", "reset-confirm"].includes(mode)) return;
     widget.current = window.turnstile.render(container.current, {
       sitekey: siteKey,
       action: mode === "register" ? "register" : mode === "reset-request" ? "password-reset" : "login",
@@ -61,7 +63,7 @@ export function AuthForm() {
       "expired-callback": () => setToken(""),
       "error-callback": () => setToken(""),
     });
-  }, [mode, siteKey]);
+  }, [mode, siteKey, turnstileReady]);
 
   useEffect(() => {
     widget.current = "";
@@ -127,7 +129,7 @@ export function AuthForm() {
   }
 
   return <>
-    <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onLoad={render} />
+    <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onReady={() => setTurnstileReady(true)} />
     <div className="auth-tabs"><button type="button" className={mode === "login" ? "is-active" : ""} onClick={() => change("login")}>{t("auth.login")}</button><button type="button" className={mode === "register" || mode === "verify" ? "is-active" : ""} onClick={() => change("register")}>{t("auth.register")}</button></div>
     <form className="auth-form" onSubmit={submit}>
       <div className="auth-form__intro"><h2>{mode === "login" ? t("auth.welcome") : mode === "register" ? t("auth.register") : mode === "verify" ? t("auth.verify") : t("auth.reset")}</h2><p>{needsCode ? t("auth.codeIntro", { email }) : t("auth.institutionalIntro")}</p></div>
