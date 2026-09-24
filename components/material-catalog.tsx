@@ -10,6 +10,7 @@ import { MaterialPdfReader } from "@/components/material-pdf-reader";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
 import { RecordSkeleton, recordHref, useHashRecord } from "@/components/record-list";
+import { UnitThumb } from "@/components/unit-thumb";
 
 export type MaterialCatalogTab = "overview" | "summaries" | "bibliography" | "anki" | "exams";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
@@ -193,13 +194,13 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <FilterBar label={t("community.materials.catalog.unit.search")}>
         <FilterSearch label={t("community.materials.catalog.unit.search")} value={unitSearch} onChange={setUnitSearch} placeholder={t("community.materials.catalog.unit.searchPlaceholder")} />
       </FilterBar>
-      {loading && !units.length ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={styles.group} key={group || "all"}>
-        {group && <h3 className={styles.groupTitle}>{group}</h3>}
+      {loading && !units.length ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={list.group} key={group || "all"}>
+        {group && <h3 className={list.groupTitle}>{group}</h3>}
         <ul className={list.rows}>
           {groupUnits.map((unit) => {
             const total = countFor(unit);
             return <li className={list.row} key={unit.code} data-tone={total ? "accent" : undefined}>
-              <span className={list.rowIcon} aria-hidden="true"><GraduationCap /></span>
+              <UnitThumb id={unit.id} code={unit.code} name={unit.name} />
               <div className={list.rowMain}>
                 <h3><a className={`link-quiet ${list.titleLink}`} href={`?uc=${encodeURIComponent(normalizeMaterialUnitCode(unit.code))}`} onClick={(event) => { event.preventDefault(); onUnitChange(normalizeMaterialUnitCode(unit.code)); setUnitSearch(""); }}>{unit.name}</a></h3>
                 <p className={list.rowMeta}>{[unit.code === GENERAL_MATERIAL_UNIT ? "" : unit.code, total === 0 ? t("community.materials.catalog.unit.none") : total === 1 ? t("community.materials.catalog.unit.countOne") : t("community.materials.catalog.unit.count", { count: total })].filter(Boolean).join(" · ")}</p>
@@ -217,7 +218,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
     <section className={styles.catalog} aria-label={unitTitle}>
       <div className={styles.tabsRow}>
-        <h2 className={styles.unitTitle}>{unitTitle}</h2>
+        <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} />{unitTitle}</h2>
         <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
           {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>{tabLabel(tab)}</button>)}
         </nav>
@@ -238,15 +239,18 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
             <FilterCheckbox label={t("community.materials.catalog.recommendedOnly")} checked={recommendedOnly} onChange={setRecommendedOnly} />
           </FilterBar>
           <div className={styles.resourceList}>
-            {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? groups.map((group) => <div className={styles.group} key={group.key || "other"}>
-              {group.title && <h3 className={styles.groupTitle}>{group.title}</h3>}
+            {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? groups.map((group) => <div className={list.group} key={group.key || "other"}>
+              {group.title && <h3 className={list.groupTitle}>{group.title}</h3>}
               <ul className={list.rows}>{group.items.map((item) => <li className={list.row} key={item.id} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
                 <span className={list.rowIcon} aria-hidden="true">{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</span>
                 <div className={list.rowMain}>
                   <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("recurso", item.id)} onClick={(event) => { event.preventDefault(); openResource(item.id); }}>{item.title}</a></h3>
                   <p className={list.rowMeta}>{resourceMeta(item)}</p>
                 </div>
-                <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
+                <span className={list.rowEnd}>
+                  {item.viewUrl && !(item.kind === "bibliography" && item.storage?.backend === "inline") && <button className={list.rowAction} type="button" onClick={() => setReader(item)} aria-label={`Ler e realçar · ${item.title}`}><Highlighter aria-hidden="true" /><span>Ler</span></button>}
+                  <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
+                </span>
               </li>)}</ul>
             </div>) : <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div>}
           </div>

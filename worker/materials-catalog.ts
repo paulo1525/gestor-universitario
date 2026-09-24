@@ -396,14 +396,44 @@ function finiteCoordinate(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : null;
 }
 
+type HighlightRect = { x: number; y: number; width: number; height: number };
+const highlightColors = ["gold", "blue", "green", "rose"];
+
+/** Up to 80 normalised line rectangles from a text selection; invalid entries are dropped. */
+function highlightRects(value: unknown): HighlightRect[] {
+  if (!Array.isArray(value)) return [];
+  const rects: HighlightRect[] = [];
+  for (const item of value.slice(0, 80)) {
+    const entry = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const x = finiteCoordinate(entry.x), y = finiteCoordinate(entry.y), width = finiteCoordinate(entry.width), height = finiteCoordinate(entry.height);
+    if (x === null || y === null || width === null || height === null || width <= 0 || height <= 0 || x + width > 1.001 || y + height > 1.001) continue;
+    rects.push({ x, y, width, height });
+  }
+  return rects;
+}
+
+function parseStoredRects(value: unknown): HighlightRect[] {
+  if (typeof value !== "string" || !value) return [];
+  try { return highlightRects(JSON.parse(value)); } catch { return []; }
+}
+
+function mapHighlight(value: Record<string, unknown>) {
+  return { id: value.id, page: value.page_number, x: value.x, y: value.y, width: value.width, height: value.height, rects: parseStoredRects(value.rects), color: value.color, selectedText: value.selected_text, note: value.note, createdAt: value.created_at, updatedAt: value.updated_at };
+}
+
+// Migration 0073 adds `rects`; until it runs, highlights are stored without them.
+function missingRectsColumn(reason: unknown) {
+  return reason instanceof Error && /no such column: rects|no column named rects/i.test(reason.message);
+}
+
 async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
   const material = await env.DB.prepare("SELECT id FROM material_catalog WHERE id=? AND mime_type='application/pdf' AND publication_status='published'").bind(id).first();
   if (!material) return json({ error: "PDF não encontrado." }, 404);
   if (request.method === "GET") {
-    const result = await env.DB.prepare("SELECT id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at FROM material_pdf_highlights WHERE user_id=? AND material_id=? ORDER BY page_number,created_at").bind(user.id, id).all();
-    return json({ highlights: result.results.map((item) => { const value = row(item); return { id: value.id, page: value.page_number, x: value.x, y: value.y, width: value.width, height: value.height, color: value.color, selectedText: value.selected_text, note: value.note, createdAt: value.created_at, updatedAt: value.updated_at }; }) });
+    const result = await env.DB.prepare("SELECT * FROM material_pdf_highlights WHERE user_id=? AND material_id=? ORDER BY page_number,y,created_at").bind(user.id, id).all();
+    return json({ highlights: result.results.map((item) => mapHighlight(row(item))) });
   }
   let body: Record<string, unknown> | null = null;
   try { body = await request.json() as Record<string, unknown>; } catch { return json({ error: "Pedido inválido." }, 400); }
@@ -414,24 +444,45 @@ async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: str
     if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
     return json({ ok: true });
   }
+  const now = Date.now();
+  if (request.method === "PATCH") {
+    // Only the colour and the note change; the geometry stays as highlighted.
+    if (!highlightId) return json({ error: "Realce inválido." }, 400);
+    const current = await env.DB.prepare("SELECT * FROM material_pdf_highlights WHERE id=? AND user_id=? AND material_id=?").bind(highlightId, user.id, id).first<Record<string, unknown>>();
+    if (!current) return json({ error: "Realce não encontrado." }, 404);
+    const color = body.color === undefined ? String(current.color) : text(body.color, 12);
+    const note = body.note === undefined ? (current.note as string | null) : (text(body.note, 800) || null);
+    if (!highlightColors.includes(color)) return json({ error: "Cor inválida." }, 400);
+    await env.DB.prepare("UPDATE material_pdf_highlights SET color=?,note=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?").bind(color, note, now, highlightId, user.id, id).run();
+    return json({ highlight: mapHighlight({ ...current, color, note, updated_at: now }) });
+  }
   if (request.method !== "POST" && request.method !== "PUT") return json({ error: "Operação não suportada." }, 405);
   const page = Number(body.page), x = finiteCoordinate(body.x), y = finiteCoordinate(body.y), width = finiteCoordinate(body.width), height = finiteCoordinate(body.height);
-  const color = text(body.color, 12) || "gold", selectedText = text(body.selectedText, 1200), note = text(body.note, 800);
-  if (!Number.isInteger(page) || page < 1 || page > 10000 || x === null || y === null || width === null || height === null || width <= 0 || height <= 0 || x + width > 1.001 || y + height > 1.001 || !["gold", "blue", "green", "rose"].includes(color)) return json({ error: "Coordenadas do realce inválidas." }, 400);
-  const now = Date.now();
+  const color = text(body.color, 12) || "gold", selectedText = text(body.selectedText, 2000), note = text(body.note, 800);
+  const rects = highlightRects(body.rects);
+  if (!Number.isInteger(page) || page < 1 || page > 10000 || x === null || y === null || width === null || height === null || width <= 0 || height <= 0 || x + width > 1.001 || y + height > 1.001 || !highlightColors.includes(color)) return json({ error: "Coordenadas do realce inválidas." }, 400);
+  const rectsJson = rects.length ? JSON.stringify(rects) : null;
   if (request.method === "PUT") {
     if (!highlightId) return json({ error: "Realce inválido." }, 400);
     const result = await env.DB.prepare("UPDATE material_pdf_highlights SET page_number=?,x=?,y=?,width=?,height=?,color=?,selected_text=?,note=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?")
       .bind(page, x, y, width, height, color, selectedText || null, note || null, now, highlightId, user.id, id).run();
     if (!result.meta.changes) return json({ error: "Realce não encontrado." }, 404);
-    return json({ highlight: { id: highlightId, page, x, y, width, height, color, selectedText, note, updatedAt: now } });
+    return json({ highlight: { id: highlightId, page, x, y, width, height, rects, color, selectedText, note, updatedAt: now } });
   }
   const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM material_pdf_highlights WHERE user_id=? AND material_id=?").bind(user.id, id).first<{ total: number }>();
   if (Number(count?.total || 0) >= 500) return json({ error: "Este PDF atingiu o limite de 500 realces." }, 409);
   const finalId = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
-    .bind(finalId, user.id, id, page, x, y, width, height, color, selectedText || null, note || null, now, now).run();
-  return json({ highlight: { id: finalId, page, x, y, width, height, color, selectedText, note, createdAt: now, updatedAt: now } }, 201);
+  let storedRects = rects;
+  try {
+    await env.DB.prepare("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,rects,color,selected_text,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(finalId, user.id, id, page, x, y, width, height, rectsJson, color, selectedText || null, note || null, now, now).run();
+  } catch (reason) {
+    if (!missingRectsColumn(reason)) throw reason;
+    storedRects = [];
+    await env.DB.prepare("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,selected_text,note,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(finalId, user.id, id, page, x, y, width, height, color, selectedText || null, note || null, now, now).run();
+  }
+  return json({ highlight: { id: finalId, page, x, y, width, height, rects: storedRects, color, selectedText, note, createdAt: now, updatedAt: now } }, 201);
 }
 
 async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {

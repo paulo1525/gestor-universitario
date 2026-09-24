@@ -57,7 +57,6 @@
   gap: 10px;
 }
 
-.unitCode,
 .tag {
   min-height: 24px;
   display: inline-flex;
@@ -69,78 +68,9 @@
   font-weight: 850;
 }
 
-.unitCode {
-  color: var(--color-accent-text);
-  background: var(--gold-soft);
-  letter-spacing: .045em;
-}
-
 .tag {
   color: var(--muted);
   background: var(--color-surface-muted);
-}
-
-.unitCover {
-  position: relative;
-  aspect-ratio: 1055 / 1492;
-  overflow: hidden;
-  align-self: start;
-  border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--line));
-  border-radius: 8px;
-  background: #f4f0e5;
-}
-
-.unitCover::after {
-  position: absolute;
-  inset: 0;
-  border: 1px solid color-mix(in srgb, white 58%, transparent);
-  border-radius: inherit;
-  pointer-events: none;
-  content: "";
-}
-
-.unitCover img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: contain;
-}
-
-.metrics,
-.detailStats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-
-.metric {
-  min-width: 0;
-  padding: 8px 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--color-surface-subtle);
-}
-
-.metric span,
-.metric strong {
-  display: block;
-}
-
-.metric span {
-  color: var(--muted);
-  font-size: var(--font-size-caption);
-  font-weight: 800;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-
-.metric strong {
-  overflow: hidden;
-  margin-top: 2px;
-  color: var(--ink);
-  font-size: var(--font-size-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .metaRow {
@@ -170,41 +100,6 @@
   color: var(--color-accent-text);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.state {
-  min-height: 230px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 8px;
-  padding: 30px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.state > svg {
-  width: 27px;
-  height: 27px;
-  color: var(--color-accent-text);
-}
-
-.state strong {
-  color: var(--ink);
-  font-size: var(--font-size-body-emphasis);
-}
-
-.state p {
-  max-width: 34rem;
-  margin: 0;
-  font-size: var(--font-size-small);
-  line-height: 1.55;
-}
-
-.detailHero {
-  display: block;
-  padding: 0;
 }
 
 .columns {
@@ -261,14 +156,6 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
-}
-
-.academicBlock > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
 }
 
 .academicBlock h3 {
@@ -516,20 +403,29 @@
 
 @media (max-width: 720px) {
 
-  .grid, .catalogGrid, .sectionBody { padding-inline: 14px; }
+  .sectionBody { padding-inline: 14px; }
 
   .academicBlocks { padding-inline: 14px; }
   .validationNotice { padding-inline: 14px; }
 }
 
 @media (max-width: 430px) {
-  .metrics,
-  .detailStats { grid-template-columns: 1fr; }
-
   .listItem { grid-template-columns: 34px minmax(0, 1fr); }
   .listItem a { grid-column: 2; }
 }
 
-/* Catalogue rows: compendium cover (or unit code) leading, one meta line. */
-li > .unitCover { width: 32px; }
-.rowArrow { width: 15px; height: 15px; color: var(--color-text-muted); }
+/* Unit summary: cover, key facts and the actions that belong to the unit. */
+.summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-5); }
+.summaryFacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, max-content)); gap: var(--space-2) var(--space-6); margin: 0; }
+.summaryFacts div { display: grid; gap: 2px; min-width: 0; }
+.summaryFacts dt { color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.summaryFacts dd { margin: 0; overflow-wrap: anywhere; color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; }
+.summaryActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.sectionEmpty { margin: 0; padding: var(--space-4) var(--space-5); color: var(--color-text-muted); font-size: var(--font-size-body); }
+
+@media (max-width: 720px) {
+  .summary { grid-template-columns: auto minmax(0, 1fr); gap: var(--space-4); padding: var(--space-4); }
+  .summaryActions { grid-column: 1 / -1; justify-content: stretch; }
+  .summaryActions > * { flex: 1 1 0; justify-content: center; }
+  .sectionEmpty { padding-inline: var(--space-4); }
+}
