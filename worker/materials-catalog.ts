@@ -50,6 +50,12 @@ function row(value: unknown): Record<string, unknown> { return value as Record<s
 function isManager(user: MaterialsCatalogUser | null): boolean { return Boolean(user && (user.role === "admin" || user.commissionDepartment === "management")); }
 function unauthenticated(): Response { return json({ error: "Sessão inválida." }, 401); }
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
+const bibliographyFormats = new Set(["complete", "excerpt", "translation"]);
+/** Formato explícito da migration 0065; antes dela, as páginas definem um excerto. */
+function bibliographyFormat(item: Record<string, unknown>): string {
+  if (typeof item.bibliography_format === "string" && bibliographyFormats.has(item.bibliography_format)) return item.bibliography_format;
+  return item.printed_page_start || item.physical_page_start ? "excerpt" : "complete";
+}
 function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = []) {
   const ready = item.storage_state === "ready";
   const externalUrl = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url)
@@ -64,6 +70,7 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     lessonCode: item.lesson_code,
     lessonCodes,
     kind: item.material_kind,
+    bibliographyFormat: item.material_kind === "bibliography" ? bibliographyFormat(item) : null,
     title: item.title,
     description: item.description,
     fileName: item.file_name,

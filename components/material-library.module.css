@@ -1,4 +1,6 @@
-.page { display: grid; gap: 24px; }
+.page { display: block; min-width: 0; }
+.editor { overflow: hidden; }
+.examList { min-width: 0; }
 .hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 5px 2px; }
 .heroCopy { display: flex; align-items: center; gap: 17px; min-width: 0; }
 .heroIcon { display: grid; width: 54px; height: 54px; flex: 0 0 auto; place-items: center; border: 1px solid #ead578; border-radius: 15px; color: #705600; background: var(--gold-soft); }

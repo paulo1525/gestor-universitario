@@ -19,11 +19,11 @@ test("o diretório expõe filtros acessíveis, limpeza contextual e cartões sem
 });
 
 test("a biblioteca de materiais tem filtro identificado, editor isolado e registos compactos", () => {
-  assert.match(materials, /className=\{styles\.filterLabel\}/);
+  assert.match(materials, /<FormLabel icon=\{Filter\}>\{t\("community\.materials\.filter"\)\}<\/FormLabel>/);
   assert.match(materials, /filter !== "all" &&/);
   assert.match(materials, /setFilter\("all"\)/);
   assert.match(materials, /className=\{styles\.formWorkspace\}/);
-  assert.match(materials, /\{activeTab === "exams" && !editor && <section className=\{styles\.panel\}>/);
+  assert.match(materials, /\{activeTab === "exams" && !editor && <div className=\{styles\.examList\}>/);
   assert.match(materials, /className=\{styles\.materialHeader\}/);
   assert.match(materials, /className=\{styles\.cardActions\}/);
   assert.match(materials, /button--compact \$\{styles\.openMaterial\}/);

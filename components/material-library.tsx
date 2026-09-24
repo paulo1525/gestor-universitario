@@ -43,7 +43,8 @@ import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
-import { MaterialCatalog, type MaterialCatalogTab } from "@/components/material-catalog";
+import { FormLabel } from "@/components/form-label";
+import { GENERAL_MATERIAL_UNIT, MaterialCatalog, normalizeMaterialUnitCode, type MaterialCatalogTab } from "@/components/material-catalog";
 import styles from "@/components/material-library.module.css";
 
 type Status = "pending" | "approved" | "rejected" | "archived";
@@ -212,7 +213,7 @@ type Material = {
   questionCount?: number | null;
   transcriptionStatus?: string;
 };
-type Unit = { id: string; code: string; name: string };
+type Unit = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type Notice = { kind: ToastKind; message: string } | null;
 const categoryLabelKeys = {
   exam: "community.materials.category.exam",
@@ -315,6 +316,9 @@ function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: stri
     versionsLoaded: Boolean(item.versions || item.versionHistory),
   };
 }
+function materialUnitCode(item: Material) {
+  return item.unit ? normalizeMaterialUnitCode(item.unit.code) : GENERAL_MATERIAL_UNIT;
+}
 function date(value: string, locale: string) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
@@ -360,7 +364,8 @@ export function MaterialLibrary() {
     [versionNotes, setVersionNotes] = useState(""),
     [publishingVersion, setPublishingVersion] = useState(false),
     [filter, setFilter] = useState("all"),
-    [activeTab, setActiveTab] = useState<MaterialCatalogTab>("overview");
+    [activeTab, setActiveTab] = useState<MaterialCatalogTab>("overview"),
+    [unitCode, setUnitCode] = useState("");
   const [title, setTitle] = useState(""),
     [description, setDescription] = useState(""),
     [category, setCategory] = useState<Category>("exam"),
@@ -383,7 +388,7 @@ export function MaterialLibrary() {
       const materialData = (await materialResponse.json()) as {
         materials?: ApiMaterial[];
         submissions?: ApiMaterial[];
-        units?: Array<{ id: string | number; code?: string; name?: string }>;
+        units?: Array<{ id: string | number; code?: string; name?: string; year?: number | null; semester?: number | null }>;
         canModerate?: boolean;
         capabilities?: { moderate?: boolean };
         error?: string;
@@ -408,6 +413,8 @@ export function MaterialLibrary() {
           id: String(item.id),
           code: item.code ?? "UC",
           name: item.name ?? t("community.common.curricularUnit"),
+          year: item.year ?? null,
+          semester: item.semester ?? null,
         })),
       );
     } catch (reason) {
@@ -424,12 +431,29 @@ export function MaterialLibrary() {
   useEffect(() => {
     void load();
   }, [load]);
+  // The selected unit lives in the address so a shared or reloaded link keeps the same context.
+  useEffect(() => {
+    setUnitCode(normalizeMaterialUnitCode(new URLSearchParams(window.location.search).get("uc")));
+  }, []);
+  const selectUnit = useCallback((code: string) => {
+    setUnitCode(code);
+    setActiveTab("overview");
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set("uc", code);
+    else url.searchParams.delete("uc");
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
+  const submissionCounts = useMemo(() => materials.reduce<Record<string, number>>((counts, item) => {
+    const code = materialUnitCode(item);
+    counts[code] = (counts[code] || 0) + 1;
+    return counts;
+  }, {}), [materials]);
   const visible = useMemo(
     () =>
-      materials.filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter)),
-    [materials, filter],
+      materials.filter((item) => materialUnitCode(item) === unitCode && (filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter))),
+    [materials, filter, unitCode],
   );
-  const interactiveStudyVisible = filter === "all" || filter === "summary";
+  const interactiveStudyVisible = unitCode === "NEURO" && (filter === "all" || filter === "summary");
   const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
   const pick = async (event: ChangeEvent<HTMLInputElement>) => {
     const selected = event.target.files?.[0] ?? null;
@@ -749,7 +773,7 @@ export function MaterialLibrary() {
               icon={<FolderOpen />}
               eyebrow={t("community.materials.eyebrow")}
               title={t("community.materials.title")}
-              actions={submissionEnabled ? <div className={styles.heroActions}><button className="button button--primary" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button></div> : undefined}
+              actions={submissionEnabled ? <button className={`button button--compact ${editor ? "button--secondary" : "button--primary"}`} type="button" aria-expanded={editor} aria-controls="material-editor" onClick={() => { if (editor) { reset(); return; } setUnitId(units.find((item) => normalizeMaterialUnitCode(item.code) === unitCode)?.id ?? ""); setEditor(true); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button> : undefined}
             />
             {notice && (
               <AppToast
@@ -757,16 +781,9 @@ export function MaterialLibrary() {
                 message={notice.message}
                 onDismiss={() => setNotice(null)}
               />
-            )}{" "}
-            <MaterialCatalog
-              activeTab={activeTab}
-              onTabChange={(tab) => {
-                setActiveTab(tab);
-                if (tab !== "exams") setEditor(false);
-              }}
-            />
-            {submissionEnabled && activeTab === "exams" && editor && (
-              <section className={styles.panel}>
+            )}
+            {submissionEnabled && editor && (
+              <section id="material-editor" className={`panel ${styles.editor}`}>
                 <SurfaceHeader icon={<UploadCloud />} title={t("community.materials.new")} description={t("community.materials.moderationInfo")} />
                 <form className={styles.form} onSubmit={submit}>
                   <div className={styles.formWorkspace}>
@@ -897,31 +914,29 @@ export function MaterialLibrary() {
                 </form>
               </section>
             )}
-            {activeTab === "exams" && !editor && <section className={styles.panel}>
-              <SurfaceHeader
-                icon={<FolderOpen />}
-                title={canModerate ? t("community.materials.libraryModeration") : t("community.materials.library")}
-                description={canModerate ? t("community.materials.pendingFirst") : t("community.materials.approvedCommunity")}
-                meta={!loading ? `${libraryCount} ${libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}` : undefined}
-              />
-              <div className={styles.toolbar}>
-                <label className={styles.filterControl}>
-                  <span className={styles.filterLabel}><Filter aria-hidden="true" />{t("community.materials.filter")}</span>
-                  <select
-                    className={styles.select}
-                    value={filter}
-                    onChange={(event) => setFilter(event.target.value)}
-                  >
-                    <option value="all">{t("community.materials.all")}</option>
-                    {favoritesEnabled && <option value="favorites">{t("community.materials.favorites")}</option>}
-                    {Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => (
-                      <option value={value} key={value}>
-                        {t(key)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+            {!editor && <MaterialCatalog
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              unitCode={unitCode}
+              onUnitChange={selectUnit}
+              units={units}
+              submissionCounts={submissionCounts}
+              examCount={loading ? 0 : libraryCount}
+              examSummary={<span>{canModerate ? t("community.materials.pendingFirst") : t("community.materials.catalog.examDescription")}</span>}
+              examFilters={<label>
+                <FormLabel icon={Filter}>{t("community.materials.filter")}</FormLabel>
+                <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+                  <option value="all">{t("community.materials.all")}</option>
+                  {favoritesEnabled && <option value="favorites">{t("community.materials.favorites")}</option>}
+                  {Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => (
+                    <option value={value} key={value}>
+                      {t(key)}
+                    </option>
+                  ))}
+                </select>
+              </label>}
+            >
+            {activeTab === "exams" && !editor && <div className={styles.examList}>
               {loading ? (
                 <div className={styles.state}>
                   <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
@@ -1063,7 +1078,8 @@ export function MaterialLibrary() {
                   ); })}
                 </div>
               )}
-            </section>}
+            </div>}
+            </MaterialCatalog>}
           </div>
         </AppShell>
       </ModuleGuard>
