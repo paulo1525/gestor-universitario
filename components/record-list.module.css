@@ -95,6 +95,9 @@
   .groupTitle.groupTitle { padding-inline: var(--space-4); }
   .rowAction span { display: none; }
   .rowAction { width: 32px; justify-content: center; padding: 0; }
+  .rowEnd { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
+  .rowEnd .statusPill { min-width: 0; }
+  .rowEnd .rowArrow { display: none; }
   .row + .row::before { right: var(--space-4); left: var(--space-4); }
   .titleLink { white-space: normal; }
   .reading { padding: var(--space-4) var(--space-4) 0; }
