@@ -72,7 +72,7 @@
   flex: none;
   border-radius: 10px;
   color: var(--color-accent-text);
-  background: var(--gold-soft);
+  background: var(--color-accent-soft);
 }
 
 .panelIcon svg {
@@ -117,7 +117,7 @@
   padding: 0 9px;
   border-radius: 999px;
   color: var(--color-accent-text);
-  background: var(--gold-soft);
+  background: var(--color-accent-soft);
   font-size: 9px;
   font-weight: 800;
   white-space: nowrap;
@@ -248,10 +248,67 @@
   transition: border-color .15s ease, background .15s ease;
 }
 
+.catalogCard {
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.catalogCard .unitCover {
+  width: 56px;
+  flex: none;
+}
+
+.catalogContent {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 5px;
+}
+
+.catalogContent .cardTop {
+  justify-content: flex-start;
+}
+
+.catalogFacts {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalogDescription {
+  overflow: hidden;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalogArrow {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--muted);
+  transition: color .15s ease, transform .15s ease;
+}
+
+.catalogCard:hover .catalogArrow,
+.catalogCard:focus-visible .catalogArrow {
+  color: var(--color-accent-text);
+  transform: translateX(2px);
+}
+
 .card:hover,
 .card:focus-visible {
-  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
-  background: color-mix(in srgb, var(--gold-soft) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--color-accent) 65%, var(--line));
+  background: color-mix(in srgb, var(--color-accent-soft) 22%, var(--surface));
 }
 
 .cardTop {
@@ -275,7 +332,7 @@
 
 .unitCode {
   color: var(--color-accent-text);
-  background: var(--gold-soft);
+  background: var(--color-accent-soft);
   letter-spacing: .045em;
 }
 
@@ -291,32 +348,12 @@
   line-height: 1.35;
 }
 
-.catalogCardBody {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 13px;
-  flex: 1;
-}
-
-.catalogCardContent {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.catalogCardContent:only-child {
-  grid-column: 1 / -1;
-}
-
 .unitCover {
   position: relative;
   aspect-ratio: 1055 / 1492;
   overflow: hidden;
   align-self: start;
-  border: 1px solid color-mix(in srgb, var(--gold) 28%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--line));
   border-radius: 8px;
   background: #f4f0e5;
 }
@@ -335,17 +372,6 @@
   height: 100%;
   display: block;
   object-fit: contain;
-}
-
-.catalogCopy p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .metrics,
@@ -412,20 +438,6 @@
   color: var(--color-accent-text);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.linkHint {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: auto;
-  color: var(--color-accent-text);
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.linkHint svg {
-  width: 14px;
 }
 
 .state {
@@ -693,7 +705,7 @@
   place-items: center;
   border-radius: 9px;
   color: var(--color-accent-text);
-  background: var(--gold-soft);
+  background: var(--color-accent-soft);
 }
 
 .listIcon svg {
@@ -758,7 +770,7 @@
   place-items: center;
   border-radius: 50%;
   color: var(--color-accent-text);
-  background: var(--gold-soft);
+  background: var(--color-accent-soft);
   font-size: 9px;
   font-weight: 850;
 }
@@ -797,12 +809,14 @@
   .metrics,
   .detailStats { grid-template-columns: 1fr; }
   .card { min-height: auto; }
-  .catalogCardBody { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
+  .catalogCard { gap: 11px; padding: 12px; }
+  .catalogCard .unitCover { width: 44px; }
   .listItem { grid-template-columns: 34px minmax(0, 1fr); }
   .listItem a { grid-column: 2; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
+  .card,
+  .catalogArrow { transition: none; }
   .spin { animation-duration: 1.6s; }
 }

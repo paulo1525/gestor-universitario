@@ -282,46 +282,24 @@ export function CurricularUnitCatalog() {
                       href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}
                       key={item.id}
                     >
-                      <div className={styles.cardTop}>
-                        <span className={styles.unitCode}>{item.code}</span>
-                        <span className={styles.tag}>
-                          {t("community.units.yearSemester", { year: item.year, semester: item.semester })}
-                        </span>
-                      </div>
-                      <div className={styles.catalogCardBody}>
-                        {compendiumUnit && <span className={styles.unitCover} aria-hidden="true">
-                          <Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="(max-width: 430px) 68px, 88px" />
-                        </span>}
-                        <div className={styles.catalogCardContent}>
-                          <div className={styles.catalogCopy}>
-                            <h3>{item.name}</h3>
-                            {item.description && <p>{item.description}</p>}
-                          </div>
-                          <div className={styles.metrics}>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.credits")}</span>
-                              <strong>
-                                {item.ects.toLocaleString(locale)} ECTS
-                              </strong>
-                            </div>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.year")}</span>
-                              <strong>{item.year}.º</strong>
-                            </div>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.semester")}</span>
-                              <strong>{item.semester}.º</strong>
-                            </div>
-                          </div>
-                          {item.representatives.length > 0 && <div className={styles.metaRow}>
-                            <UserRound />
-                            <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
-                          </div>}
-                          <span className={styles.linkHint}>
-                            {t("community.units.openArea")} <ArrowRight />
+                      {compendiumUnit && <span className={styles.unitCover} aria-hidden="true">
+                        <Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="56px" />
+                      </span>}
+                      <div className={styles.catalogContent}>
+                        <div className={styles.cardTop}>
+                          <span className={styles.unitCode}>{item.code}</span>
+                          <span className={styles.catalogFacts}>
+                            {t("community.units.yearSemester", { year: item.year, semester: item.semester })} · {item.ects.toLocaleString(locale)} ECTS
                           </span>
                         </div>
+                        <h3>{item.name}</h3>
+                        {item.description && <p className={styles.catalogDescription}>{item.description}</p>}
+                        {item.representatives.length > 0 && <div className={styles.metaRow}>
+                          <UserRound />
+                          <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
+                        </div>}
                       </div>
+                      <ArrowRight className={styles.catalogArrow} aria-hidden="true" />
                     </Link>
                   })}
                 </div>
