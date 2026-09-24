@@ -3,11 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BadgeCheck,
-  BookOpenCheck,
-  BriefcaseBusiness,
-  GraduationCap,
-  LoaderCircle,
+  ChevronLeft,
   Mail,
   Search,
   Users,
@@ -22,6 +18,8 @@ import { SurfaceHeader } from "@/components/surface-header";
 import { useI18n } from "@/components/i18n-context";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/commission-directory.module.css";
+import list from "@/components/record-list.module.css";
+import { RecordSkeleton, recordHref, useHashRecord } from "@/components/record-list";
 
 type ApiMember = {
   id: string | number;
@@ -100,6 +98,7 @@ export function CommissionDirectory() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("all");
+  const [openId, openMember] = useHashRecord("membro");
 
   const departmentLabel = useCallback(
     (value: string) => {
@@ -163,6 +162,7 @@ export function CommissionDirectory() {
     );
   }, [department, departmentLabel, locale, members, query]);
 
+  const openItem = openId ? members.find((member) => member.id === openId) ?? null : null;
   const filtersActive = query.trim().length > 0 || department !== "all";
   const clearFilters = () => {
     setQuery("");
@@ -184,93 +184,49 @@ export function CommissionDirectory() {
 
             {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}
 
-            <section className={styles.directory} aria-labelledby="diretorio-titulo">
-              <SurfaceHeader
-                icon={<BadgeCheck />}
-                title={t("community.directory.title")}
-                headingId="diretorio-titulo"
-                meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.directory.member") : t("community.directory.memberPlural")}` : undefined}
-              />
+            {!openId ? <section className={`panel ${list.listPanel}`} aria-busy={loading}>
               <FilterBar label={t("community.directory.filter")}>
                 <FilterSearch label={t("community.directory.search")} value={query} onChange={setQuery} placeholder={t("community.directory.searchPlaceholder")} />
                 <FilterSegmented label={t("community.directory.filter")} value={department} onChange={setDepartment} options={[{ value: "all" as typeof department, label: t("community.directory.all") }, ...departments.map((value) => ({ value, label: departmentLabel(value) }))]} />
               </FilterBar>
-
-              {loading ? (
-                <div className={styles.state}>
-                  <span className={styles.stateIcon} aria-hidden="true">
-                    <LoaderCircle className={styles.spin} />
-                  </span>
-                  <strong>{t("community.directory.loading")}</strong>
-                </div>
-              ) : visible.length === 0 ? (
-                <div className={styles.state}>
-                  <span className={styles.stateIcon} aria-hidden="true">
-                    <Search />
-                  </span>
-                  <strong>{t("community.directory.empty")}</strong>
-                  
-                  {filtersActive && (
-                    <button className={styles.emptyAction} type="button" onClick={clearFilters}>
-                      <X aria-hidden="true" />
-                      {t("community.directory.clear")}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className={styles.grid}>
-                  {visible.map((member) => (
-                    <article className={styles.card} key={member.id}>
-                      <div className={styles.cardIdentity}>
-                        <span className={styles.avatar} aria-hidden="true">
-                          {initials(member.name)}
-                        </span>
-                        <div>
-                          <span className={styles.position}>{member.position}</span>
-                          <h3>{member.name}</h3>
-                          <p>
-                            <BriefcaseBusiness aria-hidden="true" />
-                            {departmentLabel(member.department)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <a className={styles.email} href={`mailto:${member.email}`} title={member.email}>
-                        <Mail aria-hidden="true" />
-                        <span>{member.email}</span>
-                      </a>
-
-                      {classesEnabled && member.representedClass !== null && (
-                        <div className={styles.classRole}>
-                          <GraduationCap aria-hidden="true" />
-                          <span>{t("community.directory.classRepresentative", { class: member.representedClass })}</span>
-                        </div>
-                      )}
-
-                      <div className={styles.units}>
-                        <div className={styles.unitsHeading}>
-                          <BookOpenCheck aria-hidden="true" />
-                          <strong>{t("community.directory.followedUnits")}</strong>
-                          <span>{member.units.length}</span>
-                        </div>
-                        {member.units.length ? (
-                          <ul className={styles.unitList}>
-                            {member.units.map((unit) => (
-                              <li title={`${unit.code} · ${unit.name}`} key={unit.id}>
-                                <b>{unit.code}</b>
-                                <span>{unit.name}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p>{t("community.directory.noUnit")}</p>
-                        )}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
+              {loading ? <RecordSkeleton label={t("community.directory.loading")} /> : visible.length === 0 ? <div className={list.empty}>
+                <Search />
+                <strong>{t("community.directory.empty")}</strong>
+                {filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X aria-hidden="true" />{t("community.directory.clear")}</button>}
+              </div> : <ul className={list.rows}>
+                {visible.map((member) => <li className={list.row} key={member.id}>
+                  <span className={list.avatar} aria-hidden="true">{initials(member.name)}</span>
+                  <div className={list.rowMain}>
+                    <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("membro", member.id)} onClick={(event) => { event.preventDefault(); openMember(member.id); }}>{member.name}</a></h3>
+                    <p className={list.rowMeta}>{[member.position, departmentLabel(member.department), member.units.map((unit) => unit.code).join(", ")].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  {classesEnabled && member.representedClass !== null ? <span className={list.statusPill} data-tone="info">{t("community.directory.classRepresentative", { class: member.representedClass })}</span> : <span />}
+                </li>)}
+              </ul>}
+            </section> : <>
+              <button className={list.back} type="button" onClick={() => openMember(null)}><ChevronLeft aria-hidden="true" />{t("community.directory.back")}</button>
+              <article className={`panel ${list.reading}`} aria-busy={loading}>
+                {loading ? <RecordSkeleton label={t("community.directory.loading")} rows={2} /> : !openItem ? <div className={list.empty}><Search /><strong>{t("community.directory.empty")}</strong></div> : <>
+                  <header className={list.byline}>
+                    <span className={list.avatar} aria-hidden="true">{initials(openItem.name)}</span>
+                    <div>
+                      <p className={list.bylineName}>{openItem.position}</p>
+                      <p className={list.bylineMeta}>{departmentLabel(openItem.department)}</p>
+                    </div>
+                    {classesEnabled && openItem.representedClass !== null && <span className={list.statusPill} data-tone="info">{t("community.directory.classRepresentative", { class: openItem.representedClass })}</span>}
+                  </header>
+                  <h2 className={list.readingTitle}>{openItem.name}</h2>
+                  <span className={list.readingRule} aria-hidden="true" />
+                  <section className={list.readingSection}>
+                    <h3>{t("community.directory.followedUnits")}</h3>
+                    {openItem.units.length ? <ul className={styles.unitList}>{openItem.units.map((unit) => <li key={unit.id}><b>{unit.code}</b><span>{unit.name}</span></li>)}</ul> : <p className={styles.noUnit}>{t("community.directory.noUnit")}</p>}
+                  </section>
+                  <footer className={list.manageArea}>
+                    <a className={`button button--secondary button--compact ${styles.mailLink}`} href={`mailto:${openItem.email}`}><Mail aria-hidden="true" /><span>{openItem.email}</span></a>
+                  </footer>
+                </>}
+              </article>
+            </>}
           </div>
         </AppShell>
       </ModuleGuard>

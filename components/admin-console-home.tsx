@@ -7,6 +7,7 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardCheck,
+  LayoutGrid,
   Settings,
   ShieldCheck,
   Users,
@@ -59,9 +60,9 @@ export function AdminConsoleHome() {
   return <AppShell active="admin" breadcrumb={t("admin.home.breadcrumb")}>
     <AdminPage>
       <AdminPageHeader
+        icon={<LayoutGrid />}
         eyebrow={t("admin.home.eyebrow")}
         title={t("admin.home.title")}
-       
       />
 
       <AdminMetricGrid label={t("admin.home.statusLabel")}>

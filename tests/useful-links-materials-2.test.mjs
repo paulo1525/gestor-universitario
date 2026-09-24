@@ -3,25 +3,23 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const modules = readFileSync(new URL("../lib/app-modules.ts", import.meta.url), "utf8");
-const links = readFileSync(new URL("../components/useful-links.tsx", import.meta.url), "utf8");
+const links = readFileSync(new URL("../components/useful-links-tree.tsx", import.meta.url), "utf8");
+const editor = readFileSync(new URL("../components/useful-link-editor.tsx", import.meta.url), "utf8");
 const materials = readFileSync(new URL("../components/material-library.tsx", import.meta.url), "utf8");
 const messages = readFileSync(new URL("../lib/i18n-links.ts", import.meta.url), "utf8");
 
-test("links úteis têm biblioteca e gestão independentes com filtros completos", () => {
-  assert.match(links, /ModuleGuard moduleKey="useful_links\.library"/);
-  assert.match(links, /useModuleEnabled\("useful_links\.management"\)/);
-  for (const filter of ["query", "priorityFilter", "categoryFilter", "unitFilter", "visibilityFilter", "statusFilter"]) {
-    assert.match(links, new RegExp(filter));
-  }
-  assert.match(links, /method: editingId \? "PUT" : "POST"/);
-  assert.match(links, /method: action === "delete" \? "DELETE" : "PUT"/);
+test("links úteis: consulta pública e gestão inline no mesmo linktree", () => {
+  assert.match(links, /method: current \? "PUT" : "POST"/);
+  assert.match(links, /method: "DELETE"/);
   assert.match(links, /rel="noopener noreferrer"/);
+  assert.match(modules, /key: "useful_links\.library"/);
+  assert.match(modules, /key: "useful_links\.management"/);
 });
 
 test("links úteis usam os valores validados pela API", () => {
-  assert.match(links, /\["urgent", "important", "normal"\]/);
-  assert.match(links, /\["academic", "platform", "curricular_unit", "support", "association", "other"\]/);
-  assert.match(links, /\["students", "cc", "public"\]/);
+  assert.match(editor, /\["academic", "platform", "curricular_unit", "support", "association", "other"\]/);
+  assert.match(links, /visibility: draft\.ccOnly \? "cc" : requiresLogin \? "students" : "public"/);
+  assert.match(links, /priority: draft\.highlight \?/);
 });
 
 test("materiais 2.0 separa favoritos, feedback e versões", () => {

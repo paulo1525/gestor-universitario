@@ -4,7 +4,6 @@
 
 import {
   ChangeEvent,
-  FormEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -18,33 +17,42 @@ import {
   FileText,
   FolderOpen,
   Image as ImageIcon,
-  LoaderCircle,
+  ChevronLeft,
   Flag,
   History,
-  Send,
   ShieldCheck,
   Star,
+  Pencil,
   ThumbsUp,
-  Upload,
   UploadCloud,
   X,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { FilterBar, FilterSelect } from "@/components/filter-bar";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { useAuth } from "@/components/auth-context";
-import { FileUploadField, MultiFileUploadField, SelectedUpload } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import { useI18n } from "@/components/i18n-context";
-import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
-import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
+import { RichTextContent } from "@/components/rich-text-editor";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
 import { MaterialCatalog, type MaterialCatalogTab } from "@/components/material-catalog";
+import { MaterialUploadForm } from "@/components/material-upload-form";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { useFloatingAction } from "@/components/floating-actions";
 import styles from "@/components/material-library.module.css";
+import list from "@/components/record-list.module.css";
+import { RecordSkeleton, initials, recordHref, useHashRecord } from "@/components/record-list";
+import { richTextPlainText } from "@/lib/announcement-content";
+
+const FLOATING_CREATE_ICON = <Pencil aria-hidden="true" />;
+const FLOATING_APPROVE_ICON = <Check aria-hidden="true" />;
+const FLOATING_REJECT_ICON = <X aria-hidden="true" />;
+const FLOATING_VERSION_ICON = <UploadCloud aria-hidden="true" />;
+const statusTone: Record<string, string | undefined> = { pending: "accent", approved: "success", rejected: "danger", archived: undefined };
 
 type Status = "pending" | "approved" | "rejected" | "archived";
 type Category = "exam" | "summary" | "notes" | "other";
@@ -67,48 +75,6 @@ function MaterialThumbnail({ fileType, src, title }: { fileType: string; src: st
   );
 }
 
-function InteractiveStudyMaterial({
-  summaryLabel,
-  openLabel,
-  description,
-  unitLabel,
-}: {
-  summaryLabel: string;
-  openLabel: string;
-  description: string;
-  unitLabel: string;
-}) {
-  return (
-    <article className={styles.material + " " + styles.studyMaterial}>
-      <div className={styles.studyMaterialThumb} aria-hidden="true"><BookOpenCheck /></div>
-      <div className={styles.materialBody}>
-        <header className={styles.materialHeader}>
-          <div className={styles.cardTop}>
-            <span className={styles.tag}>{summaryLabel}</span>
-            <span className={styles.status + " " + styles.statusApproved}>Disponível</span>
-          </div>
-          <div className={styles.materialCopy}>
-            <h3>Neuroanatomia · Aula prática 1</h3>
-            <p className={styles.materialDescription}>{description}</p>
-          </div>
-          <div className={styles.materialBadges}>
-            <span className={styles.unitCode}>NEURO</span>
-          </div>
-        </header>
-        <div className={styles.meta}>
-          <span className={styles.metaRow}><BookOpenCheck aria-hidden="true" /><span>{unitLabel}</span></span>
-          <span className={styles.metaRow}><FileText aria-hidden="true" /><span>Leitura online</span></span>
-        </div>
-        <div className={styles.cardActions}>
-          <Link className={"button button--secondary button--compact " + styles.openMaterial} href="/materiais/neuroanatomia/aula-1">
-            <BookOpenCheck aria-hidden="true" />{openLabel}
-          </Link>
-        </div>
-        <footer className={styles.materialFooter}><span>Conteúdo académico</span><span>Resumo guiado</span></footer>
-      </div>
-    </article>
-  );
-}
 type ApiMaterial = {
   id: string | number;
   title: string;
@@ -220,10 +186,6 @@ const categoryLabelKeys = {
   notes: "community.materials.category.notes",
   other: "community.materials.category.other",
 } as const;
-const categoryToType: Record<
-  Category,
-  "exam_photo" | "summary" | "notes" | "other"
-> = { exam: "exam_photo", summary: "summary", notes: "notes", other: "other" };
 const statusLabelKeys = {
   pending: "community.materials.status.pending",
   approved: "community.materials.status.approved",
@@ -232,9 +194,6 @@ const statusLabelKeys = {
 } as const;
 const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_SIZE = 5 * 1024 * 1024;
-const allowedPhotos = ["image/jpeg", "image/png", "image/webp"];
-const MAX_PHOTOS = 8;
-const MAX_PHOTO_TOTAL_SIZE = 24 * 1024 * 1024;
 function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: string, unitLabel: string): Material {
   const nested = item.unit ?? item.curricularUnit;
   const unit =
@@ -342,6 +301,8 @@ export function MaterialLibrary() {
   const favoritesEnabled = useModuleEnabled("materials.favorites");
   const feedbackEnabled = useModuleEnabled("materials.feedback");
   const versioningEnabled = useModuleEnabled("materials.versioning");
+  const [openId, openMaterial] = useHashRecord("material");
+  const [query, setQuery] = useState("");
   const [materials, setMaterials] = useState<Material[]>([]),
     [units, setUnits] = useState<Unit[]>([]),
     [canModerate, setCanModerate] = useState(false),
@@ -349,8 +310,8 @@ export function MaterialLibrary() {
     [loadError, setLoadError] = useState(""),
     [notice, setNotice] = useState<Notice>(null),
     [editor, setEditor] = useState(false),
-    [saving, setSaving] = useState(false),
     [moderating, setModerating] = useState<string | null>(null),
+    [rejectTarget, setRejectTarget] = useState<Material | null>(null),
     [feedbackBusy, setFeedbackBusy] = useState<string | null>(null),
     [versionsOpen, setVersionsOpen] = useState<string | null>(null),
     [versionsLoading, setVersionsLoading] = useState<string | null>(null),
@@ -360,19 +321,7 @@ export function MaterialLibrary() {
     [versionNotes, setVersionNotes] = useState(""),
     [publishingVersion, setPublishingVersion] = useState(false),
     [filter, setFilter] = useState("all"),
-    [activeTab, setActiveTab] = useState<MaterialCatalogTab>("overview");
-  const [title, setTitle] = useState(""),
-    [description, setDescription] = useState(""),
-    [category, setCategory] = useState<Category>("exam"),
-    [unitId, setUnitId] = useState(""),
-    [anonymous, setAnonymous] = useState(true),
-    [file, setFile] = useState<File | null>(null),
-    [fileData, setFileData] = useState(""),
-    [examFiles, setExamFiles] = useState<Array<SelectedUpload & { dataUrl: string }>>([]),
-    [examSitting, setExamSitting] = useState("unknown"),
-    [assessmentComponent, setAssessmentComponent] = useState("unknown"),
-    [examDate, setExamDate] = useState(""),
-    [questionCount, setQuestionCount] = useState("");
+    [activeTab, setActiveTab] = useState<MaterialCatalogTab>(() => openId ? "exams" : "overview");
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -424,152 +373,16 @@ export function MaterialLibrary() {
   useEffect(() => {
     void load();
   }, [load]);
+  const term = query.trim().toLocaleLowerCase(locale);
   const visible = useMemo(
     () =>
-      materials.filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter)),
-    [materials, filter],
+      materials
+        .filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter))
+        .filter((item) => !term || [item.title, richTextPlainText(item.description), item.fileName, item.unit?.code, item.unit?.name, item.anonymous ? "" : item.authorName].join(" ").toLocaleLowerCase(locale).includes(term)),
+    [materials, filter, term, locale],
   );
-  const interactiveStudyVisible = filter === "all" || filter === "summary";
+  const interactiveStudyVisible = (filter === "all" || filter === "summary") && (!term || "neuroanatomia aula prática 1 resumo".includes(term));
   const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
-  const pick = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = event.target.files?.[0] ?? null;
-    if (!selected) return;
-    if (!allowed.includes(selected.type)) {
-      setNotice({
-        kind: "warning",
-        message: t("community.materials.fileTypeError"),
-      });
-      event.target.value = "";
-      return;
-    }
-    if (selected.size > MAX_SIZE) {
-      setNotice({
-        kind: "warning",
-        message: t("community.materials.fileSizeError"),
-      });
-      event.target.value = "";
-      return;
-    }
-    try {
-      const value = await readFileDataUrl(selected);
-      setFile(selected);
-      setFileData(value);
-    } catch {
-      setNotice({
-        kind: "error",
-        message: t("community.materials.fileReadError"),
-      });
-    }
-  };
-  const pickExamPhotos = async (event: ChangeEvent<HTMLInputElement>) => {
-    const selected = Array.from(event.target.files ?? []);
-    if (!selected.length) return;
-    if (examFiles.length + selected.length > MAX_PHOTOS) {
-      setNotice({ kind: "warning", message: t("community.materials.photoCountError", { count: MAX_PHOTOS }) });
-      event.target.value = "";
-      return;
-    }
-    if (selected.some((item) => !allowedPhotos.includes(item.type))) {
-      setNotice({ kind: "warning", message: t("community.materials.photoTypeError") });
-      event.target.value = "";
-      return;
-    }
-    if (selected.some((item) => item.size > MAX_SIZE)) {
-      setNotice({ kind: "warning", message: t("community.materials.photoSizeError") });
-      event.target.value = "";
-      return;
-    }
-    const total = [...examFiles.map((item) => item.file), ...selected].reduce((sum, item) => sum + item.size, 0);
-    if (total > MAX_PHOTO_TOTAL_SIZE) {
-      setNotice({ kind: "warning", message: t("community.materials.photoTotalError") });
-      event.target.value = "";
-      return;
-    }
-    try {
-      const encoded = await Promise.all(selected.map(async (item) => {
-        const dataUrl = await readFileDataUrl(item);
-        return { file: item, dataUrl, previewUrl: dataUrl };
-      }));
-      setExamFiles((current) => [...current, ...encoded]);
-    } catch {
-      setNotice({ kind: "error", message: t("community.materials.photoReadError") });
-    } finally {
-      event.target.value = "";
-    }
-  };
-  const reset = () => {
-    setTitle("");
-    setDescription("");
-    setCategory("exam");
-    setUnitId("");
-    setAnonymous(true);
-    setFile(null);
-    setFileData("");
-    setExamFiles([]);
-    setExamSitting("unknown");
-    setAssessmentComponent("unknown");
-    setExamDate("");
-    setQuestionCount("");
-    setEditor(false);
-  };
-  const descriptionLength = richTextPlainText(description).length;
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    const examSubmission = category === "exam";
-    const primaryExamFile = examFiles[0];
-    if (!title.trim() || (examSubmission ? !primaryExamFile : !file || !fileData)) {
-      setNotice({
-        kind: "warning",
-        message:
-          t("community.materials.requiredError"),
-      });
-      return;
-    }
-    if (descriptionLength > 1200) {
-      setNotice({ kind: "warning", message: t("community.materials.descriptionError") });
-      return;
-    }
-    setSaving(true);
-    try {
-      const response = await fetch("/api/material-submissions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: sanitizeRichTextHtml(description),
-          type: categoryToType[category],
-          unitId: unitId || null,
-          anonymous,
-          attachmentName: examSubmission ? primaryExamFile.file.name : file?.name,
-          attachmentDataUrl: examSubmission ? primaryExamFile.dataUrl : fileData,
-          attachments: examSubmission ? examFiles.map((item) => ({ name: item.file.name, dataUrl: item.dataUrl })) : undefined,
-          sitting: examSubmission ? examSitting : undefined,
-          assessmentComponent: examSubmission ? assessmentComponent : undefined,
-          examDate: examSubmission && examDate ? examDate : undefined,
-          questionCount: examSubmission && questionCount ? Number(questionCount) : undefined,
-        }),
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok)
-        throw new Error(data.error || t("community.materials.sendError"));
-      reset();
-      setNotice({
-        kind: "success",
-        message: t("community.materials.sent"),
-      });
-      await load();
-    } catch (reason) {
-      setNotice({
-        kind: "error",
-        message:
-          reason instanceof Error
-            ? reason.message
-            : t("community.materials.sendError"),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
   const moderate = async (id: string, status: "approved" | "rejected" | "archived") => {
     setModerating(id);
     try {
@@ -738,6 +551,15 @@ export function MaterialLibrary() {
       setPublishingVersion(false);
     }
   };
+  const openItem = openId ? materials.find((item) => item.id === openId) ?? null : null;
+  const authorOf = (item: Material) => personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale });
+  useFloatingAction(submissionEnabled && !editor && !openId ? { id: "share-material", label: t("community.materials.share"), icon: FLOATING_CREATE_ICON, onClick: () => setEditor(true) } : null);
+  // Actions on the open material live in the floating menu.
+  const pendingItem = canModerate && !editor && openItem?.status === "pending" && moderating !== openItem.id ? openItem : null;
+  useFloatingAction(pendingItem ? { id: "approve-material", label: t(pendingItem.category === "exam" ? "community.materials.finishReview" : "community.materials.approve"), icon: FLOATING_APPROVE_ICON, onClick: () => void moderate(pendingItem.id, pendingItem.category === "exam" ? "archived" : "approved") } : null);
+  useFloatingAction(pendingItem ? { id: "reject-material", label: t("community.materials.reject"), icon: FLOATING_REJECT_ICON, onClick: () => setRejectTarget(pendingItem) } : null);
+  const versionable = canModerate && versioningEnabled && !editor && openItem?.status === "approved" ? openItem : null;
+  useFloatingAction(versionable ? { id: "material-version", label: t(versionEditor === versionable.id ? "community.materials.closeVersion" : "community.materials.publishVersion"), icon: FLOATING_VERSION_ICON, onClick: () => { if (versionEditor === versionable.id) closeVersionEditor(); else { closeVersionEditor(); setVersionEditor(versionable.id); } } } : null);
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="materials.library">
@@ -757,298 +579,110 @@ export function MaterialLibrary() {
                 onDismiss={() => setNotice(null)}
               />
             )}{" "}
-            <MaterialCatalog
-              tabActions={submissionEnabled ? <button className="button button--secondary button--compact" type="button" onClick={() => { setActiveTab("exams"); setEditor((value) => !value); }}>{editor ? <X /> : <Upload />}{editor ? t("community.materials.closeForm") : t("community.materials.share")}</button> : undefined}
+            {!openId && <MaterialCatalog
               activeTab={activeTab}
               onTabChange={(tab) => {
                 setActiveTab(tab);
-                if (tab !== "exams") setEditor(false);
               }}
-            />
-            {submissionEnabled && activeTab === "exams" && editor && (
-              <section className={styles.panel}>
-                <SurfaceHeader icon={<UploadCloud />} title={t("community.materials.new")} /><p className="surface-note">{t("community.materials.moderationInfo")}</p>
-                <form className={styles.form} onSubmit={submit}>
-                  <div className={styles.formWorkspace}>
-                    <div className={styles.formGrid}>
-                      <label className={`${styles.field} ${styles.fieldTitle}`}>
-                        <span>{t("community.materials.field.title")}</span>
-                        <input
-                          value={title}
-                          onChange={(event) => setTitle(event.target.value)}
-                          maxLength={180}
-                          placeholder={t("community.materials.titlePlaceholder")}
-                          required
-                        />
-                      </label>
-                      <label className={styles.field}>
-                        <span>{t("community.materials.field.type")}</span>
-                        <select
-                          value={category}
-                          onChange={(event) =>
-                            setCategory(event.target.value as Category)
-                          }
-                        >
-                          {Object.entries(categoryLabelKeys).map(
-                            ([value, key]) => (
-                              <option value={value} key={value}>
-                                {t(key)}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
-                      <label className={styles.field}>
-                        <span>
-                          {t("community.materials.field.unit")} <small>({t("community.common.optional")})</small>
-                        </span>
-                        <select
-                          value={unitId}
-                          onChange={(event) => setUnitId(event.target.value)}
-                        >
-                          <option value="">{t("community.materials.noUnit")}</option>
-                          {units.map((item) => (
-                            <option value={item.id} key={item.id}>
-                              {item.code} · {item.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className={`${styles.field} ${styles.fieldFull}`}>
-                        <span>
-                          {t("community.materials.field.description")} <small>({t("community.common.optional")})</small>
-                        </span>
-                        <RichTextEditor
-                          value={description}
-                          onChange={setDescription}
-                          ariaLabel={t("community.materials.descriptionAria")}
-                          maxLength={1200}
-                          minHeight="compact"
-                          placeholder={t("community.materials.descriptionPlaceholder")}
-                          onInvalidLink={() => setNotice({ kind: "warning", message: t("community.materials.invalidLink") })}
-                        />
-                      </div>
-                    </div>
-                    <aside className={styles.formAside}>
-                      {category === "exam" ? <>
-                        <div className={styles.examMetadata}>
-                          <label className={styles.field}><span>{t("community.materials.examSitting")}</span><select value={examSitting} onChange={(event) => setExamSitting(event.target.value)}><option value="unknown">{t("community.materials.examSittingUnknown")}</option><option value="normal">{t("community.materials.examSittingNormal")}</option><option value="resit">{t("community.materials.examSittingResit")}</option><option value="special">{t("community.materials.examSittingSpecial")}</option><option value="continuous">{t("community.materials.examSittingContinuous")}</option></select></label>
-                          <label className={styles.field}><span>{t("community.materials.examComponent")}</span><select value={assessmentComponent} onChange={(event) => setAssessmentComponent(event.target.value)}><option value="unknown">{t("community.materials.examComponentUnknown")}</option><option value="theory">{t("community.materials.examComponentTheory")}</option><option value="practical">{t("community.materials.examComponentPractical")}</option><option value="mixed">{t("community.materials.examComponentMixed")}</option></select></label>
-                          <label className={styles.field}><span>{t("community.materials.examDate")}</span><input type="date" value={examDate} onChange={(event) => setExamDate(event.target.value)} /></label>
-                          <label className={styles.field}><span>{t("community.materials.questionCount")}</span><input type="number" min={1} max={500} value={questionCount} onChange={(event) => setQuestionCount(event.target.value)} placeholder="Ex.: 40" /></label>
-                        </div>
-                        <div className={styles.privateNotice} role="note">
-                          <ShieldCheck />
-                          <small>{t("community.materials.privateNotice")}</small>
-                        </div>
-                        <MultiFileUploadField
-                          accept="image/jpeg,image/png,image/webp"
-                          emptyLabel={t("community.materials.selectExamPhotos")}
-                          files={examFiles}
-                          help={t("community.materials.photoHelp", { count: MAX_PHOTOS })}
-                          label={t("community.materials.privatePhotos")}
-                          maxFiles={MAX_PHOTOS}
-                          onChange={(event) => void pickExamPhotos(event)}
-                          onRemove={(index) => setExamFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                        />
-                      </> : <FileUploadField
-                          accept="image/jpeg,image/png,image/webp,application/pdf"
-                          emptyLabel={t("community.materials.fileEmpty")}
-                          file={file}
-                          help={t("community.materials.fileHelp")}
-                          onChange={(event) => void pick(event)}
-                          onRemove={() => { setFile(null); setFileData(""); }}
-                          previewUrl={fileData}
-                        />}
-                      <label className={styles.checkField}>
-                        <input
-                          type="checkbox"
-                          checked={anonymous}
-                          onChange={(event) => setAnonymous(event.target.checked)}
-                        />
-                        <span>
-                          <strong>{t("community.materials.anonymous")}</strong>
-                          <small>{t("community.materials.anonymousHint")}</small>
-                        </span>
-                      </label>
-                    </aside>
-                  </div>
-                  <div className={styles.formActions}>
-                    <button
-                      className="button button--secondary"
-                      type="button"
-                      onClick={reset}
-                    >
-                      {t("community.common.cancel")}
-                    </button>
-                    <button
-                      className="button button--primary"
-                      type="submit"
-                    disabled={saving || descriptionLength > 1200}
-                    >
-                      {saving ? (
-                        <LoaderCircle className={styles.spin} />
-                      ) : (
-                        <Send />
-                      )}
-                      {saving ? t("community.materials.sending") : t("community.materials.send")}
-                    </button>
-                  </div>
-                </form>
-              </section>
-            )}
-            {activeTab === "exams" && !editor && <section className={styles.panel}>
-              <SurfaceHeader
-                icon={<FolderOpen />}
-                title={canModerate ? t("community.materials.libraryModeration") : t("community.materials.library")}
-               
-                meta={!loading ? `${libraryCount} ${libraryCount === 1 ? t("community.materials.material") : t("community.materials.materialPlural")}` : undefined}
+            />}
+            {submissionEnabled && editor && (
+              <MaterialUploadForm
+                units={units}
+                onClose={() => setEditor(false)}
+                onSubmitted={(count) => {
+                  setNotice({ kind: "success", message: t("community.materials.sent") + (count > 1 ? ` (${count})` : "") });
+                  void load();
+                }}
               />
+            )}
+            {activeTab === "exams" && !editor && !openId && <section className={`panel ${list.listPanel}`} aria-busy={loading}>
               <FilterBar label={t("community.materials.filter")}>
+                <FilterSearch label={t("community.materials.search")} value={query} onChange={setQuery} placeholder={t("community.materials.search")} />
                 <FilterSelect label={t("community.materials.filter")} value={filter} onChange={setFilter} options={[{ value: "all", label: t("community.materials.all") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), ...Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => ({ value, label: t(key) }))]} />
               </FilterBar>
-              {loading ? (
-                <div className={styles.state}>
-                  <span className={styles.stateIcon} aria-hidden="true"><LoaderCircle className={styles.spin} /></span>
-                  <strong>{t("community.materials.loading")}</strong>
-                </div>
-              ) : loadError ? (
-                <div className={styles.state} role="alert">
-                  <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
-                  <strong>{t("community.materials.loadError")}</strong>
-                  <p>{loadError}</p>
-                  <button className={styles.emptyAction} type="button" onClick={() => void load()}>
-                    <LoaderCircle aria-hidden="true" />
-                    {t("community.materials.catalog.retry")}
-                  </button>
-                </div>
-              ) : libraryCount === 0 ? (
-                <div className={styles.state}>
-                  <span className={styles.stateIcon} aria-hidden="true"><FolderOpen /></span>
-                  <strong>{t("community.materials.empty")}</strong>
-                  
-                  {filter !== "all" && (
-                    <button className={styles.emptyAction} type="button" onClick={() => setFilter("all")}>
-                      <X aria-hidden="true" />
-                      {t("community.materials.all")}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className={styles.materialGrid}>
-                  {interactiveStudyVisible && <InteractiveStudyMaterial
-                    summaryLabel={t("community.materials.category.summary")}
-                    openLabel={t("community.materials.open")}
-                    description="Leitura guiada com perguntas associadas, imagens e apontamentos pessoais."
-                    unitLabel="Neuroanatomia"
-                  />}
-                  {visible.map((item) => { const author = personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale }); return (
-                    <article className={styles.material} key={item.id}>
-                      <MaterialThumbnail key={`${item.id}-${item.fileUrl}`} fileType={item.fileType} src={item.fileUrl} title={item.title} />
-                      <div className={styles.materialBody}>
-                        <header className={styles.materialHeader}>
-                          <div className={styles.cardTop}>
-                            <span className={styles.tag}>
-                              {t(categoryLabelKeys[item.category])}
-                            </span>
-                            <span
-                              className={`${styles.status} ${item.status === "approved" ? styles.statusApproved : item.status === "rejected" ? styles.statusRejected : item.status === "archived" ? styles.statusArchived : styles.statusPending}`}
-                            >
-                              {t(statusLabelKeys[item.status])}
-                            </span>
-                          </div>
-                          <div className={styles.materialCopy}>
-                            <h3>{item.title}</h3>
-                            {item.description && <RichTextContent value={item.description} className={styles.materialDescription} />}
-                          </div>
-                          <div className={styles.materialBadges}>
-                            {item.unit && <span className={styles.unitCode}>{item.unit.code}</span>}
-                            {versioningEnabled && <span className={styles.versionBadge}>{t("community.materials.version", { number: item.version })}</span>}
-                          </div>
-                        </header>
-                        <div className={styles.meta}>
-                          <span className={styles.metaRow}>
-                            {item.anonymous ? <ShieldCheck /> : <ImageIcon />}
-                              <PersonName person={author} />
-                          </span>
-                          <span className={styles.metaRow}>
-                            <FileText />
-                            <span>{item.fileName}</span>
-                          </span>
-                        </div>
-                        <div className={styles.cardActions}>
-                          {item.status === "approved" && (favoritesEnabled || feedbackEnabled) && <div className={styles.feedbackActions}>
-                            {favoritesEnabled && <button className={`${styles.feedbackButton} ${item.favorite ? styles.isActive : ""}`} type="button" onClick={() => void toggleFavorite(item)} disabled={feedbackBusy === `favorite-${item.id}`} aria-pressed={item.favorite} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}>
-                              {feedbackBusy === `favorite-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Star />}
-                              <span>{t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}</span>
-                            </button>}
-                            {feedbackEnabled && <button className={`${styles.feedbackButton} ${item.helpful ? styles.isActive : ""}`} type="button" onClick={() => void setFeedback(item, "helpful")} disabled={feedbackBusy === `helpful-${item.id}`} aria-pressed={item.helpful}>
-                              {feedbackBusy === `helpful-${item.id}` ? <LoaderCircle className={styles.spin} /> : <ThumbsUp />}
-                              <span>{t(item.helpful ? "community.materials.notHelpful" : "community.materials.helpful")}</span><b>{item.helpfulCount}</b>
-                            </button>}
-                            {feedbackEnabled && <button className={`${styles.feedbackButton} ${item.reportedOutdated ? styles.isWarning : ""}`} type="button" onClick={() => void setFeedback(item, "outdated")} disabled={feedbackBusy === `outdated-${item.id}`} aria-pressed={item.reportedOutdated}>
-                              {feedbackBusy === `outdated-${item.id}` ? <LoaderCircle className={styles.spin} /> : <Flag />}
-                              <span>{t(item.reportedOutdated ? "community.materials.outdatedMarked" : "community.materials.outdated")}</span>{item.outdatedCount > 0 && <b>{item.outdatedCount}</b>}
-                            </button>}
-                          </div>}
-                          {versioningEnabled && item.status === "approved" && <div className={styles.versionActions}>
-                            <button type="button" onClick={() => void toggleVersions(item)} disabled={versionsLoading === item.id}>{versionsLoading === item.id ? <LoaderCircle className={styles.spin} /> : <History />}{t(versionsLoading === item.id ? "community.materials.loadingVersions" : versionsOpen === item.id ? "community.materials.hideVersions" : "community.materials.versions")}</button>
-                            {canModerate && <button type="button" onClick={() => { if (versionEditor === item.id) closeVersionEditor(); else { closeVersionEditor(); setVersionEditor(item.id); } }}><UploadCloud />{t(versionEditor === item.id ? "community.materials.closeVersion" : "community.materials.publishVersion")}</button>}
-                          </div>}
-                          {canModerate && item.status === "pending" ? (
-                            <div className={styles.moderation}>
-                              <button className="button button--primary button--compact" type="button" onClick={() => void moderate(item.id, item.category === "exam" ? "archived" : "approved")} disabled={moderating === item.id}>
-                                {moderating === item.id ? <LoaderCircle className={styles.spin} /> : <Check />}
-                                {item.category === "exam" ? t("community.materials.finishReview") : t("community.materials.approve")}
-                              </button>
-                              <button className="button button--danger button--compact" type="button" onClick={() => void moderate(item.id, "rejected")} disabled={moderating === item.id}>
-                                <X />{t("community.materials.reject")}
-                              </button>
-                            </div>
-                          ) : item.status === "approved" && item.fileUrl && (
-                            <a className={`button button--secondary button--compact ${styles.openMaterial}`} href={item.fileUrl} download={item.fileName} target="_blank" rel="noreferrer">
-                              <Download />{t("community.materials.open")}
-                            </a>
-                          )}
-                        </div>
-                        {versioningEnabled && item.status === "approved" && (versionsOpen === item.id || versionEditor === item.id) && (
-                          <div className={styles.versionArea}>
-                            {versionsOpen === item.id && (
-                              <div className={styles.versionList}>
-                                <strong>{t("community.materials.currentVersion")}: {t("community.materials.version", { number: item.version })}</strong>
-                                {item.versions.length === 0 ? <p>{t("community.materials.noVersions")}</p> : item.versions.map((version) => (
-                                  <div className={styles.versionRow} key={version.id}>
-                                    <span><b>{t("community.materials.version", { number: version.number })}</b><small>{date(version.createdAt, locale)}{version.notes ? ` · ${version.notes}` : ""}</small></span>
-                                    {version.fileUrl && <a href={version.fileUrl} target="_blank" rel="noreferrer" download={version.fileName} title={version.fileName}><Download /></a>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {canModerate && versionEditor === item.id && (
-                              <div className={styles.versionForm}>
-                                <label><span>{t("community.materials.versionFile")}</span><input type="file" accept={allowed.join(",")} onChange={(event) => void pickVersionFile(event)} />{versionFile && <small>{versionFile.name} · {size(versionFile.size, locale)}</small>}</label>
-                                <label><span>{t("community.materials.versionNotes")}</span><textarea value={versionNotes} onChange={(event) => setVersionNotes(event.target.value)} maxLength={500} placeholder={t("community.materials.versionNotesPlaceholder")} /></label>
-                                <button className="button button--primary button--compact" type="button" onClick={() => void publishVersion(item)} disabled={publishingVersion}>{publishingVersion && <LoaderCircle className={styles.spin} />}{t(publishingVersion ? "community.materials.publishingVersion" : "community.materials.publishVersion")}</button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {canModerate && item.category === "exam" && item.attachments.length > 0 && (
-                          <div className={styles.photoDownloads}>
-                            <strong>{item.attachments.length} {item.attachments.length === 1 ? t("community.materials.photo") : t("community.materials.photoPlural")}</strong>
-                            <div>{item.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download />{t("community.materials.photoNumber", { number: index + 1 })}<small>{attachment.name}</small></a>)}</div>
-                          </div>
-                        )}
-                        <footer className={styles.materialFooter}>
-                          <span>{date(item.createdAt, locale)}</span>
-                          <span>{item.unit?.name ?? t("community.common.general")}</span>
-                        </footer>
-                      </div>
-                    </article>
-                  ); })}
-                </div>
-              )}
+              {loading ? <RecordSkeleton label={t("community.materials.loading")} />
+                : loadError ? <div className={list.empty} role="alert"><FolderOpen /><strong>{t("community.materials.loadError")}</strong><button className={styles.emptyAction} type="button" onClick={() => void load()}>{t("community.materials.catalog.retry")}</button></div>
+                : libraryCount === 0 ? <div className={list.empty}><FolderOpen /><strong>{t("community.materials.empty")}</strong>{(filter !== "all" || query) && <button className={styles.emptyAction} type="button" onClick={() => { setFilter("all"); setQuery(""); }}><X aria-hidden="true" />{t("community.materials.all")}</button>}</div>
+                : <ul className={list.rows}>
+                  {interactiveStudyVisible && <li className={list.row} data-tone="success">
+                    <span className={list.rowIcon} aria-hidden="true"><BookOpenCheck /></span>
+                    <div className={list.rowMain}>
+                      <h3><Link className={`link-quiet ${list.titleLink}`} href="/materiais/neuroanatomia/aula-1">Neuroanatomia · Aula prática 1</Link></h3>
+                      <p className={list.rowMeta}>{t("community.materials.category.summary")} · Neuroanatomia · Leitura online</p>
+                    </div>
+                    <span className={list.statusPill} data-tone="success">{t("community.materials.status.approved")}</span>
+                  </li>}
+                  {visible.map((item) => <li className={list.row} key={item.id}>
+                    <span className={list.rowIcon} aria-hidden="true">{item.fileType.startsWith("image/") ? <ImageIcon /> : <FileText />}</span>
+                    <div className={list.rowMain}>
+                      <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("material", item.id)} onClick={(event) => { event.preventDefault(); openMaterial(item.id); }}>{item.title}</a></h3>
+                      <p className={list.rowMeta}>{t(categoryLabelKeys[item.category])} · <PersonName person={authorOf(item)} />{item.unit && ` · ${item.unit.code}`} · {date(item.createdAt, locale)}{item.favorite && <Star className={styles.favoriteMark} aria-label={t("community.materials.favorites")} />}</p>
+                    </div>
+                    <span className={list.statusPill} data-tone={statusTone[item.status]}>{t(statusLabelKeys[item.status])}</span>
+                  </li>)}
+                </ul>}
             </section>}
+            {!editor && openId && <>
+              <button className={list.back} type="button" onClick={() => openMaterial(null)}><ChevronLeft aria-hidden="true" />{t("community.materials.all")}</button>
+              <article className={`panel ${list.reading}`} aria-busy={loading}>
+                {loading ? <RecordSkeleton label={t("community.materials.loading")} rows={2} /> : !openItem ? <div className={list.empty}><FolderOpen /><strong>{t("community.materials.empty")}</strong></div> : <>
+                  <header className={list.byline}>
+                    <span className={list.avatar} aria-hidden="true">{openItem.anonymous ? <ShieldCheck /> : initials(openItem.authorName)}</span>
+                    <div>
+                      <p className={list.bylineName}><PersonName person={authorOf(openItem)} /></p>
+                      <p className={list.bylineMeta}>{t(categoryLabelKeys[openItem.category])} · {openItem.unit?.name ?? t("community.common.general")} · {date(openItem.createdAt, locale)}{versioningEnabled && ` · ${t("community.materials.version", { number: openItem.version })}`}</p>
+                    </div>
+                    <span className={list.statusPill} data-tone={statusTone[openItem.status]}>{t(statusLabelKeys[openItem.status])}</span>
+                  </header>
+                  <h2 className={list.readingTitle}>{openItem.title}</h2>
+                  <span className={list.readingRule} aria-hidden="true" />
+                  {openItem.description && <RichTextContent value={openItem.description} className={list.readingBody} />}
+                  {openItem.fileType.startsWith("image/") && openItem.fileUrl && <div className={`${list.readingSection} ${styles.preview}`}><MaterialThumbnail key={`${openItem.id}-${openItem.fileUrl}`} fileType={openItem.fileType} src={openItem.fileUrl} title={openItem.title} /></div>}
+                  {openItem.status === "approved" && openItem.fileUrl && <div className={list.readingSection}>
+                    <a className={`button button--secondary button--compact ${styles.fileLink}`} href={openItem.fileUrl} download={openItem.fileName} target="_blank" rel="noreferrer"><Download aria-hidden="true" /><span>{openItem.fileName}</span></a>
+                  </div>}
+                  {canModerate && openItem.category === "exam" && openItem.attachments.length > 0 && <section className={`${list.readingSection} ${styles.photoDownloads}`}>
+                    <h3>{openItem.attachments.length} {openItem.attachments.length === 1 ? t("community.materials.photo") : t("community.materials.photoPlural")}</h3>
+                    <div>{openItem.attachments.map((attachment, index) => <a key={attachment.id} href={attachment.dataUrl} download={attachment.name} target="_blank" rel="noreferrer"><Download aria-hidden="true" />{t("community.materials.photoNumber", { number: index + 1 })}<small>{attachment.name}</small></a>)}</div>
+                  </section>}
+                  {openItem.status === "approved" && (favoritesEnabled || feedbackEnabled) && <div className={`${list.readingSection} ${styles.feedbackActions}`}>
+                    {favoritesEnabled && <button className={`${styles.feedbackButton} ${openItem.favorite ? styles.isActive : ""}`} type="button" onClick={() => void toggleFavorite(openItem)} disabled={feedbackBusy === `favorite-${openItem.id}`} aria-pressed={openItem.favorite}><Star aria-hidden="true" /><span>{t(openItem.favorite ? "community.materials.unfavorite" : "community.materials.favorite")}</span></button>}
+                    {feedbackEnabled && <button className={`${styles.feedbackButton} ${openItem.helpful ? styles.isActive : ""}`} type="button" onClick={() => void setFeedback(openItem, "helpful")} disabled={feedbackBusy === `helpful-${openItem.id}`} aria-pressed={openItem.helpful}><ThumbsUp aria-hidden="true" /><span>{t(openItem.helpful ? "community.materials.notHelpful" : "community.materials.helpful")}</span><b>{openItem.helpfulCount}</b></button>}
+                    {feedbackEnabled && <button className={`${styles.feedbackButton} ${openItem.reportedOutdated ? styles.isWarning : ""}`} type="button" onClick={() => void setFeedback(openItem, "outdated")} disabled={feedbackBusy === `outdated-${openItem.id}`} aria-pressed={openItem.reportedOutdated}><Flag aria-hidden="true" /><span>{t(openItem.reportedOutdated ? "community.materials.outdatedMarked" : "community.materials.outdated")}</span>{openItem.outdatedCount > 0 && <b>{openItem.outdatedCount}</b>}</button>}
+                  </div>}
+                  {versioningEnabled && openItem.status === "approved" && <section className={`${list.readingSection} ${styles.versionList}`}>
+                    <h3><button className={styles.versionToggle} type="button" aria-expanded={versionsOpen === openItem.id} onClick={() => void toggleVersions(openItem)} disabled={versionsLoading === openItem.id}><History aria-hidden="true" />{t(versionsOpen === openItem.id ? "community.materials.hideVersions" : "community.materials.versions")}</button></h3>
+                    {versionsOpen === openItem.id && versionsLoading !== openItem.id && (openItem.versions.length === 0 ? <p>{t("community.materials.noVersions")}</p> : openItem.versions.map((version) => (
+                      <div className={styles.versionRow} key={version.id}>
+                        <span><b>{t("community.materials.version", { number: version.number })}</b><small>{date(version.createdAt, locale)}{version.notes ? ` · ${version.notes}` : ""}</small></span>
+                        {version.fileUrl && <a href={version.fileUrl} target="_blank" rel="noreferrer" download={version.fileName} title={version.fileName}><Download aria-hidden="true" /></a>}
+                      </div>
+                    )))}
+                  </section>}
+                  {canModerate && versionEditor === openItem.id && <footer className={list.manageArea}>
+                    <div className={styles.versionForm}>
+                      <label><span>{t("community.materials.versionFile")}</span><input type="file" accept={allowed.join(",")} onChange={(event) => void pickVersionFile(event)} />{versionFile && <small>{versionFile.name} · {size(versionFile.size, locale)}</small>}</label>
+                      <label><span>{t("community.materials.versionNotes")}</span><textarea value={versionNotes} onChange={(event) => setVersionNotes(event.target.value)} maxLength={500} placeholder={t("community.materials.versionNotesPlaceholder")} /></label>
+                      <button className="button button--primary button--compact" type="button" onClick={() => void publishVersion(openItem)} disabled={publishingVersion}>{t(publishingVersion ? "community.materials.publishingVersion" : "community.materials.publishVersion")}</button>
+                    </div>
+                  </footer>}
+                </>}
+              </article>
+            </>}
+            <ConfirmationDialog
+              open={Boolean(rejectTarget)}
+              eyebrow=""
+              title={t("community.materials.rejectConfirm")}
+              description=""
+              subject={rejectTarget?.title}
+              subjectLabel={t("community.materials.selectedMaterial")}
+              confirmLabel={t("community.materials.reject")}
+              cancelLabel={t("community.common.cancel")}
+              icon={<X />}
+              busy={Boolean(rejectTarget && moderating === rejectTarget.id)}
+              onClose={() => setRejectTarget(null)}
+              onConfirm={() => { if (rejectTarget) void moderate(rejectTarget.id, "rejected").then(() => setRejectTarget(null)); }}
+            />
           </div>
         </AppShell>
       </ModuleGuard>

@@ -17,7 +17,8 @@ test("a curricular unit detail exposes active faculty linked to that unit", () =
 
 test("the curricular unit page renders faculty contacts and links to the directory", () => {
   assert.match(catalog, /data\.unit\.faculty\.length > 0/);
-  assert.match(catalog, /community\.units\.facultyDescription/);
+  assert.match(catalog, /<SurfaceHeader icon=\{<GraduationCap \/>\} title=\{t\("community\.units\.faculty"\)\}/);
+  assert.doesNotMatch(catalog, /community\.units\.facultyDescription/);
   assert.match(catalog, /href="\/salas-docentes"/);
   assert.match(catalog, /mailto:\$\{member\.email\}/);
   assert.match(catalog, /campus\.office/);

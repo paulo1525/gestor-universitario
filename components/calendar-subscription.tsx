@@ -6,18 +6,17 @@ import {
   Check,
   Clipboard,
   ExternalLink,
-  Link2,
-  LoaderCircle,
   RefreshCw,
   Trash2,
-  X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { useScrollLock } from "@/components/use-scroll-lock";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { FormCloseButton } from "@/components/form-actions";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/calendar-subscription.module.css";
+import { RecordSkeleton } from "@/components/record-list";
 
 type Unit = { id: string; name: string; code: string };
 type Subscription = {
@@ -161,16 +160,14 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
       {t("calendar.subscription.open")}
     </button>
 
-    {open && <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
-      <aside className={styles.drawer} id="calendar-subscription-panel" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
-        <header className={styles.drawerHeader}>
-          <div>
-            <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
-          </div>
-          <button className={styles.close} type="button" onClick={() => setOpen(false)} aria-label={t("calendar.subscription.close")}><X /></button>
+    {open && <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
+      <section id="calendar-subscription-panel" data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
+        <header className="app-modal-header" data-app-modal-header>
+          <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
+          <FormCloseButton onClick={() => setOpen(false)} label={t("calendar.subscription.close")} />
         </header>
 
-        <div className={styles.drawerBody}>
+        <div className={styles.dialogBody} data-app-modal-body>
           <section className={styles.setup}>
             {!created ? <form id="calendar-subscription-form" className={styles.form} onSubmit={create}>
               <label className={styles.field}>
@@ -210,7 +207,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
           <section className={styles.management} aria-labelledby="calendar-subscription-active">
             <h3 id="calendar-subscription-active">{t("calendar.subscription.active")}{items.length > 0 && <b>{items.length}</b>}</h3>
             <div className={styles.list}>
-              {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /></div> : items.length ? items.map(item => <article key={item.id}>
+              {loading ? <RecordSkeleton label={t("calendar.subscription.active")} rows={2} /> : items.length ? items.map(item => <article key={item.id}>
                 <div>
                   <strong>{item.label}</strong>
                   <small>{item.lastUsedAt
@@ -227,13 +224,11 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
           {error && <div className={styles.error}><RefreshCw />{error}</div>}
         </div>
 
-        <footer className={styles.drawerFooter}>
-          {!created ? <button className={styles.primary} type="submit" form="calendar-subscription-form" disabled={saving}>
-            {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
-            {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
-          </button> : <button className={styles.secondary} type="button" onClick={() => setOpen(false)}>{t("calendar.subscription.close")}</button>}
+        <footer data-app-modal-footer>
+          <button type="button" className="button button--secondary" data-app-modal-action="secondary" onClick={() => setOpen(false)} disabled={saving}>{created ? t("calendar.subscription.close") : t("common.cancel")}</button>
+          {!created && <button type="submit" form="calendar-subscription-form" className="button button--primary" data-app-modal-action="primary" disabled={saving}>{t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}</button>}
         </footer>
-      </aside>
+      </section>
     </div>}
 
     <ConfirmationDialog

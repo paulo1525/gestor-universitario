@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { Bold, Italic, Link2, List, ListOrdered, Underline } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { richTextDisplayHtml, richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
@@ -16,6 +16,8 @@ type RichTextEditorProps = {
   minHeight?: "minimal" | "compact" | "regular";
   onInvalidLink?: () => void;
   allowHeadings?: boolean;
+  /** Rendered in the editor's footer, next to the counter (e.g. a send button). */
+  actions?: ReactNode;
 };
 
 type RichTextContentProps = { value: string; className?: string; id?: string };
@@ -28,7 +30,7 @@ export function RichTextContent({ value, className = "", id }: RichTextContentPr
   return <div id={id} className={`${styles.content} ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink, allowHeadings = false }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLength, disabled = false, minHeight = "regular", onInvalidLink, allowHeadings = false, actions }: RichTextEditorProps) {
   const { t } = useI18n();
   const editorRef = useRef<HTMLDivElement>(null);
   const plainLength = richTextPlainText(value).length;
@@ -77,6 +79,9 @@ export function RichTextEditor({ value, onChange, ariaLabel, placeholder, maxLen
       <button type="button" disabled={disabled} onMouseDown={(event) => event.preventDefault()} onClick={addLink} aria-label={t("richText.link")} title={t("richText.link")}><Link2 /></button>
     </div>
     <div ref={editorRef} className={styles.editable} contentEditable={!disabled} role="textbox" aria-label={ariaLabel} aria-multiline="true" aria-disabled={disabled} data-placeholder={resolvedPlaceholder} onInput={emit} onBlur={() => { const safeValue = sanitizeRichTextHtml(editorRef.current?.innerHTML ?? ""); if (editorRef.current) editorRef.current.innerHTML = safeValue; onChange(safeValue); }} onPaste={(event) => { event.preventDefault(); document.execCommand("insertText", false, event.clipboardData.getData("text/plain")); emit(); }} suppressContentEditableWarning />
-    {maxLength != null && <div className={`${styles.counter} ${plainLength > maxLength ? styles.counterOver : ""}`} aria-live="polite">{plainLength}/{maxLength}</div>}
+    {actions ? <div className={styles.footer}>
+      {maxLength != null && <span className={`${styles.counter} ${plainLength > maxLength ? styles.counterOver : ""}`} aria-live="polite">{plainLength}/{maxLength}</span>}
+      {actions}
+    </div> : maxLength != null && <div className={`${styles.counter} ${plainLength > maxLength ? styles.counterOver : ""}`} aria-live="polite">{plainLength}/{maxLength}</div>}
   </div>;
 }

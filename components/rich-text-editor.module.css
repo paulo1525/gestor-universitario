@@ -26,3 +26,8 @@
 .content ul,.content ol { margin:7px 0; padding-left:21px; }
 .content a { color:#245ec7; font-weight:700; }
 @media(max-width:520px){.toolbar{overflow-x:auto}.editable{min-height:120px}}
+
+/* Footer with actions (e.g. send): counter and buttons share one row inside the editor. */
+.footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 6px 8px; border-top: 1px solid #efeee9; background: #fcfcfa; }
+.footer .counter { position: static; padding: 0; border: 0; background: transparent; }
+.minimal:has(.footer) .editable { padding-bottom: 10px; }

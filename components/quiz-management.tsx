@@ -2,17 +2,30 @@
 
 import Image from "next/image";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, BookOpen, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, Download, FileSpreadsheet, Gauge, History, Image as ImageIcon, Lightbulb, ListChecks, LoaderCircle, Pencil, Plus, RefreshCw, Search, Send, ShieldCheck, Tags, Trash2, Upload, X } from "lucide-react";
+import { Archive, BookOpen, Check, CheckCircle2, ChevronLeft, CircleHelp, Download, FileSpreadsheet, Gauge, History, Image as ImageIcon, Lightbulb, ListChecks, LoaderCircle, Pencil, PencilLine, Plus, Search, ShieldCheck, Tags, Trash2, Upload, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { SurfaceHeader } from "@/components/surface-header";
-import { AdminPage, AdminPageHeader } from "@/components/admin-ui";
+import { AdminPage, AdminPageHeader, AdminToolbar } from "@/components/admin-ui";
+import { FilterSearch, FilterSelect } from "@/components/filter-bar";
+import { Pagination as ListPagination } from "@/components/pagination";
+import { CancelButton, FormActions, SubmitButton } from "@/components/form-actions";
 import { AppToast } from "@/components/app-toast";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { FormLabel } from "@/components/form-label";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import { quizCsvTemplate, validateQuizCsv } from "@/lib/quiz-csv.mjs";
+import { useFloatingAction } from "@/components/floating-actions";
 import styles from "@/components/quiz-management.module.css";
+
+const FLOATING_CREATE_ICON = <Pencil aria-hidden="true" />;
+const FLOATING_EDIT_ICON = <PencilLine aria-hidden="true" />;
+const FLOATING_DELETE_ICON = <Trash2 aria-hidden="true" />;
+const FLOATING_DOWNLOAD_ICON = <Download aria-hidden="true" />;
+
+function questionIdFromHash() {
+  const match = /^#pergunta-(.+)$/.exec(window.location.hash);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 type Unit = { id: string; code: string; name: string };
 type Theme = { id: string; unitId: string; name: string; questionCount: number };
@@ -38,7 +51,7 @@ type Notice = { kind: "success" | "error"; message: string } | null;
 type FormState = { unitId: string; theme: string; question: string; options: string[]; correctOption: number; explanation: string; difficulty: Difficulty; imageUrl: string; status: "draft" | "published" };
 type Section = "questions" | "editor" | "themes" | "import" | "activity";
 type Pagination = { page: number; pageSize: 10 | 25 | 50; total: number; totalPages: number; from: number; to: number };
-type Confirmation = { kind: "question" } | { kind: "bulk"; action: "publish" | "archive" | "delete" };
+type Confirmation = { kind: "question"; id: string; text: string } | { kind: "bulk"; action: "publish" | "archive" | "delete" };
 
 const emptyForm = (unitId = ""): FormState => ({ unitId, theme: "", question: "", options: ["", ""], correctOption: 0, explanation: "", difficulty: "medium", imageUrl: "", status: "draft" });
 
@@ -134,6 +147,22 @@ export function QuizManagement() {
   const [section, setSection] = useState<Section>("questions");
   const [themeUnitId, setThemeUnitId] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // The open question lives in #pergunta-<id> so it can be linked and the back button works.
+  const [openId, setOpenId] = useState<string | null>(() => typeof window === "undefined" ? null : questionIdFromHash());
+  const [pinnedQuestion, setPinnedQuestion] = useState<Question | null>(null);
+  useEffect(() => {
+    const sync = () => setOpenId(questionIdFromHash());
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  const openQuestion = (question: Question | null) => {
+    const url = new URL(window.location.href);
+    url.hash = question ? `pergunta-${question.id}` : "";
+    window.history.pushState(null, "", url);
+    setOpenId(question?.id ?? null);
+    setPinnedQuestion(question);
+    window.scrollTo({ top: 0 });
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const loadController = useRef<AbortController | null>(null);
@@ -224,13 +253,12 @@ export function QuizManagement() {
     } catch (reason) { setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível guardar a pergunta." }); }
     finally { setSaving(false); }
   };
-  const deleteQuestion = async () => {
-    if (!editingId) return;
+  const deleteQuestion = async (questionId: string) => {
     setSaving(true); setNotice(null);
     try {
-      const response = await fetch("/api/admin/quizzes", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete_question", id: editingId }) });
+      const response = await fetch("/api/admin/quizzes", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "delete_question", id: questionId }) });
       if (!response.ok) throw new Error(await readMessage(response, "Não foi possível eliminar a pergunta."));
-      setConfirmation(null); setShowEditor(false); setEditingId(null); setSection("questions"); setNotice({ kind: "success", message: "Pergunta eliminada." }); await load();
+      setConfirmation(null); setShowEditor(false); setEditingId(null); setSection("questions"); if (questionIdFromHash() === questionId) openQuestion(null); setNotice({ kind: "success", message: "Pergunta eliminada." }); await load();
     } catch (reason) { setNotice({ kind: "error", message: reason instanceof Error ? reason.message : "Não foi possível eliminar a pergunta." }); }
     finally { setSaving(false); setConfirmation(null); }
   };
@@ -287,11 +315,19 @@ export function QuizManagement() {
   const allVisibleSelected = visibleQuestions.length > 0 && visibleQuestions.every((question) => selected.includes(question.id));
   const selectVisible = () => setSelected((current) => allVisibleSelected ? current.filter((id) => !visibleQuestions.some((question) => question.id === id)) : [...new Set([...current, ...visibleQuestions.map((question) => question.id)])]);
 
+  const openItem = openId ? questions.find((question) => question.id === openId) ?? (pinnedQuestion?.id === openId ? pinnedQuestion : null) : null;
+  const skeleton = (count: number) => <div className={styles.skeleton} aria-busy="true"><span className="sr-only" role="status">A carregar…</span>{Array.from({ length: count }, (_, index) => <div key={index} className={styles.skeletonRow}><span /><span /></div>)}</div>;
+
+  useFloatingAction(section === "questions" && !openId ? { id: "new-quiz-question", label: "Adicionar pergunta", icon: FLOATING_CREATE_ICON, onClick: startNew } : null);
+  useFloatingAction(section === "questions" && openItem ? { id: "edit-quiz-question", label: "Editar pergunta", icon: FLOATING_EDIT_ICON, onClick: () => startEdit(openItem) } : null);
+  useFloatingAction(section === "questions" && openItem ? { id: "delete-quiz-question", label: "Eliminar pergunta", icon: FLOATING_DELETE_ICON, onClick: () => setConfirmation({ kind: "question", id: openItem.id, text: richTextPlainText(openItem.question) }) } : null);
+  useFloatingAction(section === "import" ? { id: "download-quiz-template", label: "Descarregar modelo", icon: FLOATING_DOWNLOAD_ICON, onClick: downloadTemplate } : null);
+
   const sectionTitle = section === "editor" ? (editingId ? "Editar pergunta" : "Nova pergunta") : section === "themes" ? "Temas" : section === "import" ? "Importar CSV" : section === "activity" ? "Atividade" : "Banco de perguntas";
 
   return <AppShell active="quizzes_management" breadcrumb="Gestão de testes">
     <AdminPage>
-      <AdminPageHeader eyebrow="Gestão de testes" title={sectionTitle} />
+      <AdminPageHeader icon={<CircleHelp />} eyebrow="Gestão de testes" title={sectionTitle} />
       {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
       {section !== "editor" && <nav className={styles.sectionNav} aria-label="Secções da gestão de testes">
@@ -314,37 +350,77 @@ export function QuizManagement() {
             <label><FormLabel icon={ShieldCheck}>Visibilidade</FormLabel><select value={form.status} onChange={(event) => update("status", event.target.value as FormState["status"])}><option value="draft">Guardar como rascunho</option><option value="published">Publicar já</option></select></label>
             <div className={`${styles.imageField} ${styles.full}`}><FormLabel icon={ImageIcon} optional>Imagem</FormLabel><input ref={imageInput} className={styles.visuallyHidden} type="file" accept="image/jpeg,image/png,image/webp" onChange={readImage} aria-label="Selecionar imagem para a pergunta" /><button className={styles.imagePicker} type="button" onClick={() => imageInput.current?.click()}><ImageIcon />{form.imageUrl ? "Substituir imagem" : "Selecionar imagem"}</button><small>JPEG, PNG ou WebP, até 1 MiB. A imagem é guardada com a pergunta.</small>{form.imageUrl && <div className={styles.imagePreview}>{canPreviewImage(form.imageUrl) ? <Image src={form.imageUrl} alt="Pré-visualização da imagem associada à pergunta" width={220} height={120} unoptimized /> : <span>Imagem externa associada. Por segurança, não é mostrada neste ambiente.</span>}<button type="button" onClick={() => update("imageUrl", "")}><X />Remover</button></div>}</div>
           </div>
-          <div className={styles.formActions}>{editingId && <button className="button button--secondary button--danger" type="button" onClick={() => setConfirmation({ kind: "question" })} disabled={saving}><Trash2 />Eliminar</button>}<span /><button className="button button--secondary" type="button" onClick={() => { setShowEditor(false); setEditingId(null); setSection("questions"); }} disabled={saving}>Cancelar</button><button className="button button--primary" type="submit" disabled={saving}>{saving ? <LoaderCircle className={styles.spin} /> : <Send />}{editingId ? "Guardar alterações" : "Adicionar pergunta"}</button></div>
+          <FormActions aside={editingId ? <button className="button button--ghost button--danger" type="button" onClick={() => { if (editingId) setConfirmation({ kind: "question", id: editingId, text: richTextPlainText(form.question) }); }} disabled={saving}><Trash2 />Eliminar</button> : undefined}><CancelButton onClick={() => { setShowEditor(false); setEditingId(null); setSection("questions"); }} disabled={saving}>Cancelar</CancelButton><SubmitButton busy={saving}>{editingId ? "Guardar alterações" : "Adicionar pergunta"}</SubmitButton></FormActions>
         </form>
       </section>}
 
-      {section === "questions" && <section className={`panel ${styles.questionsPanel}`} aria-labelledby="perguntas-registadas">
-        <SurfaceHeader icon={<CircleHelp />} eyebrow="Conteúdo" title="Perguntas registadas" headingId="perguntas-registadas" meta={`${pagination.total} no banco`} actions={<><button className="button button--ghost button--compact" type="button" onClick={() => void load()} disabled={loading}><RefreshCw />Atualizar</button><button className="button button--primary button--compact" type="button" onClick={startNew}><Plus />Adicionar pergunta</button></>} />
-        <div className={styles.filters}><label className={styles.searchField}><span>Pesquisar</span><span className={styles.searchControl}><Search /><input type="search" value={filter.query} onChange={(event) => setFilter((current) => ({ ...current, query: event.target.value }))} placeholder="Pergunta, UC ou tema" /></span></label><label><span>UC</span><select value={filter.unitId} onChange={(event) => { setFilter((current) => ({ ...current, unitId: event.target.value, themeId: "" })); setPagination((current) => ({ ...current, page: 1 })); }}><option value="">Todas as UCs</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}</select></label><label><span>Tema</span><select value={filter.themeId} onChange={(event) => { setFilter((current) => ({ ...current, themeId: event.target.value })); setPagination((current) => ({ ...current, page: 1 })); }}><option value="">Todos os temas</option>{themes.filter((theme) => !filter.unitId || theme.unitId === filter.unitId).map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select></label><label><span>Estado</span><select value={filter.status} onChange={(event) => { setFilter((current) => ({ ...current, status: event.target.value })); setPagination((current) => ({ ...current, page: 1 })); }}><option value="all">Todos</option><option value="draft">Rascunhos</option><option value="published">Publicadas</option><option value="archived">Arquivadas</option></select></label></div>
-        {selected.length > 0 && <div className={styles.bulkBar} role="status"><strong>{selected.length} selecionada{selected.length === 1 ? "" : "s"}</strong><span>Aplicar a todas:</span><button type="button" onClick={() => setConfirmation({ kind: "bulk", action: "publish" })} disabled={saving}><CheckCircle2 />Publicar</button><button type="button" onClick={() => setConfirmation({ kind: "bulk", action: "archive" })} disabled={saving}><Archive />Arquivar</button><button className={styles.dangerAction} type="button" onClick={() => setConfirmation({ kind: "bulk", action: "delete" })} disabled={saving}><Trash2 />Eliminar</button><button className={styles.iconButton} type="button" onClick={() => setSelected([])} aria-label="Limpar seleção"><X /></button></div>}
-        {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /><strong>A carregar perguntas…</strong></div> : loadError ? <div className={styles.state} role="alert"><strong>{loadError}</strong><button className="button button--secondary button--compact" type="button" onClick={() => void load()}>Tentar novamente</button></div> : visibleQuestions.length === 0 ? <div className={styles.state}><CircleHelp /><strong>Não existem perguntas neste filtro.</strong><p>Adicione uma pergunta manualmente ou importe um CSV validado.</p><button className="button button--secondary button--compact" type="button" onClick={startNew}><Plus />Adicionar pergunta</button></div> : <div className={styles.questionList}><div className={styles.listTools}><label><input type="checkbox" checked={allVisibleSelected} onChange={selectVisible} />Selecionar esta página</label><span>{pagination.from}–{pagination.to} de {pagination.total}</span></div>{visibleQuestions.map((question) => <QuestionRow key={question.id} question={question} selected={selected.includes(question.id)} onToggle={() => toggleQuestion(question.id)} onEdit={() => startEdit(question)} />)}</div>}
-        {!loading && !loadError && pagination.total > 0 && <div className={styles.pagination} aria-label="Paginação das perguntas"><label><span>Por página</span><select value={pagination.pageSize} onChange={(event) => setPagination((current) => ({ ...current, page: 1, pageSize: Number(event.target.value) as Pagination["pageSize"] }))}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label><span>Página <strong>{pagination.page}</strong> de {pagination.totalPages}</span><div><button className="button button--secondary button--compact" type="button" onClick={() => setPagination((current) => ({ ...current, page: Math.max(1, current.page - 1) }))} disabled={pagination.page <= 1}><ChevronLeft />Anterior</button><button className="button button--secondary button--compact" type="button" onClick={() => setPagination((current) => ({ ...current, page: Math.min(current.totalPages, current.page + 1) }))} disabled={pagination.page >= pagination.totalPages}>Seguinte<ChevronRight /></button></div></div>}
+      {section === "questions" && !openId && <section className={`panel ${styles.listPanel}`} aria-label="Perguntas registadas" aria-busy={loading}>
+        <AdminToolbar label="Filtrar perguntas">
+          <FilterSearch label="Pesquisar" value={filter.query} onChange={(value) => setFilter((current) => ({ ...current, query: value }))} placeholder="Pergunta, UC ou tema" />
+          <FilterSelect label="UC" value={filter.unitId} defaultValue="" onChange={(value) => { setFilter((current) => ({ ...current, unitId: value, themeId: "" })); setPagination((current) => ({ ...current, page: 1 })); }} options={[{ value: "", label: "Todas as UCs" }, ...units.map((unit) => ({ value: unit.id, label: `${unit.code} · ${unit.name}` }))]} />
+          <FilterSelect label="Tema" value={filter.themeId} defaultValue="" onChange={(value) => { setFilter((current) => ({ ...current, themeId: value })); setPagination((current) => ({ ...current, page: 1 })); }} options={[{ value: "", label: "Todos os temas" }, ...themes.filter((theme) => !filter.unitId || theme.unitId === filter.unitId).map((theme) => ({ value: theme.id, label: theme.name }))]} />
+          <FilterSelect label="Estado" value={filter.status} onChange={(value) => { setFilter((current) => ({ ...current, status: value })); setPagination((current) => ({ ...current, page: 1 })); }} options={[{ value: "all", label: "Todos os estados" }, { value: "draft", label: "Rascunhos" }, { value: "published", label: "Publicadas" }, { value: "archived", label: "Arquivadas" }]} />
+        </AdminToolbar>
+        {selected.length > 0 && <div className={styles.bulkBar} role="status"><strong>{selected.length} selecionada{selected.length === 1 ? "" : "s"}</strong><button type="button" onClick={() => setConfirmation({ kind: "bulk", action: "publish" })} disabled={saving}><CheckCircle2 />Publicar</button><button type="button" onClick={() => setConfirmation({ kind: "bulk", action: "archive" })} disabled={saving}><Archive />Arquivar</button><button className={styles.dangerAction} type="button" onClick={() => setConfirmation({ kind: "bulk", action: "delete" })} disabled={saving}><Trash2 />Eliminar</button><button className={styles.iconButton} type="button" onClick={() => setSelected([])} aria-label="Limpar seleção"><X /></button></div>}
+        {loading ? skeleton(4) : loadError ? <div className={styles.state} role="alert"><strong>{loadError}</strong><button className="button button--secondary button--compact" type="button" onClick={() => void load()}>Tentar novamente</button></div> : visibleQuestions.length === 0 ? <div className={styles.state}><CircleHelp /><strong>Não existem perguntas neste filtro.</strong></div> : <>
+          <div className={styles.listTools}><label><input type="checkbox" checked={allVisibleSelected} onChange={selectVisible} />Selecionar esta página</label><span>{pagination.from}–{pagination.to} de {pagination.total}</span></div>
+          <ul className={styles.rows}>{visibleQuestions.map((question) => <li className={styles.row} key={question.id} data-status={question.status}>
+            <input className={styles.rowCheck} type="checkbox" checked={selected.includes(question.id)} onChange={() => toggleQuestion(question.id)} aria-label={`Selecionar pergunta: ${richTextPlainText(question.question)}`} />
+            <div className={styles.rowMain}>
+              <h3><a className={`link-quiet ${styles.titleLink}`} href={`#pergunta-${encodeURIComponent(question.id)}`} onClick={(event) => { event.preventDefault(); openQuestion(question); }}>{richTextPlainText(question.question)}</a></h3>
+              <p className={styles.rowMeta}>{question.unitCode} · {question.theme} · {difficultyLabel(question.difficulty)}{question.updatedAt && ` · ${date(question.updatedAt)}`}</p>
+            </div>
+            <span className={styles.statusPill}>{statusLabel(question.status)}</span>
+          </li>)}</ul>
+        </>}
+        {!loading && !loadError && <ListPagination page={pagination.page} totalItems={pagination.total} pageSize={pagination.pageSize} onChange={(page) => setPagination((current) => ({ ...current, page }))} />}
       </section>}
 
-      {section === "themes" && <section className={`panel ${styles.themesPanel}`} aria-labelledby="temas-registados">
-        <SurfaceHeader icon={<Tags />} eyebrow="Organização" title="Temas registados" headingId="temas-registados" meta={`${themes.length} tema${themes.length === 1 ? "" : "s"}`} />
+      {section === "questions" && openId && <>
+        <button className={styles.back} type="button" onClick={() => openQuestion(null)}><ChevronLeft aria-hidden="true" />Voltar às perguntas</button>
+        <article className={`panel ${styles.reading}`} data-status={openItem?.status} aria-busy={loading && !openItem}>
+          {loading && !openItem ? skeleton(2) : !openItem ? <div className={styles.state}><Search /><strong>Pergunta não encontrada.</strong></div> : <>
+            <header className={styles.byline}>
+              <div>
+                <p className={styles.bylineName}>{openItem.unitCode} · {openItem.theme}</p>
+                <p className={styles.bylineMeta}>{difficultyLabel(openItem.difficulty)}{openItem.updatedAt && ` · ${date(openItem.updatedAt)}`}</p>
+              </div>
+              <span className={styles.statusPill}>{statusLabel(openItem.status)}</span>
+            </header>
+            <h2 className={styles.readingTitle}>{richTextPlainText(openItem.question)}</h2>
+            <span className={styles.readingRule} aria-hidden="true" />
+            <ol className={styles.answerList}>{openItem.options.map((option, index) => <li className={index === openItem.correctOption ? styles.correctOption : ""} key={`${openItem.id}-${index}`}><span>{String.fromCharCode(65 + index)}</span>{option}{index === openItem.correctOption && <Check aria-label="Resposta correta" />}</li>)}</ol>
+            {openItem.explanation && <div className={styles.explanation}><strong><Lightbulb aria-hidden="true" />Explicação</strong><RichTextContent value={openItem.explanation} className={styles.readingBody} /></div>}
+            {openItem.imageUrl && canPreviewImage(openItem.imageUrl) && <Image className={styles.readingImage} src={openItem.imageUrl} alt="Imagem associada à pergunta" width={320} height={180} unoptimized />}
+          </>}
+        </article>
+      </>}
+
+      {section === "themes" && <section className={`panel ${styles.listPanel}`} aria-label="Temas registados">
         <div className={styles.themeToolbar}><label><FormLabel icon={BookOpen}>Unidade curricular</FormLabel><select value={themeUnitId} onChange={(event) => setThemeUnitId(event.target.value)}><option value="">Selecionar UC</option>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label><label><FormLabel icon={Tags}>Novo tema</FormLabel><input value={newTheme} onChange={(event) => setNewTheme(event.target.value)} placeholder="Nome do tema" maxLength={120} /></label><button className="button button--primary button--compact" type="button" onClick={() => void createTheme()} disabled={creatingTheme || !themeUnitId || !newTheme.trim()}>{creatingTheme ? <LoaderCircle className={styles.spin} /> : <Plus />}Adicionar tema</button></div>
-        <div className={styles.themeList}>{themes.filter((theme) => !themeUnitId || theme.unitId === themeUnitId).map((theme) => <div className={styles.themeRow} key={theme.id}><div><strong>{theme.name}</strong><small>{units.find((unit) => unit.id === theme.unitId)?.name || "Unidade curricular"}</small></div><span>{theme.questionCount} pergunta{theme.questionCount === 1 ? "" : "s"}</span></div>)}</div>
+        {loading ? skeleton(3) : <ul className={styles.rows}>{themes.filter((theme) => !themeUnitId || theme.unitId === themeUnitId).map((theme) => <li className={`${styles.row} ${styles.staticRow}`} key={theme.id}>
+          <span className={styles.statusDot} aria-hidden="true" />
+          <div className={styles.rowMain}><h3>{theme.name}</h3><p className={styles.rowMeta}>{units.find((unit) => unit.id === theme.unitId)?.name || "Unidade curricular"}</p></div>
+          <span className={styles.statusPill}>{theme.questionCount} pergunta{theme.questionCount === 1 ? "" : "s"}</span>
+        </li>)}</ul>}
       </section>}
 
-      {section === "import" && <section className={`panel ${styles.importPanel}`} aria-labelledby="importar-csv">
-        <SurfaceHeader icon={<FileSpreadsheet />} eyebrow="Importação" title="Importar perguntas por CSV" headingId="importar-csv" actions={<button className="button button--secondary button--compact" type="button" onClick={downloadTemplate}><Download />Descarregar modelo</button>} />
+      {section === "import" && <section className={`panel ${styles.importPanel}`} aria-label="Importar perguntas por CSV">
         <div className={styles.importBody}>
           <label className={styles.importUnit}><FormLabel icon={BookOpen}>Unidade curricular</FormLabel><select value={importUnitId} onChange={(event) => setImportUnitId(event.target.value)}><option value="">Selecionar UC</option>{units.map((unit) => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
           <input ref={fileInput} className={styles.visuallyHidden} type="file" accept=".csv,text/csv" onChange={(event) => void readCsv(event)} />
-          <button className={styles.dropzone} type="button" onClick={() => fileInput.current?.click()}><Upload /><span><strong>{csvText ? "Substituir ficheiro CSV" : "Selecionar ficheiro CSV"}</strong><small>O ficheiro é validado antes da importação.</small></span></button>
+          <button className={styles.dropzone} type="button" onClick={() => fileInput.current?.click()}><Upload /><span><strong>{csvText ? "Substituir ficheiro CSV" : "Selecionar ficheiro CSV"}</strong></span></button>
           {preview && <CsvPreview preview={preview} filename={csvFileName} onImport={() => void importCsv()} importing={importing} onClear={() => { setCsvText(""); setCsvFileName(""); }} />}
         </div>
       </section>}
 
-      {section === "activity" && <section className={`panel ${styles.historyPanel}`} aria-labelledby="historico-testes"><SurfaceHeader icon={<History />} eyebrow="Auditoria" title="Atividade recente" headingId="historico-testes" />{history.length === 0 ? <div className={styles.compactEmpty}><History /><strong>Ainda não há atividade registada.</strong></div> : <ol className={styles.history}>{history.slice(0, 20).map((item) => <li key={item.id}><span className={styles.historyDot} /><div><strong>{item.action}</strong>{item.detail && <p>{item.detail}</p>}<small>{item.actorName} · {date(item.createdAt)}</small></div></li>)}</ol>}</section>}
+      {section === "activity" && <section className={`panel ${styles.listPanel}`} aria-label="Atividade recente" aria-busy={loading}>{loading ? skeleton(3) : history.length === 0 ? <div className={styles.compactEmpty}><History /><strong>Ainda não há atividade registada.</strong></div> : <ul className={styles.rows}>{history.slice(0, 20).map((item) => <li className={`${styles.row} ${styles.staticRow}`} key={item.id}>
+        <span className={styles.statusDot} aria-hidden="true" />
+        <div className={styles.rowMain}><h3>{item.action}</h3><p className={styles.rowMeta}>{[item.detail, item.actorName, date(item.createdAt)].filter(Boolean).join(" · ")}</p></div>
+      </li>)}</ul>}</section>}
+
     </AdminPage>
-    <ConfirmationDialog open={Boolean(confirmation)} eyebrow="Gestão do banco de perguntas" title={confirmation?.kind === "question" ? "Eliminar esta pergunta?" : confirmation?.action === "publish" ? "Publicar as perguntas selecionadas?" : confirmation?.action === "archive" ? "Arquivar as perguntas selecionadas?" : "Eliminar as perguntas selecionadas?"} description={confirmation?.kind === "question" ? "A pergunta e as respetivas opções serão removidas do banco." : `A ação será aplicada a ${selected.length} pergunta${selected.length === 1 ? "" : "s"}.`} subject={confirmation?.kind === "question" ? richTextPlainText(form.question).slice(0, 180) : `${selected.length} pergunta${selected.length === 1 ? "" : "s"} selecionada${selected.length === 1 ? "" : "s"}`} subjectLabel={confirmation?.kind === "question" ? "Pergunta selecionada" : "Seleção atual"} warning={confirmation?.kind === "question" || confirmation?.action === "delete" ? "Esta ação não pode ser revertida." : undefined} confirmLabel={saving ? "A concluir…" : confirmation?.kind === "question" || confirmation?.action === "delete" ? "Eliminar" : confirmation?.action === "archive" ? "Arquivar" : "Publicar"} busy={saving} tone={confirmation?.kind === "bulk" && confirmation.action !== "delete" ? "primary" : "danger"} icon={confirmation?.kind === "bulk" && confirmation.action === "publish" ? <CheckCircle2 /> : confirmation?.kind === "bulk" && confirmation.action === "archive" ? <Archive /> : <Trash2 />} onClose={() => setConfirmation(null)} onConfirm={() => { if (confirmation?.kind === "question") void deleteQuestion(); else if (confirmation) void bulk(confirmation.action); }} />
+    <ConfirmationDialog open={Boolean(confirmation)} eyebrow="Gestão do banco de perguntas" title={confirmation?.kind === "question" ? "Eliminar esta pergunta?" : confirmation?.action === "publish" ? "Publicar as perguntas selecionadas?" : confirmation?.action === "archive" ? "Arquivar as perguntas selecionadas?" : "Eliminar as perguntas selecionadas?"} description={confirmation?.kind === "question" ? "A pergunta e as respetivas opções serão removidas do banco." : `A ação será aplicada a ${selected.length} pergunta${selected.length === 1 ? "" : "s"}.`} subject={confirmation?.kind === "question" ? confirmation.text.slice(0, 180) : `${selected.length} pergunta${selected.length === 1 ? "" : "s"} selecionada${selected.length === 1 ? "" : "s"}`} subjectLabel={confirmation?.kind === "question" ? "Pergunta selecionada" : "Seleção atual"} warning={confirmation?.kind === "question" || confirmation?.action === "delete" ? "Esta ação não pode ser revertida." : undefined} confirmLabel={saving ? "A concluir…" : confirmation?.kind === "question" || confirmation?.action === "delete" ? "Eliminar" : confirmation?.action === "archive" ? "Arquivar" : "Publicar"} busy={saving} tone={confirmation?.kind === "bulk" && confirmation.action !== "delete" ? "primary" : "danger"} icon={confirmation?.kind === "bulk" && confirmation.action === "publish" ? <CheckCircle2 /> : confirmation?.kind === "bulk" && confirmation.action === "archive" ? <Archive /> : <Trash2 />} onClose={() => setConfirmation(null)} onConfirm={() => { if (confirmation?.kind === "question") void deleteQuestion(confirmation.id); else if (confirmation) void bulk(confirmation.action); }} />
   </AppShell>;
 }
 
@@ -354,6 +430,3 @@ function CsvPreview({ preview, filename, onImport, importing, onClear }: { previ
   return <div className={styles.csvPreview}><div className={styles.csvSummary}><div><strong>{preview.rows.length} linha{preview.rows.length === 1 ? "" : "s"} lida{preview.rows.length === 1 ? "" : "s"}</strong><span>{filename ? `${filename} · ` : ""}{preview.errors.length ? `${preview.errors.length} erro${preview.errors.length === 1 ? "" : "s"} a corrigir` : "CSV pronto a importar"}</span></div><button className={styles.textButton} type="button" onClick={onClear}>Remover ficheiro</button></div>{preview.rows.length > 0 && <div className={styles.previewTableWrap}><table><thead><tr><th>Linha</th><th>UC</th><th>Tema</th><th>Pergunta</th><th>Estado</th></tr></thead><tbody>{preview.rows.slice(0, 8).map((row) => <tr key={row.row} className={errorsByRow.has(row.row) ? styles.invalidRow : ""}><td>{row.row}</td><td>{row.unitCode || row.unitId || "—"}</td><td>{row.theme || "—"}</td><td>{row.question || "—"}</td><td>{errorsByRow.has(row.row) ? errorsByRow.get(row.row)?.join(" ") : "Válida"}</td></tr>)}</tbody></table></div>}{preview.rows.length > 8 && <small className={styles.moreRows}>A pré-visualização mostra as primeiras 8 linhas.</small>}<p className={styles.imageCsvHint}>As imagens só podem usar um caminho interno iniciado por <code>/</code> ou um data URL JPEG, PNG ou WebP até 1 MiB. URLs externas não são apresentadas pela aplicação.</p>{preview.errors.length > 0 && <ul className={styles.csvErrors}>{preview.errors.slice(0, 12).map((error, index) => <li key={`${error.row}-${error.field}-${index}`}>Linha {error.row || "—"}: {error.message}</li>)}</ul>}<div className={styles.csvActions}><button className="button button--primary button--compact" type="button" onClick={onImport} disabled={importing || preview.errors.length > 0 || preview.validRows.length === 0}>{importing ? <LoaderCircle className={styles.spin} /> : <Upload />}{importing ? "A importar…" : `Importar ${preview.validRows.length} válida${preview.validRows.length === 1 ? "" : "s"}`}</button></div></div>;
 }
 
-function QuestionRow({ question, selected, onToggle, onEdit }: { question: Question; selected: boolean; onToggle: () => void; onEdit: () => void }) {
-  return <article className={styles.questionRow}><label className={styles.rowCheck}><input type="checkbox" checked={selected} onChange={onToggle} aria-label={`Selecionar pergunta: ${richTextPlainText(question.question)}`} /></label><div className={styles.questionContent}><div className={styles.questionMeta}><span className={styles.unitBadge}>{question.unitCode}</span><span>{question.theme}</span><span className={`${styles.status} ${styles[question.status]}`}>{statusLabel(question.status)}</span><span className={styles.difficulty}>{difficultyLabel(question.difficulty)}</span></div><RichTextContent value={question.question} className={styles.questionTitle} /><p className={styles.optionsText}>{question.options.map((option, index) => <span className={index === question.correctOption ? styles.correctOption : ""} key={`${question.id}-${index}`}>{String.fromCharCode(65 + index)}. {option}</span>)}</p><div className={styles.explanation}><strong>Explicação:</strong><RichTextContent value={question.explanation} /></div><div className={styles.questionFooter}>{question.imageUrl && <a href={question.imageUrl} target="_blank" rel="noreferrer"><ImageIcon />Imagem</a>}{question.updatedAt && <time>{date(question.updatedAt)}</time>}</div></div><button className="button button--secondary button--compact" type="button" onClick={onEdit}><Pencil />Editar</button></article>;
-}

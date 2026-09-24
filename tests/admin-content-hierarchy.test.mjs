@@ -13,16 +13,18 @@ test("quiz administration separates the main jobs into one local navigation", ()
   assert.match(quizManagement, />Temas<\/button>/);
   assert.match(quizManagement, />Importar CSV<\/button>/);
   assert.match(quizManagement, />Atividade<\/button>/);
-  assert.match(quizManagement, /section === "questions" && <section/);
+  assert.match(quizManagement, /section === "questions" && !openId && <section/);
+  assert.match(quizManagement, /section === "questions" && openId && <>/);
+  assert.match(quizManagement, /#pergunta-/);
   assert.match(quizManagement, /section === "editor" && showEditor && <section/);
   assert.match(quizManagement, /section === "import" && <section/);
 });
 
 test("curricular-unit administration does not mix list and editor views", () => {
-  assert.match(unitManagement, /useState<"list" \| "create" \| "edit">\("list"\)/);
-  assert.match(unitManagement, /view === "create" && <section/);
-  assert.match(unitManagement, /view === "edit" && editingId && <section/);
-  assert.match(unitManagement, /view === "list" && <AdminSection/);
+  assert.match(unitManagement, /creating && <section/);
+  assert.match(unitManagement, /!creating && openId && <>/);
+  assert.match(unitManagement, /!creating && !openId && <section className=\{`panel \$\{styles\.listPanel\}`\}/);
+  assert.match(unitManagement, /#uc-/);
   assert.match(unitManagement, /representativeUserIds: \[\]/);
 });
 

@@ -43,9 +43,16 @@ async function campus(request: Request, env: CampusEnv, url: URL, user: HubUser 
       env.DB.prepare("SELECT cfu.faculty_id,cu.id AS unit_id,cu.code,cu.name FROM campus_faculty_units cfu JOIN curricular_units cu ON cu.id=cfu.curricular_unit_id WHERE cu.active=1 ORDER BY cu.name COLLATE NOCASE").all(),
       env.DB.prepare("SELECT id,code,name,study_year,semester FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE").all(),
     ]);
+    // Simple room list (room, building, optional teacher, classes) shown on "Salas e docentes".
+    const [spacesResult, classesResult] = await Promise.all([
+      env.DB.prepare("SELECT id,room,building,teacher,classes,updated_at FROM campus_spaces WHERE active=1 ORDER BY building, room COLLATE NOCASE").all(),
+      env.DB.prepare("SELECT id FROM classes ORDER BY id").all(),
+    ]);
+    const spaces = spacesResult.results.map((item) => { const space = row(item); let classes: number[] = []; try { const parsed = JSON.parse(String(space.classes || "[]")); if (Array.isArray(parsed)) classes = parsed.map(Number).filter(Number.isInteger); } catch { classes = []; } return { ...space, classes }; });
+    const classIds = classesResult.results.map((item) => Number(row(item).id)).filter(Number.isInteger);
     const facultyUnits = new Map<string, Array<Record<string, unknown>>>();
     for (const item of linksResult.results) { const link = row(item); facultyUnits.set(String(link.faculty_id), [...(facultyUnits.get(String(link.faculty_id)) || []), { id: link.unit_id, code: link.code, name: link.name }]); }
-    return json({ buildings: buildingsResult.results, floors: floorsResult.results, rooms: roomsResult.results, faculty: facultyResult.results.map((item) => ({ ...row(item), units: facultyUnits.get(String(row(item).id)) || [] })), units: unitsResult.results, canManage: canManage(user), isCommission: isCommission(user), query });
+    return json({ buildings: buildingsResult.results, floors: floorsResult.results, rooms: roomsResult.results, faculty: facultyResult.results.map((item) => ({ ...row(item), units: facultyUnits.get(String(row(item).id)) || [] })), units: unitsResult.results, spaces, classes: classIds.length ? classIds : Array.from({ length: 20 }, (_, index) => index + 1), canManage: canManage(user), isCommission: isCommission(user), query });
   }
 
   if (!(request.headers.get("content-type") || "").startsWith("application/json")) return json({ error: "Pedido JSON inválido." }, 400);
@@ -55,8 +62,8 @@ async function campus(request: Request, env: CampusEnv, url: URL, user: HubUser 
   const method = request.method;
   if (method === "DELETE") {
     const id = text(body.id, 80);
-    if (!id || !["building", "floor", "room", "faculty"].includes(entity)) return json({ error: "Registo inválido." }, 400);
-    const table = entity === "building" ? "campus_buildings" : entity === "floor" ? "campus_floors" : entity === "room" ? "campus_rooms" : "campus_faculty";
+    if (!id || !["building", "floor", "room", "faculty", "space"].includes(entity)) return json({ error: "Registo inválido." }, 400);
+    const table = entity === "space" ? "campus_spaces" : entity === "building" ? "campus_buildings" : entity === "floor" ? "campus_floors" : entity === "room" ? "campus_rooms" : "campus_faculty";
     const result = await env.DB.prepare(`UPDATE ${table} SET active=0,updated_by=?,updated_at=? WHERE id=? AND active=1`).bind(actor(user), Date.now(), id).run();
     if (!result.meta.changes) return json({ error: "Registo não encontrado." }, 404);
     await audit(env, user, `campus_${entity}_archived`, { id });
@@ -65,7 +72,15 @@ async function campus(request: Request, env: CampusEnv, url: URL, user: HubUser 
 
   const id = method === "PUT" ? text(body.id, 80) : crypto.randomUUID(), now = Date.now();
   try {
-    if (entity === "building") {
+    if (entity === "space") {
+      const room = text(body.room, 60), building = text(body.building, 10), teacher = text(body.teacher, 160);
+      const classes = Array.isArray(body.classes) ? [...new Set(body.classes.map(Number).filter((value) => Number.isInteger(value) && value >= 1 && value <= 20))].sort((a, b) => a - b) : [];
+      if (!room || !["cim", "hsj"].includes(building)) return json({ error: "Indica a sala e o edifício." }, 400);
+      const statement = method === "PUT"
+        ? env.DB.prepare("UPDATE campus_spaces SET room=?,building=?,teacher=?,classes=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(room, building, teacher || null, JSON.stringify(classes), actor(user), now, id)
+        : env.DB.prepare("INSERT INTO campus_spaces(id,room,building,teacher,classes,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(id, room, building, teacher || null, JSON.stringify(classes), actor(user), actor(user), now, now);
+      const result = await statement.run(); if (method === "PUT" && !result.meta.changes) return json({ error: "Sala não encontrada." }, 404);
+    } else if (entity === "building") {
       const name = text(body.name, 120), code = text(body.code, 30).toUpperCase(), address = text(body.address, 240), mapUrl = text(body.mapUrl, 1000), accessibility = longText(body.accessibilityNotes, 2000);
       if (name.length < 2 || !/^[A-Z0-9._-]{1,30}$/.test(code)) return json({ error: "Indique o nome e um código válido para o edifício." }, 400);
       const statement = method === "PUT" ? env.DB.prepare("UPDATE campus_buildings SET name=?,code=?,address=?,map_url=?,accessibility_notes=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(name, code, address, mapUrl || null, accessibility, actor(user), now, id) : env.DB.prepare("INSERT INTO campus_buildings(id,name,code,address,map_url,accessibility_notes,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, name, code, address, mapUrl || null, accessibility, actor(user), actor(user), now, now);

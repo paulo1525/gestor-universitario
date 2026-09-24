@@ -37,7 +37,9 @@ export function AuthForm() {
   const { user, refresh } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next")?.startsWith("/") ? params.get("next")! : "/";
+  // Only same-origin paths: "//host" and "/\host" would leave the site.
+  const requestedNext = params.get("next") ?? "";
+  const next = requestedNext.startsWith("/") && !/^\/[/\\]/.test(requestedNext) ? requestedNext : "/";
 
   useEffect(() => { if (user) router.replace(next); }, [user, next, router]);
   useEffect(() => {

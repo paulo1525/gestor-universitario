@@ -1,0 +1,14 @@
+.pagination { display: flex; align-items: center; justify-content: center; gap: 8px; padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.pagination > div { display: flex; align-items: center; gap: 4px; }
+.pagination button { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text-muted); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
+.pagination button:hover:not(:disabled) { border-color: var(--color-border-strong); color: var(--color-text); }
+.pagination button:disabled { opacity: .4; cursor: not-allowed; }
+.pagination button svg { width: 14px; height: 14px; }
+.pagination span { width: 18px; color: var(--color-text-muted); text-align: center; }
+.pagination .active { border-color: var(--color-accent); color: var(--color-text); background: var(--color-accent); }
+:global(html[data-theme="forum"]) .pagination .active { border-color: #185f89; color: #fff; background: #2679aa; }
+
+@media (max-width: 640px) {
+  .pagination { padding-inline: var(--space-2); }
+  .pagination > div { gap: 2px; }
+}

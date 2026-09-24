@@ -2,8 +2,7 @@
 .catalog { display: grid; min-width: 0; overflow: hidden; border: 1px solid var(--surface-card-border); border-radius: var(--surface-card-radius); background: var(--color-surface); box-shadow: var(--surface-card-shadow); }
 .tabsRow { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
 .tabsRow > .tabs { min-width: 0; flex: 0 1 auto; margin-right: auto; }
-.tabActions { display: flex; flex: 0 0 auto; }
-@media (max-width: 640px) { .tabsRow { flex-wrap: wrap; padding-bottom: var(--space-3); } .tabActions, .tabActions > * { width: 100%; } }
+@media (max-width: 640px) { .tabsRow { flex-wrap: wrap; padding-bottom: var(--space-3); } }
 .tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; width: fit-content; max-width: 100%; padding: 3px; border-radius: var(--radius-control); background: var(--color-surface-muted); }
 .tab { min-height: 30px; padding: 0 12px; border: 0; border-radius: calc(var(--radius-control) - 2px); color: var(--color-text-muted); background: transparent; font: inherit; font-size: var(--font-size-body); font-weight: 700; cursor: pointer; }
 .tab:hover { color: var(--color-text); }
@@ -27,21 +26,8 @@
 
 
 
-.resultCount { color: var(--muted); font-size: var(--font-size-small); font-weight: 800; white-space: nowrap; }
 .resourceList { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.resource { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 13px; padding: 15px 17px; border-bottom: 1px solid var(--line); }
-.resource:last-child { border-bottom: 0; }
-.resourceIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; color: var(--color-accent-text); background: var(--gold-soft); }
-.resourceIcon svg { width: 19px; height: 19px; }
-.resourceMain { display: grid; gap: 8px; min-width: 0; }
-.resourceHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .resourceLabel { color: var(--color-accent-text); font-size: var(--font-size-caption); font-weight: 850; letter-spacing: .02em; text-transform: uppercase; }
-.resource h3 { margin: 3px 0 0; color: var(--ink); font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
-.resource p { margin: 0; color: var(--muted); font-size: var(--font-size-small); line-height: 1.5; }
-.badge { display: inline-flex; align-items: center; min-height: 23px; padding: 0 8px; border-radius: 999px; color: var(--muted); background: var(--line); font-size: var(--font-size-caption); font-weight: 800; white-space: nowrap; }
-.badgeVerified { color: var(--color-success-text); background: var(--color-success-soft); }
-.badgePending { color: var(--color-warning); background: var(--color-warning-soft); }
-.resourceMeta { display: flex; flex-wrap: wrap; gap: 5px 15px; color: var(--muted); font-size: var(--font-size-caption); }
 .resourceActions { display: flex; align-items: center; gap: 8px; }
 .pending { color: var(--muted); font-size: var(--font-size-small); font-weight: 700; }
 .empty { display: grid; min-height: 170px; place-items: center; align-content: center; gap: 8px; padding: 25px; color: var(--muted); font-size: var(--font-size-body); text-align: center; }
@@ -58,18 +44,9 @@
 .segmented button:hover, .segmentActive { color: #4c3a00 !important; background: var(--gold-soft) !important; }
 .controlLabel { display: block; margin: 0 0 8px; color: var(--ink); font-size: var(--font-size-small); font-weight: 850; }
 .segmented .controlLabel { margin: 0 6px 0 4px; color: var(--muted); }
-.filterBlock { display: grid; gap: 1px; }
-.checkChips { display: flex; flex-wrap: wrap; gap: 7px; }
-.checkChips button { min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font: inherit; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
-.checkChips button:hover { border-color: #d8bc44; color: var(--color-accent-text); }
-.checkChips .chipActive { border-color: #d5bd52; color: var(--color-accent-text); background: var(--gold-soft); }
 .builderPreview { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px; border: 1px solid #eadb92; border-radius: 12px; background: #fffdf1; }
 .builderPreview h2 { margin: 3px 0 0; font-size: 15px; }
 .builderPreview p { margin: 4px 0 0; color: var(--muted); font-size: var(--font-size-small); }
-.cardTypeSummary { display: grid; gap: 7px; min-width: 150px; color: var(--muted); font-size: var(--font-size-caption); font-weight: 750; }
-.cardTypeSummary span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.cardTypeSummary svg { width: 13px; height: 13px; color: var(--color-accent-text); }
-.downloadGenerated { width: max-content; }
 .ankiAside { display: grid; align-content: start; gap: 10px; min-height: 250px; padding: 19px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 .ankiAside .overviewIcon { margin-bottom: 3px; }
 .ankiAside h2 { margin: 0; font-size: 18px; line-height: 1.25; }
@@ -81,9 +58,6 @@
 .notice button { display: grid; width: 25px; height: 25px; place-items: center; border: 0; border-radius: 7px; color: inherit; background: transparent; cursor: pointer; }
 .notice button svg { width: 14px; }
 .noticeError { border-color: #e0a69f; color: var(--color-danger-text); background: #fff0ed; }
-.noticeSuccess { border-color: #a8ccae; color: var(--color-success-text); background: var(--color-success-soft); }
-.selectionHint { color: var(--color-warning) !important; font-weight: 750; }
-.spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 850px) { .ankiWorkspace { grid-template-columns: 1fr; } .builderPreview { align-items: flex-start; flex-direction: column; } .cardTypeSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; } }
 @media (max-width: 560px) { .tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; } .tabs::-webkit-scrollbar { display: none; } .tab { flex: 0 0 auto; } .resultCount { align-self: flex-start; } .resource { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 13px; } .resourceIcon { width: 34px; height: 34px; } .resourceHeading { flex-direction: column; gap: 6px; } .resourceActions { align-items: stretch; flex-direction: column; } .resourceActions .button { width: 100%; justify-content: center; } .cardTypeSummary { grid-template-columns: 1fr; } .ankiMain, .ankiAside { padding: 14px; } .segmented { align-items: stretch; } .segmented .controlLabel { width: 100%; margin: 0 4px 2px; } .segmented button { flex: 1 1 0; } .downloadGenerated { width: 100%; justify-content: center; } .notice { align-items: flex-start; flex-direction: column; } .notice > .button { width: 100%; justify-content: center; } }

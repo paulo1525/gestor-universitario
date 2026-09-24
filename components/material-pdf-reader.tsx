@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { ChevronLeft, ChevronRight, Highlighter, LoaderCircle, Trash2, X } from "lucide-react";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 
 type HighlightColor = "gold" | "blue" | "green" | "rose";
@@ -41,6 +42,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<Highlight | null>(null);
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState("");
   const [pdfError, setPdfError] = useState("");
   const [pdfLoading, setPdfLoading] = useState(true);
@@ -172,6 +175,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
 
   const remove = async (highlight: Highlight) => {
     setError("");
+    setRemoving(true);
     try {
       const response = await fetch(endpoint, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: highlight.id }) });
       const data = await response.json() as { error?: string };
@@ -179,6 +183,9 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
       setHighlights((current) => current.filter((item) => item.id !== highlight.id));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível remover o realce.");
+    } finally {
+      setRemoving(false);
+      setRemoveTarget(null);
     }
   };
 
@@ -235,9 +242,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
         <aside className={styles.sidebar}>
           <label><span>Nota opcional para o próximo realce</span><textarea value={note} maxLength={800} onChange={(event) => setNote(event.target.value)} placeholder="Conceito, relação ou dúvida…" /></label>
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <div className={styles.highlightList}><strong>{loading ? "A carregar…" : `${pageHighlights.length} realces nesta página`}</strong>{pageHighlights.map((highlight) => <article key={highlight.id}><span data-color={highlight.color} /> <p>{highlight.note || "Realce sem nota"}</p><button type="button" onClick={() => void remove(highlight)} aria-label="Remover realce"><Trash2 /></button></article>)}</div>
+          <div className={styles.highlightList}><strong>{loading ? "A carregar…" : `${pageHighlights.length} realces nesta página`}</strong>{pageHighlights.map((highlight) => <article key={highlight.id}><span data-color={highlight.color} /> <p>{highlight.note || "Realce sem nota"}</p><button type="button" onClick={() => setRemoveTarget(highlight)} aria-label="Remover realce"><Trash2 /></button></article>)}</div>
         </aside>
       </div>
+      <ConfirmationDialog open={Boolean(removeTarget)} eyebrow="" title="Remover este realce?" description="" subject={removeTarget?.note || undefined} subjectLabel="Nota" confirmLabel={removing ? "A remover…" : "Remover"} busy={removing} onClose={() => setRemoveTarget(null)} onConfirm={() => { if (removeTarget) void remove(removeTarget); }} />
     </section>
   </div>;
 }

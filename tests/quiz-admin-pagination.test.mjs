@@ -40,8 +40,7 @@ test("the client debounces and cancels stale requests while selecting only the c
   assert.match(client, /signal: controller\.signal/);
   assert.match(client, /setQuestions\(nextQuestions\); setSelected\(\[\]\)/);
   assert.match(client, /Selecionar esta página/);
-  assert.match(client, /Por página/);
-  for (const size of [10, 25, 50]) assert.match(client, new RegExp(`<option value="${size}">${size}<\\/option>`));
+  assert.match(client, /<ListPagination page=\{pagination\.page\} totalItems=\{pagination\.total\} pageSize=\{pagination\.pageSize\}/);
 });
 
 test("pagination indexes cover recent, UC, topic and status scans without duplicating legacy indexes", () => {

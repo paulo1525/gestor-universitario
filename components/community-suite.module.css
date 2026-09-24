@@ -82,17 +82,8 @@ a.card:hover { border-color:#d0b444; box-shadow:0 10px 25px rgba(67,53,9,.07); t
   .columns > .page:first-child { grid-column:1; }
   .columns > .page:last-child { grid-column:2; }
 }
-.sectionBody { display:grid; gap:10px; padding:16px; }
-.listItem { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:11px; padding:12px; border:1px solid var(--line); border-radius:11px; color:inherit; background:#fff; text-decoration:none; transition:border-color .15s ease,background-color .15s ease; }
-a.listItem:hover { border-color:color-mix(in srgb,var(--gold) 55%,var(--line)); background:var(--color-surface-subtle); }
 .listIcon { width:38px; height:38px; display:grid; place-items:center; border-radius:10px; color:var(--color-accent-text); background:#fff5c8; }
 .listIcon svg { width:17px; }
-.listItem strong,.listItem small { display:block; }
-.listItem strong { font-size:var(--font-size-small); }
-.listItem > span:nth-child(2) { min-width:0; }
-.listItem strong,.listItem small { text-decoration:none; }
-.listItem small { margin-top:3px; color:var(--muted); font-size:var(--font-size-caption); line-height:1.45; }
-.listItem>a { color:var(--color-accent-text); font-size:var(--font-size-caption); font-weight:800; text-decoration:none; }
 .form { display:grid; gap:15px; padding:18px; }
 .formGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .field { min-width:0; display:grid; align-content:start; gap:6px; color:var(--color-text-muted); font-size:var(--font-size-caption); font-weight:800; }
@@ -195,12 +186,17 @@ a.listItem:hover { border-color:color-mix(in srgb,var(--gold) 55%,var(--line)); 
 .field,.checkField strong { font-size:var(--font-size-body); }
 .field input,.field textarea,.field select { font-size:var(--font-size-body-emphasis); }
 .field small,.checkField small { font-size:var(--font-size-small); }
-.result strong,.listItem strong { font-size:var(--font-size-body-emphasis); }
-.result small,.listItem small { font-size:var(--font-size-small); }
+.result strong { font-size:var(--font-size-body-emphasis); }
+.result small { font-size:var(--font-size-small); }
 @media(max-width:500px){.heroCopy{flex-direction:row}}
 
 /* Tokens partilhados deixam este conjunto pronto para variações de tema. */
-.panel,.card,.poll,.material,.statCard,.listItem,.result { border-color:var(--line); background:var(--surface); }
+.panel,
+.card,
+.poll,
+.material,
+.statCard,
+.result { border-color:var(--line); background:var(--surface); }
 .toolbar { border-color:var(--line); background:#fafaf7; }
 .search,.select,.field input,.field textarea,.field select,.iconButton { border-color:var(--line); color:var(--ink); background:var(--surface); }
 .search { min-height:40px; }
@@ -224,3 +220,27 @@ a.listItem:hover { border-color:color-mix(in srgb,var(--gold) 55%,var(--line)); 
   .hero { padding:4px 2px; }
   .toolbar,.panelHeader,.form { padding-inline:14px; }
 }
+
+/* Admin dashboard: recent activity rows and loading skeleton (same anatomy as Pedidos). */
+.rows { margin: 0; padding: var(--space-2) 0; list-style: none; }
+.row { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); transition: background-color .12s ease; }
+.row + .row::before { position: absolute; top: 0; right: var(--space-5); left: var(--space-5); height: 1px; background: var(--color-border); content: ""; }
+.row:hover { background: var(--color-surface-subtle); }
+.row .listIcon { width: 30px; height: 30px; }
+.rowMain { display: grid; min-width: 0; gap: 2px; }
+.rowMain h3 { margin: 0; overflow: hidden; color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.titleLink { color: var(--color-text); text-decoration: none; }
+.row .titleLink::after { position: absolute; inset: 0; content: ""; }
+.row:has(.titleLink:focus-visible) { box-shadow: inset var(--focus-ring); }
+.titleLink:focus-visible { outline: 0; }
+.rowMeta { margin: 0; overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-small); text-overflow: ellipsis; white-space: nowrap; }
+.skeleton { display: grid; gap: var(--space-4); padding: var(--space-5); }
+.skeletonRow { display: grid; gap: 6px; }
+.skeletonRow span { display: block; height: 12px; border-radius: 4px; background: var(--color-surface-muted); }
+.skeletonRow span:first-child { width: min(420px, 70%); }
+.skeletonRow span:last-child { width: min(220px, 40%); height: 9px; }
+@media (max-width: 640px) { .row { padding: var(--space-3) var(--space-4); } .rowMain h3 { white-space: normal; } }
+@media (prefers-reduced-motion: reduce) { .row { transition: none; } }
+
+/* Global search results use the shared record-list rows. */
+.resultArrow { width: 15px; height: 15px; color: var(--color-text-muted); }

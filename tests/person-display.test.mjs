@@ -64,7 +64,9 @@ test("authorship identifiers are exposed only in management contexts", async () 
   assert.match(tickets, /revealIdentifier: true/);
   assert.match(worker, /canViewAuthorIdentifiers = user\.role === "admin" \|\| Boolean\(user\.commissionPosition\)/);
   assert.match(worker, /\.\.\.\(canViewAuthorIdentifiers \? \{ authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number \} : \{\}\)/);
-  assert.match(announcements, /revealIdentifier: canViewAuthorIdentifiers/);
+  // Announcements and their comments never show student numbers, only names.
+  assert.match(announcements, /revealIdentifier: false/);
+  assert.doesNotMatch(announcements, /revealIdentifier: canViewAuthorIdentifiers/);
   assert.match(requests, /revealIdentifier: canManage/);
   assert.match(materials, /revealIdentifier: canModerate/);
   assert.match(audit, /revealIdentifier: true/);

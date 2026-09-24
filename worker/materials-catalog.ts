@@ -294,7 +294,7 @@ function downloadHeaders(object: { writeHttpMetadata(headers: Headers): void; ht
   return headers;
 }
 
-async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string, disposition: "attachment" | "inline" = "attachment"): Promise<Response> {
+export async function objectDownload(request: Request, env: MaterialsCatalogEnv, key: string, fileName: string, mimeType: string, disposition: "attachment" | "inline" = "attachment"): Promise<Response> {
   if (!env.MATERIALS_BUCKET) return json({ error: "O armazenamento de materiais ainda não foi provisionado.", code: "STORAGE_NOT_READY" }, 409);
   const method = request.method.toUpperCase();
   if (method !== "GET" && method !== "HEAD") return json({ error: "Operação não suportada." }, 405);

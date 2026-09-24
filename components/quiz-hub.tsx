@@ -20,7 +20,6 @@ import {
   Flag,
   GraduationCap,
   Lightbulb,
-  LoaderCircle,
   Keyboard,
   MessageCircle,
   Play,
@@ -47,6 +46,8 @@ import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import type { QuizExportPayload } from "@/lib/anki";
 import styles from "@/components/quiz-hub.module.css";
+import { FilterBar, FilterSearch } from "@/components/filter-bar";
+import { RecordSkeleton } from "@/components/record-list";
 
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic";
 type Screen = "catalogue" | "statistics" | "attempt" | "results";
@@ -889,7 +890,7 @@ export function QuizHub() {
       <AppShell active="quizzes" breadcrumb="Testes" focusMode={screen === "attempt"}>
         <div className={styles.page}>
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-          {screen === "catalogue" && restoringAttempt && <p className={styles.saving} role="status"><LoaderCircle className={styles.spin} /> A recuperar a sessão…</p>}
+          {screen === "catalogue" && restoringAttempt && <p className="sr-only" role="status">A recuperar a sessão…</p>}
           {screen === "catalogue" && restoreError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{restoreError}</p><button type="button" onClick={() => setRestoreVersion((version) => version + 1)}>Tentar novamente</button></div>}
           {screen === "attempt" && finishError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{finishError}</p><button type="button" disabled={finishing} onClick={() => remaining === 0 ? void finishAttempt(true) : requestFinish()}>Tentar concluir novamente</button></div>}
           {screen === "catalogue" && <Catalogue
@@ -987,6 +988,9 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   onStatistics: () => void;
   onExportAnki: () => void;
 }) {
+  const [unitQuery, setUnitQuery] = useState("");
+  const unitTerm = unitQuery.trim().toLocaleLowerCase("pt-PT");
+  const visibleUnits = units.filter((unit) => unit.id === selectedUnitId || !unitTerm || `${unit.code} ${unit.name}`.toLocaleLowerCase("pt-PT").includes(unitTerm));
   const insufficientBank = Boolean(selectedUnit && availableQuestionCount < DEFAULT_QUESTION_COUNT);
   const needsTopics = selectedMode === "topic" && !selectedTopicIds.length;
   const canStart = Boolean(selectedUnit && !insufficientBank && !needsTopics && !availability && !loadingAttempt);
@@ -998,10 +1002,11 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
     <SurfaceHeader standalone headingLevel="h1" icon={<BrainCircuit />} eyebrow="Testes" title="Escolhe uma disciplina" />
     <TestsTabs active="practice" onStatistics={onStatistics} />
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
-    {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar a tua sessão" text="A carregar disciplinas e perguntas." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
+    {loading ? <section className={styles.unitCatalogue} aria-busy="true"><RecordSkeleton label="A preparar a tua sessão" /></section> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
       <section className={styles.unitCatalogue} aria-label="Disciplinas">
+        {units.length > 1 && <FilterBar label="Filtrar disciplinas"><FilterSearch label="Pesquisar disciplinas" value={unitQuery} onChange={setUnitQuery} placeholder="Pesquisar disciplinas" /></FilterBar>}
         <div className={styles.unitGrid}>
-          {units.map((unit) => {
+          {visibleUnits.map((unit) => {
             const selected = unit.id === selectedUnitId;
             return <article key={unit.id} className={`${styles.unitCard} ${selected ? styles.unitCardSelected : ""}`}>
               <button type="button" className={styles.unitCardHeader} onClick={() => onUnit(unit.id)} aria-expanded={selected}>
@@ -1021,7 +1026,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Sessão guiada</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir uma sessão guiada ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Sessão guiada</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki || Boolean(resumeAttempt)}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
+                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}><Download />{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki || Boolean(resumeAttempt)}><Play />{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
               </div>}
             </article>;
           })}
@@ -1032,7 +1037,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
 }
 
 function StatisticsView({ statistics, loading, error, totalAvailableQuestions, clearing, onBack, onRetry, onClear }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; clearing: boolean; onBack: () => void; onRetry: () => void; onClear: () => void }) {
-  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
+  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><section className={styles.unitCatalogue} aria-busy="true"><RecordSkeleton label="A preparar as tuas estatísticas" /></section></>;
   if (error || !statistics) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
   const { summary } = statistics;
   const accuracy = Math.round((summary.accuracy ?? 0) * 100);
@@ -1092,7 +1097,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
       <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0 || timerBusy}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0 || timerBusy}>Desistir</button></div>
       <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Perguntas respondidas"><span style={{ width: `${progress}%` }} /></div>
     </section>
-    <div className={styles.sessionSummary}><span role="status">{savingCount ? <><LoaderCircle className={styles.spin} /> A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{timerBusy ? <LoaderCircle className={styles.spin} /> : attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
+    <div className={styles.sessionSummary}><span role="status">{savingCount ? <>A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
     {timerError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{timerError}</p><button type="button" disabled={timerBusy} onClick={onTimer}>Sincronizar cronómetro</button></div>}
     {attempt.timerPaused && <p className={styles.saving} role="status"><Pause />Cronómetro em pausa. Retoma para continuar a responder.</p>}
     <div className={styles.attemptLayout}>
@@ -1148,9 +1153,9 @@ function Comments({ comments, loading, text, sending, replyTo, onText, onSubmit,
     <form onSubmit={onSubmit}>
       {replyTo && <aside className={styles.replyingTo}><span>Em resposta a <strong>{replyTo.authorName}</strong></span><button type="button" onClick={onCancelReply}>Cancelar</button></aside>}
       <div className={styles.commentComposer}><RichTextEditor value={text} onChange={onText} ariaLabel={replyTo ? `Resposta a ${replyTo.authorName}` : "Novo comentário sobre a pergunta"} placeholder={replyTo ? `Responder a ${replyTo.authorName}…` : "Escreve uma dúvida ou comentário…"} maxLength={1200} minHeight="minimal" /></div>
-      <footer><small>Publicação imediata</small><button className={styles.primaryButton} type="submit" disabled={sending || plainLength < 2 || plainLength > 1200}>{sending ? <LoaderCircle className={styles.spin} /> : <Send />}{sending ? "A enviar…" : replyTo ? "Responder" : "Publicar"}</button></footer>
+      <footer><small>Publicação imediata</small><button className={styles.primaryButton} type="submit" disabled={sending || plainLength < 2 || plainLength > 1200}><Send />{sending ? "A enviar…" : replyTo ? "Responder" : "Publicar"}</button></footer>
     </form>
-    <div className={styles.commentList}>{loading ? <span className={styles.saving}><LoaderCircle className={styles.spin} /> A carregar comentários…</span> : comments.length ? comments.map((comment) => <article key={comment.id} className={comment.parentCommentId ? styles.commentReply : ""}><span>{comment.authorName.slice(0, 1).toUpperCase()}</span><div className={styles.commentBubble}><header><span><strong>{comment.authorName}</strong>{(comment.isAdmin || comment.authorRole === "admin") && <b className={styles.roleBadge}>Administrador</b>}<small>{humanDate(comment.createdAt)}</small></span><button type="button" onClick={() => onReply(comment)}>Responder</button></header>{comment.replyToName && <p className={styles.replyContext}>Em resposta a {comment.replyToName}</p>}<RichTextContent value={comment.body} className={styles.commentBody} /></div></article>) : <p className={styles.noComments}>Ainda não há comentários.</p>}</div>
+    <div className={styles.commentList}>{loading ? <RecordSkeleton label="A carregar comentários…" rows={2} /> : comments.length ? comments.map((comment) => <article key={comment.id} className={comment.parentCommentId ? styles.commentReply : ""}><span>{comment.authorName.slice(0, 1).toUpperCase()}</span><div className={styles.commentBubble}><header><span><strong>{comment.authorName}</strong>{(comment.isAdmin || comment.authorRole === "admin") && <b className={styles.roleBadge}>Administrador</b>}<small>{humanDate(comment.createdAt)}</small></span><button type="button" onClick={() => onReply(comment)}>Responder</button></header>{comment.replyToName && <p className={styles.replyContext}>Em resposta a {comment.replyToName}</p>}<RichTextContent value={comment.body} className={styles.commentBody} /></div></article>) : <p className={styles.noComments}>Ainda não há comentários.</p>}</div>
   </section>;
 }
 

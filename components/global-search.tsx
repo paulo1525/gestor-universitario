@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Building2, CalendarDays, FileText, GraduationCap, LoaderCircle, MapPinned, Megaphone, Search, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, CalendarDays, FileText, GraduationCap, MapPinned, Megaphone, Search, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AppToast } from "@/components/app-toast";
@@ -12,6 +12,8 @@ import { useI18n } from "@/components/i18n-context";
 import { ModuleGuard } from "@/components/module-guard";
 import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/community-suite.module.css";
+import list from "@/components/record-list.module.css";
+import { RecordSkeleton } from "@/components/record-list";
 
 type Result = { id: string; type: string; title: string; description: string; href: string; meta?: string };
 type ApiResult = { id: string | number; type?: string; title?: string; name?: string; description?: string; excerpt?: string; href?: string; url?: string; meta?: string; createdAt?: string };
@@ -107,13 +109,19 @@ export function GlobalSearch() {
   return <AuthGuard><ModuleGuard moduleKey="search.global"><AppShell active="search" breadcrumb={t("search.breadcrumb")}><div className={styles.page}>
     <SurfaceHeader standalone headingLevel="h1" icon={<Search />} eyebrow={t("search.eyebrow")} title={t("search.title")} />
     {error && <AppToast kind="error" message={error} onDismiss={() => setError("")} />}
-    <section className={styles.panel}>
-      <SurfaceHeader icon={<Search />} title={t("search.section")} />
-      <form className={styles.toolbar} onSubmit={submit} role="search"><label className={styles.search}><Search /><span className="sr-only">{t("search.term")}</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search.placeholder")} maxLength={160} /></label><button className="button button--primary" type="submit" disabled={!query.trim() || loading}>{loading ? <LoaderCircle className={styles.spin} /> : <Search />}{t("search.submit")}</button></form>
-      {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /><strong>{t("search.loading")}</strong></div>
-        : !submitted ? <div className={styles.state}><Search /><strong>{t("search.initial.title")}</strong></div>
-          : results.length === 0 ? <div className={styles.state}><Search /><strong>{t("search.empty.title", { query: submitted })}</strong></div>
-            : <><div className={styles.panelHeader}><div><h2>{t("search.results.title", { query: submitted })}</h2><p>{t("search.results.order")}</p></div><span className={styles.count}>{t(results.length === 1 ? "search.results.one" : "search.results.many", { count: results.length })}</span></div><div className={styles.results}>{results.map((item) => <Link className={styles.result} href={item.href} key={`${item.type}-${item.id}`}><span className={styles.resultType}>{resultIcon(item.type)}</span><span><strong>{item.title}</strong><small>{item.description || item.meta || labelFor(item.type) || t("search.type.content")}</small></span><span className={styles.tags}><span className={styles.tag}>{labelFor(item.type)}</span><ArrowRight /></span></Link>)}</div></>}
+    <section className={`panel ${list.listPanel}`} aria-busy={loading}>
+      <form className={styles.toolbar} onSubmit={submit} role="search"><label className={styles.search}><Search /><span className="sr-only">{t("search.term")}</span><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("search.placeholder")} maxLength={160} /></label><button className="button button--primary button--compact" type="submit" disabled={!query.trim() || loading}><Search />{t("search.submit")}</button></form>
+      {loading ? <RecordSkeleton label={t("search.loading")} />
+        : !submitted ? <div className={list.empty}><Search /><strong>{t("search.initial.title")}</strong></div>
+          : results.length === 0 ? <div className={list.empty}><Search /><strong>{t("search.empty.title", { query: submitted })}</strong></div>
+            : <ul className={list.rows} aria-label={t("search.results.title", { query: submitted })}>{results.map((item) => <li className={list.row} key={`${item.type}-${item.id}`}>
+              <span className={list.rowIcon} aria-hidden="true">{resultIcon(item.type)}</span>
+              <div className={list.rowMain}>
+                <h3><Link className={`link-quiet ${list.titleLink}`} href={item.href}>{item.title}</Link></h3>
+                <p className={list.rowMeta}>{[labelFor(item.type), item.description || item.meta].filter(Boolean).join(" · ")}</p>
+              </div>
+              <ArrowRight className={styles.resultArrow} aria-hidden="true" />
+            </li>)}</ul>}
     </section>
   </div></AppShell></ModuleGuard></AuthGuard>;
 }

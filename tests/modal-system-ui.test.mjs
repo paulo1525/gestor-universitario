@@ -21,15 +21,16 @@ test("o sistema modal partilha backdrop, superfície, cabeçalho, ações e foco
 });
 
 test("as modais principais usam o chrome comum", () => {
-  for (const source of [confirmation, calendar, campus, roster, audit]) {
+  // The audit record now opens as a reading card (#registo-<id>), not a modal.
+  assert.doesNotMatch(audit, /data-app-modal/);
+  for (const source of [confirmation, calendar, campus, roster]) {
     assert.match(source, /data-app-modal="modal"/);
     assert.match(source, /data-app-modal-header/);
   }
   assert.match(confirmation, /data-app-modal-footer/);
   assert.match(calendar, /data-app-modal-footer/);
-  assert.match(campus, /data-app-modal-footer="embedded"/);
+  assert.match(campus, /data-app-modal-footer>/);
   assert.match(roster, /data-app-modal-body/);
-  assert.match(audit, /data-app-modal-body/);
 });
 
 test("confirmações de inquéritos e pedidos reutilizam o componente modal comum", () => {

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
+import { ChevronLeft, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, ContactRound, ExternalLink, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, Link2, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
 import adminNavigationStyles from "@/components/admin-navigation.module.css";
@@ -123,7 +123,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
                 {moduleAccess["quizzes.practice"]?<Link className={`${adminNavigationStyles.item} ${active === "quizzes" ? adminNavigationStyles.active : ""}`} href="/testes" onClick={() => setOpen(false)}><BrainCircuit/><span>{t("nav.quizzes.title")}</span></Link>:moduleAccess["quizzes.learning"]?<Link className={`${adminNavigationStyles.item} ${active === "quizzes" ? adminNavigationStyles.active : ""}`} href="/testes/aprender" onClick={() => setOpen(false)}><BrainCircuit/><span>{t("nav.quizzes.title")}</span></Link>:null}
                 {moduleAccess["documents.library"]&&<Link className={`${adminNavigationStyles.item} ${active === "documents" ? adminNavigationStyles.active : ""}`} href="/documentos" onClick={() => setOpen(false)}><FileText/><span>{t("nav.documents.title")}</span></Link>}
                 {(moduleAccess["materials.library"]||moduleAccess["materials.submission"])&&<Link className={`${adminNavigationStyles.item} ${active === "materials" ? adminNavigationStyles.active : ""}`} href="/materiais" onClick={() => setOpen(false)}><Library/><span>{t("nav.materials.title")}</span></Link>}
-                {moduleAccess["useful_links.library"]&&<Link className={`${adminNavigationStyles.item} ${active === "useful_links" ? adminNavigationStyles.active : ""}`} href="/links-uteis" onClick={() => setOpen(false)}><ExternalLink/><span>{t("links.nav.title")}</span></Link>}
+                {moduleAccess["useful_links.library"]&&<a className={`${adminNavigationStyles.item} ${active === "useful_links" ? adminNavigationStyles.active : ""}`} href="/links-uteis/" target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}><Link2/><span>{t("links.nav.title")}</span><ExternalLink aria-hidden="true" style={{ width: 12, height: 12, marginLeft: "auto", opacity: .7 }}/></a>}
               </div>
             </section>}
             {hasCommunity&&<section className={adminNavigationStyles.group}>

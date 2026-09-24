@@ -475,7 +475,6 @@ html[data-theme="forum"] [class*="material-library-module"][class*="material"]:n
 
 html[data-theme="forum"] [class*="announcements-board-module"][class*="card"] {
   overflow: visible;
-  border: 0;
   border-radius: 0;
   box-shadow: none;
 }
@@ -497,7 +496,7 @@ html[data-theme="forum"] [class*="editorHeader"] {
   background: linear-gradient(180deg, #f6fafc, #eaf2f7);
 }
 
-html[data-theme="forum"] [data-platform-surface-header] {
+html[data-theme="forum"] [data-platform-surface-header]:not(.surface-header--standalone) {
   min-height: var(--surface-header-min-height);
   padding: var(--surface-header-padding-block) var(--surface-header-padding-inline);
   border-color: var(--surface-card-border);
@@ -556,7 +555,7 @@ html[data-theme="forum"] [class*="loading"] {
 }
 
 /* Links and actions */
-html[data-theme="forum"] .workspace main a:not(.button) {
+html[data-theme="forum"] .workspace main a:not(.button):not(.link-quiet) {
   color: var(--color-link);
 }
 
@@ -1185,4 +1184,18 @@ html[data-theme="forum"] .search-field:focus-within {
     width:min(304px,calc(100vw - 24px));
   }
 
+}
+
+html[data-theme="forum"] .fab-dial__toggle { color: #fff; background: #2679aa; box-shadow: 0 6px 18px rgba(18, 67, 96, .26); }
+html[data-theme="forum"] .fab-dial__toggle:hover { background: #2f86b6; }
+html[data-theme="forum"] .fab-dial__toggle--quiet, html[data-theme="forum"] .fab-dial__toggle--quiet:hover { border: 1px solid #3b3b37; color: var(--gold); background: #161616; }
+
+/* Disabled primary buttons read as disabled in this theme too. */
+html[data-theme="forum"] .button--primary:disabled,
+html[data-theme="forum"] .button--primary:disabled:hover { border-color: var(--color-border); color: var(--color-text-disabled); background: var(--color-surface-muted); box-shadow: none; }
+
+/* Panels without a section header (lists with the filter bar on top, reading cards)
+   carry the theme's blue top edge themselves; panels with a header get it from the header. */
+html[data-theme="forum"] .workspace :is(.panel, [class$="__panel"], [class*="__panel "]):not(:has(> [data-platform-surface-header])) {
+  border-top: var(--surface-header-accent-size) solid var(--surface-header-accent);
 }

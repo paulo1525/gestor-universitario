@@ -5,95 +5,12 @@
 /* The wrapper gap already separates the page header from the content. */
 .page > :global(.surface-header--standalone) { margin-bottom: 0; }
 
-.hero {
-  align-items: flex-end;
-  margin-bottom: 0;
-  padding: 4px 2px;
-}
-
-.heroCopy {
-  min-width: 0;
-}
-
-.hero h1 {
-  margin: 5px 0 7px;
-  color: var(--ink);
-  font-size: var(--font-size-heading-1);
-  letter-spacing: -.03em;
-  line-height: 1.12;
-}
-
-.hero p {
-  max-width: 52rem;
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--font-size-body-emphasis);
-  line-height: 1.6;
-}
-
-.manageCta {
-  flex: none;
-  white-space: nowrap;
-}
-
-.manageCta svg {
-  width: 16px;
-}
-
 .panel {
   overflow: hidden;
   border: 1px solid var(--surface-card-border);
   border-radius: var(--surface-card-radius);
   background: var(--surface);
   box-shadow: var(--surface-card-shadow);
-}
-
-.panelHeader {
-  min-height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-header-background);
-}
-
-.panelTitle {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.panelIcon {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  border-radius: 10px;
-  color: var(--color-accent-text);
-  background: var(--gold-soft);
-}
-
-.panelIcon svg {
-  width: 19px;
-  height: 19px;
-}
-
-.panelHeader h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 16px;
-  line-height: 1.3;
-}
-
-.panelHeader p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: var(--font-size-small);
-  line-height: 1.5;
 }
 
 .panelLink {
@@ -111,21 +28,6 @@
   width: 13px;
   height: 13px;
 }
-
-.count {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 9px;
-  border-radius: 999px;
-  color: var(--color-accent-text);
-  background: var(--gold-soft);
-  font-size: var(--font-size-caption);
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-
 
 .emptyAction {
   min-height: 40px;
@@ -146,54 +48,6 @@
 
 .emptyAction svg {
   width: 13px;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.grid,
-.catalogGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 16px 20px 20px;
-}
-
-.card,
-.catalogCard {
-  min-width: 0;
-  min-height: 178px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 15px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  color: var(--ink);
-  background: var(--surface);
-  text-decoration: none;
-  transition: border-color .15s ease, background .15s ease;
-}
-
-.card:hover,
-.card:focus-visible {
-  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
-  background: color-mix(in srgb, var(--gold-soft) 22%, var(--surface));
 }
 
 .cardTop {
@@ -226,33 +80,6 @@
   background: var(--color-surface-muted);
 }
 
-.card h3 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.35;
-}
-
-.catalogCardBody {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  align-items: stretch;
-  gap: 13px;
-  flex: 1;
-}
-
-.catalogCardContent {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.catalogCardContent:only-child {
-  grid-column: 1 / -1;
-}
-
 .unitCover {
   position: relative;
   aspect-ratio: 1055 / 1492;
@@ -277,17 +104,6 @@
   height: 100%;
   display: block;
   object-fit: contain;
-}
-
-.catalogCopy p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: var(--font-size-caption);
-  line-height: 1.5;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .metrics,
@@ -356,20 +172,6 @@
   white-space: nowrap;
 }
 
-.linkHint {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: auto;
-  color: var(--color-accent-text);
-  font-size: var(--font-size-caption);
-  font-weight: 800;
-}
-
-.linkHint svg {
-  width: 14px;
-}
-
 .state {
   min-height: 230px;
   display: flex;
@@ -398,10 +200,6 @@
   margin: 0;
   font-size: var(--font-size-small);
   line-height: 1.55;
-}
-
-.emptyState {
-  min-height: 190px;
 }
 
 .detailHero {
@@ -705,10 +503,6 @@
   font-weight: 850;
 }
 
-.spin {
-  animation: spin .8s linear infinite;
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -721,26 +515,21 @@
 }
 
 @media (max-width: 720px) {
-  .hero { align-items: stretch; flex-direction: column; gap: 12px; }
-  .manageCta { width: 100%; }
-  .panelHeader, .grid, .catalogGrid, .sectionBody { padding-inline: 14px; }
 
+  .grid, .catalogGrid, .sectionBody { padding-inline: 14px; }
 
   .academicBlocks { padding-inline: 14px; }
   .validationNotice { padding-inline: 14px; }
 }
 
 @media (max-width: 430px) {
-  .panelHeader { align-items: flex-start; }
   .metrics,
   .detailStats { grid-template-columns: 1fr; }
-  .card { min-height: auto; }
-  .catalogCardBody { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
+
   .listItem { grid-template-columns: 34px minmax(0, 1fr); }
   .listItem a { grid-column: 2; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
-  .spin { animation-duration: 1.6s; }
-}
+/* Catalogue rows: compendium cover (or unit code) leading, one meta line. */
+li > .unitCover { width: 32px; }
+.rowArrow { width: 15px; height: 15px; color: var(--color-text-muted); }

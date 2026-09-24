@@ -83,22 +83,22 @@ test("dashboard feedback and icon-only affordances retain accessible semantics",
   assert.match(dashboardStyles, /\.item:focus-visible/);
 });
 
-test("calendar subscription stays behind a compact toolbar action and opens in a drawer", () => {
+test("calendar subscription stays behind a compact toolbar action and opens in the shared compact modal", () => {
   assert.match(subscription, /className=\{styles\.trigger\}/);
   assert.match(subscription, /aria-haspopup="dialog"/);
   assert.match(subscription, /aria-controls="calendar-subscription-panel"/);
-  assert.match(subscription, /className=\{styles\.backdrop\}/);
-  assert.match(subscription, /className=\{styles\.drawer\}/);
-  assert.match(subscription, /role="dialog"/);
+  assert.match(subscription, /className="app-modal-backdrop" data-app-modal-backdrop/);
+  assert.match(subscription, /id="calendar-subscription-panel" data-app-modal="modal" data-app-modal-size="compact" role="dialog"/);
+  assert.match(subscription, /data-app-modal-header/);
+  assert.match(subscription, /data-app-modal-body/);
+  assert.match(subscription, /data-app-modal-footer/);
+  assert.match(subscription, /<FormCloseButton /);
   assert.match(subscription, /className=\{styles\.setup\}/);
   assert.match(subscription, /className=\{styles\.management\}/);
-  assert.doesNotMatch(subscription, /className=\{styles\.formHeading\}/);
-  assert.doesNotMatch(subscription, /className=\{styles\.actionRow\}/);
+  assert.doesNotMatch(subscription, /className=\{styles\.(?:drawer|backdrop|formHeading|actionRow)\}/);
   const trigger = cssRule(subscriptionStyles, ".trigger");
-  const drawer = cssRule(subscriptionStyles, ".drawer");
   assert.match(trigger, /min-height:\s*38px/);
-  assert.match(drawer, /width:\s*min\(440px, 100vw\)/);
-  assert.match(drawer, /height:\s*100dvh/);
+  assert.doesNotMatch(subscriptionStyles, /\.drawer\b/);
 });
 
 test("today control shares the calendar toolbar control geometry and keyboard state", () => {

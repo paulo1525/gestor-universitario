@@ -1,13 +1,13 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, CircleDot, LoaderCircle, MessageSquareText, Ticket, Trash2, UserRound, Wrench } from "lucide-react";
+import { Check, ChevronLeft, CircleDot, LoaderCircle, MessageSquareText, Search, Ticket, Trash2, Wrench, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FilterSearch, FilterSelect } from "@/components/filter-bar";
-import { AdminEmptyState, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
+import { AdminEmptyState, AdminPage, AdminPageHeader, AdminToolbar } from "@/components/admin-ui";
 import { AuthGuard } from "@/components/auth-guard";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { useFloatingAction } from "@/components/floating-actions";
 import { FormLabel } from "@/components/form-label";
 import { useI18n } from "@/components/i18n-context";
 import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
@@ -19,49 +19,64 @@ import styles from "@/components/ticket-admin.module.css";
 type Row = { id: string; class_id: number; request_type: string | null; description: string; status: string; response: string | null; student_name: string | null; student_number: string | null; created_by: string; created_by_name: string; created_by_email: string | null; created_by_student_number: string | null; created_at: number; execution_result: string | null };
 type FilterValue = "pending" | "resolved" | "all";
 
+const FLOATING_DELETE_ICON = <Trash2 aria-hidden="true" />;
+
 function isPending(status: string) { return ["pending", "approved"].includes(status); }
 function isResolved(status: string) { return ["executed", "rejected", "execution_error"].includes(status); }
-function statusStyle(status: string) {
-  if (status === "pending") return styles.statusPending;
-  if (status === "approved") return styles.statusApproved;
-  if (status === "executed") return styles.statusExecuted;
-  if (status === "execution_error") return styles.statusExecutionError;
-  return styles.statusRejected;
+
+function ticketIdFromHash() {
+  const match = /^#ticket-(.+)$/.exec(window.location.hash);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function TicketAdmin() {
   const { locale, t } = useI18n();
+  const dateLocale = locale === "en" ? "en-GB" : "pt-PT";
   const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterValue>("pending");
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Row | null>(null);
+  // The open ticket lives in #ticket-<id> so it can be linked and the back button works.
+  const [openId, setOpenId] = useState<string | null>(() => typeof window === "undefined" ? null : ticketIdFromHash());
+
+  useEffect(() => {
+    const sync = () => setOpenId(ticketIdFromHash());
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+
+  const openTicket = (id: string | null) => {
+    const url = new URL(window.location.href);
+    url.hash = id ? `ticket-${id}` : "";
+    window.history.pushState(null, "", url);
+    setOpenId(id);
+    window.scrollTo({ top: 0 });
+  };
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/class-tickets", { cache: "no-store" });
-    const result = await response.json() as { tickets: Row[] };
-    setRows(result.tickets || []);
+    try {
+      const response = await fetch("/api/admin/class-tickets", { cache: "no-store" });
+      const result = await response.json() as { tickets: Row[] };
+      setRows(result.tickets || []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  const counts = useMemo(() => ({
-    all: rows.length,
-    pending: rows.filter((row) => isPending(row.status)).length,
-    resolved: rows.filter((row) => isResolved(row.status)).length,
-  }), [rows]);
-
   const visible = useMemo(() => {
-    const localeCode = locale === "en" ? "en-GB" : "pt-PT";
-    const needle = query.trim().toLocaleLowerCase(localeCode);
+    const needle = query.trim().toLocaleLowerCase(dateLocale);
     return rows.filter((row) => {
       const matchesFilter = filter === "pending" ? isPending(row.status) : filter === "resolved" ? isResolved(row.status) : true;
-      const searchable = `${row.class_id} ${row.request_type || ""} ${row.description} ${row.student_name || ""} ${row.student_number || ""} ${row.created_by_name}`.toLocaleLowerCase(localeCode);
+      const searchable = `${row.class_id} ${row.request_type || ""} ${row.description} ${row.student_name || ""} ${row.student_number || ""} ${row.created_by_name}`.toLocaleLowerCase(dateLocale);
       return matchesFilter && (!needle || searchable.includes(needle));
     });
-  }, [rows, filter, locale, query]);
+  }, [rows, filter, dateLocale, query]);
 
   const labels: Record<string, string> = {
     pending: t("classes.tickets.status.pending"), approved: t("classes.tickets.status.approved"), rejected: t("classes.tickets.status.rejected"),
@@ -76,6 +91,10 @@ export function TicketAdmin() {
   ];
 
   const update = (id: string, patch: Partial<Row>) => setRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row));
+  const formatDate = (value: number) => new Date(value).toLocaleString(dateLocale, { dateStyle: "medium", timeStyle: "short" });
+  const authorOf = (row: Row) => personDisplay({ fullName: row.created_by_name, email: row.created_by_email, studentNumber: row.created_by_student_number, id: row.created_by }, { revealIdentifier: true });
+  const studentOf = (row: Row) => personDisplay({ fullName: row.student_name, studentNumber: row.student_number }, { revealIdentifier: true });
+  const typeOf = (row: Row) => types[row.request_type || "other"] || t("classes.tickets.defaultType");
 
   async function save(row: Row) {
     setSaving(row.id);
@@ -93,51 +112,64 @@ export function TicketAdmin() {
     setNotice(response.ok ? t("classes.tickets.deleted") : result.error || t("classes.tickets.deleteError"));
     setSaving(null);
     setDeleteTarget(null);
-    if (response.ok) void load();
+    if (response.ok) {
+      if (ticketIdFromHash() === row.id) openTicket(null);
+      void load();
+    }
   }
 
+  const openItem = openId ? rows.find((row) => row.id === openId) ?? null : null;
+  useFloatingAction(openItem && saving !== openItem.id ? { id: "delete-ticket", label: t("classes.tickets.delete"), icon: FLOATING_DELETE_ICON, onClick: () => setDeleteTarget(openItem) } : null);
+
+  const skeleton = (count: number) => <div className={styles.skeleton} aria-busy="true"><span className="sr-only" role="status">{t("classes.tickets.loading")}</span>{Array.from({ length: count }, (_, index) => <div key={index} className={styles.skeletonRow}><span /><span /></div>)}</div>;
+  const terminal = openItem ? ["executed", "rejected"].includes(openItem.status) : false;
+
   return <AuthGuard requireAdmin><AppShell active="tickets" breadcrumb={t("classes.tickets.breadcrumb")}><AdminPage>
-    <AdminPageHeader eyebrow={t("classes.tickets.eyebrow")} title={t("classes.tickets.title")} />
-    <AdminSection className={styles.panel} icon={<Ticket />} title={t("classes.tickets.listTitle")}>
-      <AdminToolbar className={styles.toolbar} label={t("classes.tickets.filter")}>
+    <AdminPageHeader icon={<Ticket />} eyebrow={t("classes.tickets.eyebrow")} title={t("classes.tickets.title")} />
+    {notice && <p className="admin-notice" role="status">{notice}</p>}
+    {!openId && <section className={`panel ${styles.listPanel}`} aria-label={t("classes.tickets.listTitle")} aria-busy={loading}>
+      <AdminToolbar label={t("classes.tickets.filter")}>
         <FilterSearch label={t("classes.tickets.search")} value={query} onChange={setQuery} placeholder={t("classes.tickets.searchPlaceholder")} />
         <FilterSelect label={t("classes.tickets.filter")} value={filter} onChange={(value) => setFilter(value as FilterValue)} defaultValue="pending" options={filterOptions.map((option) => ({ value: option.value, label: option.label }))} />
       </AdminToolbar>
-      {notice && <p className="admin-notice" role="status">{notice}</p>}
-      <div className={styles.summary} aria-live="polite"><span>{t("classes.tickets.visibleSummary", { visible: visible.length, total: counts.all })}</span><span>{t("classes.tickets.statusSummary", { pending: counts.pending, resolved: counts.resolved })}</span></div>
-      <div className={styles.list}>{visible.map((row) => {
-        const expanded = expandedId === row.id;
-        const terminal = ["executed", "rejected"].includes(row.status);
-        const author = personDisplay({ fullName: row.created_by_name, email: row.created_by_email, studentNumber: row.created_by_student_number, id: row.created_by }, { revealIdentifier: true });
-        const student = personDisplay({ fullName: row.student_name, studentNumber: row.student_number }, { revealIdentifier: true });
-        return <article key={row.id} className={`${styles.card} ${expanded ? styles.expanded : ""}`}>
-          <header className={styles.cardHeader}>
-            <div className={styles.cardIdentity}>
-              <div className={styles.badges}><span className={styles.typeBadge}><Ticket />{types[row.request_type || "other"] || t("classes.tickets.defaultType")}</span><span className={`${styles.status} ${statusStyle(row.status)}`}>{labels[row.status] || row.status}</span></div>
-              <h3>{row.student_name ? <PersonName person={student} /> : <>{t("classes.tickets.submittedBy", { name: "" })}<PersonName person={author} /></>}</h3>
-              <div className={styles.cardMeta}><span><UserRound /><PersonName person={author} /></span><time>{new Date(row.created_at).toLocaleString(locale === "en" ? "en-GB" : "pt-PT", { dateStyle: "medium", timeStyle: "short" })}</time></div>
+      {loading ? skeleton(3) : visible.length === 0 ? <AdminEmptyState icon={<Ticket />} title={query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")} /> : <ul className={styles.rows}>{visible.map((row) => {
+        const author = authorOf(row);
+        return <li className={styles.row} key={row.id} data-status={row.status}>
+          <span className={styles.statusDot} aria-hidden="true" />
+          <div className={styles.rowMain}>
+            <h3><a className={`link-quiet ${styles.titleLink}`} href={`#ticket-${encodeURIComponent(row.id)}`} onClick={(event) => { event.preventDefault(); openTicket(row.id); }}>{row.student_name ? <PersonName person={studentOf(row)} /> : <>{t("classes.tickets.submittedBy", { name: "" })}<PersonName person={author} /></>}</a></h3>
+            <p className={styles.rowMeta}>{typeOf(row)} · {t("classes.common.class", { number: row.class_id })} · <PersonName person={author} /> · {formatDate(row.created_at)}</p>
+          </div>
+          <span className={styles.statusPill}>{labels[row.status] || row.status}</span>
+        </li>;
+      })}</ul>}
+    </section>}
+    {openId && <>
+      <button className={styles.back} type="button" onClick={() => openTicket(null)}><ChevronLeft aria-hidden="true" />{t("classes.tickets.back")}</button>
+      <article className={`panel ${styles.reading}`} data-status={openItem?.status} aria-busy={loading}>
+        {loading ? skeleton(2) : !openItem ? <AdminEmptyState icon={<Search />} title={t("classes.tickets.noFilter")} /> : <>
+          <header className={styles.byline}>
+            <div>
+              <p className={styles.bylineName}><PersonName person={authorOf(openItem)} /></p>
+              <p className={styles.bylineMeta}>{typeOf(openItem)} · {t("classes.common.class", { number: openItem.class_id })} · {formatDate(openItem.created_at)}</p>
             </div>
-            <button className={styles.expand} type="button" aria-expanded={expanded} aria-controls={`ticket-${row.id}`} onClick={() => setExpandedId((current) => current === row.id ? null : row.id)}>{expanded ? t("classes.tickets.hideDetails") : t("classes.tickets.analyse")}<ChevronDown /></button>
+            <span className={styles.statusPill}>{labels[openItem.status] || openItem.status}</span>
           </header>
-          {expanded && <div className={styles.details} id={`ticket-${row.id}`}>
-            <div className={styles.request}>
-              <section className={styles.requestBody}><span>{t("classes.tickets.requestDescription")}</span><RichTextContent value={row.description} className={styles.requestText} /></section>
-              <details className={styles.secondary}><summary><Wrench />{t("classes.tickets.adminContext")}</summary><div className={styles.secondaryGrid}>
-                <div><span>{t("classes.common.class", { number: "" }).trim()}</span><strong>{t("classes.common.class", { number: row.class_id })}</strong></div>
-                <div><span>{t("classes.tickets.submittedByLabel")}</span><strong><PersonName person={author} /></strong></div>
-                <div><span>{t("classes.tickets.targetStudent")}</span><strong>{row.student_name ? <PersonName person={student} /> : t("classes.tickets.notProvided")}</strong></div>
-                {row.execution_result && <div className={styles.execution}><span>{t("classes.tickets.executionResult")}</span><p>{row.execution_result}</p></div>}
-              </div></details>
+          <h2 className={styles.readingTitle}>{openItem.student_name ? <PersonName person={studentOf(openItem)} /> : typeOf(openItem)}</h2>
+          <span className={styles.readingRule} aria-hidden="true" />
+          <RichTextContent value={openItem.description} className={styles.readingBody} />
+          {openItem.execution_result && <p className={styles.execution}><Wrench aria-hidden="true" />{openItem.execution_result}</p>}
+          <footer className={styles.manageArea}>
+            <div className={styles.manageFields}>
+              <label><FormLabel icon={CircleDot}>{t("classes.tickets.decisionStatus")}</FormLabel><select value={openItem.status} disabled={terminal} onChange={(event) => update(openItem.id, { status: event.target.value })}><option value="pending">{t("classes.tickets.status.pending")}</option><option value="approved">{t("classes.tickets.approveExecute")}</option><option value="rejected">{t("classes.tickets.reject")}</option>{["executed", "execution_error"].includes(openItem.status) && <option value={openItem.status}>{labels[openItem.status]}</option>}</select></label>
             </div>
-            <div className={styles.decision}>
-              <label><FormLabel icon={CircleDot}>{t("classes.tickets.decisionStatus")}</FormLabel><select value={row.status} disabled={terminal} onChange={(event) => update(row.id, { status: event.target.value })}><option value="pending">{t("classes.tickets.status.pending")}</option><option value="approved">{t("classes.tickets.approveExecute")}</option><option value="rejected">{t("classes.tickets.reject")}</option>{["executed", "execution_error"].includes(row.status) && <option value={row.status}>{labels[row.status]}</option>}</select></label>
-              <label><FormLabel icon={MessageSquareText}>{t("classes.tickets.reasoning")}</FormLabel><RichTextEditor value={row.response || ""} onChange={(response) => update(row.id, { response })} ariaLabel={t("classes.tickets.reasoningAria", { name: row.student_name ? student.name : author.name })} placeholder={t("classes.tickets.reasoningPlaceholder")} maxLength={5000} minHeight="compact" disabled={terminal} onInvalidLink={() => setNotice(t("classes.tickets.invalidLink"))} /></label>
-              <footer className={styles.actions}><button className="button button--secondary button--danger" disabled={saving === row.id} onClick={() => setDeleteTarget(row)}><Trash2 />{t("classes.tickets.delete")}</button><button className="button button--primary" disabled={saving === row.id || terminal} onClick={() => void save(row)}>{saving === row.id ? <LoaderCircle className="spin" /> : <Check />}{t("classes.tickets.save")}</button></footer>
-            </div>
-          </div>}
-        </article>;
-      })}{!visible.length && <AdminEmptyState icon={<Ticket />} title={query ? t("classes.tickets.noSearch") : filter === "pending" ? t("classes.tickets.noPending") : t("classes.tickets.noFilter")} />}</div>
-    </AdminSection>
+            <label className={styles.reasoning}><FormLabel icon={MessageSquareText}>{t("classes.tickets.reasoning")}</FormLabel><RichTextEditor value={openItem.response || ""} onChange={(response) => update(openItem.id, { response })} ariaLabel={t("classes.tickets.reasoningAria", { name: openItem.student_name ? studentOf(openItem).name : authorOf(openItem).name })} placeholder={t("classes.tickets.reasoningPlaceholder")} maxLength={5000} minHeight="compact" disabled={terminal} onInvalidLink={() => setNotice(t("classes.tickets.invalidLink"))} /></label>
+            <div className={styles.manageActions}><button className="button button--primary button--compact" type="button" disabled={saving === openItem.id || terminal} onClick={() => { if (openItem.status === "rejected") setRejectTarget(openItem); else void save(openItem); }}>{saving === openItem.id ? <LoaderCircle className="spin" /> : <Check />}{t("classes.tickets.save")}</button></div>
+          </footer>
+        </>}
+      </article>
+    </>}
     <ConfirmationDialog open={Boolean(deleteTarget)} eyebrow={t("classes.tickets.eyebrow")} title={locale === "en" ? "Delete this request?" : "Eliminar este pedido?"} description={t("classes.tickets.deleteConfirm")} subject={deleteTarget?.student_name || deleteTarget?.created_by_name} subjectLabel={locale === "en" ? "Request concerning" : "Pedido relativo a"} warning={locale === "en" ? "The request and its administrative history will be permanently removed." : "O pedido e o respetivo histórico administrativo serão removidos definitivamente."} confirmLabel={locale === "en" ? "Delete request" : "Eliminar pedido"} cancelLabel={locale === "en" ? "Cancel" : "Cancelar"} busy={Boolean(deleteTarget && saving === deleteTarget.id)} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) void remove(deleteTarget); }} />
+    <ConfirmationDialog open={Boolean(rejectTarget)} eyebrow="" title={t("classes.tickets.rejectTitle")} description="" subject={rejectTarget?.student_name || rejectTarget?.created_by_name} subjectLabel={locale === "en" ? "Request concerning" : "Pedido relativo a"} confirmLabel={t("classes.tickets.reject")} cancelLabel={locale === "en" ? "Cancel" : "Cancelar"} icon={<X />} onClose={() => setRejectTarget(null)} onConfirm={() => { if (rejectTarget) { const target = rejectTarget; setRejectTarget(null); void save(target); } }} />
   </AdminPage></AppShell></AuthGuard>;
 }

@@ -3,26 +3,30 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const campus = await readFile(new URL("../components/campus-directory.tsx", import.meta.url), "utf8");
-const campusStyles = await readFile(new URL("../components/campus-directory.module.css", import.meta.url), "utf8");
 const backend = await readFile(new URL("../worker/campus.ts", import.meta.url), "utf8");
+const migration = await readFile(new URL("../migrations/0071_campus_spaces.sql", import.meta.url), "utf8");
+const messages = await readFile(new URL("../lib/i18n.ts", import.meta.url), "utf8");
 
-test("o diretório liga docentes às unidades curriculares e preserva metadados do campus", () => {
-  assert.match(backend, /EXISTS \(SELECT 1 FROM campus_faculty_units/);
-  assert.match(backend, /cu\.code LIKE \? OR cu\.name LIKE \?/);
-  assert.match(backend, /b\.map_url AS building_map_url/);
-  assert.match(backend, /b\.accessibility_notes AS building_accessibility_notes/);
-  assert.match(campus, /href=\{unitHref\(unit\.id\)\}/);
-  assert.match(campus, /externalUrl\(room\.building_map_url\)/);
+test("salas e docentes é uma lista simples: sala, edifício (CIM ou Hospital São João), docente opcional e turmas", () => {
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS campus_spaces/);
+  assert.match(migration, /building TEXT NOT NULL CHECK \(building IN \('cim', 'hsj'\)\)/);
+  assert.match(migration, /teacher TEXT,/);
+  assert.match(backend, /if \(entity === "space"\)/);
+  assert.match(backend, /\["cim", "hsj"\]\.includes\(building\)/);
+  assert.match(backend, /value >= 1 && value <= 20/);
+  assert.match(campus, /t\("campus\.spaces\.room"\)/);
+  assert.match(campus, /t\("campus\.spaces\.teacher"\)} <small>\(\{t\("common\.optional"\)\}\)<\/small>/);
+  assert.match(campus, /t\("campus\.spaces\.classes"\)/);
+  assert.match(messages, /"campus\.eyebrow": "Faculdade de Medicina"/);
+  assert.match(messages, /"campus\.spaces\.building\.hsj": "Hospital São João"/);
 });
 
-test("o diretório usa padrões acessíveis para tabs, carregamento e editor", () => {
-  assert.match(campus, /role="tablist"/);
-  assert.match(campus, /aria-selected=\{tab === "rooms"\}/);
-  assert.match(campus, /role="tabpanel"/);
-  assert.match(campus, /role="status" aria-live="polite"/);
-  assert.match(campus, /role="dialog" aria-modal="true"/);
-  assert.match(campus, /useEscapeKey\(Boolean\(editor\), closeEditor\)/);
-  assert.match(campus, /useScrollLock\(Boolean\(editor\)\)/);
-  assert.match(campusStyles, /prefers-reduced-motion/);
-  assert.match(campusStyles, /var\(--surface-card-border\)/);
+test("salas e docentes segue o modelo lista → cartão, com gestão no menu flutuante", () => {
+  assert.match(campus, /useHashRecord\("sala"\)/);
+  assert.match(campus, /<RecordSkeleton /);
+  assert.match(campus, /useFloatingAction\(canManage && !editor && !openId \? \{ id: "new-space"/);
+  assert.match(campus, /<ConfirmationDialog/);
+  assert.match(campus, /data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true"/);
+  assert.match(campus, /useEscapeKey\(true, onClose\)/);
+  assert.match(campus, /new URLSearchParams\(window\.location\.search\)\.get\("q"\)/);
 });

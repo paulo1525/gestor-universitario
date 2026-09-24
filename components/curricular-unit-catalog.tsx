@@ -12,7 +12,6 @@ import {
   CalendarClock,
   FileText,
   GraduationCap,
-  LoaderCircle,
   Mail,
   MapPin,
   Megaphone,
@@ -24,6 +23,8 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
+import { RecordSkeleton } from "@/components/record-list";
+import list from "@/components/record-list.module.css";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
@@ -247,75 +248,28 @@ export function CurricularUnitCatalog() {
                 onDismiss={() => setError("")}
               />
             )}
-            <section className={`${styles.panel} ${styles.catalogPanel}`}>
-              <SurfaceHeader icon={<BookOpen />} title={t("community.units.catalog")} meta={!loading ? `${visible.length} ${visible.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}` : undefined} />
+            <section className={`panel ${list.listPanel}`} aria-busy={loading}>
               {units.length > 0 && <FilterBar label={t("community.units.filters")}>
                 <FilterSearch label={t("community.units.search")} value={query} onChange={setQuery} placeholder={t("community.units.searchPlaceholder")} />
                 <FilterSelect label={t("community.units.filterYear")} value={year} onChange={setYear} options={[{ value: "all", label: t("community.units.allYears") }, ...[1, 2, 3, 4, 5, 6].map((value) => ({ value: String(value), label: t("community.units.yearOption", { year: value }) }))]} />
               </FilterBar>}
-              {loading ? (
-                <div className={styles.state}>
-                  <LoaderCircle className={styles.spin} />
-                  <strong>{t("community.units.loading")}</strong>
-                </div>
-              ) : visible.length === 0 ? (
-                <div className={`${styles.state} ${styles.emptyState}`}>
+              {loading ? <RecordSkeleton label={t("community.units.loading")} /> : visible.length === 0 ? (
+                <div className={list.empty}>
                   {filtersActive ? <Search /> : <BookOpen />}
                   <strong>{t(filtersActive ? "community.units.empty" : "community.units.emptyInitial")}</strong>
                   {filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}
                 </div>
               ) : (
-                <div className={`${styles.grid} ${styles.catalogGrid}`}>
-                  {visible.map((item) => {
-                    const compendiumUnit = resolveMaterialCompendiumUnit(item.id) || resolveMaterialCompendiumUnit(item.code) || resolveMaterialCompendiumUnit(item.name);
-                    return <Link
-                      className={`${styles.card} ${styles.catalogCard}`}
-                      href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}
-                      key={item.id}
-                    >
-                      <div className={styles.cardTop}>
-                        <span className={styles.unitCode}>{item.code}</span>
-                        <span className={styles.tag}>
-                          {t("community.units.yearSemester", { year: item.year, semester: item.semester })}
-                        </span>
-                      </div>
-                      <div className={styles.catalogCardBody}>
-                        {compendiumUnit && <span className={styles.unitCover} aria-hidden="true">
-                          <Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="(max-width: 430px) 68px, 88px" />
-                        </span>}
-                        <div className={styles.catalogCardContent}>
-                          <div className={styles.catalogCopy}>
-                            <h3>{item.name}</h3>
-                            {item.description && <p>{item.description}</p>}
-                          </div>
-                          <div className={styles.metrics}>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.credits")}</span>
-                              <strong>
-                                {item.ects.toLocaleString(locale)} ECTS
-                              </strong>
-                            </div>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.year")}</span>
-                              <strong>{item.year}.º</strong>
-                            </div>
-                            <div className={styles.metric}>
-                              <span>{t("community.units.semester")}</span>
-                              <strong>{item.semester}.º</strong>
-                            </div>
-                          </div>
-                          {item.representatives.length > 0 && <div className={styles.metaRow}>
-                            <UserRound />
-                            <span>{item.representatives.map((representative) => representative.name).join(" · ")}</span>
-                          </div>}
-                          <span className={styles.linkHint}>
-                            {t("community.units.openArea")} <ArrowRight />
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  })}
-                </div>
+                <ul className={list.rows}>
+                  {visible.map((item) => { const compendiumUnit = resolveMaterialCompendiumUnit(item.id) || resolveMaterialCompendiumUnit(item.code) || resolveMaterialCompendiumUnit(item.name); return <li className={list.row} key={item.id}>
+                    {compendiumUnit ? <span className={styles.unitCover} aria-hidden="true"><Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="32px" /></span> : <span className={styles.unitCode}>{item.code}</span>}
+                    <div className={list.rowMain}>
+                      <h3><Link className={`link-quiet ${list.titleLink}`} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}>{item.name}</Link></h3>
+                      <p className={list.rowMeta}>{[compendiumUnit ? item.code : "", t("community.units.yearSemester", { year: item.year, semester: item.semester }), `${item.ects.toLocaleString(locale)} ECTS`, item.representatives.map((representative) => representative.name).join(", ")].filter(Boolean).join(" · ")}</p>
+                    </div>
+                    <ArrowRight className={styles.rowArrow} aria-hidden="true" />
+                  </li>; })}
+                </ul>
               )}
             </section>
           </div>
@@ -449,10 +403,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
             )}{" "}
             {loading ? (
               <section className={styles.panel}>
-                <div className={styles.state}>
-                  <LoaderCircle className={styles.spin} />
-                  <strong>{t("community.units.detailLoading")}</strong>
-                </div>
+                <RecordSkeleton label={t("community.units.detailLoading")} />
               </section>
             ) : (
               data && (
@@ -515,16 +466,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                     </div>
                     <div className={styles.page}>
                       {data.unit.faculty.length > 0 && <section className={styles.panel}>
-                        <div className={styles.panelHeader}>
-                          <div className={styles.panelTitle}>
-                            <span className={styles.panelIcon} aria-hidden="true"><GraduationCap /></span>
-                            <div>
-                              <h2>{t("community.units.faculty")}</h2>
-                              <p>{t("community.units.facultyDescription")}</p>
-                            </div>
-                          </div>
-                          <Link className={styles.panelLink} href="/salas-docentes">{t("community.units.facultyDirectory")} <ArrowRight aria-hidden="true" /></Link>
-                        </div>
+                        <SurfaceHeader icon={<GraduationCap />} title={t("community.units.faculty")} actions={<Link className={styles.panelLink} href="/salas-docentes">{t("community.units.facultyDirectory")} <ArrowRight aria-hidden="true" /></Link>} />
                         <div className={`${styles.sectionBody} ${styles.representativeList}`}>
                           {data.unit.faculty.map((member) => <article className={styles.representativeCard} key={member.id}>
                             <div className={styles.cardTop}>

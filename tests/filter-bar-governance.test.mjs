@@ -7,7 +7,6 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const filterPages = [
   "components/announcements-board.tsx",
   "components/documents-library.tsx",
-  "components/useful-links.tsx",
   "components/curricular-unit-catalog.tsx",
   "components/academic-calendar.tsx",
   "components/requests-center.tsx",

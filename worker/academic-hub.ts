@@ -3,6 +3,8 @@
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import { isExamWorkflowTransitionAllowed } from "@/lib/exam-workflow.mjs";
 import { handleMaterialsCatalogRoute, isMaterialsCatalogPath } from "./materials-catalog";
+import { deleteSubmissionFiles, handleMaterialUploadRoute, isMaterialUploadPath, markUploadsAttached, readyUploads } from "./material-uploads";
+import { MATERIAL_MAX_EXAM_PHOTOS } from "@/lib/material-upload";
 
 export type HubUser = {
   id: string;
@@ -220,12 +222,76 @@ async function documents(request: Request, env: HubEnv, url: URL, user: HubUser 
 
 function requestDto(row: Record<string, unknown>, viewer: HubUser, management: boolean) {
   const owns = row.submitted_by === viewer.id;
-  const dto: Record<string, unknown> = { id: row.id, subject: row.subject, body: row.body, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, anonymous: row.anonymous === 1, status: row.status, response: row.response, responseVisibility: row.response_visibility, respondedAt: row.responded_at, createdAt: row.created_at, updatedAt: row.updated_at, isOwn: owns };
+  const dto: Record<string, unknown> = { id: row.id, subject: row.subject, body: row.body, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, anonymous: row.anonymous === 1, status: row.status, response: row.response, responseVisibility: row.response_visibility, respondedAt: row.responded_at, commentCount: Number(row.comment_count ?? 0), createdAt: row.created_at, updatedAt: row.updated_at, isOwn: owns };
   if (row.anonymous !== 1 && (management || owns)) dto.submitter = { id: row.submitted_by, fullName: row.submitter_name, email: row.submitter_email, studentNumber: management ? row.submitter_student_number : undefined };
   // Identidades anónimas nunca são incluídas automaticamente. A revelação
   // excecional usa o endpoint dedicado e deixa um registo de auditoria.
   if (row.anonymous === 1 && isPrimary(viewer)) dto.canRevealIdentity = true;
   return dto;
+}
+
+const REQUEST_COMMENT_MAX = 2000;
+const REQUEST_COMMENTS_PER_10_MIN = 15;
+
+// Conversation on a request. The author and the commission can always write; on public
+// requests any student can read and comment. An anonymous author stays anonymous in the thread, and the
+// author's identity is never shown to other students.
+async function requestComments(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("requests.submission")) return disabled();
+  const managing = isCommission(user) && await enabled("requests.management");
+  const body = request.method === "GET" ? null : await bodyJson(request);
+  const requestId = request.method === "GET" ? text(url.searchParams.get("requestId"), 80) : text(body?.requestId, 80);
+  if (request.method === "DELETE") {
+    const id = text(body?.id, 80);
+    const existing = id ? await env.DB.prepare("SELECT id,user_id,request_id FROM course_request_comments WHERE id=? AND deleted_at IS NULL").bind(id).first<{ id: string; user_id: string; request_id: string }>() : null;
+    if (!existing) return json({ error: "Comentário não encontrado." }, 404);
+    const own = existing.user_id === user.id;
+    if (!own && !managing) return json({ error: "Só o autor ou a Comissão de Curso pode apagar este comentário." }, 403);
+    const now = Date.now();
+    const statements = [env.DB.prepare("UPDATE course_request_comments SET deleted_at=?,deleted_by=? WHERE id=? AND deleted_at IS NULL").bind(now, actor(user), id)];
+    if (!own) statements.push(env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'course_request_comment_removed',?,?)").bind(actor(user), JSON.stringify({ id, requestId: existing.request_id }), now));
+    await env.DB.batch(statements);
+    return json({ ok: true });
+  }
+  if (!requestId) return json({ error: "Pedido inválido." }, 400);
+  const target = await env.DB.prepare("SELECT id,submitted_by,anonymous,response_visibility FROM course_requests WHERE id=?").bind(requestId).first<{ id: string; submitted_by: string; anonymous: number; response_visibility: string }>();
+  if (!target) return json({ error: "Pedido não encontrado." }, 404);
+  const isAuthor = target.submitted_by === user.id;
+  const canWrite = isAuthor || managing || target.response_visibility === "public";
+  const canRead = canWrite;
+  if (!canRead) return json({ error: "Pedido não encontrado." }, 404);
+  if (request.method === "GET") {
+    const rows = await env.DB.prepare("SELECT c.id,c.body,c.created_at,c.user_id,u.full_name,u.email,u.commission_position FROM course_request_comments c JOIN users u ON u.id=c.user_id WHERE c.request_id=? AND c.deleted_at IS NULL ORDER BY c.created_at ASC LIMIT 300").bind(requestId).all<{ id: string; body: string; created_at: number; user_id: string; full_name: string; email: string; commission_position: string | null }>();
+    return json({
+      canWrite,
+      comments: rows.results.map((row) => {
+        const byAuthor = row.user_id === target.submitted_by;
+        const hideName = byAuthor && (target.anonymous === 1 || (!managing && !isAuthor));
+        return {
+          id: row.id,
+          body: row.body,
+          createdAt: row.created_at,
+          author: { fullName: hideName ? (target.anonymous === 1 ? "Envio anónimo" : "Estudante") : row.full_name, anonymous: hideName },
+          commission: !byAuthor && Boolean(row.commission_position),
+          own: row.user_id === user.id,
+          canDelete: row.user_id === user.id || managing,
+        };
+      }),
+    });
+  }
+  if (request.method === "POST") {
+    if (!canWrite) return forbidden();
+    const content = sanitizeRichTextHtml(String(body?.body || "").trim());
+    const length = richTextPlainText(content).length;
+    if (!length || length > REQUEST_COMMENT_MAX) return json({ error: `Escreve um comentário até ${REQUEST_COMMENT_MAX} caracteres.` }, 400);
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS total FROM course_request_comments WHERE user_id=? AND created_at>?").bind(user.id, Date.now() - 10 * 60_000).first<{ total: number }>();
+    if (Number(recent?.total || 0) >= REQUEST_COMMENTS_PER_10_MIN) return json({ error: "Demasiados comentários seguidos. Tenta daqui a pouco." }, 429);
+    const id = crypto.randomUUID(), now = Date.now();
+    await env.DB.prepare("INSERT INTO course_request_comments (id,request_id,user_id,body,created_at) VALUES (?,?,?,?,?)").bind(id, requestId, user.id, content, now).run();
+    return json({ ok: true, id }, 201);
+  }
+  return json({ error: "Operação não suportada." }, 405);
 }
 
 async function requests(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -268,8 +334,8 @@ async function requests(request: Request, env: HubEnv, url: URL, user: HubUser |
   if (!await enabled(management ? "requests.management" : "requests.submission")) return disabled();
   if (management && !isCommission(user)) return forbidden();
   if (request.method === "GET") {
-    const where = management ? "1=1" : "(r.submitted_by=? OR (r.response_visibility='public' AND r.response IS NOT NULL))";
-    const query = `SELECT r.*,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id JOIN users u ON u.id=r.submitted_by WHERE ${where} ORDER BY r.created_at DESC LIMIT 500`;
+    const where = management ? "1=1" : "(r.submitted_by=? OR (r.response_visibility='public' AND (r.response IS NOT NULL OR EXISTS (SELECT 1 FROM course_request_comments rc JOIN users ru ON ru.id=rc.user_id WHERE rc.request_id=r.id AND rc.deleted_at IS NULL AND rc.user_id<>r.submitted_by AND ru.commission_position IS NOT NULL))))";
+    const query = `SELECT r.*,(SELECT COUNT(*) FROM course_request_comments rc WHERE rc.request_id=r.id AND rc.deleted_at IS NULL) AS comment_count,cu.code AS unit_code,cu.name AS unit_name,u.full_name AS submitter_name,u.email AS submitter_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS submitter_student_number FROM course_requests r LEFT JOIN curricular_units cu ON cu.id=r.curricular_unit_id JOIN users u ON u.id=r.submitted_by WHERE ${where} ORDER BY r.created_at DESC LIMIT 500`;
     const [result, units] = await Promise.all([management ? env.DB.prepare(query).all() : env.DB.prepare(query).bind(user.id).all(), unitChoices(env)]);
     return json({ requests: result.results.map((row) => requestDto(rowObject(row), user, management)), units, canRevealAnonymousIdentity: isPrimary(user) && management });
   }
@@ -284,12 +350,13 @@ async function requests(request: Request, env: HubEnv, url: URL, user: HubUser |
     return json({ ok: true, id, anonymous }, 201);
   }
   if (request.method === "PATCH") {
-    const id = text(body.id, 80), status = text(body.status, 30), response = longText(body.response, 8000), responseVisibility = text(body.responseVisibility, 20) || "private";
-    if (!id || !["received", "reviewing", "forwarded", "resolved", "closed"].includes(status) || (response && !["public", "private"].includes(responseVisibility))) return json({ error: "Atualização inválida." }, 400);
+    // Replies now live in the comment thread; this only changes status and visibility.
+    const id = text(body.id, 80), status = text(body.status, 30), responseVisibility = text(body.responseVisibility, 20) || "private";
+    if (!id || !["received", "reviewing", "forwarded", "resolved", "closed"].includes(status) || !["public", "private"].includes(responseVisibility)) return json({ error: "Atualização inválida." }, 400);
     const now = Date.now();
-    const result = await env.DB.prepare("UPDATE course_requests SET status=?,response=?,response_visibility=?,responded_by=?,responded_at=?,updated_at=? WHERE id=?").bind(status, response || null, response ? responseVisibility : null, response ? actor(user) : null, response ? now : null, now, id).run();
+    const result = await env.DB.prepare("UPDATE course_requests SET status=?,response_visibility=?,updated_at=? WHERE id=?").bind(status, responseVisibility, now, id).run();
     if (!result.meta.changes) return json({ error: "Pedido não encontrado." }, 404);
-    await audit(env, user, "course_request_updated", { id, status, responseVisibility: response ? responseVisibility : null });
+    await audit(env, user, "course_request_updated", { id, status, responseVisibility });
     return json({ ok: true });
   }
   return json({ error: "Operação não suportada." }, 405);
@@ -574,7 +641,7 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
     const simplePoll = !Array.isArray(body.questions) && simpleOptions.length > 0;
     const questions = Array.isArray(body.questions) ? body.questions as Array<Record<string, unknown>> : simplePoll ? [{ prompt: title, selectionType: body.allowMultiple === true ? "multiple" : "single", required: true, options: simpleOptions }] : [];
     if (title.length < 3 || !questions.length || questions.length > 20 || !["always", "after_vote", "after_close", "cc"].includes(resultsVisibility)) return json({ error: "Dados do inquérito inválidos." }, 400);
-    const id = crypto.randomUUID(), now = Date.now(), initialStatus = simplePoll ? "published" : "draft", statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO polls (id,title,description,status,results_visibility,starts_at,ends_at,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, title, description, initialStatus, resultsVisibility, timestamp(body.startsAt), timestamp(body.endsAt), actor(user), now, now)];
+    const id = crypto.randomUUID(), now = Date.now(), initialStatus = "published", statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO polls (id,title,description,status,results_visibility,starts_at,ends_at,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id, title, description, initialStatus, resultsVisibility, timestamp(body.startsAt), timestamp(body.endsAt), actor(user), now, now)];
     for (let index = 0; index < questions.length; index += 1) {
       const question = questions[index], prompt = text(question.prompt, 300), selectionType = text(question.selectionType, 20) || "single", optionLabels = Array.isArray(question.options) ? question.options.map((value) => text(typeof value === "object" && value ? (value as Record<string, unknown>).label : value, 180)).filter(Boolean) : [];
       if (prompt.length < 3 || !["single", "multiple"].includes(selectionType) || optionLabels.length < 2 || optionLabels.length > 20) return json({ error: "Cada pergunta deve ter pelo menos duas opções válidas." }, 400);
@@ -598,7 +665,7 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
     const resultsVisibility = has("resultsVisibility") ? text(body.resultsVisibility, 30) : String(current.results_visibility);
     const startsAt = has("startsAt") ? timestamp(body.startsAt) : current.starts_at as number | null;
     const endsAt = has("endsAt") ? timestamp(body.endsAt) : current.ends_at as number | null;
-    if (title.length < 3 || !["draft", "published", "closed", "archived"].includes(status) || !["always", "after_vote", "after_close", "cc"].includes(resultsVisibility)) return json({ error: "Dados do inquérito inválidos." }, 400);
+    if (title.length < 3 || !["published", "closed"].includes(status) || !["always", "after_vote", "after_close", "cc"].includes(resultsVisibility)) return json({ error: "Dados do inquérito inválidos." }, 400);
     if ((has("startsAt") && body.startsAt !== null && body.startsAt !== "" && startsAt === null) || (has("endsAt") && body.endsAt !== null && body.endsAt !== "" && endsAt === null)) return json({ error: "Data do inquérito inválida." }, 400);
     if (startsAt !== null && endsAt !== null && endsAt <= startsAt) return json({ error: "A data de fim deve ser posterior ao início." }, 400);
 
@@ -636,14 +703,66 @@ function materialVersionDto(item: unknown) {
 function materialDto(item: unknown, extraAttachments: Array<Record<string, unknown>> = [], versions: Array<Record<string, unknown>> = []) {
   const row = rowObject(item);
   const categories: Record<string, string> = { exam_photo: "exam", summary: "summary", notes: "notes", other: "other" };
-  const attachments = [{ id: `${String(row.id)}-legacy`, name: row.attachment_name, mime: row.attachment_mime, dataUrl: row.attachment_data_url }, ...extraAttachments.map((attachment) => ({ id: attachment.id, name: attachment.attachment_name, mime: attachment.attachment_mime, dataUrl: attachment.attachment_data_url }))];
-  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: row.attachment_data_url, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: row.attachment_data_url, url: row.attachment_data_url, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, examSitting: row.exam_sitting, assessmentComponent: row.assessment_component, examDate: row.exam_date, questionCount: row.question_count, transcriptionStatus: row.transcription_status, transcriptionNotes: row.transcription_notes, favorite: row.is_favorite === 1, isFavorite: row.is_favorite === 1, favoriteCount: Number(row.favorite_count || 0), helpful: row.helpful_by_me === 1, helpfulByMe: row.helpful_by_me === 1, helpfulCount: Number(row.helpful_count || 0), outdated: row.outdated_by_me === 1, reportedOutdated: row.outdated_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1, outdatedCount: Number(row.outdatedCount || row.outdated_count || 0), currentVersion: Number(row.current_version || versions[0]?.version_number || 1), versionCount: Number(row.version_count || Math.max(1, versions.length)), versions: versions.map(materialVersionDto), createdAt: row.created_at, updatedAt: row.updated_at };
+  // Files stored in R2 are served through the authorised download route; legacy rows keep their inline data URL.
+  const mainFile = row.storage_backend === "r2" ? `/api/material-submissions/${String(row.id)}/files/main` : row.storage_backend === "removed" ? null : row.attachment_data_url;
+  const attachments = [{ id: `${String(row.id)}-legacy`, name: row.attachment_name, mime: row.attachment_mime, dataUrl: mainFile, kind: row.file_kind ?? null, size: row.size_bytes ?? null }, ...extraAttachments.map((attachment) => ({ id: attachment.id, name: attachment.attachment_name, mime: attachment.attachment_mime, dataUrl: attachment.storage_backend === "r2" ? `/api/material-submissions/${String(row.id)}/files/${String(attachment.id)}` : attachment.storage_backend === "removed" ? null : attachment.attachment_data_url, kind: attachment.file_kind ?? null, size: attachment.size_bytes ?? null }))];
+  let ankiMeta: unknown = null;
+  try { ankiMeta = row.anki_meta ? JSON.parse(String(row.anki_meta)) : null; } catch { ankiMeta = null; }
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.material_type, category: categories[String(row.material_type)] || "other", unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, unit: row.curricular_unit_id ? { id: row.curricular_unit_id, code: row.unit_code, name: row.unit_name } : null, academicYear: row.academic_year, anonymous: row.anonymous === 1, attachmentName: row.attachment_name, attachmentMime: row.attachment_mime, attachmentDataUrl: mainFile, attachments, fileName: row.attachment_name, fileType: row.attachment_mime, fileUrl: mainFile, url: mainFile, fileKind: row.file_kind ?? null, sizeBytes: row.size_bytes ?? null, anki: ankiMeta, status: row.status === "published" ? "approved" : row.status, moderationNote: row.moderation_note, examSitting: row.exam_sitting, assessmentComponent: row.assessment_component, examDate: row.exam_date, questionCount: row.question_count, transcriptionStatus: row.transcription_status, transcriptionNotes: row.transcription_notes, favorite: row.is_favorite === 1, isFavorite: row.is_favorite === 1, favoriteCount: Number(row.favorite_count || 0), helpful: row.helpful_by_me === 1, helpfulByMe: row.helpful_by_me === 1, helpfulCount: Number(row.helpful_count || 0), outdated: row.outdated_by_me === 1, reportedOutdated: row.outdated_by_me === 1, reportedOutdatedByMe: row.outdated_by_me === 1, outdatedCount: Number(row.outdatedCount || row.outdated_count || 0), currentVersion: Number(row.current_version || versions[0]?.version_number || 1), versionCount: Number(row.version_count || Math.max(1, versions.length)), versions: versions.map(materialVersionDto), createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 function validDataUrl(value: string): { mime: string; bytes: number } | null {
   const match = /^data:([^;,]+);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
   if (!match || !MATERIAL_MIMES.has(match[1])) return null;
   return { mime: match[1], bytes: Math.floor(match[2].length * 3 / 4) };
+}
+
+function sanitizeAnkiMeta(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const count = (key: string) => { const number = Number(raw[key]); return Number.isInteger(number) && number >= 0 ? Math.min(number, 10_000_000) : 0; };
+  const names = (key: string) => (Array.isArray(raw[key]) ? raw[key] as unknown[] : []).slice(0, 10).map((item) => text(item, 120)).filter(Boolean);
+  const format = ["anki2", "anki21", "anki21b"].includes(String(raw.format)) ? String(raw.format) : "anki2";
+  return JSON.stringify({ readable: raw.readable === true, format, deckNames: names("deckNames"), noteTypes: names("noteTypes"), noteCount: count("noteCount"), cardCount: count("cardCount"), untaggedNotes: count("untaggedNotes"), reviewCount: count("reviewCount"), mediaCount: raw.mediaCount === null ? null : count("mediaCount") });
+}
+
+/** Creates a submission from files already uploaded to R2 (see worker/material-uploads.ts). */
+async function createSubmissionFromUploads(env: HubEnv, user: HubUser, body: Record<string, unknown>): Promise<Response> {
+  const ids = (body.uploads as unknown[]).map((item) => text(item, 80)).filter(Boolean);
+  const uploads = await readyUploads(env, user.id, ids);
+  if (!uploads) return json({ error: "Envio inválido ou expirado. Volta a adicionar o ficheiro." }, 400);
+  const isExam = uploads.every((item) => item.file_kind === "image");
+  if (isExam ? uploads.length > MATERIAL_MAX_EXAM_PHOTOS : uploads.length !== 1) return json({ error: "Envio inválido." }, 400);
+  const primary = uploads[0];
+  const title = text(body.title, 180), description = sanitizeRichTextHtml(longText(body.description, 3000)), unitId = text(body.unitId, 80), academicYear = text(body.academicYear, 20), anonymous = body.anonymous === true;
+  const requested = text(body.category, 30);
+  const type = isExam ? "exam_photo" : primary.file_kind === "apkg" || primary.file_kind === "zip" ? "other" : ["summary", "notes", "other"].includes(requested) ? requested : "summary";
+  if (title.length < 3) return json({ error: "Indica um título com pelo menos 3 caracteres." }, 400);
+  if (!unitId) return json({ error: "Escolhe a unidade curricular." }, 400);
+  if (!await existingUnit(env, unitId)) return json({ error: "Unidade curricular inválida." }, 400);
+  const ankiMeta = primary.file_kind === "apkg" ? sanitizeAnkiMeta(body.anki) : null;
+  if (ankiMeta && JSON.parse(ankiMeta).reviewCount > 0) return json({ error: "O baralho inclui histórico de estudo. Exporta de novo sem informação de agendamento." }, 400);
+
+  const id = crypto.randomUUID(), now = Date.now();
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare("INSERT INTO material_submissions (id,title,description,material_type,curricular_unit_id,academic_year,anonymous,submitted_by,attachment_name,attachment_mime,attachment_data_url,status,file_kind,storage_backend,storage_key,size_bytes,anki_meta,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'','pending',?,'r2',?,?,?,?,?)")
+      .bind(id, title, description, type, unitId || null, academicYear || null, anonymous ? 1 : 0, user.id, primary.file_name, primary.mime_type, primary.file_kind, primary.storage_key, primary.declared_size, ankiMeta, now, now),
+    ...uploads.slice(1).map((item, index) => env.DB.prepare("INSERT INTO material_submission_attachments (id,submission_id,attachment_name,attachment_mime,attachment_data_url,sort_order,created_at,file_kind,storage_backend,storage_key,size_bytes) VALUES (?,?,?,?,'',?,?,?,'r2',?,?)")
+      .bind(crypto.randomUUID(), id, item.file_name, item.mime_type, index + 1, now, item.file_kind, item.storage_key, item.declared_size)),
+    ...markUploadsAttached(env, uploads.map((item) => item.id), id, now),
+  ];
+  if (isExam) {
+    const sitting = ["normal", "resit", "special", "continuous", "unknown"].includes(text(body.sitting, 20)) ? text(body.sitting, 20) : "unknown";
+    const assessmentComponent = ["theory", "practical", "mixed", "unknown"].includes(text(body.assessmentComponent, 20)) ? text(body.assessmentComponent, 20) : "unknown";
+    const examDateValue = body.examDate ? Date.parse(String(body.examDate)) : NaN;
+    const questionCount = body.questionCount === undefined || body.questionCount === "" ? null : Number(body.questionCount);
+    if (questionCount !== null && (!Number.isInteger(questionCount) || questionCount < 1 || questionCount > 500)) return json({ error: "O número de questões deve estar entre 1 e 500." }, 400);
+    statements.push(env.DB.prepare("INSERT INTO exam_submission_details(submission_id,sitting,assessment_component,exam_date,question_count,transcription_status,transcription_notes,updated_at) VALUES (?,?,?,?,?,'received',?,?)").bind(id, sitting, assessmentComponent, Number.isFinite(examDateValue) ? examDateValue : null, questionCount, longText(body.transcriptionNotes, 2000), now));
+    statements.push(env.DB.prepare("INSERT INTO exam_submission_workflow(id,submission_id,from_status,to_status,note,actor_user_id,created_at) VALUES (?,?,NULL,'received',?, ?,?)").bind(crypto.randomUUID(), id, longText(body.transcriptionNotes, 2000), actor(user), now));
+  }
+  await env.DB.batch(statements);
+  await audit(env, user, "material_submission_created", { id, type, fileKind: primary.file_kind, files: uploads.length, anonymous, unitId: unitId || null });
+  return json({ ok: true, id, anonymous, status: "pending" }, 201);
 }
 
 async function materials(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -677,6 +796,7 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
   }
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
+  if (request.method === "POST" && Array.isArray(body.uploads)) return createSubmissionFromUploads(env, user, body);
   if (request.method === "POST") {
     const file = body.file && typeof body.file === "object" && !Array.isArray(body.file) ? body.file as Record<string, unknown> : {};
     const category = text(body.category, 30), categoryTypes: Record<string, string> = { exam: "exam_photo", summary: "summary", notes: "notes", other: "other" };
@@ -731,6 +851,8 @@ async function materials(request: Request, env: HubEnv, url: URL, user: HubUser 
     if (!id || !["pending", "published", "rejected", "archived"].includes(status)) return json({ error: "Moderação inválida." }, 400);
     const now = Date.now(), result = await env.DB.prepare("UPDATE material_submissions SET status=?,moderation_note=?,moderated_by=?,moderated_at=?,updated_at=? WHERE id=?").bind(status, note || null, actor(user), now, now, id).run();
     if (!result.meta.changes) return json({ error: "Submissão não encontrada." }, 404);
+    // Rejected files stop occupying the R2 free allowance.
+    if (status === "rejected") await deleteSubmissionFiles(env, id);
     await audit(env, user, "material_submission_moderated", { id, status });
     return json({ ok: true });
   }
@@ -1020,21 +1142,34 @@ function httpsUrl(value: unknown): string | null {
 
 function usefulLinkDto(item: unknown) {
   const row = rowObject(item);
-  return { id: row.id, title: row.title, url: row.url, description: row.description, priority: row.priority, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, url: row.url, description: row.description, priority: row.priority, category: row.category, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, visibility: row.visibility, requiresLogin: Number(row.requires_login) === 1, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
+// Anonymous visitors only ever receive published links that are explicitly public
+// and do not require a session; the filter lives in SQL, never in the client.
+const USEFUL_LINKS_ANONYMOUS_SCOPE = "l.status='published' AND l.requires_login=0 AND l.visibility='public'";
+
 async function usefulLinks(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
-  const canManage = canManageCore(user), mutation = request.method !== "GET", management = canManage && (mutation || url.searchParams.get("scope") === "management");
+  const mutation = request.method !== "GET";
+  if (!user && mutation) return unauthenticated();
+  const canManage = canManageCore(user), management = canManage && (mutation || url.searchParams.get("scope") === "management");
   if (!await enabled(management ? "useful_links.management" : "useful_links.library")) return disabled();
   if (mutation && !canManage) return forbidden();
   if (request.method === "GET") {
     const unitId = text(url.searchParams.get("unitId"), 80), category = text(url.searchParams.get("category"), 30), priority = text(url.searchParams.get("priority"), 20);
     if (category && !USEFUL_LINK_CATEGORIES.has(category) || priority && !USEFUL_LINK_PRIORITIES.has(priority)) return json({ error: "Filtro de links invalido." }, 400);
-    const scope = management ? "1=1" : `l.status='published' AND (l.visibility!='cc' OR ${isCommission(user) ? "1=1" : "1=0"})`;
+    const scope = !user ? USEFUL_LINKS_ANONYMOUS_SCOPE : management ? "1=1" : `l.status='published' AND (l.visibility!='cc' OR ${isCommission(user) ? "1=1" : "1=0"})`;
     const result = await env.DB.prepare(`SELECT l.*,cu.code AS unit_code,cu.name AS unit_name FROM useful_links l LEFT JOIN curricular_units cu ON cu.id=l.curricular_unit_id WHERE ${scope} AND (?='' OR l.curricular_unit_id=?) AND (?='' OR l.category=?) AND (?='' OR l.priority=?) ORDER BY CASE l.priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,cu.name COLLATE NOCASE,l.title COLLATE NOCASE`).bind(unitId, unitId, category, category, priority, priority).all();
-    return json({ links: result.results.map(usefulLinkDto), units: await unitChoices(env), canManage, capabilities: { manage: canManage } });
+    if (!user) {
+      // Only a boolean is disclosed so the page can offer "Entrar"; titles, counts and URLs stay private.
+      const restricted = await env.DB.prepare(`SELECT 1 AS found FROM useful_links l WHERE l.status='published' AND l.visibility!='cc' AND NOT (${USEFUL_LINKS_ANONYMOUS_SCOPE}) LIMIT 1`).first();
+      return json({ links: result.results.map(usefulLinkDto), restricted: Boolean(restricted), authenticated: false, canManage: false, capabilities: { manage: false } });
+    }
+    // The linktree shows inline editing only when the caller may manage and the management module is on.
+    const manageable = canManage && (management || await enabled("useful_links.management"));
+    return json({ links: result.results.map(usefulLinkDto), units: management ? await unitChoices(env) : [], authenticated: true, canManage: manageable, capabilities: { manage: manageable } });
   }
+  if (!user) return unauthenticated();
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON invalido." }, 400);
   if (request.method === "DELETE") {
@@ -1055,18 +1190,22 @@ async function usefulLinks(request: Request, env: HubEnv, url: URL, user: HubUse
     await audit(env, user, "useful_link_status_updated", { id, status });
     return json({ ok: true, id, status });
   }
-  const id = request.method === "POST" ? crypto.randomUUID() : text(body.id, 80), title = text(body.title, 180), linkUrl = httpsUrl(body.url), description = longText(body.description, 2000), priority = text(body.priority, 20) || "normal", category = text(body.category, 30) || "other", unitId = text(body.unitId, 80), visibility = text(body.visibility, 20) || "students", status = text(body.status, 20) || "published";
-  if (!id || title.length < 3 || !linkUrl || !USEFUL_LINK_PRIORITIES.has(priority) || !USEFUL_LINK_CATEGORIES.has(category) || !["public", "students", "cc"].includes(visibility) || !["draft", "published", "archived"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do link invalido. O endereco tem de usar HTTPS." }, 400);
+  const id = request.method === "POST" ? crypto.randomUUID() : text(body.id, 80), title = text(body.title, 180), linkUrl = httpsUrl(body.url), description = longText(body.description, 2000), priority = text(body.priority, 20) || "normal", category = text(body.category, 30) || "other", unitId = text(body.unitId, 80), requestedVisibility = text(body.visibility, 20) || "students", status = text(body.status, 20) || "published";
+  if (!id || title.length < 3 || !linkUrl || !USEFUL_LINK_PRIORITIES.has(priority) || !USEFUL_LINK_CATEGORIES.has(category) || !["public", "students", "cc"].includes(requestedVisibility) || !["draft", "published", "archived"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do link invalido. O endereco tem de usar HTTPS." }, 400);
+  // requires_login is the anonymous gate; visibility stays consistent with it ('cc' always requires a session).
+  const loginFlag = body.requiresLogin ?? body.requires_login;
+  const requiresLogin = requestedVisibility === "cc" || (typeof loginFlag === "boolean" ? loginFlag : loginFlag === 1 || loginFlag === "1" ? true : loginFlag === 0 || loginFlag === "0" ? false : requestedVisibility !== "public");
+  const visibility = requestedVisibility === "cc" ? "cc" : requiresLogin ? "students" : "public", requiresLoginValue = requiresLogin ? 1 : 0;
   const now = Date.now();
   if (request.method === "POST") {
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO useful_links(id,title,url,description,priority,category,curricular_unit_id,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, title, linkUrl, description, priority, category, unitId || null, visibility, status, actor(user), actor(user), now, now),
-      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'useful_link_created',?,?)").bind(actor(user), JSON.stringify({ id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, status }), now),
+      env.DB.prepare("INSERT INTO useful_links(id,title,url,description,priority,category,curricular_unit_id,visibility,requires_login,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, title, linkUrl, description, priority, category, unitId || null, visibility, requiresLoginValue, status, actor(user), actor(user), now, now),
+      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'useful_link_created',?,?)").bind(actor(user), JSON.stringify({ id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, requiresLogin, status }), now),
     ]);
   } else {
-    const result = await env.DB.prepare("UPDATE useful_links SET title=?,url=?,description=?,priority=?,category=?,curricular_unit_id=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?").bind(title, linkUrl, description, priority, category, unitId || null, visibility, status, actor(user), now, id).run();
+    const result = await env.DB.prepare("UPDATE useful_links SET title=?,url=?,description=?,priority=?,category=?,curricular_unit_id=?,visibility=?,requires_login=?,status=?,updated_by=?,updated_at=? WHERE id=?").bind(title, linkUrl, description, priority, category, unitId || null, visibility, requiresLoginValue, status, actor(user), now, id).run();
     if (!result.meta.changes) return json({ error: "Link nao encontrado." }, 404);
-    await audit(env, user, "useful_link_updated", { id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, status });
+    await audit(env, user, "useful_link_updated", { id, title, url: linkUrl, priority, category, unitId: unitId || null, visibility, requiresLogin, status });
   }
   return json({ ok: true, id }, request.method === "POST" ? 201 : 200);
 }
@@ -1162,7 +1301,7 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
 
 export function isAcademicHubPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return isMaterialsCatalogPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
+  return isMaterialsCatalogPath(path) || isMaterialUploadPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/requests/comments" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
 export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -1173,6 +1312,7 @@ export async function handleAcademicHubRoute(request: Request, env: HubEnv, url:
   if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);
   if (pathname === "/api/documents") return documents(request, env, url, user, enabled);
   if (pathname === "/api/requests") return requests(request, env, url, user, enabled);
+  if (pathname === "/api/requests/comments") return requestComments(request, env, url, user, enabled);
   if (pathname === "/api/commission-directory" && request.method === "GET") return directory(env, user, enabled);
   if (pathname === "/api/curricular-units" && request.method === "GET") return unitCatalog(env, user, enabled);
   if (pathname === "/api/admin/curricular-unit-content") return curricularUnitAcademicContent(request, env, url, user, enabled, undefined, true);
@@ -1188,6 +1328,7 @@ export async function handleAcademicHubRoute(request: Request, env: HubEnv, url:
   if (pathname === "/api/notifications") return notifications(request, env, url, user, enabled);
   if (pathname === "/api/notification-preferences") return notificationPreferences(request, env, user, enabled);
   if (pathname === "/api/search" && request.method === "GET") return search(env, url, user, enabled);
+  if (isMaterialUploadPath(pathname)) return handleMaterialUploadRoute(request, env, url, user, enabled, Boolean(user && isCommission(user) && await enabled("materials.moderation")));
   if (pathname === "/api/material-submissions") return materials(request, env, url, user, enabled);
   if (pathname === "/api/material-favorites") return materialFavorites(request, env, url, user, enabled);
   if (pathname === "/api/material-feedback") return materialFeedback(request, env, url, user, enabled);
