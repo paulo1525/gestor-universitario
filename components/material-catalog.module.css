@@ -26,7 +26,8 @@
 
 
 
-.resourceList { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+/* Already inside the catalog card: flush, no second border or radius. */
+.resourceList { overflow: hidden; background: var(--surface); }
 .resourceLabel { color: var(--color-accent-text); font-size: var(--font-size-caption); font-weight: 850; letter-spacing: .02em; text-transform: uppercase; }
 .resourceActions { display: flex; align-items: center; gap: 8px; }
 .pending { color: var(--muted); font-size: var(--font-size-small); font-weight: 700; }

@@ -3,7 +3,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 
@@ -33,6 +33,7 @@ const COLORS: Array<{ value: HighlightColor; label: string }> = [
 ];
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const PAGE_GAP = 16;
+const COMPACT_QUERY = "(max-width: 900px), (pointer: coarse)";
 
 // The legacy build ships the polyfills (e.g. Map#getOrInsertComputed) that
 // Safari and older Chromium/Firefox releases still lack.
@@ -118,6 +119,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const [removing, setRemoving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 900px)").matches);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
+  // Touch screens and narrow windows get the bottom action sheet and larger targets.
+  const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches);
+  // Polite announcements for screen readers (selection ready, highlight saved or removed).
+  const [announcement, setAnnouncement] = useState("");
   const [query, setQuery] = useState("");
   const [searchState, setSearchState] = useState<{ query: string; pages: number[]; index: number; searching: boolean }>({ query: "", pages: [], index: 0, searching: false });
   const dialogRef = useRef<HTMLElement>(null);
@@ -131,6 +136,12 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const numPages = pdfDocument?.numPages ?? 0;
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const media = window.matchMedia(COMPACT_QUERY);
+    const sync = () => setCompact(media.matches);
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   // Document and highlights load in parallel.
   useEffect(() => {
@@ -283,6 +294,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
       const created = { ...data.highlight, rects: data.highlight.rects?.length ? data.highlight.rects : rects };
       setHighlights((current) => [...current, created].sort((a, b) => a.page - b.page || a.y - b.y));
       setActiveId(created.id);
+      setAnnouncement(`Realce guardado na página ${page}.`);
       return created;
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível guardar o realce.");
@@ -313,6 +325,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
       if (!response.ok) throw new Error(data.error || "Não foi possível remover o realce.");
       setHighlights((current) => current.filter((item) => item.id !== highlight.id));
       if (activeId === highlight.id) setActiveId(null);
+      setAnnouncement("Realce removido.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível remover o realce.");
     } finally {
@@ -344,6 +357,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
     const last = range.getClientRects()[range.getClientRects().length - 1] ?? bounds;
     const host = scroller.getBoundingClientRect();
     const half = Math.min(120, host.width / 2 - 8);
+    setAnnouncement("Texto selecionado. Escolhe uma cor para realçar.");
     setPending({ page, rects, text: text.slice(0, 2000), anchor: { left: Math.min(host.width - half, Math.max(half, last.right - host.left)), top: last.bottom - host.top + scroller.scrollTop + 8 } });
   }, [tool]);
 
@@ -356,6 +370,29 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
     await createHighlight(selection.page, selection.rects, selection.text, highlightColor);
     setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches);
   }, [createHighlight, pending]);
+
+  // Touch selections are adjusted with the system handles, which fire no pointerup on the page:
+  // once the selection settles it becomes a pending highlight too. Mouse drags still wait for pointerup.
+  useEffect(() => {
+    let timer = 0, pointerDown = false;
+    const onDown = () => { pointerDown = true; };
+    const onUp = () => { pointerDown = false; };
+    const onChange = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const selection = window.getSelection();
+        if (pointerDown || !selection || selection.isCollapsed || !selection.rangeCount) return;
+        if (scrollerRef.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) captureSelection();
+      }, 400);
+    };
+    document.addEventListener("selectionchange", onChange);
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("pointercancel", onUp, true);
+    return () => { window.clearTimeout(timer); document.removeEventListener("selectionchange", onChange); window.removeEventListener("pointerdown", onDown, true); window.removeEventListener("pointerup", onUp, true); window.removeEventListener("pointercancel", onUp, true); };
+  }, [captureSelection]);
+
+  const cancelPending = useCallback(() => { setPending(null); window.getSelection()?.removeAllRanges(); }, []);
 
   const selectHighlight = useCallback((highlight: Highlight, scroll = true) => {
     setActiveId(highlight.id);
@@ -528,6 +565,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
         </div>
       </header>
       <div className={styles.toolbar} role="toolbar" aria-label="Ferramentas de leitura">
+        <div className={styles.toolGroups}>
         <div className={styles.group}>
           <button className={styles.iconButton} type="button" onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage <= 1} aria-label="Página anterior" title="Página anterior (←)"><ChevronLeft /></button>
           <form className={styles.pageField} onSubmit={(event) => { event.preventDefault(); goToPageInput(); }}>
@@ -552,12 +590,13 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
           <button className={styles.toolButton} type="button" aria-pressed={layout === "scroll"} onClick={() => changeLayout("scroll")} title="Rolar pelo documento"><Rows3 /><span className={styles.toolLabel}>Contínuo</span></button>
           <button className={styles.toolButton} type="button" aria-pressed={layout === "single"} onClick={() => changeLayout("single")} title="Uma página de cada vez"><RectangleVertical /><span className={styles.toolLabel}>Página a página</span></button>
         </div>
-        <div className={styles.group} role="group" aria-label="Modo de realce">
+        <div className={styles.group} data-group="mark" role="group" aria-label="Modo de realce">
           <button className={styles.toolButton} type="button" aria-pressed={tool === "text"} onClick={() => setTool("text")} title="Selecionar texto para realçar"><MousePointer2 /><span className={styles.toolLabel}>Texto</span></button>
-          <button className={styles.toolButton} type="button" aria-pressed={tool === "area"} onClick={() => { setTool("area"); setPending(null); }} title="Desenhar uma zona (H)"><SquareDashed /><span className={styles.toolLabel}>Zona</span></button>
+          <button className={styles.toolButton} type="button" aria-pressed={tool === "area"} onClick={() => { setTool("area"); setPending(null); setAnnouncement("Modo zona: arrasta sobre a página para marcar uma zona."); }} title="Desenhar uma zona (H)"><SquareDashed /><span className={styles.toolLabel}>Zona</span></button>
           <div className={styles.swatches} role="radiogroup" aria-label="Cor do realce">
             {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatch} data-color={entry.value} aria-checked={color === entry.value} aria-label={entry.label} title={entry.label} onClick={() => setColor(entry.value)} />)}
           </div>
+        </div>
         </div>
         <form className={styles.search} role="search" onSubmit={(event) => { event.preventDefault(); stepSearch(1); }}>
           <Search aria-hidden="true" />
@@ -601,17 +640,28 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
                   <button className="button button--secondary button--compact" type="button" onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage >= numPages}>Seguinte<ChevronRight aria-hidden="true" /></button>
                 </nav>}
               </div>}
-          {pending && <div className={styles.selectionPopover} style={{ left: pending.anchor.left, top: pending.anchor.top }} role="dialog" aria-label="Realçar seleção" onPointerUp={(event) => event.stopPropagation()}>
-            {COLORS.map((entry) => <button key={entry.value} type="button" className={styles.swatch} data-color={entry.value} aria-label={`Realçar a ${entry.label.toLowerCase()}`} title={`Realçar a ${entry.label.toLowerCase()}`} onClick={() => void commitPending(entry.value)} />)}
+          {pending && <div className={styles.selectionPopover} data-compact={compact || undefined} style={compact ? undefined : { left: pending.anchor.left, top: pending.anchor.top }} role="group" aria-label="Realçar seleção" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
+            {compact && <p className={styles.popoverExcerpt}>{pending.text}</p>}
+            <div className={styles.popoverColors}>
+              {COLORS.map((entry) => <button key={entry.value} type="button" className={compact ? styles.colorChoice : styles.swatch} data-color={entry.value} aria-label={`Realçar a ${entry.label.toLowerCase()}`} title={`Realçar a ${entry.label.toLowerCase()}`} onClick={() => void commitPending(entry.value)}>{compact && <><span className={styles.dot} data-color={entry.value} aria-hidden="true" />{entry.label}</>}</button>)}
+            </div>
             <span className={styles.popoverDivider} aria-hidden="true" />
-            <button type="button" className={styles.popoverAction} onClick={() => { void navigator.clipboard?.writeText(pending.text); setPending(null); }}>Copiar</button>
+            <div className={styles.popoverActions}>
+              <button type="button" className={styles.popoverAction} onClick={() => { void navigator.clipboard?.writeText(pending.text); setPending(null); setAnnouncement("Texto copiado."); }}><Copy aria-hidden="true" />Copiar</button>
+              {compact && <button type="button" className={styles.popoverAction} onClick={cancelPending}><X aria-hidden="true" />Cancelar</button>}
+            </div>
           </div>}
-          {saving && <span className={styles.saving} role="status">A guardar realce</span>}
+          {tool === "area" && <p className={styles.toolHint}>Arrasta sobre a página para marcar uma zona. Toca em <strong>Texto</strong> para voltar a deslocar.</p>}
+          {saving && <span className={styles.saving} aria-hidden="true">A guardar realce</span>}
+          <p className={styles.srOnly} role="status" aria-live="polite">{saving ? "A guardar realce…" : announcement}</p>
         </div>
         <aside id="pdf-highlights-panel" className={styles.sidebar} aria-label="Realces e notas" hidden={!sidebarOpen}>
           <header className={styles.sidebarHeader}>
             <div><ListTree aria-hidden="true" /><h3>Realces</h3><span className={styles.sidebarCount}>{highlights.length}</span></div>
-            <button className="button button--secondary button--compact" type="button" onClick={exportNotes} disabled={!listed.length}><Download aria-hidden="true" />Exportar</button>
+            <div className={styles.sidebarActions}>
+              <button className="button button--secondary button--compact" type="button" onClick={exportNotes} disabled={!listed.length}><Download aria-hidden="true" />Exportar</button>
+              {compact && <button className={styles.iconButton} type="button" onClick={() => setSidebarOpen(false)} aria-label="Fechar realces"><X /></button>}
+            </div>
           </header>
           <div className={styles.colorFilter} role="group" aria-label="Filtrar por cor">
             <button type="button" aria-pressed={colorFilter === "all"} onClick={() => setColorFilter("all")}>Todas</button>
@@ -623,7 +673,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
               : !listed.length ? <div className={styles.emptyList}><Highlighter aria-hidden="true" /><strong>{highlights.length ? "Sem realces nesta cor" : "Ainda sem realces"}</strong><span>{highlights.length ? "" : "Seleciona texto no PDF e escolhe uma cor."}</span></div>
                 : listedGroups.map(([page, items]) => <section key={page} className={styles.pageGroup}>
                   <button type="button" className={styles.pageGroupTitle} onClick={() => scrollToPage(page)}>Página {page}<span>{items.length}</span></button>
-                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => selectHighlight(highlight)} onColor={(value) => void updateHighlight(highlight, { color: value })} onNote={(value) => void updateHighlight(highlight, { note: value })} onRemove={() => setRemoveTarget(highlight)} />)}
+                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onColor={(value) => void updateHighlight(highlight, { color: value })} onNote={(value) => void updateHighlight(highlight, { note: value })} onRemove={() => setRemoveTarget(highlight)} />)}
                 </section>)}
           </div>
         </aside>
