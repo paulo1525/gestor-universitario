@@ -2,9 +2,10 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowLeftRight, BookOpen, ChevronRight, Download, FileText, GraduationCap, Highlighter, LoaderCircle, Package, Search, Sparkles } from "lucide-react";
+import { ArrowLeftRight, BookOpen, CheckCircle2, ChevronRight, Download, FileText, FolderOpen, GraduationCap, Highlighter, Layers, ListFilter, LoaderCircle, Package, RotateCcw, Search } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { SurfaceHeader } from "@/components/surface-header";
+import { FormLabel } from "@/components/form-label";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
 import { MaterialPdfReader } from "@/components/material-pdf-reader";
 import styles from "@/components/material-catalog.module.css";
@@ -31,13 +32,20 @@ function bibliographyFormat(item: CatalogItem): BibliographyFormat {
   return item.pages?.printedStart || item.pages?.physicalStart ? "excerpt" : "complete";
 }
 
-export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange, units, submissionCounts, children }: {
+/**
+ * Materials follow the announcements anatomy: one panel with a header and
+ * counter, a filter bar and bordered rows. The unit is chosen before anything else.
+ */
+export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange, units, submissionCounts, examCount, examFilters, examSummary, children }: {
   activeTab: MaterialCatalogTab;
   onTabChange: (tab: MaterialCatalogTab) => void;
   unitCode: string;
   onUnitChange: (code: string) => void;
   units: MaterialUnitOption[];
   submissionCounts: Record<string, number>;
+  examCount?: number;
+  examFilters?: ReactNode;
+  examSummary?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -119,7 +127,6 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => order(a) - order(b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
   }, [activeTab, t, visible]);
   const stats = useMemo(() => ({ summaries: unitItems.filter((item) => item.kind === "summary").length, bibliography: unitItems.filter((item) => item.kind === "bibliography").length, decks: unitDecks.length }), [unitDecks.length, unitItems]);
-  const label = (item: CatalogItem) => item.kind === "summary" ? t("community.materials.catalog.tab.summaries") : item.kind === "bibliography" ? t("community.materials.catalog.tab.bibliography") : item.kind === "anki" ? t("community.materials.catalog.tab.anki") : t("community.materials.catalog.tab.overview");
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
@@ -135,7 +142,10 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     window.requestAnimationFrame(() => document.getElementById(`material-tab-${next}`)?.focus());
   };
   const retryCatalog = () => setCatalogAttempt((attempt) => attempt + 1);
-  const unitName = (unit: MaterialUnitOption) => unit.code === GENERAL_MATERIAL_UNIT ? unit.name : `${unit.code} · ${unit.name}`;
+  const count = (value: number, one: string, many: string) => `${value} ${value === 1 ? one : many}`;
+  const results = (value: number) => count(value, t("community.materials.catalog.result"), t("community.materials.catalog.results"));
+  const errorState = <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong>{error && <span>{error}</span>}<button className="button button--secondary button--compact" type="button" onClick={retryCatalog}><RotateCcw />{t("community.materials.catalog.retry")}</button></div>;
+  const loadingState = <div className={styles.empty} role="status"><LoaderCircle className={styles.spin} /><strong>{t("community.materials.catalog.loading")}</strong></div>;
 
   if (!selectedUnit) {
     const term = unitSearch.trim().toLocaleLowerCase("pt-PT");
@@ -145,75 +155,104 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       const key = unit.year && unit.semester ? `${unit.year}.º ano · ${unit.semester}.º semestre` : "";
       unitGroups.set(key, [...(unitGroups.get(key) || []), unit]);
     }
-    return <section className={styles.panel} aria-label={t("community.materials.catalog.unit.title")}>
-      <SurfaceHeader icon={<GraduationCap />} title={t("community.materials.catalog.unit.title")} description={t("community.materials.catalog.unit.description")} meta={!loading ? `${matching.length} ${matching.length === 1 ? t("community.units.unit") : t("community.units.unitPlural")}` : undefined} />
-      <div className={styles.toolbar}>
-        <label className={styles.toolbarField}><span>{t("community.materials.catalog.unit.search")}</span><span className={styles.searchInput}><Search aria-hidden="true" /><input type="search" value={unitSearch} onChange={(event) => setUnitSearch(event.target.value)} placeholder={t("community.materials.catalog.unit.searchPlaceholder")} /></span></label>
+    return <section className={`panel ${styles.feed}`} aria-busy={loading}>
+      <SurfaceHeader icon={<GraduationCap />} title={t("community.materials.catalog.unit.title")} meta={count(matching.length, t("community.units.unit"), t("community.units.unitPlural"))} />
+      <div className={styles.filters}>
+        <label className={styles.searchField}><FormLabel icon={Search}>{t("community.materials.catalog.unit.search")}</FormLabel><div><Search /><input type="search" value={unitSearch} onChange={(event) => setUnitSearch(event.target.value)} placeholder={t("community.materials.catalog.unit.searchPlaceholder")} /></div></label>
+        <button className={styles.resetFilters} type="button" onClick={() => setUnitSearch("")} disabled={!unitSearch}><RotateCcw />{t("community.materials.catalog.clearFilters")}</button>
       </div>
-      {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
-      {loading && !units.length ? <div className={styles.empty} role="status"><LoaderCircle className={styles.spin} /><span>{t("community.materials.catalog.loading")}</span></div> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={styles.unitGroup} key={group || "all"}>
+      <div className={styles.resultsSummary}><span>{t("community.materials.catalog.unit.description")}</span></div>
+      {loading && !units.length ? loadingState : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={styles.group} key={group || "all"}>
         {group && <h3 className={styles.groupTitle}>{group}</h3>}
-        <ul className={styles.unitList}>
+        <ul className={styles.list}>
           {groupUnits.map((unit) => {
-            const count = countFor(unit);
-            return <li key={unit.code}><button type="button" className={styles.unitOption} onClick={() => { onUnitChange(normalizeMaterialUnitCode(unit.code)); setUnitSearch(""); }}>
-              <span className={styles.unitCode}>{unit.code === GENERAL_MATERIAL_UNIT ? "UC" : unit.code}</span>
-              <span className={styles.unitName}><strong>{unit.name}</strong><small data-empty={count === 0 || undefined}>{count === 0 ? t("community.materials.catalog.unit.none") : count === 1 ? t("community.materials.catalog.unit.countOne") : t("community.materials.catalog.unit.count", { count })}</small></span>
-              <ChevronRight aria-hidden="true" />
+            const total = countFor(unit);
+            return <li key={unit.code}><button type="button" className={styles.row} onClick={() => { onUnitChange(normalizeMaterialUnitCode(unit.code)); setUnitSearch(""); }}>
+              <span className={styles.rail}><GraduationCap /></span>
+              <span className={styles.rowContent}><span className={styles.badges}><span className={styles.badge}>{unit.code === GENERAL_MATERIAL_UNIT ? "UC" : unit.code}</span></span><strong>{unit.name}</strong><small>{total === 0 ? t("community.materials.catalog.unit.none") : total === 1 ? t("community.materials.catalog.unit.countOne") : t("community.materials.catalog.unit.count", { count: total })}</small></span>
+              <ChevronRight className={styles.rowArrow} aria-hidden="true" />
             </button></li>;
           })}
         </ul>
-      </div>) : <div className={styles.empty}><Search /><strong>{t("community.materials.catalog.unit.empty")}</strong></div>}
+      </div>) : <div className={styles.empty}><Search /><strong>{t("community.materials.catalog.unit.empty")}</strong><button className="button button--secondary button--compact" type="button" onClick={() => setUnitSearch("")}><RotateCcw />{t("community.materials.catalog.clearFilters")}</button></div>}
     </section>;
   }
 
-  return <section className={styles.catalog} aria-label={t("community.materials.title")}>
-    <div className={styles.contextBar}>
-      <div className={styles.unitSummary}>
-        <span className={styles.overviewIcon} aria-hidden="true"><GraduationCap /></span>
-        <div><span className={styles.resourceLabel}>{t("community.materials.catalog.unit.selected")}</span><strong>{unitName(selectedUnit)}</strong></div>
-        <button className="button button--secondary button--compact" type="button" onClick={() => onUnitChange("")}><ArrowLeftRight aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
-      </div>
+  const meta = activeTab === "summaries" || activeTab === "bibliography" ? results(visible.length)
+    : activeTab === "exams" ? results(examCount ?? 0)
+    : activeTab === "anki" ? results(unitDecks.length)
+    : results(stats.summaries + stats.bibliography + stats.decks);
+  const unitTitle = selectedUnit.code === GENERAL_MATERIAL_UNIT ? selectedUnit.name : `${selectedUnit.code} · ${selectedUnit.name}`;
+
+  return <section className={`panel ${styles.feed}`} aria-busy={loading}>
+    <SurfaceHeader icon={<FolderOpen />} title={unitTitle} meta={meta} actions={<button className="button button--secondary button--compact" type="button" onClick={() => onUnitChange("")}><ArrowLeftRight />{t("community.materials.catalog.unit.change")}</button>} />
+    <div className={styles.toolbar}>
       <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
-        {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>{tabLabel(tab)}</button>)}
+        {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>{tabLabel(tab)}</button>)}
       </nav>
     </div>
-    {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
     <div id={`material-panel-${activeTab}`} className={styles.tabPanel} role="tabpanel" aria-labelledby={`material-tab-${activeTab}`} tabIndex={-1}>
-      {activeTab === "overview" && <>
-        {loading ? <div className={styles.empty} role="status"><LoaderCircle className={styles.spin} /><span>{t("community.materials.catalog.loading")}</span></div> : error ? <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : <>
-          <div className={styles.overviewGrid}><article className={styles.overviewCard}><span className={styles.overviewIcon} aria-hidden="true"><FileText /></span><div><strong>{stats.summaries}</strong><span>{t("community.materials.catalog.tab.summaries")}</span><small>{t("community.materials.catalog.summaryDescription")}</small></div><button type="button" onClick={() => onTabChange("summaries")}>{t("community.materials.catalog.explore")}</button></article><article className={styles.overviewCard}><span className={styles.overviewIcon} aria-hidden="true"><BookOpen /></span><div><strong>{stats.bibliography}</strong><span>{t("community.materials.catalog.tab.bibliography")}</span><small>{t("community.materials.catalog.bibliographyDescription")}</small></div><button type="button" onClick={() => onTabChange("bibliography")}>{t("community.materials.catalog.explore")}</button></article><article className={styles.overviewCard}><span className={styles.overviewIcon} aria-hidden="true"><Package /></span><div><strong>{stats.decks}</strong><span>{t("community.materials.catalog.tab.anki")}</span><small>{t("community.materials.catalog.ankiDescription")}</small></div><button type="button" onClick={() => onTabChange("anki")}>{t("community.materials.catalog.configure")}</button></article></div>
-          <div className={styles.overviewNote}><Sparkles aria-hidden="true" /><div><strong>Materiais organizados para estudar por aula</strong><p>Os originais são preservados e as versões verificadas ficam identificadas. Na bibliografia, a obra completa, os excertos por sumário e as traduções aparecem separados.</p></div></div>
-        </>}
-      </>}
-      {(activeTab === "summaries" || activeTab === "bibliography") && <section className={styles.panel}>
-        <SurfaceHeader icon={activeTab === "bibliography" ? <BookOpen /> : <FileText />} title={tabLabel(activeTab)} meta={`${visible.length} ${visible.length === 1 ? t("community.materials.catalog.result") : t("community.materials.catalog.results")}`} />
-        <div className={styles.toolbar}>
-          {activeTab === "bibliography" && <div className={styles.segmented} role="group" aria-label={t("community.materials.catalog.format.label")}>
-            <button type="button" aria-pressed={formatFilter === "all"} className={formatFilter === "all" ? styles.segmentActive : ""} onClick={() => setFormatFilter("all")}>{t("community.materials.catalog.format.all")}<b>{filtered.length}</b></button>
-            {formats.map((format) => <button key={format} type="button" aria-pressed={formatFilter === format} className={formatFilter === format ? styles.segmentActive : ""} onClick={() => setFormatFilter(format)}>{formatLabel(format)}<b>{formatCounts[format]}</b></button>)}
-          </div>}
-          <label className={styles.toolbarField}><span>{t("community.materials.catalog.search")}</span><span className={styles.searchInput}><Search aria-hidden="true" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("community.materials.catalog.searchPlaceholder")} /></span></label>
-          {unitLessons.length > 0 && <label className={styles.toolbarField}><span>{t("community.materials.catalog.lesson")}</span><select value={lessonFilter} onChange={(event) => setLessonFilter(event.target.value)}><option value="">{t("community.materials.catalog.allLessons")}</option>{unitLessons.map((lesson) => <option value={lesson.code} key={lesson.id}>{lesson.code} · {lesson.title}</option>)}</select></label>}
-          <label className={styles.toolbarField}><span>{t("community.materials.catalog.editorialStatus")}</span><select value={verificationFilter} onChange={(event) => setVerificationFilter(event.target.value as typeof verificationFilter)}><option value="all">{t("community.materials.catalog.allStatuses")}</option><option value="verified">{t("community.materials.catalog.verified")}</option><option value="original">{t("community.materials.catalog.original")}</option><option value="pending">{t("community.materials.catalog.pending")}</option></select></label>
-          <label className={styles.toolbarCheck}><input type="checkbox" checked={recommendedOnly} onChange={(event) => setRecommendedOnly(event.target.checked)} /><span>{t("community.materials.catalog.recommendedOnly")}</span></label>
-          {resourceFiltersActive && <button className="button button--ghost button--compact" type="button" onClick={clearResourceFilters}>{t("community.materials.catalog.clearFilters")}</button>}
+      {activeTab === "overview" && (loading ? loadingState : error ? errorState : <ul className={styles.list}>
+        {([["summaries", FileText, stats.summaries, "summaryDescription"], ["bibliography", BookOpen, stats.bibliography, "bibliographyDescription"], ["anki", Package, stats.decks, "ankiDescription"]] as const).map(([tab, Icon, total, description]) => <li key={tab}><button type="button" className={styles.row} onClick={() => onTabChange(tab)}>
+          <span className={styles.rail}><Icon /></span>
+          <span className={styles.rowContent}><strong>{tabLabel(tab)}</strong><small>{t(`community.materials.catalog.${description}`)}</small></span>
+          <span className={styles.rowCount}>{total}</span>
+          <ChevronRight className={styles.rowArrow} aria-hidden="true" />
+        </button></li>)}
+      </ul>)}
+      {(activeTab === "summaries" || activeTab === "bibliography") && <>
+        <div className={styles.filters}>
+          <label className={styles.searchField}><FormLabel icon={Search}>{t("community.materials.catalog.search")}</FormLabel><div><Search /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("community.materials.catalog.searchPlaceholder")} /></div></label>
+          {activeTab === "bibliography" && <label><FormLabel icon={Layers}>{t("community.materials.catalog.format.label")}</FormLabel><select value={formatFilter} onChange={(event) => setFormatFilter(event.target.value as typeof formatFilter)}><option value="all">{t("community.materials.catalog.format.all")} ({filtered.length})</option>{formats.map((format) => <option value={format} key={format}>{formatLabel(format)} ({formatCounts[format]})</option>)}</select></label>}
+          {unitLessons.length > 0 && <label><FormLabel icon={ListFilter}>{t("community.materials.catalog.lesson")}</FormLabel><select value={lessonFilter} onChange={(event) => setLessonFilter(event.target.value)}><option value="">{t("community.materials.catalog.allLessons")}</option>{unitLessons.map((lesson) => <option value={lesson.code} key={lesson.id}>{lesson.code} · {lesson.title}</option>)}</select></label>}
+          <label><FormLabel icon={CheckCircle2}>{t("community.materials.catalog.editorialStatus")}</FormLabel><select value={verificationFilter} onChange={(event) => setVerificationFilter(event.target.value as typeof verificationFilter)}><option value="all">{t("community.materials.catalog.allStatuses")}</option><option value="verified">{t("community.materials.catalog.verified")}</option><option value="original">{t("community.materials.catalog.original")}</option><option value="pending">{t("community.materials.catalog.pending")}</option></select></label>
+          <button className={styles.resetFilters} type="button" onClick={clearResourceFilters} disabled={!resourceFiltersActive}><RotateCcw />{t("community.materials.catalog.clearFilters")}</button>
         </div>
-        <div className={styles.resourceList}>
-          {loading ? <div className={styles.empty} role="status"><LoaderCircle className={styles.spin} />{t("community.materials.catalog.loading")}</div> : error ? <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? groups.map((group) => <div className={styles.resourceGroup} key={group.key || "other"}>
-            {group.title && <h3 className={styles.groupTitle}>{group.title}</h3>}
+        <div className={styles.resultsSummary}><label className={styles.check}><input type="checkbox" checked={recommendedOnly} onChange={(event) => setRecommendedOnly(event.target.checked)} /><span>{t("community.materials.catalog.recommendedOnly")}</span></label><span>{results(visible.length)}</span></div>
+        {loading ? loadingState : error ? errorState : visible.length ? groups.map((group) => <div className={styles.group} key={group.key || "other"}>
+          {group.title && <h3 className={styles.groupTitle}>{group.title}</h3>}
+          <div className={styles.list}>
             {group.items.map((item) => {
               const itemLessons = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
               const storagePending = item.storage?.state !== "ready";
               const metadataOnly = item.kind === "bibliography" && item.storage?.backend === "inline";
               const format = item.kind === "bibliography" ? bibliographyFormat(item) : null;
-              return <article className={styles.resource} key={item.id}><span className={styles.resourceIcon} aria-hidden="true">{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</span><div className={styles.resourceMain}><div className={styles.resourceHeading}><div><span className={styles.resourceLabel}>{format ? formatBadge(format) : label(item)}{item.recommended && " · recomendado"}</span><h3>{item.title}</h3></div><span className={`${styles.badge} ${item.verification === "verified" ? styles.badgeVerified : item.verification === "pending" ? styles.badgePending : ""}`}>{verificationLabel(item.verification)}</span></div>{item.description && <p>{item.description}</p>}<div className={styles.resourceMeta}>{item.source?.author && <span>{item.source.author}</span>}{(item.pages?.printedStart || item.pages?.printedEnd) && <span>Páginas impressas {item.pages?.printedStart}–{item.pages?.printedEnd}</span>}{(item.pages?.physicalStart || item.pages?.physicalEnd) && <span>Páginas físicas {item.pages?.physicalStart}–{item.pages?.physicalEnd}</span>}{itemLessons.length > 0 && <span>{itemLessons.join(" · ")}</span>}{item.pages?.note && <span>{item.pages.note}</span>}</div><div className={styles.resourceActions}>{metadataOnly ? <span className={styles.pending}>Referência bibliográfica apenas; consulte a obra por uma via licenciada.</span> : <>{item.viewUrl && <button className="button button--primary button--compact" type="button" onClick={() => setReader(item)}><Highlighter />Abrir e realçar</button>}{item.downloadUrl ? <a className="button button--secondary button--compact" href={item.downloadUrl} download={item.fileName}><Download />Descarregar</a> : <span className={styles.pending}>{storagePending ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable")}</span>}</>}</div></div></article>;
+              return <article className={styles.resource} key={item.id}>
+                <div className={styles.rail}>{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</div>
+                <div className={styles.resourceMain}>
+                  <header><div className={styles.badges}>{format && <span className={styles.badge}>{formatBadge(format)}</span>}{item.recommended && <span className={styles.badge}>Recomendado</span>}<span className={`${styles.badge} ${item.verification === "verified" ? styles.badgeVerified : item.verification === "pending" ? styles.badgePending : styles.badgeNeutral}`}>{verificationLabel(item.verification)}</span></div></header>
+                  <h3>{item.title}</h3>
+                  {item.description && <p>{item.description}</p>}
+                  <footer>
+                    <div className={styles.resourceMeta}>{item.source?.author && <span>{item.source.author}</span>}{(item.pages?.printedStart || item.pages?.printedEnd) && <span>Páginas impressas {item.pages?.printedStart}–{item.pages?.printedEnd}</span>}{(item.pages?.physicalStart || item.pages?.physicalEnd) && <span>Páginas físicas {item.pages?.physicalStart}–{item.pages?.physicalEnd}</span>}{itemLessons.length > 0 && <span>{itemLessons.join(" · ")}</span>}{item.pages?.note && <span>{item.pages.note}</span>}</div>
+                    <div className={styles.resourceActions}>{metadataOnly ? <span className={styles.pending}>Referência bibliográfica apenas; consulte a obra por uma via licenciada.</span> : <>{item.viewUrl && <button className="button button--primary button--compact" type="button" onClick={() => setReader(item)}><Highlighter />Abrir e realçar</button>}{item.downloadUrl ? <a className="button button--secondary button--compact" href={item.downloadUrl} download={item.fileName}><Download />Descarregar</a> : <span className={styles.pending}>{storagePending ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable")}</span>}</>}</div>
+                  </footer>
+                </div>
+              </article>;
             })}
-          </div>) : <div className={styles.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong><span>{t("community.materials.catalog.emptyHint")}</span>{resourceFiltersActive && <button className="button button--ghost button--compact" type="button" onClick={clearResourceFilters}>{t("community.materials.catalog.clearFilters")}</button>}</div>}
+          </div>
+        </div>) : <div className={styles.empty}><Search /><strong>{t("community.materials.catalog.empty")}</strong><span>{t("community.materials.catalog.emptyHint")}</span>{resourceFiltersActive && <button className="button button--secondary button--compact" type="button" onClick={clearResourceFilters}><RotateCcw />{t("community.materials.catalog.clearFilters")}</button>}</div>}
+      </>}
+      {activeTab === "anki" && <>
+        <div className={styles.filters}>
+          <div className={styles.segmentField}><FormLabel icon={Package}>{t("community.materials.catalog.packageBase")}</FormLabel><div className={styles.segmented}><button type="button" aria-pressed={ankiVariant === "essential"} onClick={() => setAnkiVariant("essential")}>{t("community.materials.catalog.essential")}</button><button type="button" aria-pressed={ankiVariant === "complete"} onClick={() => setAnkiVariant("complete")}>{t("community.materials.catalog.complete")}</button></div></div>
         </div>
-      </section>}
-      {activeTab === "anki" && <div className={styles.ankiWorkspace}><div className={styles.ankiMain}><div className={styles.segmented}><span className={styles.controlLabel}>{t("community.materials.catalog.packageBase")}</span><button type="button" aria-pressed={ankiVariant === "essential"} className={ankiVariant === "essential" ? styles.segmentActive : ""} onClick={() => setAnkiVariant("essential")}>{t("community.materials.catalog.essential")}</button><button type="button" aria-pressed={ankiVariant === "complete"} className={ankiVariant === "complete" ? styles.segmentActive : ""} onClick={() => setAnkiVariant("complete")}>{t("community.materials.catalog.complete")}</button></div><div className={styles.builderPreview}><div><span className={styles.resourceLabel}>Download preparado</span><h2>{compendiumUnit?.shortTitle || selectedUnit.name} · {ankiVariant === "essential" ? "Essencial" : "Completo"}</h2><p>O pacote é gerado uma única vez e servido diretamente do armazenamento, sem processamento no dispositivo.</p></div></div></div><aside className={styles.ankiAside} aria-label={t("community.materials.catalog.recommended")}><span className={styles.overviewIcon} aria-hidden="true"><Package /></span><span className={styles.resourceLabel}>{t("community.materials.catalog.recommended")}</span><h2>{compendiumUnit?.shortTitle || selectedUnit.name} · {ankiVariant === "essential" ? "Essencial" : "Completo"}</h2><p>{selectedDeck?.description || t("community.materials.catalog.ankiUnitPending")}</p><strong>{selectedDeck?.cardCount || 0} {t("community.materials.catalog.cards")}</strong>{selectedDeck?.downloadUrl ? <a className="button button--secondary button--compact" href={selectedDeck.downloadUrl} download><Download />Descarregar pacote</a> : <span className={styles.pending}>{selectedDeck ? t("community.materials.catalog.ankiStoragePending") : t("community.materials.catalog.ankiUnitPending")}</span>}</aside></div>}
-      {activeTab === "exams" && children}
+        <div className={styles.resultsSummary}><span>O pacote é gerado uma única vez e servido diretamente do armazenamento, sem processamento no dispositivo.</span></div>
+        {loading ? loadingState : <article className={styles.resource}>
+          <div className={styles.rail}><Package /></div>
+          <div className={styles.resourceMain}>
+            <header><div className={styles.badges}><span className={styles.badge}>Download preparado</span><span className={`${styles.badge} ${styles.badgeNeutral}`}>{selectedDeck?.cardCount || 0} {t("community.materials.catalog.cards")}</span></div></header>
+            <h3>{compendiumUnit?.shortTitle || selectedUnit.name} · {ankiVariant === "essential" ? "Essencial" : "Completo"}</h3>
+            <p>{selectedDeck?.description || t("community.materials.catalog.ankiUnitPending")}</p>
+            <footer><div className={styles.resourceMeta} /><div className={styles.resourceActions}>{selectedDeck?.downloadUrl ? <a className="button button--secondary button--compact" href={selectedDeck.downloadUrl} download><Download />Descarregar pacote</a> : <span className={styles.pending}>{selectedDeck ? t("community.materials.catalog.ankiStoragePending") : t("community.materials.catalog.ankiUnitPending")}</span>}</div></footer>
+          </div>
+        </article>}
+      </>}
+      {activeTab === "exams" && <>
+        {examFilters && <div className={styles.filters}>{examFilters}</div>}
+        {examSummary && <div className={styles.resultsSummary}>{examSummary}</div>}
+        {children}
+      </>}
     </div>
     {reader?.viewUrl && <MaterialPdfReader key={reader.id} materialId={reader.id} title={reader.title} viewUrl={reader.viewUrl} onClose={() => setReader(null)} />}
   </section>;

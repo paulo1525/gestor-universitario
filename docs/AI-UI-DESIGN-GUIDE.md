@@ -80,6 +80,7 @@ O CSS Module de uma página deve conter apenas o que é específico dessa págin
 - `AdminSection` e `AdminMetric` expõem `data-platform-surface`; cabeçalhos de secção expõem `data-platform-surface-header`. Estes atributos são o ponto de integração estável entre as primitivas React e os temas.
 - O tema base mantém cabeçalhos claros sem decoração adicional. O tema azul pode usar o seu filete azul funcional através de `--surface-header-accent-*`, sem alterar a anatomia ou a densidade do cartão.
 - Uma coleção extensa vive dentro de uma única superfície. Cada registo é uma linha separada por borda, sem raio ou sombra próprios, como em Avisos e comunicados.
+- Páginas de biblioteca ou listagem (Avisos, Materiais) usam a mesma anatomia: cabeçalho da página, um único painel com `SurfaceHeader` e contador, separadores dentro do painel como em Notificações, barra de filtros com `FormLabel` e botão “Limpar filtros”, linha de resumo e registos com faixa lateral. Não criar barras de contexto, cartões de resumo ou painéis adicionais por módulo.
 - Cartões verdadeiramente autónomos, como métricas e destinos, preservam borda, raio e sombra partilhados; tabelas, formulários e listas não devem ser forçados a parecer cartões promocionais.
 - A ação que abre um editor pode ser primária. No estado aberto, “Fechar editor”/“Fechar” é sempre uma ação secundária compacta e troca o ícone de adição por um ícone de fecho.
 
