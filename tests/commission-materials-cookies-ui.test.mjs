@@ -10,31 +10,30 @@ const cookies = readFileSync(new URL("../app/cookies/page.tsx", import.meta.url)
 const cookieStyles = readFileSync(new URL("../app/cookies/cookies.module.css", import.meta.url), "utf8");
 
 test("o diretório expõe filtros acessíveis, limpeza contextual e cartões sem overflow", () => {
-  assert.match(directory, /aria-pressed=\{department === "all"\}/);
+  assert.match(directory, /<FilterSegmented label=\{t\("community\.directory\.filter"\)\} value=\{department\}/);
   assert.match(directory, /filtersActive &&/);
   assert.match(directory, /<ul className=\{styles\.unitList\}>/);
-  assert.match(directoryStyles, /grid-template-columns:\s*repeat\(auto-fit, minmax\(min\(320px, 100%\), 1fr\)\)/);
+  // One row per member in a single panel; the member's details open in a reading card.
+  assert.match(directory, /<ul className=\{list\.rows\}>/);
+  assert.match(directory, /className=\{`panel \$\{list\.reading\}`\}/);
   assert.match(directoryStyles, /text-overflow:\s*ellipsis/);
-  assert.match(directoryStyles, /@media \(max-width: 440px\)/);
 });
 
 test("a biblioteca de materiais tem filtro identificado, editor isolado e registos compactos", () => {
-  assert.match(materials, /<FormLabel icon=\{Filter\}>\{t\("community\.materials\.filter"\)\}<\/FormLabel>/);
-  assert.match(materials, /filter !== "all" &&/);
+  assert.match(materials, /<FilterSelect label=\{t\("community\.materials\.filter"\)\} value=\{filter\}/);
+  assert.match(materials, /filter !== "all" \|\| query/);
   assert.match(materials, /setFilter\("all"\)/);
-  assert.match(materials, /className=\{styles\.formWorkspace\}/);
-  assert.match(materials, /\{activeTab === "exams" && !editor && <div className=\{styles\.examList\}>/);
-  assert.match(materials, /className=\{styles\.materialHeader\}/);
-  assert.match(materials, /className=\{styles\.cardActions\}/);
-  assert.match(materials, /button--compact \$\{styles\.openMaterial\}/);
+  assert.match(materials, /<MaterialUploadForm/);
+  // Submissions: search + filter on top of one panel, one row per material, detail at #material-<id>.
+  assert.match(materials, /\{activeTab === "exams" && unitCode && !editor && !openId && <section className=\{`panel \$\{list\.listPanel\}`\}/);
+  assert.match(materials, /<FilterSearch label=\{t\("community\.materials\.search"\)\}/);
+  assert.match(materials, /href=\{recordHref\("material", item\.id\)\}/);
+  assert.match(materials, /className=\{`panel \$\{list\.reading\}`\}/);
   assert.match(materials, /loadError/);
   assert.match(materials, /community\.materials\.catalog\.retry/);
-  assert.match(materialStyles, /\.stateIcon/);
-  assert.match(materialStyles, /\.materialGrid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
-  assert.match(materialStyles, /\.material\s*\{[^}]*grid-template-columns:\s*112px minmax\(0, 1fr\)/s);
-  assert.match(materialStyles, /\.formWorkspace\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.4fr\) minmax\(320px, \.6fr\)/s);
-  assert.match(materialStyles, /\.feedbackButton, \.versionActions button, \.materialBody \.cardActions > \.openMaterial\s*\{[^}]*min-height:\s*34px;[^}]*padding:\s*0 9px;[^}]*border-radius:\s*9px;[^}]*font-size:\s*9px/s);
-  assert.match(materialStyles, /\.feedbackButton svg, \.versionActions svg, \.materialBody \.cardActions > \.openMaterial svg\s*\{[^}]*width:\s*14px;[^}]*height:\s*14px/s);
+  assert.match(materials, /<RecordSkeleton label=\{t\("community\.materials\.loading"\)\} \/>/);
+  assert.doesNotMatch(materials, /LoaderCircle/);
+  assert.match(materialStyles, /\.feedbackButton/);
   assert.doesNotMatch(materialStyles, /grid-template-rows:\s*155px 1fr/);
 });
 

@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Boxes, LoaderCircle, RefreshCw } from "lucide-react";
+import { Boxes, RefreshCw } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { useModules } from "@/components/module-context";
+import { QuietLoading } from "@/components/quiet-loading";
 
 export function HomepageResolver() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export function HomepageResolver() {
   }, [error, home?.href, loading, router]);
 
   if (loading || home?.href) {
-    return <main className="auth-loading"><LoaderCircle className="spin" size={28} /><strong>{t("guard.preparing")}</strong></main>;
+    return <QuietLoading label={t("guard.preparing")} />;
   }
 
   if (error) {

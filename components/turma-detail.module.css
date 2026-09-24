@@ -1,0 +1,6 @@
+/* Loading placeholder for the class page: static grey lines, no spinner. */
+.skeleton { display: grid; gap: var(--space-4); padding: var(--space-5); }
+.skeletonRow { display: grid; gap: 6px; }
+.skeletonRow span { display: block; height: 12px; border-radius: 4px; background: var(--color-surface-muted); }
+.skeletonRow span:first-child { width: min(420px, 70%); }
+.skeletonRow span:last-child { width: min(220px, 40%); height: 9px; }

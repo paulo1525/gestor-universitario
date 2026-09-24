@@ -30,7 +30,7 @@ test("estudantes comuns consultam as turmas sem ver decisões individuais",()=>{
   assert.match(worker,/preferencia:specialStatus!=="none"\?"Estatuto especial":readOnlyStudent \? "A aguardar decisão"/);
   assert.match(dashboard,/classes\.dashboard\.baseClasses/);
   assert.match(dashboard,/showDecisions = !preferenceOnly && !placementsPublished/);
-  assert.match(dashboard,/showDecisions && <th>\{t\("classes\.dashboard\.decisions"\)\}<\/th>/);
+  assert.match(dashboard,/\{showDecisions && ` · \$\{t\("classes\.dashboard\.stayCount"/);
   assert.match(detail,/hideDecisions/);
 });
 
@@ -122,7 +122,9 @@ test("composição é guardada diretamente e exige todos os campos",()=>{
   assert.match(detail,/specialStatusesEnabled && <th>/);
   assert.match(detail,/addPublishedStudent/);
   assert.match(detail,/classes\.detail\.addPublished/);
-  assert.match(detail,/isPublished && data\.permissions\.edit && !editingPublished/);
+  assert.match(detail,/useFloatingAction\(isPublished && data\?\.permissions\.edit && !editingPublished \? \{ id: "add-published-student"/);
+  assert.doesNotMatch(detail,/<Plus \/>/);
+  assert.match(detail,/<ConfirmationDialog open=\{Boolean\(removeTarget\)\}/);
 });
 
 test("a importação global aparece antes da lista de turmas e inclui ajuda para IA",()=>{
@@ -211,11 +213,10 @@ test("editor lista preferências por ordem e integra o destino final",()=>{
 
 test("publicação aparece na página inicial",()=>{
   assert.match(dashboard,/classes\.dashboard\.yearClasses/);
-  assert.match(dashboard,/meta=\{placementsPublished \? t\("classes\.dashboard\.publishedBadge"\) : undefined\}/);
+  assert.match(dashboard,/placementsPublished \? t\("classes\.dashboard\.finalClasses"\)/);
   assert.doesNotMatch(dashboard,/published-badge/);
-  assert.match(dashboard,/classes\.dashboard\.publishedBadge/);
   assert.match(dashboard,/classes\.dashboard\.pdf/);
-  assert.match(dashboard,/placementsPublished && <Link/);
+  assert.match(dashboard,/useFloatingAction\(placementsPublished \? \{ id: "classes-public-pdf"/);
   assert.match(worker,/handlePublicClassesPdf/);
   assert.match(worker,/content-type":"application\/pdf/);
   assert.match(worker,/SELECT class_id,full_name,student_number FROM class_students/);
@@ -431,7 +432,7 @@ test("tabela abre numa nova aba, ocupa o ecrã e mantém o editor administrativo
   assert.match(placements,/placement-table-page__actions"><div className="placement-action-tools">\{refreshAction\}\{exportAction\}<\/div>\{calculateAction\}/);
   assert.match(placements,/recalculation\?"button--secondary":"button--primary"/);
   assert.match(placements,/<Calculator\/>Criar primeiro rascunho/);
-  assert.match(styles,/\.button:disabled \{[^}]*background: #f1f1ee;[^}]*box-shadow: none/);
+  assert.match(styles,/\.button:disabled \{[^}]*background: var\(--color-surface-muted\);[^}]*box-shadow: none/);
   assert.match(placements,/placement-heading__actions" aria-label="Ferramentas da página">\{refreshAction\}\{fullScreenAction\}\{exportAction\}/);
   assert.match(styles,/\.placement-table-page \.calculate-action__tooltip\{top:calc\(100% \+ 12px\);bottom:auto/);
   assert.match(styles,/\.placement-sheet>\.placement-table-wrap\{max-height:calc\(100dvh - 330px\);overflow:auto/);
@@ -479,8 +480,8 @@ test("editor bloqueia o fundo e a confirmação de publicação é estruturada",
 });
 
 test("gestão de utilizadores adapta filtros e registos ao ecrã mobile",()=>{
-  assert.match(admin,/data-label=\{t\("admin\.control\.user"\)\}/);
-  assert.match(admin,/data-label=\{t\("admin\.control\.actions"\)\}/);
+  assert.match(admin,/href=\{`#utilizador-\$\{encodeURIComponent\(user\.id\)\}`\}/);
+  assert.match(admin,/className=\{styles\.manageFields\}/);
   assert.match(styles,/\.admin-users \.search-field,[\s\S]*?flex:\s*0 0 auto/);
   assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?height:\s*auto !important[\s\S]*?display:\s*flex[\s\S]*?flex-direction:\s*column/);
   assert.match(styles,/\.admin-table-wrap tbody tr\s*\{[\s\S]*?overflow:\s*hidden/);

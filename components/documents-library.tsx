@@ -3,23 +3,23 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlignLeft,
+  ChevronLeft,
   Download,
   Eye,
   FileArchive,
   FileText,
-  Filter,
   GraduationCap,
-  LoaderCircle,
   LockKeyhole,
-  Plus,
-  Search,
   Tags,
   Trash2,
   Type,
   Users,
   X,
+  Pencil,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
+import { CancelButton, FormActions, FormCloseButton, SubmitButton } from "@/components/form-actions";
 import { SurfaceHeader } from "@/components/surface-header";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -29,8 +29,14 @@ import { FileUploadField } from "@/components/file-upload-field";
 import { ModuleGuard } from "@/components/module-guard";
 import { useModuleEnabled } from "@/components/use-module-enabled";
 import styles from "@/components/documents-library.module.css";
+import list from "@/components/record-list.module.css";
+import { RecordSkeleton, recordHref, useHashRecord } from "@/components/record-list";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
+import { useFloatingAction } from "@/components/floating-actions";
+
+const FLOATING_CREATE_ICON = <Pencil aria-hidden="true" />;
+const FLOATING_DELETE_ICON = <Trash2 aria-hidden="true" />;
 
 type DateInput = string | number;
 type DocumentItem = {
@@ -119,6 +125,7 @@ export function DocumentsLibrary() {
   const [file, setFile] = useState<File | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [openId, openDocument] = useHashRecord("documento");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,6 +211,7 @@ export function DocumentsLibrary() {
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "N\u00e3o foi poss\u00edvel eliminar o documento.");
       setNotice({ kind: "success", message: "Documento eliminado." });
+      if (openId === deleteTarget.id) openDocument(null);
       setDeleteTarget(null);
       await load();
     } catch (error) {
@@ -211,67 +219,82 @@ export function DocumentsLibrary() {
     } finally { setDeleting(false); setDeleteTarget(null); }
   };
 
+  const openItem = openId ? documents.find((item) => item.id === openId) ?? null : null;
+  const authorOf = (item: DocumentItem) => personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage });
+  useFloatingAction(canManage && !editor && !openId ? { id: "new-document", label: "Publicar documento", icon: FLOATING_CREATE_ICON, onClick: () => setEditor(true) } : null);
+  const deletable = canManage && !editor && openItem ? openItem : null;
+  useFloatingAction(deletable ? { id: "delete-document", label: "Eliminar documento", icon: FLOATING_DELETE_ICON, onClick: () => setDeleteTarget(deletable) } : null);
+
   return (
     <AuthGuard>
       <ModuleGuard moduleKey="documents.library">
         <AppShell active="documents" breadcrumb="Documentos e atas">
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-          <SurfaceHeader
-            standalone
-            headingLevel="h1"
-            icon={<FileArchive />}
-            eyebrow="Arquivo da Comissão de Curso"
-            title="Documentos e atas"
-            actions={canManage ? <button className="button button--primary" type="button" onClick={() => setEditor((value) => !value)}><Plus />{editor ? "Fechar" : "Publicar documento"}</button> : undefined}
-          />
+          <SurfaceHeader standalone headingLevel="h1" icon={<FileArchive />} eyebrow="Arquivo da Comissão de Curso" title="Documentos e atas" />
 
           {canManage && editor && (
             <form className={`${styles.panel} ${styles.form}`} onSubmit={save}>
-              <SurfaceHeader icon={<FileArchive />} title="Novo documento" description="Define claramente quem poderá consultar o ficheiro." />
+              <SurfaceHeader icon={<FileArchive />} title="Novo documento" actions={<FormCloseButton onClick={() => setEditor(false)} label="Fechar" disabled={saving} />} />
               <div className={styles.formGrid}>
-                <label className={styles.wide}><span><Type />{"T\u00edtulo"}</span><input required maxLength={180} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+                <label className={styles.wide}><span><Type />{"Título"}</span><input required maxLength={180} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
                 <label><span><Tags />Tipo</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-                <label><span><Eye />Visibilidade</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })}><option value="authenticated">Estudantes autenticados</option><option value="commission">{"Apenas Comiss\u00e3o de Curso"}</option><option value="public">{"P\u00fablico"}</option></select></label>
-                <label className={styles.wide}><span><GraduationCap />Unidade curricular <small>(opcional)</small></span><select value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}><option value="">Documento geral</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"\u00b7"} {unit.name}</option>)}</select></label>
-                <label className={styles.full}><span><AlignLeft />{"Descri\u00e7\u00e3o"} <small>(opcional)</small></span><textarea rows={3} maxLength={1500} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
+                <label><span><Eye />Visibilidade</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })}><option value="authenticated">Estudantes autenticados</option><option value="commission">{"Apenas Comissão de Curso"}</option><option value="public">{"Público"}</option></select></label>
+                <label className={styles.wide}><span><GraduationCap />Unidade curricular <small>(opcional)</small></span><select value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}><option value="">Documento geral</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"·"} {unit.name}</option>)}</select></label>
+                <label className={styles.full}><span><AlignLeft />{"Descrição"} <small>(opcional)</small></span><textarea rows={3} maxLength={1500} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
                 <div className={styles.full}>
                   <FileUploadField
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.txt,image/*"
                     emptyLabel="Documento para o arquivo"
                     file={file}
-                    help={"PDF, imagem, documento Office ou formato aberto, at\u00e9 4 MB. N\u00e3o incluas dados pessoais desnecess\u00e1rios."}
+                    help={"PDF, imagem, documento Office ou formato aberto, até 4 MB. Não incluas dados pessoais desnecessários."}
                     onChange={(event) => setFile(event.target.files?.[0] || null)}
                     onRemove={() => setFile(null)}
                   />
                 </div>
               </div>
-              <footer className={styles.formActions}><button className="button button--primary" disabled={saving}>{saving && <LoaderCircle className={styles.spin} />}{saving ? "A publicar\u2026" : "Publicar documento"}</button></footer>
+              <FormActions><CancelButton onClick={() => setEditor(false)} disabled={saving}>Cancelar</CancelButton><SubmitButton busy={saving}>{saving ? "A publicar…" : "Publicar documento"}</SubmitButton></FormActions>
             </form>
           )}
 
-          <section className={styles.panel}>
-            <SurfaceHeader
-              icon={<Filter />}
-              title="Pesquisar e filtrar"
-              description="Encontra rapidamente documentos, atas e regulamentos no arquivo."
-              meta={`${visible.length} ${visible.length === 1 ? "resultado" : "resultados"}`}
-              actions={filtersActive ? <button className={styles.clearFilters} type="button" onClick={clearFilters}><X />Limpar</button> : undefined}
-            />
-            <div className={styles.filterBar}>
-              <div className={styles.filterControls}>
-                <label className={`${styles.filterField} ${styles.searchFilter}`}><span><Search />Pesquisa</span><div className={styles.searchControl}><Search /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar por título, descrição ou ficheiro…" /></div></label>
-                <label className={styles.filterField}><span><Tags />Tipo de documento</span><select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option value="all">Todos os tipos</option>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-                <label className={styles.filterField}><span><GraduationCap />Unidade curricular</span><select value={unitFilter} onChange={(event) => setUnitFilter(event.target.value)}><option value="all">Todas as unidades curriculares</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"\u00b7"} {unit.name}</option>)}</select></label>
-              </div>
-            </div>
-            {loading ? <div className={styles.loading}><LoaderCircle className={styles.spin} />{"A carregar arquivo\u2026"}</div>
-              : visible.length === 0 ? <div className={styles.empty}><FileText /><strong>{filtersActive ? "Não existem documentos com estes filtros" : "Ainda não existem documentos"}</strong><span>{filtersActive ? "Experimenta limpar os filtros ou pesquisar outros termos." : "Os documentos publicados aparecerão aqui."}</span>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />Limpar filtros</button>}</div>
-                : <div className={styles.cardGrid}>{visible.map((item) => { const author = personDisplay({ fullName: item.authorName, email: item.authorEmail, studentNumber: item.authorStudentNumber, id: item.authorId }, { revealIdentifier: canManage }); return <article className={styles.fileCard} key={item.id}>
-                  <div className={styles.fileIcon}>{item.type === "minutes" ? <FileArchive /> : <FileText />}</div>
-                    <div><div className={styles.badgeRow}><span className={styles.badge}>{typeLabels[item.type] || item.type}</span><span className={styles.softBadge}>{item.visibility === "commission" ? <LockKeyhole /> : <Users />}{visibilityLabels[item.visibility] || item.visibility}</span></div><h2>{item.title}</h2>{item.description && <p>{item.description}</p>}<small>{item.unitName || "Arquivo geral"} {"\u00b7"} <PersonName person={author} /> {"\u00b7"} {formatCreatedAt(item.createdAt)}</small></div>
-                  <div className={styles.cardActions}>{item.fileUrl && <a className="button" href={item.fileUrl} download={item.fileName}><Download />Descarregar</a>}{canManage && <button className={styles.iconDanger} type="button" onClick={() => setDeleteTarget(item)} aria-label={`Eliminar ${item.title}`}><Trash2 /></button>}</div>
-                </article>; })}</div>}
-          </section>
+          {!editor && !openId && <section className={`panel ${list.listPanel}`} aria-busy={loading}>
+            <FilterBar label="Filtrar documentos">
+              <FilterSearch label="Pesquisar" value={query} onChange={setQuery} placeholder="Título, descrição ou ficheiro…" />
+              <FilterSelect label="Tipo de documento" value={typeFilter} onChange={setTypeFilter} options={[{ value: "all", label: "Todos os tipos" }, ...Object.entries(typeLabels).map(([key, label]) => ({ value: key, label }))]} />
+              <FilterSelect label="Unidade curricular" value={unitFilter} onChange={setUnitFilter} options={[{ value: "all", label: "Todas as unidades curriculares" }, ...units.map((unit) => ({ value: unit.id, label: `${unit.code} · ${unit.name}` }))]} />
+            </FilterBar>
+            {loading ? <RecordSkeleton label={"A carregar arquivo…"} />
+              : visible.length === 0 ? <div className={list.empty}><FileText /><strong>{filtersActive ? "Não existem documentos com estes filtros" : "Ainda não existem documentos"}</strong>{filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />Limpar filtros</button>}</div>
+                : <ul className={list.rows}>{visible.map((item) => <li className={list.row} key={item.id}>
+                  <span className={list.rowIcon} aria-hidden="true">{item.type === "minutes" ? <FileArchive /> : <FileText />}</span>
+                  <div className={list.rowMain}>
+                    <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("documento", item.id)} onClick={(event) => { event.preventDefault(); openDocument(item.id); }}>{item.title}</a></h3>
+                    <p className={list.rowMeta}>{typeLabels[item.type] || item.type} {"·"} {item.unitName || "Arquivo geral"} {"·"} <PersonName person={authorOf(item)} /> {"·"} {formatCreatedAt(item.createdAt)}</p>
+                  </div>
+                  {item.visibility !== "authenticated" ? <span className={list.statusPill} data-tone={item.visibility === "commission" ? "accent" : "info"}>{visibilityLabels[item.visibility] || item.visibility}</span> : <span />}
+                </li>)}</ul>}
+          </section>}
+
+          {!editor && openId && <>
+            <button className={list.back} type="button" onClick={() => openDocument(null)}><ChevronLeft aria-hidden="true" />Todos os documentos</button>
+            <article className={`panel ${list.reading}`} aria-busy={loading}>
+              {loading ? <RecordSkeleton label={"A carregar documento…"} rows={2} /> : !openItem ? <div className={list.empty}><FileText /><strong>Documento não encontrado</strong></div> : <>
+                <header className={list.byline}>
+                  <span className={list.iconChip} aria-hidden="true">{openItem.type === "minutes" ? <FileArchive /> : <FileText />}</span>
+                  <div>
+                    <p className={list.bylineName}><PersonName person={authorOf(openItem)} /></p>
+                    <p className={list.bylineMeta}>{typeLabels[openItem.type] || openItem.type} {"·"} {openItem.unitName || "Arquivo geral"} {"·"} {formatCreatedAt(openItem.createdAt)}</p>
+                  </div>
+                  <span className={list.statusPill} data-tone={openItem.visibility === "commission" ? "accent" : undefined}>{openItem.visibility === "commission" ? <LockKeyhole aria-hidden="true" className={styles.pillIcon} /> : <Users aria-hidden="true" className={styles.pillIcon} />}{visibilityLabels[openItem.visibility] || openItem.visibility}</span>
+                </header>
+                <h2 className={list.readingTitle}>{openItem.title}</h2>
+                <span className={list.readingRule} aria-hidden="true" />
+                {openItem.description && <p className={list.readingBody}>{openItem.description}</p>}
+                {openItem.fileUrl && <footer className={list.manageArea}>
+                  <a className={`button button--secondary button--compact ${styles.download}`} href={openItem.fileUrl} download={openItem.fileName}><Download aria-hidden="true" />{openItem.fileName}</a>
+                </footer>}
+              </>}
+            </article>
+          </>}
           <ConfirmationDialog open={Boolean(deleteTarget)} title="Eliminar este documento?" description="O documento deixa de estar disponível no arquivo da plataforma." subject={deleteTarget?.title} subjectLabel="Documento selecionado" warning="Esta ação não pode ser revertida." confirmLabel={deleting ? "A eliminar…" : "Eliminar documento"} busy={deleting} onClose={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
         </AppShell>
       </ModuleGuard>

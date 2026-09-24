@@ -105,7 +105,7 @@
 
 .statisticsDangerButton:hover,
 .statisticsDangerButton:focus-visible {
-  color: #8d2f2a;
+  color: var(--color-danger-text);
   border-color: #bf5c55;
   background: #fff3f1;
 }
@@ -244,7 +244,7 @@
 
 .statisticsPanel { overflow: hidden; }
 .statisticsPanel > header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--surface-header-background); }
-.statisticsPanel > header h2 { margin-top: 4px; font-size: 13px; }
+.statisticsPanel > header h2 { margin-top: 4px; font-size: var(--font-size-body-emphasis); }
 
 .topicStatistics,
 .recentAttempts { display: grid; }
@@ -283,7 +283,7 @@
 .recentAttempts article strong { overflow: hidden; color: var(--ink); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
 .recentAttempts article small { grid-column: 2; color: var(--muted); font-size: .75rem; }
 .recentAttempts article > span { min-width: 64px; display: grid; justify-items: end; gap: 2px; }
-.recentAttempts article > span b { font-size: 12px; }
+.recentAttempts article > span b { font-size: var(--font-size-body-emphasis); }
 .recentAttempts article > span small { grid-column: auto; }
 .passedAttempt b { color: var(--green); }
 .reviewAttempt b { color: var(--color-accent-text); }
@@ -319,7 +319,7 @@
 .resumeCard h2 {
   margin: 0 0 2px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
 }
 
 .resumeCard p {
@@ -364,39 +364,42 @@
   box-shadow: var(--surface-card-shadow);
 }
 
+/* One row per course unit inside the catalogue panel; the open unit expands its settings below its row. */
 .unitGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
+  padding: var(--space-2) 0;
 }
 
 .unitCard {
+  position: relative;
   min-width: 0;
-  overflow: hidden;
-  align-self: start;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  transition: border-color .15s ease, background .15s ease;
+}
+
+.unitCard + .unitCard::before {
+  position: absolute;
+  top: 0;
+  right: var(--space-5);
+  left: var(--space-5);
+  height: 1px;
+  background: var(--color-border);
+  content: "";
 }
 
 .unitCardSelected {
-  grid-column: 1 / -1;
-  border-color: color-mix(in srgb, var(--gold) 68%, var(--line));
+  background: var(--color-surface-subtle);
 }
 
 .unitCardHeader {
   width: 100%;
-  min-height: 78px;
+  min-height: 52px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 11px;
-  padding: 13px 14px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border: 0;
   color: var(--ink);
-  background: var(--surface);
+  background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -405,15 +408,15 @@
 .unitCardHeader:hover,
 .unitCardHeader:focus-visible { background: var(--color-surface-subtle); }
 .unitCardHeader > span:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
-.unitCardHeader strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.unitCardHeader small { color: var(--muted); font-size: .75rem; }
+.unitCardHeader strong { overflow: hidden; font-size: var(--font-size-body-emphasis); text-overflow: ellipsis; white-space: nowrap; }
+.unitCardHeader small { color: var(--muted); font-size: var(--font-size-small); }
 .unitCardHeader > svg { width: 17px; color: var(--muted); transition: transform .15s ease; }
 .unitCardHeader[aria-expanded="true"] > svg { transform: rotate(180deg); }
 
 .unitSettings {
   display: grid;
   gap: 16px;
-  padding: 16px;
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--color-surface-subtle) 42%, var(--surface));
 }
@@ -921,7 +924,7 @@
 .summaryUnit strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 13px;
+  font-size: var(--font-size-body-emphasis);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1180,7 +1183,7 @@
 .sessionIdentity strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: var(--font-size-body-emphasis);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1227,7 +1230,7 @@
 
 .timer strong {
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--font-size-body-emphasis);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2272,7 +2275,7 @@
 .replyContext {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 7px !important;
+  font-size: var(--font-size-caption) !important;
 }
 
 .roleBadge {
@@ -2384,8 +2387,8 @@
     width: 100%;
   }
 
-  .unitGrid { grid-template-columns: 1fr; padding: 10px; }
-  .unitCardSelected { grid-column: auto; }
+  .unitCardHeader { padding: var(--space-3) var(--space-4); }
+  .unitCard + .unitCard::before { right: var(--space-4); left: var(--space-4); }
   .settingColumns { grid-template-columns: 1fr; }
   .unitActions { align-items: stretch; flex-direction: column; }
   .unitActions > span { display: grid; grid-template-columns: 1fr 1fr; }

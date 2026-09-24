@@ -1,0 +1,282 @@
+/* Public Linktree-style page for useful links. Lives outside the AppShell and
+   only consumes the theme tokens from app/globals.css and app/theme-forum.css. */
+
+.page {
+  min-height: 100dvh;
+  padding: var(--space-4) var(--space-4) 96px;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.column {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+
+.spacer { flex: 1 1 auto; }
+
+.iconLink,
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: var(--font-size-small);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.iconLink { width: var(--control-height-sm); }
+.signIn { padding: 0 var(--space-3); color: var(--color-text); }
+
+.iconLink svg,
+.signIn svg { width: 15px; height: 15px; flex: 0 0 auto; }
+
+.iconLink:hover,
+.signIn:hover { border-color: var(--color-border-hover); color: var(--color-text); }
+
+.iconLink:focus-visible,
+.signIn:focus-visible,
+.link:focus-visible,
+.itemAction:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.header {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) 0 var(--space-6);
+  text-align: center;
+}
+
+.logoFrame {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  margin-bottom: var(--space-2);
+  place-items: center;
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.logo { width: 100%; height: 100%; object-fit: contain; }
+
+.title {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display), sans-serif;
+  font-size: var(--font-size-heading-2);
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+.brand {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: 650;
+}
+
+.groups { display: grid; gap: var(--space-5); }
+
+.group { display: grid; gap: var(--space-2); }
+
+.groupLabel {
+  margin: 0;
+  padding: 0 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One row = one card: [chip + text link] [lock] [edit] [delete] [↗].
+   The management buttons are siblings of the links, never nested inside them. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 58px;
+  padding-right: 6px;
+  border: 1px solid var(--surface-card-border);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  transition: border-color .15s ease, background-color .15s ease;
+}
+
+.row:hover { border-color: var(--color-border-hover); background: var(--color-surface-subtle); }
+
+.link {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  align-self: stretch;
+  padding: 10px var(--space-2) 10px 10px;
+  border-radius: var(--radius-panel);
+  color: inherit;
+  text-decoration: none;
+}
+
+.chip {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-control);
+  color: var(--color-accent);
+  background: var(--sidebar-bg);
+  font-family: var(--font-display), sans-serif;
+  font-size: var(--font-size-heading-3);
+  font-weight: 800;
+}
+
+.row[data-priority="urgent"] .chip { color: var(--sidebar-active-text); background: var(--sidebar-active-bg); }
+
+.copy {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.copy strong {
+  overflow: hidden;
+  font-size: var(--font-size-body-emphasis);
+  font-weight: 750;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lock { width: 14px; height: 14px; flex: 0 0 auto; color: var(--color-text-subtle); }
+
+.arrowLink {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--color-text-subtle);
+}
+
+.arrow { width: 16px; height: 16px; }
+.row:hover .arrowLink { color: var(--color-accent-text); }
+
+.itemActions { display: flex; flex: 0 0 auto; gap: 2px; }
+
+.itemAction {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--color-text-subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.itemAction svg { width: 14px; height: 14px; }
+.itemAction:hover { color: var(--color-text); background: var(--color-surface-muted); }
+.itemActionDanger:hover { color: var(--color-danger); background: var(--color-danger-soft); }
+
+/* Add/edit modal: frame, labels, controls, checkboxes and buttons come from the
+   global modal family (app/globals.css). Only layout lives here. */
+.dialogForm { display: flex; flex-direction: column; min-height: 0; }
+.dialogBody { display: grid; gap: var(--space-3); }
+.field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.checks { display: grid; gap: var(--space-2); padding-top: 2px; }
+.check { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; }
+.dialogError { margin: 0; color: var(--color-danger-text); font-size: var(--font-size-small); }
+
+.message {
+  margin: 0;
+  padding: var(--space-5) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  text-align: center;
+}
+
+.skeleton { pointer-events: none; }
+.skeleton .chip { background: var(--color-surface-muted); }
+
+.skeletonLine {
+  display: block;
+  width: 62%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+}
+
+.skeletonLineShort { width: 38%; height: 8px; }
+
+/* Blue theme: white rounded logo tile and blue chips, as in the forum sidebar. */
+:global(html[data-theme="forum"]) .logoFrame {
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-panel);
+}
+
+:global(html[data-theme="forum"]) .chip {
+  color: var(--surface-header-icon-color);
+  background: var(--surface-header-icon-background);
+}
+
+:global(html[data-theme="forum"]) .row[data-priority="urgent"] .chip {
+  color: var(--sidebar-active-text);
+  background: var(--sidebar-active-bg);
+}
+
+:global(html[data-theme="forum"]) .skeleton .chip { background: var(--color-surface-muted); }
+
+:global(html[data-theme="forum"]) .groupLabel { color: var(--surface-header-meta-color); }
+
+@media (min-width: 640px) {
+  .page { padding-top: var(--space-6); }
+  .header { padding-bottom: 28px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row { transition: none; }
+}

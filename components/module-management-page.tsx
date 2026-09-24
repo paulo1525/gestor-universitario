@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
+import { Blocks, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AdminPage, AdminPageHeader } from "@/components/admin-ui";
 import { useAuth } from "@/components/auth-context";
@@ -12,7 +12,7 @@ export function ModuleManagementPage() {
   const { t } = useI18n();
   if (!user?.testMode && (user?.role !== "admin" || user?.commissionPosition !== "principal_admin")) return <main className="auth-loading"><ShieldCheck size={28}/><strong>{t("admin.modulesPage.accessDenied")}</strong></main>;
   return <AppShell active="modules" breadcrumb={t("admin.modulesPage.breadcrumb")}><AdminPage>
-    <AdminPageHeader eyebrow={t("admin.modulesPage.eyebrow")} title={t("admin.modulesPage.title")} description={t("admin.modulesPage.description")} />
+    <AdminPageHeader icon={<Blocks />} eyebrow={t("admin.modulesPage.eyebrow")} title={t("admin.modulesPage.title")} />
     <ModuleManagement />
   </AdminPage></AppShell>;
 }

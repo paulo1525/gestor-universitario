@@ -92,13 +92,14 @@ test("os downloads preparados não expõem os pacotes protegidos", () => {
   assert.match(worker, /STORAGE_NOT_READY/);
   assert.match(worker, /WHERE id=\? AND publication_status='published'/);
   assert.match(worker, /item\.storage_state !== "ready"/);
-  assert.match(component, /Download preparado/);
-  assert.match(component, /servido diretamente do armazenamento/);
+  // The unit's prepared package is a plain download link; nothing is built on the device.
+  assert.match(component, /selectedDeck\?\.downloadUrl \? <a className="button button--secondary button--compact" href=\{selectedDeck\.downloadUrl\} download>/);
   assert.match(component, /Referência bibliográfica apenas/);
   assert.doesNotMatch(component, /buildMaterialApkg|materialApkgBlob|URL\.createObjectURL|MaterialCompendiumExport/);
   assert.match(component, /verificationFilter/);
   assert.match(component, /Páginas físicas/);
-  assert.match(component, /aria-pressed/);
+  // Essential / Complete is the shared segmented filter (accessible state handled there).
+  assert.match(component, /<FilterSegmented label=\{t\("community\.materials\.catalog\.packageBase"\)\} value=\{ankiVariant\}/);
 });
 
 test("a consulta do catálogo fornece os dois bindings do filtro de pesquisa", () => {
@@ -160,7 +161,8 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", () =>
   assert.match(component, /ArrowRight/);
   assert.match(component, /role="tabpanel"/);
   assert.match(component, /retryCatalog/);
-  assert.match(component, /Download preparado/);
+  // The curricular unit is chosen before the tabs appear.
+  assert.match(component, /if \(!selectedUnit\) \{/);
   assert.match(styles, /scrollbar-width:\s*none/);
   assert.match(styles, /@media \(max-width: 560px\)/);
   assert.match(styles, /resourceActions \.button \{ width: 100%/);

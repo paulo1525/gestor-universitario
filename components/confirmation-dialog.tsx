@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { LoaderCircle, Trash2, TriangleAlert, X } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { useScrollLock } from "@/components/use-scroll-lock";
 import styles from "@/components/confirmation-dialog.module.css";
@@ -23,7 +23,7 @@ type ConfirmationDialogProps = {
   onConfirm: () => void;
 };
 
-export function ConfirmationDialog({ open, title, description, subject, subjectLabel = "Registo selecionado", warning, confirmLabel, cancelLabel = "Cancelar", eyebrow = "Eliminação definitiva", busy = false, tone = "danger", icon, onClose, onConfirm }: ConfirmationDialogProps) {
+export function ConfirmationDialog({ open, title, description, subject, subjectLabel = "Registo selecionado", warning, confirmLabel, cancelLabel = "Cancelar", busy = false, tone = "danger", onClose, onConfirm }: ConfirmationDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLElement>(null);
@@ -45,17 +45,23 @@ export function ConfirmationDialog({ open, title, description, subject, subjectL
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
-  const compact = !eyebrow && !description && !subject && !warning;
+  const compact = !subject && !warning;
   if (!open) return null;
   return <div className={styles.backdrop} data-app-modal-backdrop role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) dismiss(); }}>
-    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} data-app-modal="modal" data-app-modal-size={compact ? "compact" : "medium"} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
+    <section ref={dialogRef} className={`${styles.dialog} ${compact ? styles.compact : ""}`} data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined} aria-busy={busy || undefined} onKeyDown={keepFocusInside}>
+      {/* Light confirmation: question, the item in bold, one short consequence line, two buttons. */}
       <header className={styles.header} data-app-modal-header>
-        <span className={`${styles.icon} ${tone === "primary" ? styles.primaryIcon : ""}`} aria-hidden="true">{icon ?? <Trash2 />}</span>
-        <div className={styles.copy}>{eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}<h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div>
-        <button ref={closeRef} className={styles.close} data-app-modal-close type="button" disabled={busy} onClick={dismiss} aria-label="Fechar confirmação"><X /></button>
+        <h2 id={titleId}>{title}</h2>
+        {description && <p id={descriptionId} className="sr-only">{description}</p>}
       </header>
-      {(subject || warning) && <div className={styles.body} data-app-modal-body>{subject && <div className={styles.subject}><span>{subjectLabel}</span><strong>{subject}</strong></div>}{warning && <div className={styles.warning}><TriangleAlert aria-hidden="true" /><p>{warning}</p></div>}</div>}
-      <footer className={styles.footer} data-app-modal-footer>{!compact && <button className={styles.cancel} data-app-modal-action="secondary" type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button>}<button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} data-app-modal-action={tone === "primary" ? "primary" : "danger"} type="button" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className={styles.spin} /> : (icon ?? <Trash2 />)}{confirmLabel}</button></footer>
+      {(subject || warning) && <div className={styles.body} data-app-modal-body>
+        {subject && <p className={styles.subject}><span className="sr-only">{subjectLabel}: </span>{subject}</p>}
+        {warning && <p className={styles.warning}>{warning}</p>}
+      </div>}
+      <footer className={styles.footer} data-app-modal-footer>
+        <button ref={closeRef} className={styles.cancel} data-app-modal-action="secondary" type="button" disabled={busy} onClick={dismiss}>{cancelLabel}</button>
+        <button className={`${styles.confirm} ${tone === "primary" ? styles.primaryConfirm : ""}`} data-app-modal-action={tone === "primary" ? "primary" : "danger"} type="button" disabled={busy} onClick={onConfirm}>{busy && <LoaderCircle className={styles.spin} aria-hidden="true" />}{confirmLabel}</button>
+      </footer>
     </section>
   </div>;
 }

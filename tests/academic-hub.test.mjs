@@ -8,7 +8,8 @@ const backend = readFileSync(new URL("../worker/academic-hub.ts", import.meta.ur
 const shell = readFileSync(new URL("../components/app-shell.tsx", import.meta.url), "utf8");
 const requests = readFileSync(new URL("../components/requests-center.tsx", import.meta.url), "utf8");
 const requestStyles = readFileSync(new URL("../components/requests-center.module.css", import.meta.url), "utf8");
-const materials = readFileSync(new URL("../components/material-library.tsx", import.meta.url), "utf8");
+// The submission form (anonymity, moderation notice) lives in its own component.
+const materials = readFileSync(new URL("../components/material-library.tsx", import.meta.url), "utf8") + readFileSync(new URL("../components/material-upload-form.tsx", import.meta.url), "utf8");
 const polls = readFileSync(new URL("../components/polls-hub.tsx", import.meta.url), "utf8");
 const directory = readFileSync(new URL("../components/commission-directory.tsx", import.meta.url), "utf8");
 const unitCatalog = readFileSync(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8");
@@ -87,7 +88,9 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
   assert.match(backend, /announcement_curricular_units/);
   assert.doesNotMatch(directory, /community\.directory\.sync/);
   assert.match(directory, /<SurfaceHeader/);
-  assert.match(directory, /community\.directory\.title/);
+  // Members are rows; each opens its own reading card at #membro-<id>.
+  assert.match(directory, /useHashRecord\("membro"\)/);
+  assert.match(directory, /<ul className=\{list\.rows\}>/);
   assert.match(unitCatalog, /community\.units\.upcoming/);
   assert.match(unitCatalog, /community\.units\.documents/);
   assert.match(unitCatalog, /data\.unit\.representatives\.length > 0/);
@@ -95,8 +98,8 @@ test("diretório e áreas de UC usam users e agregam informação académica", (
 });
 
 test("o catálogo público de UCs mantém o estado vazio curto e sem filtros inúteis", () => {
-  assert.match(unitCatalog, /styles\.panelIcon/);
-  assert.match(unitCatalog, /units\.length > 0 && <div className=\{styles\.catalogToolbar\}/);
+  assert.doesNotMatch(unitCatalog, /styles\.panelIcon/);
+  assert.match(unitCatalog, /units\.length > 0 && <FilterBar label=\{t\("community\.units\.filters"\)\}>/);
   assert.match(unitCatalog, /community\.units\.emptyInitial/);
   assert.doesNotMatch(unitCatalog, /community\.units\.emptyDescription/);
   assert.doesNotMatch(unitCatalog, /community\.units\.filtersHint/);
@@ -122,7 +125,10 @@ test("calendar supports optimistic drag-and-drop rescheduling with an accessible
   assert.match(calendar, /onDrop=/);
   assert.match(calendar, /method: "PATCH"/);
   assert.match(calendar, /setEvents\(previousEvents\)/);
-  assert.match(calendar, /type="date"/);
+  // Keyboard fallback: the edit form (Editar in the event view) changes the date and time.
+  assert.match(calendar, /onClick=\{\(\) => beginEdit\(selectedEvent\)\}/);
+  assert.match(calendar, /type="datetime-local"/);
+  assert.doesNotMatch(calendar, /id="event-reschedule-date"/);
   assert.match(calendar, /community\.calendar\.reverted/);
 });
 

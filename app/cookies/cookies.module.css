@@ -34,7 +34,7 @@
   place-items: center;
   border: 1px solid #ead578;
   border-radius: 16px;
-  color: #705600;
+  color: var(--color-accent-text);
   background: var(--gold-soft);
 }
 
@@ -56,7 +56,7 @@
   gap: 6px;
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--font-size-small);
   font-weight: 650;
 }
 
@@ -74,7 +74,7 @@
   padding: 16px;
   border: 1px solid #e7d886;
   border-radius: 12px;
-  color: #4d493c;
+  color: var(--color-text-soft);
   background: #fffdf3;
 }
 
@@ -84,14 +84,14 @@
   height: 19px;
   padding: 9px;
   border-radius: 10px;
-  color: #735900;
+  color: var(--color-accent-text);
   background: var(--gold-soft);
 }
 
 .introduction p,
 .section > p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-size-body-emphasis);
   line-height: 1.75;
 }
 
@@ -115,7 +115,7 @@
   flex: 0 0 auto;
   place-items: center;
   border-radius: 9px;
-  color: #705600;
+  color: var(--color-accent-text);
   background: var(--gold-soft);
 }
 
@@ -132,14 +132,14 @@
 }
 
 .section > p {
-  color: #56544d;
+  color: var(--color-text-muted);
 }
 
 .section code {
   padding: 2px 5px;
   border: 1px solid #e8e5db;
   border-radius: 5px;
-  color: #554300;
+  color: var(--color-accent-text);
   background: #f7f6f0;
   font-size: .88em;
 }
@@ -163,7 +163,7 @@
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   vertical-align: top;
-  font-size: 10px;
+  font-size: var(--font-size-small);
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -179,9 +179,9 @@
 }
 
 .tableWrap thead th {
-  color: #68655c;
+  color: var(--color-text-muted);
   background: #f7f6f1;
-  font-size: 8px;
+  font-size: var(--font-size-caption);
   font-weight: 850;
   letter-spacing: .055em;
   text-transform: uppercase;
@@ -193,7 +193,7 @@
 }
 
 .tableWrap tbody td {
-  color: #57554d;
+  color: var(--color-text-muted);
 }
 
 .actions {
@@ -299,8 +299,8 @@
   .tableWrap td::before {
     display: block;
     margin-bottom: 4px;
-    color: #77736a;
-    font-size: 8px;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-caption);
     font-weight: 850;
     letter-spacing: .055em;
     text-transform: uppercase;

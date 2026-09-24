@@ -67,10 +67,13 @@ test("public and administrative cards share one theme-aware surface contract", (
   assert.match(files.guide, /Contrato partilhado das superfícies/);
 });
 
-test("editor triggers are compact and visually demote the close state", () => {
-  assert.match(files.announcements, /button--compact[^\n]*editorOpen\s*\?\s*"button--secondary"\s*:\s*"button--primary"/);
-  assert.match(files.polls, /button button--primary button--compact/);
-  assert.match(files.requests, /button--compact[^\n]*composerOpen\s*\?\s*"button--secondary"\s*:\s*"button--primary"/);
+test("create actions live in the floating actions menu, never in a section header", () => {
+  assert.match(files.announcements, /useFloatingAction\(canPublish && !editorOpen/);
+  assert.doesNotMatch(files.announcements, /actions=\{canPublish/);
+  assert.match(files.polls, /useFloatingAction\(canManage && !editor && !openId \? \{ id: "new-poll"/);
+  assert.doesNotMatch(files.polls, /actions=\{canManage && !editor/);
+  assert.match(files.requests, /useFloatingAction\(!composerOpen && !openId \? \{ id: "new-request"/);
+  assert.doesNotMatch(files.requests, /aria-controls="request-composer"/);
 });
 
 test("long public collections use bordered rows inside one shared panel", () => {
@@ -96,8 +99,8 @@ test("administration cards stay on the shared primitives and equal-height grid",
   assert.match(files.guide, /mesma altura/);
   assert.match(files.adminUi, /\.sectionGrid\s*\{[^}]*align-items:\s*stretch/s);
   assert.match(files.adminUi, /\.section\s*\{[^}]*height:\s*100%/s);
+  assert.match(files.communityDashboard, /AdminSection/);
   for (const component of [files.auditHistory, files.communityDashboard, files.ticketAdmin]) {
-    assert.match(component, /AdminSection/);
     assert.match(component, /AdminEmptyState/);
     assert.doesNotMatch(component, /className=(?:"|\{`)[^"`]*(?:panel__header|empty-state)/);
   }
@@ -126,13 +129,18 @@ test("quiz and curricular-unit pages use the same workspace alignment", () => {
 test("new feature cards use the shared light surfaces and borders", () => {
   assert.match(files.quizHub, /\.modeCard\s*\{[^}]*border:\s*1px solid var\(--line\)[^}]*background:\s*var\(--surface\)/s);
   assert.match(files.quizAdmin, /\.statGrid\s+:global\(\.stat-card\)\s*\{/s);
-  assert.match(files.unitsCatalog, /\.card,\s*\.catalogCard\s*\{[^}]*border:\s*1px solid var\(--line\)[^}]*background:\s*var\(--surface\)/s);
-  assert.match(files.unitsAdmin, /\.unitGrid\s*\{[^}]*background:\s*var\(--surface\)/s);
-  assert.match(files.unitsAdmin, /\.unit(?:Entry|Card)\s*\{[^}]*border-(?:top|bottom):\s*1px solid var\(--line\)/s);
+  // The public catalogue is a list of rows inside one panel (shared record-list anatomy), not a card grid.
+  assert.doesNotMatch(files.unitsCatalog, /\.catalogCard\s*\{/);
+  assert.match(files.unitsCatalogComponent, /<ul className=\{list\.rows\}>/);
+  assert.match(files.unitsAdmin, /\.row \+ \.row::before\s*\{[^}]*background:\s*var\(--color-border\)/s);
+  assert.doesNotMatch(files.unitsAdmin, /\.unitGrid|\.unitCard/);
 });
 
-test("the public curricular-unit catalogue follows the shared panel header anatomy", () => {
-  assert.match(files.unitsCatalogComponent, /<SurfaceHeader icon=\{<BookOpen \/>\} title=\{t\("community\.units\.catalog"\)\}/);
+test("the public curricular-unit catalogue follows the shared list-panel anatomy", () => {
+  // No section header repeating the page: the filter bar sits at the top of the single list panel.
+  assert.doesNotMatch(files.unitsCatalogComponent, /title=\{t\("community\.units\.catalog"\)\}/);
+  assert.match(files.unitsCatalogComponent, /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*\{units\.length > 0 && <FilterBar /);
   assert.doesNotMatch(files.unitsCatalog, /\.catalogPanel\s*\{[^}]*--surface-header-accent-size/s);
-  assert.match(files.unitsCatalog, /\.catalogToolbar\s*\{[^}]*grid-template-columns:/s);
+  assert.match(files.unitsCatalogComponent, /<FilterBar label=\{t\("community\.units\.filters"\)\}>/);
+  assert.doesNotMatch(files.unitsCatalog, /\.catalogToolbar/);
 });

@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, BookOpen, ClipboardList, FileText, LoaderCircle, Megaphone, TrendingUp, Users, Vote } from "lucide-react";
+import { ArrowRight, BookOpen, ClipboardList, FileText, LayoutDashboard, Megaphone, TrendingUp, Users, Vote, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { AdminEmptyState, AdminMetric, AdminMetricGrid, AdminPage, AdminPageHeader, AdminSection } from "@/components/admin-ui";
 import { AppToast } from "@/components/app-toast";
@@ -98,9 +98,9 @@ export function CommunityAdminDashboard() {
 
   return <AuthGuard requireAdmin><ModuleGuard moduleKey="dashboard.analytics"><AppShell active="dashboard" breadcrumb={t("admin.dashboard.breadcrumb")}>
     <AdminPage>
-      <AdminPageHeader eyebrow={t("admin.dashboard.eyebrow")} title={t("admin.dashboard.title")} description={t("admin.dashboard.description")} actions={<button className="button button--secondary" type="button" onClick={() => void load()} disabled={loading}><TrendingUp />{t("admin.dashboard.refresh")}</button>} />
+      <AdminPageHeader icon={<LayoutDashboard />} eyebrow={t("admin.dashboard.eyebrow")} title={t("admin.dashboard.title")} />
       {error && <AppToast kind="error" message={error} duration={0} onDismiss={() => setError("")} />}
-      {loading ? <AdminSection icon={<TrendingUp />} title={t("admin.dashboard.mainIndicators")}><AdminEmptyState icon={<LoaderCircle className={styles.spin} />} title={t("admin.dashboard.calculating")} /></AdminSection> : data && <>
+      {loading ? <section className={`panel ${styles.skeleton}`} aria-busy="true"><span className="sr-only" role="status">{t("admin.dashboard.calculating")}</span>{[0, 1, 2].map((index) => <div key={index} className={styles.skeletonRow}><span /><span /></div>)}</section> : data && <>
         <AdminMetricGrid label={t("admin.dashboard.mainIndicators")}>
           <AdminMetric icon={<Megaphone />} value={data.metrics.activeAnnouncements.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.activeAnnouncements")} />
           <AdminMetric icon={<ClipboardList />} value={data.metrics.openRequests.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.openRequests")} />
@@ -108,21 +108,24 @@ export function CommunityAdminDashboard() {
           <AdminMetric icon={<Vote />} value={data.metrics.activePolls.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")} label={t("admin.dashboard.activePolls")} />
         </AdminMetricGrid>
         <div className={styles.dashboardGrid}>
-          <AdminSection icon={<TrendingUp />} title={t("admin.dashboard.byModule")} description={t("admin.dashboard.byModuleDescription")}>
+          <AdminSection icon={<TrendingUp />} title={t("admin.dashboard.byModule")} actions={<button className="button button--ghost button--compact" type="button" onClick={() => void load()} disabled={loading}><RefreshCw />{t("admin.dashboard.refresh")}</button>}>
             {data.engagement.length ? <div className={styles.progressList}>{data.engagement.map((item) => {
               const percent = item.total ? Math.min(100, Math.round(item.value / item.total * 100)) : Math.min(100, item.value);
               const label = adminDataLabel(locale, "engagement", item.label) || item.label;
               return <div className={styles.progressLine} key={item.label}><div><strong>{label}</strong><span>{item.value.toLocaleString(locale === "en" ? "en-GB" : "pt-PT")}</span></div><div className={styles.progressTrack}><span style={{ width: `${percent}%` }} /></div></div>;
             })}</div> : <AdminEmptyState icon={<TrendingUp />} title={t("admin.dashboard.noEngagement")} />}
           </AdminSection>
-          <AdminSection icon={<ClipboardList />} title={t("admin.dashboard.recent")} description={t("admin.dashboard.recentDescription")}>
-            {data.recent.length ? <div className={styles.sectionBody}>{data.recent.map((item) => {
-              const content = <><span className={styles.listIcon}>{icon(item.type)}</span><span><strong>{item.title}</strong>{activityDetail(item, locale) && <small>{activityDetail(item, locale)}</small>}</span>{item.href && <ArrowRight />}</>;
-              return item.href ? <Link className={styles.listItem} href={item.href} key={item.id}>{content}</Link> : <div className={styles.listItem} key={item.id}>{content}</div>;
-            })}</div> : <AdminEmptyState icon={<ClipboardList />} title={t("admin.dashboard.noRecent")} />}
+          <AdminSection icon={<ClipboardList />} title={t("admin.dashboard.recent")}>
+            {data.recent.length ? <ul className={styles.rows}>{data.recent.map((item) => <li className={styles.row} key={item.id}>
+              <span className={styles.listIcon} aria-hidden="true">{icon(item.type)}</span>
+              <div className={styles.rowMain}>
+                <h3>{item.href ? <Link className={`link-quiet ${styles.titleLink}`} href={item.href}>{item.title}</Link> : item.title}</h3>
+                {activityDetail(item, locale) && <p className={styles.rowMeta}>{activityDetail(item, locale)}</p>}
+              </div>
+            </li>)}</ul> : <AdminEmptyState icon={<ClipboardList />} title={t("admin.dashboard.noRecent")} />}
           </AdminSection>
         </div>
-        <AdminSection icon={<BookOpen />} title={t("admin.dashboard.byUnit")} description={t("admin.dashboard.byUnitDescription")} actions={<Link className="button button--secondary button--compact" href="/unidades-curriculares"><BookOpen />{t("admin.dashboard.viewCatalog")}</Link>}>
+        <AdminSection icon={<BookOpen />} title={t("admin.dashboard.byUnit")} actions={<Link className="button button--secondary button--compact" href="/unidades-curriculares"><BookOpen />{t("admin.dashboard.viewCatalog")}</Link>}>
           {data.units.length ? <div className={styles.grid}>{data.units.map((item) => <Link className={styles.card} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`} key={item.id}><span className={styles.unitCode}>{item.code ?? "UC"}</span><h3>{item.name}</h3><div className={styles.metrics}><div className={styles.metric}><span>{t("admin.dashboard.requests")}</span><strong>{item.issues}</strong></div><div className={styles.metric}><span>{t("admin.dashboard.upcomingEvents")}</span><strong>{item.events}</strong></div></div><span className={styles.linkHint}>{t("admin.dashboard.openUnit")} <ArrowRight /></span></Link>)}</div> : <AdminEmptyState icon={<Users />} title={t("admin.dashboard.noUnits")} />}
         </AdminSection>
       </>}

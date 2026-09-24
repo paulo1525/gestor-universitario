@@ -4,22 +4,19 @@ import {
   Apple,
   CalendarPlus,
   Check,
-  ChevronDown,
   Clipboard,
   ExternalLink,
-  Link2,
-  LoaderCircle,
   RefreshCw,
-  Settings2,
   Trash2,
-  X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { useScrollLock } from "@/components/use-scroll-lock";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { FormCloseButton } from "@/components/form-actions";
 import { useI18n } from "@/components/i18n-context";
 import styles from "@/components/calendar-subscription.module.css";
+import { RecordSkeleton } from "@/components/record-list";
 
 type Unit = { id: string; name: string; code: string };
 type Subscription = {
@@ -163,74 +160,54 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
       {t("calendar.subscription.open")}
     </button>
 
-    {open && <div className={styles.backdrop} role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
-      <aside className={styles.drawer} id="calendar-subscription-panel" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
-        <header className={styles.drawerHeader}>
-          <div>
-            <span className={styles.drawerIcon} aria-hidden="true"><CalendarPlus /></span>
-            <div>
-              <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
-              <p>{t("calendar.subscription.description")}</p>
-            </div>
-          </div>
-          <button className={styles.close} type="button" onClick={() => setOpen(false)} aria-label={t("calendar.subscription.close")}><X /></button>
+    {open && <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
+      <section id="calendar-subscription-panel" data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
+        <header className="app-modal-header" data-app-modal-header>
+          <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
+          <FormCloseButton onClick={() => setOpen(false)} label={t("calendar.subscription.close")} />
         </header>
 
-        <div className={styles.drawerBody}>
-          <div className={styles.setup}>
-            {!created ? <form className={styles.form} onSubmit={create}>
-              <details className={styles.customise}>
-                <summary><Settings2 />{t("calendar.subscription.customise")}<ChevronDown /></summary>
-                <div className={styles.customiseBody}>
-                  <label>
-                    <strong>{t("calendar.subscription.label")}</strong>
-                    <input maxLength={80} value={label} onChange={event => setLabel(event.target.value)} placeholder={t("calendar.subscription.labelPlaceholder")} />
-                  </label>
-                  {units.length > 0 && <fieldset>
-                    <legend>{t("calendar.subscription.units")}</legend>
-                    <small>{t("calendar.subscription.unitsHelp")}</small>
-                    <div className={styles.unitGrid}>{units.map(unit => <label key={unit.id}>
-                      <input
-                        type="checkbox"
-                        checked={unitIds.includes(unit.id)}
-                        onChange={event => setUnitIds(current => event.target.checked
-                          ? [...current, unit.id]
-                          : current.filter(id => id !== unit.id))}
-                      />
-                      <span>{unit.code ? <b>{unit.code}</b> : null}{unit.name}</span>
-                    </label>)}</div>
-                  </fieldset>}
-                </div>
-              </details>
-
-              <button className={styles.primary} disabled={saving}>
-                {saving ? <LoaderCircle className={styles.spin} /> : <Link2 />}
-                {t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}
-              </button>
+        <div className={styles.dialogBody} data-app-modal-body>
+          <section className={styles.setup}>
+            {!created ? <form id="calendar-subscription-form" className={styles.form} onSubmit={create}>
+              <label className={styles.field}>
+                <span>{t("calendar.subscription.label")}</span>
+                <input maxLength={80} value={label} onChange={event => setLabel(event.target.value)} placeholder={t("calendar.subscription.labelPlaceholder")} />
+              </label>
+              {units.length > 0 && <fieldset className={styles.field}>
+                <legend>{t("calendar.subscription.units")}</legend>
+                <div className={styles.unitList}>{units.map(unit => <label key={unit.id}>
+                  <input
+                    type="checkbox"
+                    checked={unitIds.includes(unit.id)}
+                    onChange={event => setUnitIds(current => event.target.checked
+                      ? [...current, unit.id]
+                      : current.filter(id => id !== unit.id))}
+                  />
+                  <span>{unit.code ? <b>{unit.code}</b> : null}{unit.name}</span>
+                </label>)}</div>
+              </fieldset>}
             </form> : <div className={styles.created}>
-              <header><span><Check /></span><div><strong>{t("calendar.subscription.createdTitle")}</strong><p>{t("calendar.subscription.created")}</p></div></header>
+              <p className={styles.success}><Check />{t("calendar.subscription.createdTitle")}</p>
               <div className={styles.external}>
-                <a className={styles.recommended} href={google} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.google")}</a>
-                <a href={webcal}><Apple />{t("calendar.subscription.apple")}</a>
-                <a href={outlook} target="_blank" rel="noreferrer"><ExternalLink />{t("calendar.subscription.outlook")}</a>
+                <a href={google} target="_blank" rel="noreferrer"><span>{t("calendar.subscription.google")}</span><ExternalLink /></a>
+                <a href={webcal}><span>{t("calendar.subscription.apple")}</span><Apple /></a>
+                <a href={outlook} target="_blank" rel="noreferrer"><span>{t("calendar.subscription.outlook")}</span><ExternalLink /></a>
               </div>
-              <details className={styles.manual}>
-                <summary>{t("calendar.subscription.otherApp")}<ChevronDown /></summary>
+              <div className={styles.field}>
+                <span>{t("calendar.subscription.otherApp")}</span>
                 <div className={styles.url}>
-                  <input readOnly value={created.feedUrl} aria-label={t("calendar.subscription.copy")} />
+                  <input readOnly value={created.feedUrl} aria-label={t("calendar.subscription.copy")} onFocus={event => event.currentTarget.select()} />
                   <button type="button" onClick={() => void copy()}>{copied ? <Check /> : <Clipboard />}{t(copied ? "calendar.subscription.copied" : "calendar.subscription.copy")}</button>
                 </div>
-              </details>
+              </div>
             </div>}
-          </div>
+          </section>
 
-          <details className={styles.management}>
-            <summary>
-              <span><Settings2 /><strong>{t("calendar.subscription.active")}</strong>{items.length > 0 && <b>{items.length}</b>}</span>
-              <ChevronDown />
-            </summary>
+          <section className={styles.management} aria-labelledby="calendar-subscription-active">
+            <h3 id="calendar-subscription-active">{t("calendar.subscription.active")}{items.length > 0 && <b>{items.length}</b>}</h3>
             <div className={styles.list}>
-              {loading ? <div className={styles.state}><LoaderCircle className={styles.spin} /></div> : items.length ? items.map(item => <article key={item.id}>
+              {loading ? <RecordSkeleton label={t("calendar.subscription.active")} rows={2} /> : items.length ? items.map(item => <article key={item.id}>
                 <div>
                   <strong>{item.label}</strong>
                   <small>{item.lastUsedAt
@@ -242,11 +219,16 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
                 </button>
               </article>) : <p className={styles.empty}>{t("calendar.subscription.none")}</p>}
             </div>
-          </details>
+          </section>
 
           {error && <div className={styles.error}><RefreshCw />{error}</div>}
         </div>
-      </aside>
+
+        <footer data-app-modal-footer>
+          <button type="button" className="button button--secondary" data-app-modal-action="secondary" onClick={() => setOpen(false)} disabled={saving}>{created ? t("calendar.subscription.close") : t("common.cancel")}</button>
+          {!created && <button type="submit" form="calendar-subscription-form" className="button button--primary" data-app-modal-action="primary" disabled={saving}>{t(saving ? "calendar.subscription.generating" : "calendar.subscription.generate")}</button>}
+        </footer>
+      </section>
     </div>}
 
     <ConfirmationDialog

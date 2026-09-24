@@ -27,7 +27,8 @@ test("o histórico explica ações e detalhes administrativos nos dois idiomas",
   assert.equal(adminDataLabel("pt-PT", "detail", "proposalId"), "Proposta de colocação");
   assert.equal(adminDataLabel("en", "detail", "proposalId"), "Placement proposal");
   assert.match(auditHistory, /function flattenDetails/);
-  assert.match(auditHistory, /t\("admin\.audit\.details"\)/);
+  assert.match(auditHistory, /#registo-/);
+  assert.match(auditHistory, /t\("admin\.audit\.back"\)/);
   assert.match(auditHistory, /t\("admin\.audit\.actionDetails"\)/);
   assert.doesNotMatch(auditHistory, />Ver log</);
   assert.doesNotMatch(auditHistory, /<pre>/);

@@ -17,10 +17,8 @@ test("custom modal and off-canvas layers use the shared Escape stack", () => {
   for (const name of [
     "academic-calendar.tsx",
     "app-shell.tsx",
-    "audit-history.tsx",
     "class-roster-import.tsx",
     "placement-workbench.tsx",
-    "polls-hub.tsx",
     "requests-center.tsx",
   ]) assert.match(source[name], /useEscapeKey/);
 

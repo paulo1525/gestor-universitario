@@ -4,6 +4,7 @@ import {usePathname,useRouter} from "next/navigation";
 import {ShieldCheck} from "lucide-react";
 import {useAuth} from "@/components/auth-context";
 import {useI18n} from "@/components/i18n-context";
+import { QuietLoading } from "@/components/quiet-loading";
 type AccessConfig={maintenance:boolean;formationActive:boolean};
 // Default Portuguese catalogue text: Sem permissão para visualizar esta página.
 let cached:AccessConfig|null=null,request:Promise<AccessConfig>|null=null;
@@ -17,12 +18,12 @@ export function AccessDenied(){
 export function AuthGuard({children,allowDuringMaintenance=false,requireAdmin=false}:{children:ReactNode;allowDuringMaintenance?:boolean;requireAdmin?:boolean}){
  const {user,loading}=useAuth(),[access,setAccess]=useState<AccessConfig|null>(()=>cached),pathname=usePathname(),router=useRouter();
  const {t}=useI18n();
- useEffect(()=>{if(!loading&&!user)router.replace(`/login?next=${encodeURIComponent(pathname)}`)},[loading,user,pathname,router]);
+ useEffect(()=>{if(!loading&&!user)router.replace(`/login?next=${encodeURIComponent(`${pathname}${window.location.search}${window.location.hash}`)}`)},[loading,user,pathname,router]);
  useEffect(()=>{void accessConfig().then(setAccess)},[]);
  const roleBlocked=Boolean(requireAdmin&&user&&user.role!=="admin");
  const maintenanceBlocked=Boolean(!roleBlocked&&access?.maintenance&&user?.role!=="admin"&&!user?.preview&&!allowDuringMaintenance),formationBlocked=Boolean(!roleBlocked&&access?.formationActive&&user?.role==="student"&&!user?.classRepresentative&&!user?.preview&&!allowDuringMaintenance);
  useEffect(()=>{if(!loading&&user&&roleBlocked)return;if(!loading&&user&&maintenanceBlocked)router.replace("/manutencao/");else if(!loading&&user&&formationBlocked)router.replace("/formacao-em-curso/")},[loading,user,roleBlocked,maintenanceBlocked,formationBlocked,router]);
  if(roleBlocked)return <AccessDenied/>;
- if(loading||!user||!access||maintenanceBlocked||formationBlocked)return <main className="auth-loading"><ShieldCheck size={28}/><strong>{t("guard.validating")}</strong></main>;
+ if(loading||!user||!access||maintenanceBlocked||formationBlocked)return <QuietLoading label={t("guard.validating")} />;
  return children;
 }

@@ -13,7 +13,7 @@ test("os cabeçalhos principais mantêm o desenho atual sem descritores", async 
     ["notifications-center", /description=\{t\("notifications\.description"\)\}/],
     ["polls-hub", /description=\{t\("polls\.intro"\)\}/],
     ["requests-center", /description=\{t\("requests\.intro"\)\}/],
-    ["useful-links", /description=\{t\("links\.description"\)\}/],
+    ["useful-links-tree", /description=\{t\("links\.description"\)\}/],
     ["global-search", /description=\{t\("search\.intro"\)\}/],
   ];
   for (const [name, pattern] of checks) assert.doesNotMatch(await read(name), pattern, `${name} voltou a mostrar o descritor principal`);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Children, type ReactNode } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { FilterBar } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import styles from "@/components/admin-ui.module.css";
 
@@ -17,7 +18,6 @@ export function AdminPageHeader({
   icon?: ReactNode;
   eyebrow: string;
   title: string;
-  description?: string;
   actions?: ReactNode;
 }) {
   return <SurfaceHeader
@@ -65,7 +65,6 @@ export function AdminSection({
   icon,
   eyebrow,
   title,
-  description,
   actions,
   children,
   className,
@@ -73,7 +72,6 @@ export function AdminSection({
   icon?: ReactNode;
   eyebrow?: string;
   title: string;
-  description?: string;
   actions?: ReactNode;
   children?: ReactNode;
   className?: string;
@@ -83,7 +81,6 @@ export function AdminSection({
       icon={icon ?? <ShieldCheck />}
       eyebrow={eyebrow}
       title={title}
-      description={description}
       actions={actions && <div className={styles.sectionActions}>{actions}</div>}
     />
     {children}
@@ -98,20 +95,17 @@ export function AdminNavigationItem({
   href,
   icon,
   title,
-  description,
   meta,
 }: {
   href: string;
   icon: ReactNode;
   title: string;
-  description: string;
   meta?: string;
 }) {
   return <Link className={styles.navigationItem} data-platform-surface="navigation" href={href}>
     <span className={styles.navigationIcon} aria-hidden="true">{icon}</span>
     <span className={styles.navigationCopy}>
       <strong>{title}</strong>
-      <small>{description}</small>
     </span>
     {meta && <span className={styles.navigationMeta}>{meta}</span>}
     <ArrowRight className={styles.navigationArrow} aria-hidden="true" />
@@ -122,8 +116,9 @@ export function AdminSectionGrid({ children }: { children: ReactNode }) {
   return <div className={styles.sectionGrid}>{children}</div>;
 }
 
-export function AdminToolbar({ children, className, label }: { children: ReactNode; className?: string; label?: string }) {
-  return <div className={`${styles.toolbar}${className ? ` ${className}` : ""}`} aria-label={label}>{children}</div>;
+/** Search and filters for an administrative collection; shares the platform filter anatomy. */
+export function AdminToolbar({ children, className, label, standalone = false }: { children: ReactNode; className?: string; label: string; standalone?: boolean }) {
+  return <FilterBar className={className} label={label} standalone={standalone}>{children}</FilterBar>;
 }
 
 export function AdminDataRegion({ children, className, label }: { children: ReactNode; className?: string; label?: string }) {
@@ -134,17 +129,15 @@ export function AdminFormGrid({ children }: { children: ReactNode }) {
   return <div className={styles.formGrid}>{children}</div>;
 }
 
-export function AdminEmptyState({ icon, title, description, action, className }: {
+export function AdminEmptyState({ icon, title, action, className }: {
   icon: ReactNode;
   title: string;
-  description?: string;
   action?: ReactNode;
   className?: string;
 }) {
   return <div className={`${styles.emptyState}${className ? ` ${className}` : ""}`}>
     <span aria-hidden="true">{icon}</span>
     <strong>{title}</strong>
-    {description && <p>{description}</p>}
     {action}
   </div>;
 }

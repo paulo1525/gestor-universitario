@@ -1370,16 +1370,65 @@ async function handleValidationExport(request:Request,env:Env,user:CurrentUser):
  return new Response(xlsxZip(files),{headers:{"content-type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","content-disposition":`attachment; filename="${filename}-${new Date().toISOString().slice(0,10)}.xlsx`}});
 }
 
+function announcementAudienceWhere(management: boolean): string {
+  return management ? "1=1" : "(a.audience_scope='all' OR (a.audience_scope='year' AND (a.audience_year IS NULL OR u_view.study_year IS NULL OR a.audience_year=u_view.study_year)) OR (a.audience_scope='unit' AND (a.audience_unit_id IS NULL OR EXISTS (SELECT 1 FROM curricular_unit_representatives cur_view WHERE cur_view.curricular_unit_id=a.audience_unit_id AND cur_view.user_id=u_view.id))) )";
+}
+
+const ANNOUNCEMENT_COMMENT_MAX = 1000;
+const ANNOUNCEMENT_COMMENTS_PER_10_MIN = 15;
+
+// Comments on a published announcement the user can see. Authors delete their own; the Núcleo moderates.
+async function handleAnnouncementComments(request: Request, env: Env, user: CurrentUser): Promise<Response> {
+  if (!await isModuleEnabled(env, "announcements.feed")) return moduleDisabled();
+  const management = Boolean(user.commissionPosition) || user.role === "admin";
+  const canViewIdentifiers = management;
+  const visible = (announcementId: string, includeArchived = false) => env.DB.prepare(`SELECT a.id FROM announcements a LEFT JOIN users u_view ON u_view.id=? WHERE a.id=? AND ${includeArchived ? "a.status IN ('published','archived')" : "a.status='published'"} AND (a.expires_at IS NULL OR a.expires_at>?) AND ${announcementAudienceWhere(management)}`).bind(user.id, announcementId, Date.now()).first();
+  if (request.method === "GET") {
+    const announcementId = new URL(request.url).searchParams.get("announcementId")?.trim() || "";
+    if (!announcementId || !await visible(announcementId, management)) return json({ error: "Aviso não encontrado." }, 404);
+    const rows = await env.DB.prepare("SELECT c.id,c.body,c.created_at,c.user_id,u.full_name,u.email FROM announcement_comments c JOIN users u ON u.id=c.user_id WHERE c.announcement_id=? AND c.deleted_at IS NULL ORDER BY c.created_at ASC LIMIT 300").bind(announcementId).all<{ id: string; body: string; created_at: number; user_id: string; full_name: string; email: string}>();
+    return json({ comments: rows.results.map(row => ({ id: row.id, body: row.body, createdAt: row.created_at, author: { fullName: row.full_name, ...(canViewIdentifiers ? { id: row.user_id, email: row.email } : {}) }, own: row.user_id === user.id, canDelete: row.user_id === user.id || isManagementCore(user) })) });
+  }
+  const body = await parseJson(request);
+  if (request.method === "POST") {
+    const announcementId = String(body?.announcementId || "").trim();
+    const text = sanitizeAnnouncementHtml(String(body?.body || "").trim());
+    const textLength = announcementPlainText(text).length;
+    if (!textLength || textLength > ANNOUNCEMENT_COMMENT_MAX) return json({ error: `Escreve um comentário até ${ANNOUNCEMENT_COMMENT_MAX} caracteres.` }, 400);
+    if (!announcementId || !await visible(announcementId)) return json({ error: "Aviso não encontrado." }, 404);
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS total FROM announcement_comments WHERE user_id=? AND created_at>?").bind(user.id, Date.now() - 10 * 60_000).first<{ total: number }>();
+    if (Number(recent?.total || 0) >= ANNOUNCEMENT_COMMENTS_PER_10_MIN) return json({ error: "Demasiados comentários seguidos. Tenta daqui a pouco." }, 429);
+    const id = crypto.randomUUID(), now = Date.now();
+    await env.DB.prepare("INSERT INTO announcement_comments (id,announcement_id,user_id,body,created_at) VALUES (?,?,?,?,?)").bind(id, announcementId, user.id, text, now).run();
+    return json({ ok: true, id }, 201);
+  }
+  if (request.method === "DELETE") {
+    const id = String(body?.id || "").trim();
+    const existing = id ? await env.DB.prepare("SELECT id,user_id,announcement_id FROM announcement_comments WHERE id=? AND deleted_at IS NULL").bind(id).first<{ id: string; user_id: string; announcement_id: string }>() : null;
+    if (!existing) return json({ error: "Comentário não encontrado." }, 404);
+    const own = existing.user_id === user.id;
+    if (!own && !isManagementCore(user)) return json({ error: "Só o autor ou o Núcleo pode apagar este comentário." }, 403);
+    const now = Date.now(), actorId = user.actorId || user.id;
+    const statements = [env.DB.prepare("UPDATE announcement_comments SET deleted_at=?,deleted_by=? WHERE id=? AND deleted_at IS NULL").bind(now, actorId, id)];
+    if (!own) statements.push(env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_comment_removed',?,?)").bind(actorId, JSON.stringify({ id, announcementId: existing.announcement_id }), now));
+    await env.DB.batch(statements);
+    return json({ ok: true });
+  }
+  return json({ error: "Operação não suportada." }, 405);
+}
+
 async function handleAnnouncements(request: Request, env: Env, user: CurrentUser): Promise<Response> {
   if (!await isModuleEnabled(env, "announcements.feed")) return moduleDisabled();
   const publishingEnabled = await isModuleEnabled(env, "announcements.publishing");
   const canPublish = Boolean(publishingEnabled && user.commissionPosition);
   const canViewAuthorIdentifiers = user.role === "admin" || Boolean(user.commissionPosition);
-  const audienceWhere = (management: boolean) => management ? "1=1" : "(a.audience_scope='all' OR (a.audience_scope='year' AND (a.audience_year IS NULL OR u_view.study_year IS NULL OR a.audience_year=u_view.study_year)) OR (a.audience_scope='unit' AND (a.audience_unit_id IS NULL OR EXISTS (SELECT 1 FROM curricular_unit_representatives cur_view WHERE cur_view.curricular_unit_id=a.audience_unit_id AND cur_view.user_id=u_view.id))) )";
+  const audienceWhere = announcementAudienceWhere;
   if (request.method === "GET") {
     const management = canPublish || user.role === "admin";
-    const announcements = await env.DB.prepare(`SELECT a.id,a.title,a.body,a.priority,a.status,a.is_critical,a.audience_scope,a.audience_year,a.audience_unit_id,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,CASE WHEN ack.user_id IS NULL THEN 0 ELSE 1 END AS acknowledged,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id LEFT JOIN users u_view ON u_view.id=? LEFT JOIN announcement_acknowledgements ack ON ack.announcement_id=a.id AND ack.user_id=? WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?) AND ${audienceWhere(management)} ORDER BY CASE WHEN a.is_critical=1 THEN 0 WHEN a.priority='urgent' THEN 1 WHEN a.priority='important' THEN 2 ELSE 3 END,a.published_at DESC LIMIT 100`).bind(user.id, user.id, Date.now()).all<Record<string, unknown>>();
-    return json({ announcements: announcements.results.map((announcement) => { const { author_user_id, author_email, author_student_number, ...publicFields } = announcement; return { ...publicFields, isCritical: announcement.is_critical === 1, requiresAcknowledgement: announcement.is_critical === 1, acknowledged: announcement.acknowledged === 1, body: announcementDisplayHtml(String(announcement.body || "")), ...(canViewAuthorIdentifiers ? { authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number } : {}) }; }), canPublish, canViewAuthorIdentifiers, publishingEnabled });
+    // Archived announcements are an archive for whoever manages them; everyone else only sees the live feed.
+    const archivedView = management && new URL(request.url).searchParams.get("view") === "archived";
+    const announcements = await env.DB.prepare(`SELECT a.id,a.title,a.body,a.priority,a.status,a.is_critical,a.audience_scope,a.audience_year,a.audience_unit_id,a.author_user_id,a.author_name,a.author_position_code,a.author_position_label,a.published_at,a.expires_at,a.archived_at,CASE WHEN ack.user_id IS NULL THEN 0 ELSE 1 END AS acknowledged,(SELECT COUNT(*) FROM announcement_comments cm WHERE cm.announcement_id=a.id AND cm.deleted_at IS NULL) AS comment_count,u.email AS author_email,CASE WHEN lower(u.email) LIKE 'up_________@%' THEN substr(u.email,3,9) WHEN lower(u.email) LIKE '_________@%' THEN substr(u.email,1,9) ELSE NULL END AS author_student_number FROM announcements a LEFT JOIN users u ON u.id=a.author_user_id LEFT JOIN users u_view ON u_view.id=? LEFT JOIN announcement_acknowledgements ack ON ack.announcement_id=a.id AND ack.user_id=? WHERE ${archivedView ? "a.status='archived' AND ?>0" : "a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?)"} AND ${audienceWhere(management)} ORDER BY ${archivedView ? "a.archived_at DESC" : "CASE WHEN a.is_critical=1 THEN 0 WHEN a.priority='urgent' THEN 1 WHEN a.priority='important' THEN 2 ELSE 3 END,a.published_at DESC"} LIMIT 100`).bind(user.id, user.id, Date.now()).all<Record<string, unknown>>();
+    return json({ announcements: announcements.results.map((announcement) => { const { author_user_id, author_email, author_student_number, ...publicFields } = announcement; return { ...publicFields, isCritical: announcement.is_critical === 1, requiresAcknowledgement: announcement.is_critical === 1, acknowledged: announcement.acknowledged === 1, body: announcementDisplayHtml(String(announcement.body || "")), canEdit: canPublish && (author_user_id === user.id || isManagementCore(user)), ...(canViewAuthorIdentifiers ? { authorId: author_user_id, authorEmail: author_email, authorStudentNumber: author_student_number } : {}) }; }), canPublish, canViewAuthorIdentifiers, publishingEnabled });
   }
   const body = await parseJson(request);
   if (request.method === "PATCH" && body?.action === "acknowledge") {
@@ -1419,14 +1468,47 @@ async function handleAnnouncements(request: Request, env: Env, user: CurrentUser
     await env.DB.batch(statements);
     return json({ ok: true, id }, 201);
   }
+  if (request.method === "PATCH" && body?.action === "update") {
+    const id = String(body.id || "").trim();
+    const title = String(body.title || "").trim().replace(/\s+/g, " ").slice(0, 140);
+    const content = sanitizeAnnouncementHtml(String(body.body || "").trim());
+    const plainContent = announcementPlainText(content);
+    const priority = String(body.priority || "normal");
+    const isCritical = body.isCritical === true;
+    const audienceScope = String(body.audienceScope || "all");
+    const audienceYear = body.audienceYear === null || body.audienceYear === "" || body.audienceYear === undefined ? null : Number(body.audienceYear);
+    const expiresAt = body.expiresAt === null || body.expiresAt === "" || body.expiresAt === undefined ? null : Date.parse(String(body.expiresAt));
+    if (!id) return json({ error: "Aviso inválido." }, 400);
+    if (title.length < 5 || plainContent.length < 10 || plainContent.length > 5000) return json({ error: "Indique um título e uma mensagem completos, até 5000 caracteres." }, 400);
+    if (!["normal", "important", "urgent"].includes(priority) || !["all", "year"].includes(audienceScope)) return json({ error: "Prioridade ou segmento inválido." }, 400);
+    if (audienceScope === "year" && (!Number.isInteger(audienceYear) || Number(audienceYear) < 1 || Number(audienceYear) > 6)) return json({ error: "Indique um ano curricular entre 1 e 6." }, 400);
+    if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= Date.now())) return json({ error: "A validade deve terminar no futuro." }, 400);
+    const existing = await env.DB.prepare("SELECT id,author_user_id,status FROM announcements WHERE id=?").bind(id).first<{ id: string; author_user_id: string; status: string }>();
+    if (!existing || existing.status !== "published") return json({ error: "Aviso não encontrado." }, 404);
+    if (existing.author_user_id !== user.id && !isManagementCore(user)) return json({ error: "Só o autor ou o Núcleo pode editar este aviso." }, 403);
+    const now = Date.now(), actorId = user.actorId || user.id;
+    await env.DB.batch([
+      env.DB.prepare("UPDATE announcements SET title=?,body=?,priority=?,is_critical=?,audience_scope=?,audience_year=?,audience_unit_id=NULL,expires_at=?,updated_at=? WHERE id=? AND status='published'").bind(title, content, priority, isCritical ? 1 : 0, audienceScope, audienceScope === "year" ? audienceYear : null, expiresAt, now, id),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_updated',?,?)").bind(actorId, JSON.stringify({ id, title, priority, expiresAt, isCritical, audienceScope, audienceYear }), now),
+    ]);
+    return json({ ok: true, id });
+  }
   if (request.method === "PATCH") {
     const id = String(body?.id || ""), status = String(body?.status || "");
-    if (!id || status !== "archived") return json({ error: "Ação inválida." }, 400);
+    if (!id || !["archived", "published"].includes(status)) return json({ error: "Ação inválida." }, 400);
     const existing = await env.DB.prepare("SELECT id,author_user_id,status FROM announcements WHERE id=?").bind(id).first<{ id: string; author_user_id: string; status: string }>();
     if (!existing) return json({ error: "Aviso não encontrado." }, 404);
     if (existing.author_user_id !== user.id && !isManagementCore(user)) return json({ error: "Só o autor ou o Núcleo pode arquivar este aviso." }, 403);
-    if (existing.status === "archived") return json({ ok: true, alreadyArchived: true });
     const now = Date.now(), actorId = user.actorId || user.id;
+    if (status === "published") {
+      if (existing.status !== "archived") return json({ ok: true, alreadyPublished: true });
+      await env.DB.batch([
+        env.DB.prepare("UPDATE announcements SET status='published',archived_at=NULL,archived_by=NULL,updated_at=? WHERE id=? AND status='archived'").bind(now, id),
+        env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_restored',?,?)").bind(actorId, JSON.stringify({ id }), now),
+      ]);
+      return json({ ok: true });
+    }
+    if (existing.status === "archived") return json({ ok: true, alreadyArchived: true });
     await env.DB.batch([
       env.DB.prepare("UPDATE announcements SET status='archived',archived_at=?,archived_by=?,updated_at=? WHERE id=? AND status='published'").bind(now, actorId, now, id),
       env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_archived',?,?)").bind(actorId, JSON.stringify({ id }), now),
@@ -1569,6 +1651,10 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   if (pathname === "/api/admin/modules" && ["GET", "PUT"].includes(request.method)) {
     const user = await currentUser(request, env);
     return user ? handleAdminModules(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (pathname === "/api/announcements/comments" && ["GET", "POST", "DELETE"].includes(request.method)) {
+    const user = await currentUser(request, env);
+    return user ? handleAnnouncementComments(request, env, user) : json({ error: "Sessão inválida." }, 401);
   }
   if (pathname === "/api/announcements" && ["GET", "POST", "PATCH"].includes(request.method)) {
     const user = await currentUser(request, env);

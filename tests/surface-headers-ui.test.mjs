@@ -39,7 +39,6 @@ test("todas as páginas principais no AppShell usam o cabeçalho comum ou o equi
     "components/requests-center.tsx",
     "components/turma-detail.tsx",
     "components/turmas-dashboard.tsx",
-    "components/useful-links.tsx",
   ];
 
   const adminComponents = [
@@ -68,13 +67,16 @@ test("todas as páginas principais no AppShell usam o cabeçalho comum ou o equi
 
 test("pesquisa, filtros e separadores não substituem o título das superfícies principais", () => {
   const checks = [
-    ["components/global-search.tsx", /<section className=\{styles\.panel\}>\s*<SurfaceHeader[\s\S]*?<form className=\{styles\.toolbar\}/],
-    ["components/campus-directory.tsx", /<section className=\{styles\.panel\}[^>]*>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/notifications-center.tsx", /<section className=\{styles\.panel\}>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/polls-hub.tsx", /<section className=\{styles\.workspace\}>\s*<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
-    ["components/material-catalog.tsx", /<SurfaceHeader[\s\S]*?<div className=\{styles\.toolbar\}/],
+    ["components/global-search.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<form className=\{styles\.toolbar\}/],
+    ["components/campus-directory.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/notifications-center.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/polls-hub.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/documents-library.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/commission-directory.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/material-library.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/material-catalog.tsx", /role="tabpanel"[\s\S]*?<FilterBar /],
     ["components/placement-workbench.tsx", /title="Estudantes e resultados"[\s\S]*?actions=\{<label className="search-field"/],
-    ["components/turmas-dashboard.tsx", /<SurfaceHeader[\s\S]*?className="search-field"/],
+    ["components/turmas-dashboard.tsx", /<section className=\{`panel \$\{styles\.listPanel\}`\}[^>]*>\s*<FilterBar /],
   ];
 
   for (const [path, pattern] of checks) {

@@ -2,7 +2,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
 
-import Link from "next/link";
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -21,7 +20,6 @@ import {
   Flag,
   GraduationCap,
   Lightbulb,
-  LoaderCircle,
   Keyboard,
   MessageCircle,
   Play,
@@ -36,6 +34,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { PageTabs } from "@/components/page-tabs";
 import { SurfaceHeader } from "@/components/surface-header";
 import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
@@ -47,6 +46,8 @@ import { RichTextContent, RichTextEditor } from "@/components/rich-text-editor";
 import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-content";
 import type { QuizExportPayload } from "@/lib/anki";
 import styles from "@/components/quiz-hub.module.css";
+import { FilterBar, FilterSearch } from "@/components/filter-bar";
+import { RecordSkeleton } from "@/components/record-list";
 
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic";
 type Screen = "catalogue" | "statistics" | "attempt" | "results";
@@ -349,7 +350,7 @@ export function QuizHub() {
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
   const [answerFormat, setAnswerFormat] = useState<AnswerFormat>(() => readQuizPreferences().answerFormat ?? "multiple_choice");
   const [shortAnswerMode, setShortAnswerMode] = useState<ShortAnswerMode>(() => readQuizPreferences().shortAnswerMode ?? "type_and_check");
-  const [screen, setScreen] = useState<Screen>("catalogue");
+  const [screen, setScreen] = useState<Screen>(() => typeof window !== "undefined" && window.location.hash === "#estatisticas" ? "statistics" : "catalogue");
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -462,6 +463,7 @@ export function QuizHub() {
   }, [clearingStatistics, loadCatalogue, loadStatistics]);
 
   useEffect(() => { void loadCatalogue(); }, [loadCatalogue]);
+  useEffect(() => { if (window.location.hash === "#estatisticas") void loadStatistics(); }, [loadStatistics]);
   useEffect(() => {
     if (!selectedUnit) return;
     setSelectedTopicIds((current) => {
@@ -888,7 +890,7 @@ export function QuizHub() {
       <AppShell active="quizzes" breadcrumb="Testes" focusMode={screen === "attempt"}>
         <div className={styles.page}>
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
-          {screen === "catalogue" && restoringAttempt && <p className={styles.saving} role="status"><LoaderCircle className={styles.spin} /> A recuperar a sessão…</p>}
+          {screen === "catalogue" && restoringAttempt && <p className="sr-only" role="status">A recuperar a sessão…</p>}
           {screen === "catalogue" && restoreError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{restoreError}</p><button type="button" onClick={() => setRestoreVersion((version) => version + 1)}>Tentar novamente</button></div>}
           {screen === "attempt" && finishError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{finishError}</p><button type="button" disabled={finishing} onClick={() => remaining === 0 ? void finishAttempt(true) : requestFinish()}>Tentar concluir novamente</button></div>}
           {screen === "catalogue" && <Catalogue
@@ -973,6 +975,10 @@ export function QuizHub() {
   </AuthGuard>;
 }
 
+function TestsTabs({ active, onPractice, onStatistics }: { active: "practice" | "statistics"; onPractice?: () => void; onStatistics?: () => void }) {
+  return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "learn", label: "Aprender matéria", icon: <GraduationCap />, href: "/testes/aprender" }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }]} />;
+}
+
 function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
   exportingAnki: boolean;
@@ -982,6 +988,9 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   onStatistics: () => void;
   onExportAnki: () => void;
 }) {
+  const [unitQuery, setUnitQuery] = useState("");
+  const unitTerm = unitQuery.trim().toLocaleLowerCase("pt-PT");
+  const visibleUnits = units.filter((unit) => unit.id === selectedUnitId || !unitTerm || `${unit.code} ${unit.name}`.toLocaleLowerCase("pt-PT").includes(unitTerm));
   const insufficientBank = Boolean(selectedUnit && availableQuestionCount < DEFAULT_QUESTION_COUNT);
   const needsTopics = selectedMode === "topic" && !selectedTopicIds.length;
   const canStart = Boolean(selectedUnit && !insufficientBank && !needsTopics && !availability && !loadingAttempt);
@@ -990,12 +999,14 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
   const countOptions = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<BrainCircuit />} eyebrow="Testes" title="Escolhe uma disciplina" actions={<div className={styles.statisticsActions}><Link className={styles.statisticsButton} href="/testes/aprender"><GraduationCap />Aprender matéria</Link><button className={styles.statisticsButton} type="button" onClick={onStatistics}><BarChart3 />Estatísticas</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<BrainCircuit />} eyebrow="Testes" title="Escolhe uma disciplina" />
+    <TestsTabs active="practice" onStatistics={onStatistics} />
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
-    {loading ? <State icon={<LoaderCircle className={styles.spin} />} title="A preparar a tua sessão" text="A carregar disciplinas e perguntas." /> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
+    {loading ? <section className={styles.unitCatalogue} aria-busy="true"><RecordSkeleton label="A preparar a tua sessão" /></section> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
       <section className={styles.unitCatalogue} aria-label="Disciplinas">
+        {units.length > 1 && <FilterBar label="Filtrar disciplinas"><FilterSearch label="Pesquisar disciplinas" value={unitQuery} onChange={setUnitQuery} placeholder="Pesquisar disciplinas" /></FilterBar>}
         <div className={styles.unitGrid}>
-          {units.map((unit) => {
+          {visibleUnits.map((unit) => {
             const selected = unit.id === selectedUnitId;
             return <article key={unit.id} className={`${styles.unitCard} ${selected ? styles.unitCardSelected : ""}`}>
               <button type="button" className={styles.unitCardHeader} onClick={() => onUnit(unit.id)} aria-expanded={selected}>
@@ -1015,7 +1026,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Sessão guiada</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir uma sessão guiada ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Sessão guiada</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}>{exportingAnki ? <LoaderCircle className={styles.spin} /> : <Download />}{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki || Boolean(resumeAttempt)}>{loadingAttempt ? <LoaderCircle className={styles.spin} /> : <Play />}{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
+                <footer className={styles.unitActions}><span><button className={styles.ankiButton} type="button" onClick={onExportAnki} disabled={!canStart || exportingAnki}><Download />{exportingAnki ? "A criar…" : "Baixar para Anki (.apkg)"}</button><button className={styles.primaryButton} type="button" onClick={onStart} disabled={!canStart || exportingAnki || Boolean(resumeAttempt)}><Play />{loadingAttempt ? "A iniciar…" : "Começar sessão"}</button></span></footer>
               </div>}
             </article>;
           })}
@@ -1026,8 +1037,8 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
 }
 
 function StatisticsView({ statistics, loading, error, totalAvailableQuestions, clearing, onBack, onRetry, onClear }: { statistics: QuizStatistics | null; loading: boolean; error: string; totalAvailableQuestions: number; clearing: boolean; onBack: () => void; onRetry: () => void; onClear: () => void }) {
-  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button>} /><State icon={<LoaderCircle className={styles.spin} />} title="A preparar as tuas estatísticas" text="Estamos a reunir o teu progresso e as tentativas concluídas." /></>;
-  if (error || !statistics) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button>} /><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
+  if (loading) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><section className={styles.unitCatalogue} aria-busy="true"><RecordSkeleton label="A preparar as tuas estatísticas" /></section></>;
+  if (error || !statistics) return <><SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} /><State icon={<TriangleAlert />} title="Não foi possível carregar as estatísticas" text={error || "Tenta novamente dentro de instantes."} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /></>;
   const { summary } = statistics;
   const accuracy = Math.round((summary.accuracy ?? 0) * 100);
   const recentAccuracy = Math.round((summary.recentAccuracy ?? 0) * 100);
@@ -1041,7 +1052,7 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
     { label: "Últimos 10 testes", percent: recentAccuracy, value: `${statistics.recentAttempts.length} concluídos` },
   ];
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" actions={<div className={styles.statisticsActions}><button className={`${styles.statisticsButton} ${styles.statisticsDangerButton}`} type="button" onClick={onClear} disabled={clearing}><Trash2 />Limpar estatísticas</button><button className={styles.statisticsButton} type="button" onClick={onBack}><ArrowLeft />Novo teste</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="As minhas estatísticas" /><TestsTabs active="statistics" onPractice={onBack} />
     <section className={styles.statisticsLead}>
       <article className={styles.readinessCard}><div><span className={styles.statisticsKicker}><BarChart3 />Preparação global</span><div className={styles.statisticsRing} style={{ "--score": `${accuracy}%` } as CSSProperties}><strong>{accuracy}%</strong><small>acerto</small></div></div><div><h2>{summary.completedCount ? `${summary.completedCount} ${summary.completedCount === 1 ? "teste concluído" : "testes concluídos"}` : "Começa a construir o teu histórico"}</h2><p>{readiness}</p></div></article>
       <article className={styles.timeCard}><span className={styles.statisticsKicker}><Clock3 />Tempo de testes</span><dl><div><dt>Tempo total</dt><dd>{humanDuration(summary.totalDurationSeconds)}</dd></div><div><dt>Média por teste</dt><dd>{humanDuration(summary.averageDurationSeconds)}</dd></div></dl></article>
@@ -1051,7 +1062,7 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
     </section>
     <div className={styles.statisticsDetailGrid}>
       <section className={styles.statisticsPanel} aria-labelledby="desempenho-temas"><SurfaceHeader icon={<Trophy />} eyebrow="Desempenho por tema" title="Onde deves concentrar a revisão" headingId="desempenho-temas" />{statistics.topics.length ? <div className={styles.topicStatistics}>{statistics.topics.slice(0, 8).map((topic) => { const score = Math.round((topic.accuracy ?? 0) * 100); return <div key={`${topic.unitId}-${topic.topicId}`}><div><span className={styles.unitCode}>{topic.unitCode}</span><strong>{topic.title}</strong><small>{topic.correctCount}/{topic.answeredCount} certas</small></div><div className={styles.topicBar} aria-label={`${score}% de acerto`}><span style={{ width: `${score}%` }} /></div><b>{score}%</b></div>; })}</div> : <p className={styles.statisticsEmpty}>Ainda não há temas avaliados em testes concluídos.</p>}</section>
-      <section className={styles.statisticsPanel} aria-labelledby="tentativas-recentes"><SurfaceHeader icon={<TimerReset />} eyebrow="Histórico recente" title="Últimos testes concluídos" headingId="tentativas-recentes" />{statistics.recentAttempts.length ? <div className={styles.recentAttempts}>{statistics.recentAttempts.map((item) => { const score = Math.round((item.accuracy ?? 0) * 100); return <article key={item.id}><div><span className={styles.unitCode}>{item.unitCode}</span><strong>{modeTitle(item.mode)}</strong><small>{humanDate(item.completedAt)} · {humanDuration(item.durationSeconds)}</small></div><span className={score >= 50 ? styles.passedAttempt : styles.reviewAttempt}><b>{score}%</b><small>{item.correctCount}/{item.questionCount}</small></span></article>; })}</div> : <p className={styles.statisticsEmpty}>Os testes concluídos aparecerão aqui.</p>}</section>
+      <section className={styles.statisticsPanel} aria-labelledby="tentativas-recentes"><SurfaceHeader icon={<TimerReset />} eyebrow="Histórico recente" title="Últimos testes concluídos" headingId="tentativas-recentes" actions={<button className={`${styles.statisticsButton} ${styles.statisticsDangerButton}`} type="button" onClick={onClear} disabled={clearing}><Trash2 />Limpar estatísticas</button>} />{statistics.recentAttempts.length ? <div className={styles.recentAttempts}>{statistics.recentAttempts.map((item) => { const score = Math.round((item.accuracy ?? 0) * 100); return <article key={item.id}><div><span className={styles.unitCode}>{item.unitCode}</span><strong>{modeTitle(item.mode)}</strong><small>{humanDate(item.completedAt)} · {humanDuration(item.durationSeconds)}</small></div><span className={score >= 50 ? styles.passedAttempt : styles.reviewAttempt}><b>{score}%</b><small>{item.correctCount}/{item.questionCount}</small></span></article>; })}</div> : <p className={styles.statisticsEmpty}>Os testes concluídos aparecerão aqui.</p>}</section>
     </div>
   </>;
 }
@@ -1086,7 +1097,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
       <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0 || timerBusy}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0 || timerBusy}>Desistir</button></div>
       <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Perguntas respondidas"><span style={{ width: `${progress}%` }} /></div>
     </section>
-    <div className={styles.sessionSummary}><span role="status">{savingCount ? <><LoaderCircle className={styles.spin} /> A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{timerBusy ? <LoaderCircle className={styles.spin} /> : attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
+    <div className={styles.sessionSummary}><span role="status">{savingCount ? <>A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
     {timerError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{timerError}</p><button type="button" disabled={timerBusy} onClick={onTimer}>Sincronizar cronómetro</button></div>}
     {attempt.timerPaused && <p className={styles.saving} role="status"><Pause />Cronómetro em pausa. Retoma para continuar a responder.</p>}
     <div className={styles.attemptLayout}>
@@ -1128,7 +1139,7 @@ function ResultsView({ attempt, correctCount, percent, recommendation, onRestart
   const total = attempt.questions.length;
   const displayedCorrect = attempt.totalCorrect !== null && Number.isFinite(attempt.totalCorrect) ? attempt.totalCorrect : correctCount;
   return <>
-    <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} actions={<div className={styles.statisticsActions}><div className={styles.scoreRing} style={{ "--score": `${percent}%` } as CSSProperties}><strong>{percent}%</strong></div><button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw /> Novo teste</button></div>} />
+    <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} meta={`${percent}%`} />
     <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p><button type="button" onClick={onRestart}>Praticar <ArrowRight /></button></section>
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
     <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{question.imageUrl && <figure className={styles.reviewImage}><img src={question.imageUrl} alt={question.imageAlt} loading="lazy" /></figure>}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
@@ -1142,9 +1153,9 @@ function Comments({ comments, loading, text, sending, replyTo, onText, onSubmit,
     <form onSubmit={onSubmit}>
       {replyTo && <aside className={styles.replyingTo}><span>Em resposta a <strong>{replyTo.authorName}</strong></span><button type="button" onClick={onCancelReply}>Cancelar</button></aside>}
       <div className={styles.commentComposer}><RichTextEditor value={text} onChange={onText} ariaLabel={replyTo ? `Resposta a ${replyTo.authorName}` : "Novo comentário sobre a pergunta"} placeholder={replyTo ? `Responder a ${replyTo.authorName}…` : "Escreve uma dúvida ou comentário…"} maxLength={1200} minHeight="minimal" /></div>
-      <footer><small>Publicação imediata</small><button className={styles.primaryButton} type="submit" disabled={sending || plainLength < 2 || plainLength > 1200}>{sending ? <LoaderCircle className={styles.spin} /> : <Send />}{sending ? "A enviar…" : replyTo ? "Responder" : "Publicar"}</button></footer>
+      <footer><small>Publicação imediata</small><button className={styles.primaryButton} type="submit" disabled={sending || plainLength < 2 || plainLength > 1200}><Send />{sending ? "A enviar…" : replyTo ? "Responder" : "Publicar"}</button></footer>
     </form>
-    <div className={styles.commentList}>{loading ? <span className={styles.saving}><LoaderCircle className={styles.spin} /> A carregar comentários…</span> : comments.length ? comments.map((comment) => <article key={comment.id} className={comment.parentCommentId ? styles.commentReply : ""}><span>{comment.authorName.slice(0, 1).toUpperCase()}</span><div className={styles.commentBubble}><header><span><strong>{comment.authorName}</strong>{(comment.isAdmin || comment.authorRole === "admin") && <b className={styles.roleBadge}>Administrador</b>}<small>{humanDate(comment.createdAt)}</small></span><button type="button" onClick={() => onReply(comment)}>Responder</button></header>{comment.replyToName && <p className={styles.replyContext}>Em resposta a {comment.replyToName}</p>}<RichTextContent value={comment.body} className={styles.commentBody} /></div></article>) : <p className={styles.noComments}>Ainda não há comentários.</p>}</div>
+    <div className={styles.commentList}>{loading ? <RecordSkeleton label="A carregar comentários…" rows={2} /> : comments.length ? comments.map((comment) => <article key={comment.id} className={comment.parentCommentId ? styles.commentReply : ""}><span>{comment.authorName.slice(0, 1).toUpperCase()}</span><div className={styles.commentBubble}><header><span><strong>{comment.authorName}</strong>{(comment.isAdmin || comment.authorRole === "admin") && <b className={styles.roleBadge}>Administrador</b>}<small>{humanDate(comment.createdAt)}</small></span><button type="button" onClick={() => onReply(comment)}>Responder</button></header>{comment.replyToName && <p className={styles.replyContext}>Em resposta a {comment.replyToName}</p>}<RichTextContent value={comment.body} className={styles.commentBody} /></div></article>) : <p className={styles.noComments}>Ainda não há comentários.</p>}</div>
   </section>;
 }
 

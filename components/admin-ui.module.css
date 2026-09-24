@@ -3,6 +3,8 @@
   gap: var(--space-5);
   width: 100%;
 }
+/* The wrapper gap already separates the page header from the content. */
+.page > :global(.surface-header--standalone) { margin-bottom: 0; }
 
 .pageHeader {
   display: flex;
@@ -32,9 +34,7 @@
   line-height: var(--line-height-body);
 }
 
-.pageActions,
-.sectionActions,
-.toolbar {
+.pageActions, .sectionActions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -301,13 +301,7 @@
   color: var(--color-accent-text);
 }
 
-.toolbar {
-  justify-content: space-between;
-  min-height: 60px;
-  padding: 10px var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-subtle);
-}
+
 
 .dataRegion {
   min-width: 0;
@@ -433,10 +427,7 @@
     white-space: normal;
   }
 
-  .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
+
 
   .formGrid {
     grid-template-columns: 1fr;

@@ -28,7 +28,7 @@ function section(start, end) {
 }
 
 const modules = section("async function moduleStates", "function moduleDisabled");
-const announcements = section("async function handleAnnouncements", "type CurricularUnitInput");
+const announcements = section("function announcementAudienceWhere", "type CurricularUnitInput");
 const curricularUnits = section("async function handleCurricularUnits", "async function routeApi");
 const routes = section("async function routeApi", "export default");
 
@@ -97,7 +97,7 @@ test("comunicados lideram a navegação, têm editor isolado e um urgente global
   assert.match(urgentBanner, /api\/announcements/);
   assert.match(urgentBanner, /priority === "urgent"/);
   assert.match(announcementsUi, /contentEditable/);
-  assert.match(announcementsUi, /!editorOpen && <section/);
+  assert.match(announcementsUi, /!editorOpen && !openId && </);
   assert.doesNotMatch(announcementsUi, /Canal oficial da Comissão de Curso/);
   assert.match(announcementContent, /escapeHtmlText/);
   assert.match(announcementContent, /allowedTags\.has\(tag\)/);
@@ -112,7 +112,8 @@ test("comunicados podem ser pesquisados, filtrados e paginados", () => {
   assert.match(announcementsUi, /priorityFilter/);
   assert.match(announcementsUi, /authorFilter/);
   assert.match(announcementsUi, /paginatedAnnouncements/);
-  assert.match(announcementsUi, /announcements\.pagination\.aria/);
+  // Pagination is the shared component used by every long list.
+  assert.match(announcementsUi, /<Pagination page=\{currentPage\}/);
   assert.match(announcementsUi, /announcements\.filters\.reset/);
 });
 
@@ -146,7 +147,7 @@ test("unidades curriculares são geridas apenas pelo Núcleo e aceitam zero a do
   assert.match(representativesMigration, /CREATE TABLE curricular_unit_representatives/);
   assert.match(representativesMigration, /position INTEGER NOT NULL CHECK \(position IN \(1, 2\)\)/);
   assert.match(representativesMigration, /ADD COLUMN representative_user_id TEXT REFERENCES users\(id\) ON DELETE SET NULL/);
-  assert.match(curricularUi, /styles\.unitCard/);
+  assert.match(curricularUi, /<li className=\{styles\.row\}/);
   assert.match(curricularUi, /\[0, 1\]\.map/);
   assert.match(curricularUi, /<AppToast/);
   assert.match(moduleUi, /<AppToast/);

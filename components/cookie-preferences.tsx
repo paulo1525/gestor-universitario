@@ -1,18 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { Cookie, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { OPEN_COOKIE_PREFERENCES } from "@/components/floating-actions";
+import { FormCloseButton } from "@/components/form-actions";
 import { useI18n } from "@/components/i18n-context";
 import { useEscapeKey } from "@/components/use-escape-key";
 
 const PERSISTENCE_KEY = "gu_persistent_login";
 
+/* Cookie preferences in the shared light modal (same anatomy as every other modal). */
 export function CookiePreferences() {
   const { t } = useI18n();
+  const titleId = useId();
   const [open, setOpen] = useState(false);
   const [persistent, setPersistent] = useState(true);
   useEscapeKey(open, () => setOpen(false));
+
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(OPEN_COOKIE_PREFERENCES, show);
+    return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES, show);
+  }, []);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -28,16 +37,24 @@ export function CookiePreferences() {
 
   function close() { setOpen(false); }
 
+  if (!open) return null;
   return (
-    <>
-      <button className="cookie-settings-button" type="button" onClick={() => setOpen((current) => !current)} aria-label={open ? t("cookies.close") : t("cookies.open")} aria-expanded={open} aria-controls="cookie-preferences-panel"><Cookie size={17} /></button>
-      {open && <div id="cookie-preferences-panel" className="cookie-panel" role="dialog" aria-modal="false" aria-labelledby="cookie-title">
-        <div className="cookie-panel__header"><div><Cookie size={20} /><h2 id="cookie-title">{t("cookies.title")}</h2></div><button type="button" onClick={close} aria-label={t("common.close")}><X size={18} /></button></div>
-        <p>{t("cookies.description")}</p>
-        <div className="cookie-option"><div><strong>{t("cookies.essential")}</strong><span>{t("cookies.essentialDescription")}</span></div><span className="cookie-required">{t("cookies.alwaysActive")}</span></div>
-        <label className="cookie-option"><div><strong>{t("cookies.keepSignedIn")}</strong><span>{t("cookies.keepSignedInDescription")}</span></div><input className="toggle" type="checkbox" checked={persistent} onChange={(event) => setPersistent(event.target.checked)} /></label>
-        <div className="cookie-panel__actions"><Link href="/cookies/" onClick={close}>{t("cookies.policy")}</Link><button className="button button--primary" type="button" onClick={() => void save()}>{t("cookies.save")}</button></div>
-      </div>}
-    </>
+    <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) close(); }}>
+      <section id="cookie-preferences-panel" data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <header className="app-modal-header" data-app-modal-header>
+          <h2 id={titleId}>{t("cookies.title")}</h2>
+          <FormCloseButton onClick={close} label={t("common.close")} />
+        </header>
+        <div className="cookie-options" data-app-modal-body>
+          <p className="cookie-options__intro">{t("cookies.description")}</p>
+          <div className="cookie-option"><strong>{t("cookies.essential")}</strong><span className="cookie-required">{t("cookies.alwaysActive")}</span></div>
+          <label className="cookie-option"><span><strong>{t("cookies.keepSignedIn")}</strong><small>{t("cookies.keepSignedInDescription")}</small></span><input className="toggle" type="checkbox" checked={persistent} onChange={(event) => setPersistent(event.target.checked)} /></label>
+        </div>
+        <footer data-app-modal-footer>
+          <Link className="cookie-policy-link" href="/cookies/" onClick={close}>{t("cookies.policy")}</Link>
+          <button className="button button--primary" data-app-modal-action="primary" type="button" onClick={() => void save()}>{t("cookies.save")}</button>
+        </footer>
+      </section>
+    </div>
   );
 }

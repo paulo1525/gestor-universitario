@@ -29,7 +29,7 @@ Uma página nova deve parecer parte destas áreas à primeira vista. Uma inspira
 Usar as primitivas exportadas por `components/admin-ui.tsx` antes de criar estrutura local:
 
 1. `AdminPage` define o ritmo vertical e a largura de trabalho.
-2. `AdminPageHeader` contém uma eyebrow, um único `h1`, descrição curta opcional e no máximo uma ação primária.
+2. `AdminPageHeader` contém um ícone próprio da página (prop `icon`), uma eyebrow e um único `h1`: sem descrição e sem botões. As ações de criar vivem no menu flutuante; as restantes pertencem à secção onde atuam.
 3. `AdminMetricGrid` e `AdminMetric` apresentam apenas números ou estados que ajudam a decidir a próxima ação.
 4. `AdminSection` agrupa uma tarefa coerente; `AdminNavigationList` representa destinos e não cartões promocionais.
 5. `AdminToolbar` reúne pesquisa, filtros e ações em lote numa única faixa.
@@ -80,9 +80,11 @@ O CSS Module de uma página deve conter apenas o que é específico dessa págin
 - `AdminSection` e `AdminMetric` expõem `data-platform-surface`; cabeçalhos de secção expõem `data-platform-surface-header`. Estes atributos são o ponto de integração estável entre as primitivas React e os temas.
 - O tema base mantém cabeçalhos claros sem decoração adicional. O tema azul pode usar o seu filete azul funcional através de `--surface-header-accent-*`, sem alterar a anatomia ou a densidade do cartão.
 - Uma coleção extensa vive dentro de uma única superfície. Cada registo é uma linha separada por borda, sem raio ou sombra próprios, como em Avisos e comunicados.
-- Páginas de biblioteca ou listagem (Avisos, Materiais) usam a mesma anatomia: cabeçalho da página, um único painel com `SurfaceHeader` e contador, separadores dentro do painel como em Notificações, barra de filtros com `FormLabel` e botão “Limpar filtros”, linha de resumo e registos com faixa lateral. Não criar barras de contexto, cartões de resumo ou painéis adicionais por módulo.
+- Páginas de biblioteca ou listagem (Avisos, Pedidos, Materiais, Documentos…) usam a mesma anatomia (referência: `components/requests-center.tsx` e `components/record-list.tsx`): cabeçalho da página; um único painel sem cabeçalho de secção repetido, com a `FilterBar` (incluindo pesquisa) no topo; uma linha por registo com título clicável e uma linha de metadados; ao abrir, cartão de leitura em `#<prefixo>-<id>` com botão de voltar; ações do item no menu flutuante; paginação partilhada (`components/pagination.tsx`) nas listas longas. Em Materiais, a unidade curricular escolhe-se primeiro. Não criar barras de contexto, cartões de resumo ou painéis adicionais por módulo.
 - Cartões verdadeiramente autónomos, como métricas e destinos, preservam borda, raio e sombra partilhados; tabelas, formulários e listas não devem ser forçados a parecer cartões promocionais.
-- A ação que abre um editor pode ser primária. No estado aberto, “Fechar editor”/“Fechar” é sempre uma ação secundária compacta e troca o ícone de adição por um ícone de fecho.
+- Criar/adicionar/novo nunca é um botão de cabeçalho: regista-se no menu flutuante com `useFloatingAction` (`components/floating-actions.tsx`), chamado antes de qualquer `return` antecipado. Sem ações da página, o botão flutuante é só o das preferências de cookies. Ações sobre um item aberto (editar, arquivar, restaurar) também vão para esse menu.
+- Um editor aberto fecha-se com `FormCloseButton` no cabeçalho e `FormActions` (Cancelar + ação primária) no rodapé.
+- Carregamentos não mostram spinners nem texto: entre rotas usa-se `QuietLoading`; dentro de uma página, linhas cinzentas estáticas no lugar do conteúdo.
 
 ## Navegação lateral
 
@@ -112,7 +114,8 @@ Para coleções de dados extensas, preferir uma tabela ou linhas dentro de um ú
 ## Cabeçalhos e hierarquia
 
 - O fundo da área de trabalho mantém-se claro.
-- O cabeçalho da página é simples e sem contentor decorativo: eyebrow dourada, `h1`, descrição e ação primária à direita.
+- O cabeçalho da página é simples e sem contentor decorativo: ícone em quadrado suave (dourado no tema base, azul no Tema Azul), eyebrow e `h1`. Nunca leva botões nem descrição; a navegação entre vistas da mesma área usa `PageTabs` (`components/page-tabs.tsx`).
+- Os cabeçalhos de secção levam sempre um ícone (`SurfaceHeader` com `icon`). No Tema Azul mantêm a faixa superior azul e o fundo em gradiente suave.
 - A ação principal usa o componente de botão existente.
 - As secções usam painéis brancos com cabeçalho de 72–78 px e separador inferior.
 - Os números de resumo usam o padrão `stat-card`/`admin-stats`, não banners personalizados.
@@ -135,12 +138,23 @@ Gradientes funcionais, como uma barra de progresso ou um gráfico circular, pode
 
 ## Formulários e ações
 
-- Labels sempre visíveis; placeholders não substituem labels.
+- Em formulários, labels sempre visíveis; placeholders não substituem labels. Nos filtros (`components/filter-bar.tsx`) a label fica associada ao controlo mas visualmente oculta, porque o placeholder ou a opção "Todos…" já identifica o filtro.
 - Altura, borda, raio e foco devem reutilizar os controlos existentes.
 - A ação primária aparece uma vez por contexto; ações secundárias são visivelmente menos fortes.
 - Desativado, a carregar, sucesso e erro devem ser distinguíveis sem depender apenas da cor.
-- Operações destrutivas exigem confirmação e linguagem explícita.
+- Operações destrutivas (apagar, remover, arquivar, recusar) exigem sempre `ConfirmationDialog` (`components/confirmation-dialog.tsx`) com título curto e o item em causa.
 - Em mobile, ações deixam de competir horizontalmente e podem ocupar a largura disponível.
+
+## Texto na interface
+
+- Não explicar a interface: sem descrições por baixo de títulos de secção, sem linhas de ajuda que descrevem o que um controlo faz e sem segunda linha em estados vazios.
+- Só se mantém texto auxiliar quando informa uma regra ou uma consequência que o estudante não pode adivinhar (privacidade, anonimato, moderação, campos obrigatórios, limites de ficheiros). Nesse caso usa-se uma única linha discreta (`.surface-note`).
+- `SurfaceHeader`, `AdminSection` e `AdminPageHeader` não aceitam `description` de propósito.
+
+## Escala tipográfica
+
+- Escala compacta definida pelos tokens `--font-size-*` em `app/globals.css`; nenhum texto abaixo de 10px.
+- Tamanhos fixos em CSS Modules são proibidos: usar sempre os tokens (verificado em `tests/filter-bar-governance.test.mjs`).
 
 ## Responsividade e acessibilidade
 
