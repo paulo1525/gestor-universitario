@@ -44,21 +44,14 @@ test("the second-year unit registry resolves every prepared portrait cover", asy
   }
 });
 
-test("the curricular-unit catalog reuses prepared A4 covers without importing PDF generation", async () => {
+test("curricular units are shown with a subject icon, never the A4 covers", async () => {
   const catalog = await readFile(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(catalog, /material-compendium-pdf/);
-  // Lists and headers use the light WebP thumbnails, never the 2.5 MB A4 covers.
   const thumb = await readFile(new URL("../components/unit-thumb.tsx", import.meta.url), "utf8");
-  assert.match(thumb, /from "@\/lib\/material-compendium-units"/);
-  const listStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
   assert.match(catalog, /<UnitThumb /);
   assert.doesNotMatch(catalog, /compendiumUnit\.coverUrl/);
-  assert.match(thumb, /src=\{unit\.thumbUrl\}/);
-  assert.match(listStyles, /\.thumb\s*\{[^}]*aspect-ratio:\s*1055\s*\/\s*1492/s);
-  for (const unit of MATERIAL_COMPENDIUM_UNITS) {
-    const bytes = await readFile(new URL(`../public${unit.thumbUrl}`, import.meta.url));
-    assert.ok(bytes.length < 40_000, `${unit.code} thumbnail must stay light`);
-  }
+  assert.doesNotMatch(thumb, /<img|coverUrl|thumbUrl/);
+  assert.match(thumb, /export function unitIcon\(/);
 });
 
 test("compendium PDF contains the uniform cover and respects solution visibility", async () => {

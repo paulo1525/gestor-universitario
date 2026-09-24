@@ -299,8 +299,8 @@
   border-bottom: 1px solid var(--color-border);
 }
 .studyItem:last-child { border-bottom: 0; }
-.studyItem > :first-child { justify-self: center; width: 32px; }
-.studyItem > .itemIcon:first-child { width: 44px; }
+.studyItem > :first-child { justify-self: center; width: 44px; height: 44px; border-radius: 11px; }
+.studyItem > :first-child svg { width: 18px; height: 18px; }
 .studyItem .itemIcon { width: 44px; height: 44px; }
 .studyItem :global(.button) { white-space: nowrap; }
 .studyItem :global(.button) svg { width: 14px; }
@@ -353,7 +353,7 @@
   .itemCopy p { display: none; }
   .itemMeta .badge { display: none; }
   .studyItem { grid-template-columns: 40px minmax(0, 1fr); padding: 12px 14px; }
-  .studyItem > .itemIcon:first-child { width: 40px; height: 40px; }
+  .studyItem > :first-child { width: 40px; height: 40px; }
   .studyItem :global(.button) { grid-column: 1 / -1; width: 100%; justify-content: center; }
 }
 
