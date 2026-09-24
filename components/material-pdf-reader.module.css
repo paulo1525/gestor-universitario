@@ -1,6 +1,6 @@
 /* Leitor de PDF dos materiais: documento contínuo à esquerda, realces e notas à direita. */
-.backdrop { position: fixed; z-index: 1200; inset: 0; display: grid; padding: 16px; place-items: center; background: var(--color-overlay, rgb(10 12 14 / 72%)); }
-.dialog { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); user-select: none; width: min(1480px, 100%); height: min(960px, calc(100dvh - 32px)); overflow: hidden; border: 1px solid var(--surface-card-border); border-radius: var(--surface-card-radius); background: var(--surface); box-shadow: 0 24px 70px rgb(0 0 0 / 28%); }
+.pageRoot { position: fixed; inset: 0; display: grid; background: var(--surface); }
+.reader { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); user-select: none; width: 100%; height: 100dvh; overflow: hidden; background: var(--surface); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Highlight palette: functional colours shared by swatches, marks and list items. */
@@ -10,11 +10,9 @@
 .swatch[data-color="rose"], .swatchSmall[data-color="rose"], .colorChoice[data-color="rose"], .mark[data-color="rose"], .dot[data-color="rose"], .highlightItem[data-color="rose"] { --hl: rgb(222 92 128); --hl-soft: rgb(222 92 128 / 30%); }
 
 .header { min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface-header-background, var(--surface)); }
-.headerIcon { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border-radius: var(--radius-control); color: var(--color-accent-text); background: var(--color-accent-soft); }
-.headerIcon svg { width: 18px; height: 18px; }
 .headerTitle { min-width: 0; flex: 1; }
 .headerTitle span { color: var(--color-accent-text); font-size: var(--font-size-caption); font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
-.headerTitle h2 { overflow: hidden; margin: 2px 0 0; color: var(--ink); font-size: var(--font-size-heading-2); line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.headerTitle h1 { overflow: hidden; margin: 2px 0 0; color: var(--ink); font-size: var(--font-size-heading-2); line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .headerActions { display: flex; align-items: center; gap: 6px; }
 
 .iconButton { position: relative; display: inline-grid; width: 36px; height: 36px; flex: none; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); cursor: pointer; text-decoration: none; }
@@ -45,7 +43,7 @@
 .searchCount { position: absolute; right: 90px; color: var(--muted); font-size: var(--font-size-caption); font-weight: 800; white-space: nowrap; }
 
 .workspace { display: grid; min-height: 0; grid-template-columns: minmax(0, 1fr) 340px; }
-.dialog[data-sidebar="closed"] .workspace { grid-template-columns: minmax(0, 1fr); }
+.reader[data-sidebar="closed"] .workspace { grid-template-columns: minmax(0, 1fr); }
 .scroller { position: relative; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; background: var(--color-surface-muted, #e9e8e3); }
 .pages { display: grid; justify-items: center; gap: 16px; padding: 16px 24px 40px; }
 .page { position: relative; flex: none; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 6px 18px rgb(0 0 0 / 8%); }
@@ -143,13 +141,11 @@
   .search { flex-basis: 100%; margin-left: 0; }
 }
 @media (max-width: 900px) {
-  .backdrop { padding: 0; }
-  .dialog { width: 100%; height: 100dvh; border: 0; border-radius: 0; }
-  .workspace, .dialog[data-sidebar="closed"] .workspace { position: relative; grid-template-columns: minmax(0, 1fr); }
+  .workspace, .reader[data-sidebar="closed"] .workspace { position: relative; grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: absolute; z-index: 30; inset: auto 0 0; max-height: 62%; border-top: 1px solid var(--line); border-left: 0; border-radius: var(--surface-card-radius) var(--surface-card-radius) 0 0; box-shadow: 0 -12px 32px rgb(0 0 0 / 18%); }
   .group + .group { padding-left: 0; border-left: 0; }
   .toolbar { gap: 8px; }
-  .zoomSelect, .headerIcon, .swatches { display: none; }
+  .zoomSelect, .swatches { display: none; }
   /* Icon-only on mobile, but the label stays available to screen readers. */
   .toolLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .toolbar { gap: 8px 10px; padding: 8px 10px; }
@@ -179,3 +175,9 @@
 @media (prefers-reduced-motion: reduce) {
   .mark { transition: none; }
 }
+
+/* Annotator page states (loading error, material without PDF). */
+.pageState { display: grid; min-height: 100dvh; place-content: center; justify-items: center; gap: 12px; padding: 24px; color: var(--muted); background: var(--color-surface-muted); text-align: center; }
+.pageState > svg { width: 26px; height: 26px; color: var(--color-accent-text); }
+.pageState strong { max-width: 420px; color: var(--ink); font-size: var(--font-size-body-emphasis); }
+.pageState > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }

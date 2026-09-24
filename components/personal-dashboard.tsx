@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { SurfaceHeader } from "@/components/surface-header";
 import { useAuth } from "@/components/auth-context";
 import { useI18n } from "@/components/i18n-context";
+import { materialReaderHref } from "@/lib/material-reader";
 import { UnitThumb } from "@/components/unit-thumb";
 import { RecordSkeleton } from "@/components/record-list";
 import styles from "@/components/personal-dashboard.module.css";
@@ -114,7 +115,7 @@ function StudyPanel({ reading }: { reading: Reading[] }) {
       {reading.map((item) => <div className={styles.studyItem} key={item.id}>
         <UnitThumb code={item.unitCode} name={item.unitName} />
         <span className={styles.itemCopy}><strong>{item.title}</strong><small>{[item.unitCode, item.highlightCount === 1 ? t("personalDashboard.study.highlightsOne") : t("personalDashboard.study.highlights", { count: item.highlightCount }), pages[item.id] > 1 ? t("personalDashboard.study.page", { page: pages[item.id] }) : ""].filter(Boolean).join(" · ")}</small></span>
-        <Link className="button button--secondary button--compact" href={`/materiais/?uc=${encodeURIComponent(item.unitCode.toLocaleUpperCase("pt-PT"))}#ler-${encodeURIComponent(item.id)}`}><Highlighter aria-hidden="true" />{t("personalDashboard.study.continue")}</Link>
+        <a className="button button--secondary button--compact" href={materialReaderHref(item.id)} target="_blank" rel="noopener"><Highlighter aria-hidden="true" />{t("personalDashboard.study.continue")}</a>
       </div>)}
       {modules.map((module) => {
         const done = Math.max(0, (module.progress?.currentStepPosition ?? 1) - 1), percent = module.stepCount ? Math.round((done / module.stepCount) * 100) : 0;

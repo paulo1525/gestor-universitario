@@ -3,7 +3,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 
@@ -92,7 +92,8 @@ function storageSet(key: string, value: string) {
   try { window.localStorage.setItem(key, value); } catch { /* private mode: position is not remembered */ }
 }
 
-export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { materialId: string; title: string; viewUrl: string; onClose: () => void }) {
+/** Full-page annotator (/materiais/ler/): the PDF on the left, highlights and notes on the right. */
+export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fileName, onClose }: { materialId: string; title: string; viewUrl: string; downloadUrl?: string | null; fileName?: string; onClose: () => void }) {
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [pdfjs, setPdfjs] = useState<PdfJs | null>(null);
   const [pdfError, setPdfError] = useState("");
@@ -176,13 +177,11 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
     return () => controller.abort();
   }, [endpoint]);
 
-  // Modal behaviour: body scroll lock, focus return and focus trap.
+  // The annotator fills the window: only the document and the highlight list scroll.
   useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    dialogRef.current?.querySelector<HTMLElement>("[data-reader-close]")?.focus();
-    return () => { document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+    return () => { document.body.style.overflow = previousOverflow; };
   }, []);
 
   useEffect(() => {
@@ -448,20 +447,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
       const target = event.target as HTMLElement | null;
       const typing = Boolean(target?.closest("input, textarea, [contenteditable='true']"));
       if (event.key === "Escape") {
-        if (pending) { setPending(null); window.getSelection()?.removeAllRanges(); return; }
-        if (removeTarget) return;
-        onCloseRef.current();
+        if (pending) { setPending(null); window.getSelection()?.removeAllRanges(); }
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
-      if (event.key === "Tab") {
-        const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []).filter((element) => element.offsetParent !== null);
-        if (!focusable.length) return;
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
-        return;
-      }
       if (typing || event.altKey || removeTarget) return;
       if ((event.ctrlKey || event.metaKey) && (event.key === "+" || event.key === "=")) { event.preventDefault(); stepZoom(1); return; }
       if ((event.ctrlKey || event.metaKey) && event.key === "-") { event.preventDefault(); stepZoom(-1); return; }
@@ -553,15 +542,15 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const zoomLabel = zoom === "width" ? "Largura" : zoom === "page" ? "Página" : `${Math.round(zoom * 100)}%`;
   const zoomValue = typeof zoom === "number" ? String(zoom) : zoom;
 
-  return <div className={styles.backdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"}>
+  return <div className={styles.pageRoot}>
+    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"}>
       <header className={styles.header}>
-        <span className={styles.headerIcon} aria-hidden="true"><Highlighter /></span>
-        <div className={styles.headerTitle}><span>Leitor de bibliografia</span><h2 id="material-pdf-title" title={title}>{title}</h2></div>
+        <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Voltar aos materiais" title="Voltar aos materiais"><ArrowLeft /></button>
+        <div className={styles.headerTitle}><span>Anotador</span><h1 id="material-pdf-title" title={title}>{title}</h1></div>
         <div className={styles.headerActions}>
+          {downloadUrl && <a className={styles.iconButton} href={downloadUrl} download={fileName || true} aria-label="Descarregar PDF" title="Descarregar PDF"><Download /></a>}
           <a className={styles.iconButton} href={viewUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir PDF original num novo separador" title="Abrir PDF original"><ExternalLink /></a>
           <button className={styles.iconButton} type="button" onClick={() => setSidebarOpen((open) => !open)} aria-pressed={sidebarOpen} aria-controls="pdf-highlights-panel" aria-label={sidebarOpen ? "Esconder realces" : "Mostrar realces"} title={sidebarOpen ? "Esconder realces" : "Mostrar realces"}>{sidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}<span className={styles.badgeCount}>{highlights.length}</span></button>
-          <button data-reader-close className={styles.iconButton} type="button" onClick={onClose} aria-label="Fechar leitor" title="Fechar (Esc)"><X /></button>
         </div>
       </header>
       <div className={styles.toolbar} role="toolbar" aria-label="Ferramentas de leitura">
@@ -679,7 +668,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
         </aside>
       </div>
       <ConfirmationDialog open={Boolean(removeTarget)} eyebrow="" title="Remover este realce?" description="" subject={removeTarget?.selectedText || removeTarget?.note || undefined} subjectLabel={removeTarget?.selectedText ? "Texto" : "Nota"} confirmLabel={removing ? "A remover…" : "Remover"} busy={removing} onClose={() => setRemoveTarget(null)} onConfirm={() => { if (removeTarget) void remove(removeTarget); }} />
-    </section>
+    </main>
   </div>;
 }
 

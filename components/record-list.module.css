@@ -44,6 +44,7 @@
 .rowAction:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .rowAction svg { width: 14px; height: 14px; }
 .rowEnd { display: inline-flex; align-items: center; gap: var(--space-3); }
+.rowActions { display: inline-flex; align-items: center; gap: var(--space-2); }
 .rowEnd .statusPill { min-width: 72px; text-align: center; }
 .rowArrow { width: 16px; height: 16px; color: var(--color-text-muted); }
 .empty { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 200px; padding: 32px; color: var(--color-text-muted); text-align: center; }
@@ -94,12 +95,17 @@
   .row { gap: var(--space-3); padding: var(--space-3) var(--space-4); }
   .groupTitle.groupTitle { padding-inline: var(--space-4); }
   .rowAction span { display: none; }
-  .rowAction { width: 32px; justify-content: center; padding: 0; }
+  .rowAction { width: 36px; min-height: 36px; justify-content: center; padding: 0; }
   .rowEnd { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
   .rowEnd .statusPill { min-width: 0; }
   .rowEnd .rowArrow { display: none; }
   .row + .row::before { right: var(--space-4); left: var(--space-4); }
   .titleLink { white-space: normal; }
+  /* Rows with actions: title uses the full width, actions and status on a second line. */
+  .row:has(.rowActions) { grid-template-columns: auto minmax(0, 1fr); }
+  .row:has(.rowActions) .rowEnd { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; }
+  .row:has(.rowActions) .rowAction { width: auto; min-height: 36px; padding: 0 12px; }
+  .row:has(.rowActions) .rowAction span { display: inline; }
   .reading { padding: var(--space-4) var(--space-4) 0; }
   .reading.reading .readingTitle { font-size: 18px; }
   .manageArea { margin-inline: calc(var(--space-4) * -1); padding-inline: var(--space-4); }
