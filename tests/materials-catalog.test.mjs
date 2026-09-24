@@ -234,3 +234,16 @@ test("a migration 0073 acrescenta os retângulos sem perder realces existentes",
     db.close();
   }
 });
+
+test("listas de materiais e UCs usam a paginação partilhada e o leitor tem modo página a página", async () => {
+  const library = await readFile(new URL("../components/material-library.tsx", import.meta.url), "utf8");
+  const units = await readFile(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8");
+  for (const source of [component, library, units]) {
+    assert.match(source, /from "@\/components\/pagination"/);
+    assert.match(source, /<Pagination /);
+  }
+  assert.match(component, /pageGroups\.map/);
+  assert.match(pdfReader, /layout === "single"/);
+  assert.match(pdfReader, /gu-pdf-layout/);
+  assert.match(pdfReader, /Página a página/);
+});

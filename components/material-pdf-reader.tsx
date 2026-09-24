@@ -3,7 +3,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 
@@ -19,6 +19,7 @@ type Highlight = Rect & {
   createdAt?: number;
 };
 type Tool = "text" | "area";
+type Layout = "scroll" | "single";
 type Zoom = "width" | "page" | number;
 type PageSize = { width: number; height: number };
 type PendingSelection = { page: number; rects: Rect[]; text: string; anchor: { left: number; top: number } };
@@ -104,6 +105,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [tool, setTool] = useState<Tool>("text");
+  // Continuous scroll or one page at a time; the choice is remembered.
+  const [layout, setLayout] = useState<Layout>(() => typeof window !== "undefined" && storageGet("gu-pdf-layout") === "single" ? "single" : "scroll");
   const [color, setColor] = useState<HighlightColor>("gold");
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [highlightsLoading, setHighlightsLoading] = useState(true);
@@ -189,11 +192,33 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   const scale = scaleFor(baseSize);
 
   const scrollToPage = useCallback((page: number, behavior: ScrollBehavior = "smooth", offset = 0) => {
+    if (layout === "single") {
+      // Page mode: the requested page replaces the current one.
+      const target = Math.max(1, Math.min(numPages || 1, page));
+      setCurrentPage(target);
+      setPageInput(String(target));
+      storageSet(`gu-pdf-page:${materialId}`, String(target));
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => scrollerRef.current?.scrollTo({ top: offset, behavior: "auto" })));
+      return;
+    }
     const element = pageRefs.current.get(page);
     const scroller = scrollerRef.current;
     if (!element || !scroller) return;
     scroller.scrollTo({ top: element.offsetTop - PAGE_GAP + offset, behavior });
-  }, []);
+  }, [layout, materialId, numPages]);
+
+  const changeLayout = (next: Layout) => {
+    if (next === layout) return;
+    const page = currentPage;
+    setLayout(next);
+    storageSet("gu-pdf-layout", next);
+    setPending(null);
+    if (next === "scroll") window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const element = pageRefs.current.get(page);
+      if (element && scrollerRef.current) scrollerRef.current.scrollTop = element.offsetTop - PAGE_GAP;
+    }));
+    else scrollerRef.current?.scrollTo({ top: 0 });
+  };
 
   // Restore the last page read in this PDF once the layout exists.
   useEffect(() => {
@@ -206,7 +231,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
   // The current page is the one crossing the upper third of the scroller.
   const updateCurrentPage = useCallback(() => {
     const scroller = scrollerRef.current;
-    if (!scroller || !numPages) return;
+    if (!scroller || !numPages || layout === "single") return;
     const probe = scroller.scrollTop + scroller.clientHeight / 3;
     let page = 1;
     for (const [number, element] of pageRefs.current) if (element.offsetTop <= probe && number > page) page = number;
@@ -214,7 +239,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
       if (previous !== page) { setPageInput(String(page)); storageSet(`gu-pdf-page:${materialId}`, String(page)); }
       return page;
     });
-  }, [materialId, numPages]);
+  }, [layout, materialId, numPages]);
 
   useEffect(() => { updateCurrentPage(); }, [scale, updateCurrentPage]);
 
@@ -523,6 +548,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
           </select>
           <button className={styles.iconButton} type="button" onClick={() => stepZoom(1)} disabled={scale >= ZOOM_STEPS[ZOOM_STEPS.length - 1] - 0.01} aria-label="Ampliar" title="Ampliar (+)"><Plus /></button>
         </div>
+        <div className={styles.group} role="group" aria-label="Apresentação">
+          <button className={styles.toolButton} type="button" aria-pressed={layout === "scroll"} onClick={() => changeLayout("scroll")} title="Rolar pelo documento"><Rows3 /><span className={styles.toolLabel}>Contínuo</span></button>
+          <button className={styles.toolButton} type="button" aria-pressed={layout === "single"} onClick={() => changeLayout("single")} title="Uma página de cada vez"><RectangleVertical /><span className={styles.toolLabel}>Página a página</span></button>
+        </div>
         <div className={styles.group} role="group" aria-label="Modo de realce">
           <button className={styles.toolButton} type="button" aria-pressed={tool === "text"} onClick={() => setTool("text")} title="Selecionar texto para realçar"><MousePointer2 /><span className={styles.toolLabel}>Texto</span></button>
           <button className={styles.toolButton} type="button" aria-pressed={tool === "area"} onClick={() => { setTool("area"); setPending(null); }} title="Desenhar uma zona (H)"><SquareDashed /><span className={styles.toolLabel}>Zona</span></button>
@@ -544,7 +573,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
           {pdfError ? <div className={styles.pdfError} role="alert"><strong>Não foi possível abrir este PDF.</strong><span>{pdfError}</span><a className="button button--secondary button--compact" href={viewUrl} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />Abrir o PDF original</a></div>
             : !pdfDocument || !pdfjs || !baseSize ? <div className={styles.pages} aria-busy="true"><div className={styles.pagePlaceholder} style={{ width: Math.min(760, Math.max(280, viewport.width - 48)), aspectRatio: "1 / 1.414" }} /></div>
               : <div className={styles.pages}>
-                {Array.from({ length: numPages }, (_, index) => index + 1).map((page) => {
+                {(layout === "single" ? [Math.min(currentPage, numPages)] : Array.from({ length: numPages }, (_, index) => index + 1)).map((page) => {
                   const size = pageSizes[page] ?? baseSize;
                   return <PdfPage
                     key={page}
@@ -566,6 +595,11 @@ export function MaterialPdfReader({ materialId, title, viewUrl, onClose }: { mat
                     onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches); }}
                   />;
                 })}
+                {layout === "single" && <nav className={styles.pager} aria-label="Navegação entre páginas">
+                  <button className="button button--secondary button--compact" type="button" onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage <= 1}><ChevronLeft aria-hidden="true" />Anterior</button>
+                  <span>{currentPage} / {numPages}</span>
+                  <button className="button button--secondary button--compact" type="button" onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage >= numPages}>Seguinte<ChevronRight aria-hidden="true" /></button>
+                </nav>}
               </div>}
           {pending && <div className={styles.selectionPopover} style={{ left: pending.anchor.left, top: pending.anchor.top }} role="dialog" aria-label="Realçar seleção" onPointerUp={(event) => event.stopPropagation()}>
             {COLORS.map((entry) => <button key={entry.value} type="button" className={styles.swatch} data-color={entry.value} aria-label={`Realçar a ${entry.label.toLowerCase()}`} title={`Realçar a ${entry.label.toLowerCase()}`} onClick={() => void commitPending(entry.value)} />)}

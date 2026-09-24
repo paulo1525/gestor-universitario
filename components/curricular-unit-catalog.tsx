@@ -27,6 +27,7 @@ import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { RecordSkeleton } from "@/components/record-list";
 import list from "@/components/record-list.module.css";
+import { clampPage, Pagination } from "@/components/pagination";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
@@ -198,6 +199,8 @@ function normaliseAcademicContent(value: unknown): AcademicContent {
   return { academicYear: textValue(source.academicYear) || null, availableYears: Array.isArray(source.availableYears) ? source.availableYears.filter((item): item is string => typeof item === "string") : [], profile, evaluations, exams, sources };
 }
 
+const UNIT_PAGE_SIZE = 12;
+
 export function CurricularUnitCatalog() {
   const { locale, t } = useI18n();
   const [units, setUnits] = useState<Unit[]>([]),
@@ -234,15 +237,20 @@ export function CurricularUnitCatalog() {
             .includes(term)),
     );
   }, [locale, units, query, year]);
-  // Study plan order: grouped by year and semester, as in the materials picker.
+  // Study plan order: grouped by year and semester, as in the materials picker;
+  // pagination slices the ordered list and each page is regrouped.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [query, year]);
+  const ordered = useMemo(() => [...visible].sort((a, b) => a.year - b.year || a.semester - b.semester || a.name.localeCompare(b.name, locale)), [locale, visible]);
+  const currentPage = clampPage(page, ordered.length, UNIT_PAGE_SIZE);
   const groups = useMemo(() => {
     const map = new Map<string, Unit[]>();
-    for (const item of [...visible].sort((a, b) => a.year - b.year || a.semester - b.semester || a.name.localeCompare(b.name, locale))) {
+    for (const item of ordered.slice((currentPage - 1) * UNIT_PAGE_SIZE, currentPage * UNIT_PAGE_SIZE)) {
       const key = t("community.units.yearSemester", { year: item.year, semester: item.semester });
       map.set(key, [...(map.get(key) ?? []), item]);
     }
     return [...map.entries()];
-  }, [locale, t, visible]);
+  }, [currentPage, ordered, t]);
   const filtersActive = Boolean(query.trim() || year !== "all");
   const clearFilters = () => { setQuery(""); setYear("all"); };
   return (
@@ -288,6 +296,7 @@ export function CurricularUnitCatalog() {
                   </ul>
                 </div>)
               )}
+              {!loading && <Pagination page={currentPage} totalItems={ordered.length} pageSize={UNIT_PAGE_SIZE} onChange={setPage} />}
             </section>
           </div>
         </AppShell>
