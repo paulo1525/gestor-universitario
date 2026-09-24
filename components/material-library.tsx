@@ -39,7 +39,7 @@ import { useI18n } from "@/components/i18n-context";
 import { RichTextContent } from "@/components/rich-text-editor";
 import { personDisplay } from "@/lib/person-display";
 import { PersonName } from "@/components/person-name";
-import { MaterialCatalog, type MaterialCatalogTab } from "@/components/material-catalog";
+import { GENERAL_MATERIAL_UNIT, MaterialCatalog, normalizeMaterialUnitCode, type MaterialCatalogTab } from "@/components/material-catalog";
 import { MaterialUploadForm } from "@/components/material-upload-form";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useFloatingAction } from "@/components/floating-actions";
@@ -178,7 +178,7 @@ type Material = {
   questionCount?: number | null;
   transcriptionStatus?: string;
 };
-type Unit = { id: string; code: string; name: string };
+type Unit = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type Notice = { kind: ToastKind; message: string } | null;
 const categoryLabelKeys = {
   exam: "community.materials.category.exam",
@@ -274,6 +274,9 @@ function normalize(item: ApiMaterial, anonymousLabel: string, studentLabel: stri
     versionsLoaded: Boolean(item.versions || item.versionHistory),
   };
 }
+function materialUnitCode(item: Material) {
+  return item.unit ? normalizeMaterialUnitCode(item.unit.code) : GENERAL_MATERIAL_UNIT;
+}
 function date(value: string, locale: string) {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
@@ -321,7 +324,9 @@ export function MaterialLibrary() {
     [versionNotes, setVersionNotes] = useState(""),
     [publishingVersion, setPublishingVersion] = useState(false),
     [filter, setFilter] = useState("all"),
-    [activeTab, setActiveTab] = useState<MaterialCatalogTab>(() => openId ? "exams" : "overview");
+    [activeTab, setActiveTab] = useState<MaterialCatalogTab>(() => openId ? "exams" : "overview"),
+    // The selected unit lives in the address (?uc=) so a shared or reloaded link keeps the same context.
+    [unitCode, setUnitCode] = useState(() => typeof window === "undefined" ? "" : normalizeMaterialUnitCode(new URLSearchParams(window.location.search).get("uc")));
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -332,7 +337,7 @@ export function MaterialLibrary() {
       const materialData = (await materialResponse.json()) as {
         materials?: ApiMaterial[];
         submissions?: ApiMaterial[];
-        units?: Array<{ id: string | number; code?: string; name?: string }>;
+        units?: Array<{ id: string | number; code?: string; name?: string; year?: number | null; semester?: number | null }>;
         canModerate?: boolean;
         capabilities?: { moderate?: boolean };
         error?: string;
@@ -357,6 +362,8 @@ export function MaterialLibrary() {
           id: String(item.id),
           code: item.code ?? "UC",
           name: item.name ?? t("community.common.curricularUnit"),
+          year: item.year ?? null,
+          semester: item.semester ?? null,
         })),
       );
     } catch (reason) {
@@ -373,15 +380,28 @@ export function MaterialLibrary() {
   useEffect(() => {
     void load();
   }, [load]);
+  const selectUnit = useCallback((code: string) => {
+    setUnitCode(code);
+    setActiveTab("overview");
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set("uc", code);
+    else url.searchParams.delete("uc");
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
+  const submissionCounts = useMemo(() => materials.reduce<Record<string, number>>((counts, item) => {
+    const code = materialUnitCode(item);
+    counts[code] = (counts[code] || 0) + 1;
+    return counts;
+  }, {}), [materials]);
   const term = query.trim().toLocaleLowerCase(locale);
   const visible = useMemo(
     () =>
       materials
-        .filter((item) => filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter))
+        .filter((item) => materialUnitCode(item) === unitCode && (filter === "all" || (filter === "favorites" ? item.favorite : item.category === filter)))
         .filter((item) => !term || [item.title, richTextPlainText(item.description), item.fileName, item.unit?.code, item.unit?.name, item.anonymous ? "" : item.authorName].join(" ").toLocaleLowerCase(locale).includes(term)),
-    [materials, filter, term, locale],
+    [materials, filter, term, locale, unitCode],
   );
-  const interactiveStudyVisible = (filter === "all" || filter === "summary") && (!term || "neuroanatomia aula prática 1 resumo".includes(term));
+  const interactiveStudyVisible = unitCode === "NEURO" && (filter === "all" || filter === "summary") && (!term || "neuroanatomia aula prática 1 resumo".includes(term));
   const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
   const moderate = async (id: string, status: "approved" | "rejected" | "archived") => {
     setModerating(id);
@@ -579,11 +599,13 @@ export function MaterialLibrary() {
                 onDismiss={() => setNotice(null)}
               />
             )}{" "}
-            {!openId && <MaterialCatalog
+            {!openId && !editor && <MaterialCatalog
               activeTab={activeTab}
-              onTabChange={(tab) => {
-                setActiveTab(tab);
-              }}
+              onTabChange={setActiveTab}
+              unitCode={unitCode}
+              onUnitChange={selectUnit}
+              units={units}
+              submissionCounts={submissionCounts}
             />}
             {submissionEnabled && editor && (
               <MaterialUploadForm
@@ -595,7 +617,7 @@ export function MaterialLibrary() {
                 }}
               />
             )}
-            {activeTab === "exams" && !editor && !openId && <section className={`panel ${list.listPanel}`} aria-busy={loading}>
+            {activeTab === "exams" && unitCode && !editor && !openId && <section className={`panel ${list.listPanel}`} aria-busy={loading}>
               <FilterBar label={t("community.materials.filter")}>
                 <FilterSearch label={t("community.materials.search")} value={query} onChange={setQuery} placeholder={t("community.materials.search")} />
                 <FilterSelect label={t("community.materials.filter")} value={filter} onChange={setFilter} options={[{ value: "all", label: t("community.materials.all") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), ...Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => ({ value, label: t(key) }))]} />

@@ -25,7 +25,7 @@ test("a biblioteca de materiais tem filtro identificado, editor isolado e regist
   assert.match(materials, /setFilter\("all"\)/);
   assert.match(materials, /<MaterialUploadForm/);
   // Submissions: search + filter on top of one panel, one row per material, detail at #material-<id>.
-  assert.match(materials, /\{activeTab === "exams" && !editor && !openId && <section className=\{`panel \$\{list\.listPanel\}`\}/);
+  assert.match(materials, /\{activeTab === "exams" && unitCode && !editor && !openId && <section className=\{`panel \$\{list\.listPanel\}`\}/);
   assert.match(materials, /<FilterSearch label=\{t\("community\.materials\.search"\)\}/);
   assert.match(materials, /href=\{recordHref\("material", item\.id\)\}/);
   assert.match(materials, /className=\{`panel \$\{list\.reading\}`\}/);
