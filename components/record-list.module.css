@@ -28,6 +28,24 @@
 .statusPill[data-tone="success"] { color: var(--color-success-text); background: var(--green-soft); }
 .statusPill[data-tone="danger"] { color: var(--color-danger-text); background: #fde9e6; }
 .statusPill[data-tone="info"] { color: #1d5f86; background: var(--blue-soft); }
+/* Groups inside a list (year/semester, book…). */
+.group + .group { border-top: 1px solid var(--color-border); }
+.groupTitle.groupTitle { margin: 0; padding: var(--space-4) var(--space-5) 0; color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+/* Curricular-unit cover thumbnail (components/unit-thumb.tsx). */
+.thumb { display: grid; width: 30px; aspect-ratio: 1055 / 1492; flex: none; place-items: center; overflow: hidden; border: 1px solid var(--color-border); border-radius: 5px; color: var(--color-accent-text); background: var(--gold-soft); box-shadow: 0 1px 2px rgb(0 0 0 / 8%); }
+.thumb[data-empty] { aspect-ratio: auto; height: 30px; border: 0; border-radius: 8px; box-shadow: none; }
+.thumb[data-size="large"] { width: 64px; border-radius: 7px; }
+.thumb[data-size="large"][data-empty] { height: 64px; border-radius: 12px; }
+.thumb img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.thumb svg { width: 15px; height: 15px; }
+.thumb[data-size="large"] svg { width: 26px; height: 26px; }
+.rowAction { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 750; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.rowAction:hover { border-color: var(--color-border-strong); background: var(--color-surface-subtle); }
+.rowAction:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.rowAction svg { width: 14px; height: 14px; }
+.rowEnd { display: inline-flex; align-items: center; gap: var(--space-3); }
+.rowEnd .statusPill { min-width: 72px; text-align: center; }
+.rowArrow { width: 16px; height: 16px; color: var(--color-text-muted); }
 .empty { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 200px; padding: 32px; color: var(--color-text-muted); text-align: center; }
 .empty svg { width: 28px; height: 28px; color: var(--color-accent-text); }
 .empty strong { color: var(--color-text-soft); font-size: var(--font-size-body-emphasis); }
@@ -39,7 +57,7 @@
 .skeletonRow span:last-child { width: min(220px, 40%); height: 9px; }
 
 /* Open record: back link, then a compact reading card. */
-.back { display: inline-flex; width: max-content; align-items: center; gap: 4px; margin: 0 0 var(--space-3) -6px; padding: 4px 6px; border: 0; border-radius: var(--radius-control); color: var(--color-text-muted); background: transparent; font: inherit; font-size: var(--font-size-body); font-weight: 700; cursor: pointer; }
+.back { display: inline-flex; width: max-content; text-decoration: none; align-items: center; gap: 4px; margin: 0 0 var(--space-3) -6px; padding: 4px 6px; border: 0; border-radius: var(--radius-control); color: var(--color-text-muted); background: transparent; font: inherit; font-size: var(--font-size-body); font-weight: 700; cursor: pointer; }
 .back:hover { color: var(--color-text); background: var(--color-surface-muted); }
 .back svg { width: 15px; height: 15px; }
 .reading { display: grid; justify-items: start; overflow: hidden; padding: var(--space-4) var(--space-5) 0; }
@@ -74,6 +92,9 @@
 
 @media (max-width: 640px) {
   .row { gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+  .groupTitle.groupTitle { padding-inline: var(--space-4); }
+  .rowAction span { display: none; }
+  .rowAction { width: 32px; justify-content: center; padding: 0; }
   .row + .row::before { right: var(--space-4); left: var(--space-4); }
   .titleLink { white-space: normal; }
   .reading { padding: var(--space-4) var(--space-4) 0; }

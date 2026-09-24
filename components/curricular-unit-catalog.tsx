@@ -1,7 +1,6 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -10,7 +9,10 @@ import {
   BookOpen,
   CalendarDays,
   CalendarClock,
+  ChevronLeft,
+  ClipboardCheck,
   FileText,
+  FolderOpen,
   GraduationCap,
   Mail,
   MapPin,
@@ -25,13 +27,14 @@ import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
 import { SurfaceHeader } from "@/components/surface-header";
 import { RecordSkeleton } from "@/components/record-list";
 import list from "@/components/record-list.module.css";
+import { clampPage, Pagination } from "@/components/pagination";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
 import { QuestionBankSection } from "@/components/question-bank-section";
 import { RichTextContent } from "@/components/rich-text-editor";
 import { useI18n } from "@/components/i18n-context";
-import { resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
+import { UnitThumb } from "@/components/unit-thumb";
 import styles from "@/components/curricular-unit-catalog.module.css";
 
 type ApiRepresentative = {
@@ -196,6 +199,8 @@ function normaliseAcademicContent(value: unknown): AcademicContent {
   return { academicYear: textValue(source.academicYear) || null, availableYears: Array.isArray(source.availableYears) ? source.availableYears.filter((item): item is string => typeof item === "string") : [], profile, evaluations, exams, sources };
 }
 
+const UNIT_PAGE_SIZE = 12;
+
 export function CurricularUnitCatalog() {
   const { locale, t } = useI18n();
   const [units, setUnits] = useState<Unit[]>([]),
@@ -232,6 +237,20 @@ export function CurricularUnitCatalog() {
             .includes(term)),
     );
   }, [locale, units, query, year]);
+  // Study plan order: grouped by year and semester, as in the materials picker;
+  // pagination slices the ordered list and each page is regrouped.
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [query, year]);
+  const ordered = useMemo(() => [...visible].sort((a, b) => a.year - b.year || a.semester - b.semester || a.name.localeCompare(b.name, locale)), [locale, visible]);
+  const currentPage = clampPage(page, ordered.length, UNIT_PAGE_SIZE);
+  const groups = useMemo(() => {
+    const map = new Map<string, Unit[]>();
+    for (const item of ordered.slice((currentPage - 1) * UNIT_PAGE_SIZE, currentPage * UNIT_PAGE_SIZE)) {
+      const key = t("community.units.yearSemester", { year: item.year, semester: item.semester });
+      map.set(key, [...(map.get(key) ?? []), item]);
+    }
+    return [...map.entries()];
+  }, [currentPage, ordered, t]);
   const filtersActive = Boolean(query.trim() || year !== "all");
   const clearFilters = () => { setQuery(""); setYear("all"); };
   return (
@@ -260,17 +279,24 @@ export function CurricularUnitCatalog() {
                   {filtersActive && <button className={styles.emptyAction} type="button" onClick={clearFilters}><X />{t("community.units.clearFilters")}</button>}
                 </div>
               ) : (
-                <ul className={list.rows}>
-                  {visible.map((item) => { const compendiumUnit = resolveMaterialCompendiumUnit(item.id) || resolveMaterialCompendiumUnit(item.code) || resolveMaterialCompendiumUnit(item.name); return <li className={list.row} key={item.id}>
-                    {compendiumUnit ? <span className={styles.unitCover} aria-hidden="true"><Image src={compendiumUnit.coverUrl} alt="" width={1055} height={1492} sizes="32px" /></span> : <span className={styles.unitCode}>{item.code}</span>}
-                    <div className={list.rowMain}>
-                      <h3><Link className={`link-quiet ${list.titleLink}`} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}>{item.name}</Link></h3>
-                      <p className={list.rowMeta}>{[compendiumUnit ? item.code : "", t("community.units.yearSemester", { year: item.year, semester: item.semester }), `${item.ects.toLocaleString(locale)} ECTS`, item.representatives.map((representative) => representative.name).join(", ")].filter(Boolean).join(" · ")}</p>
-                    </div>
-                    <ArrowRight className={styles.rowArrow} aria-hidden="true" />
-                  </li>; })}
-                </ul>
+                groups.map(([group, items]) => <div className={list.group} key={group}>
+                  <h3 className={list.groupTitle}>{group}</h3>
+                  <ul className={list.rows}>
+                    {items.map((item) => <li className={list.row} key={item.id}>
+                      <UnitThumb id={item.id} code={item.code} name={item.name} />
+                      <div className={list.rowMain}>
+                        <h3><Link className={`link-quiet ${list.titleLink}`} href={`/unidades-curriculares/${encodeURIComponent(item.id)}`}>{item.name}</Link></h3>
+                        <p className={list.rowMeta}>{[item.code, `${item.ects.toLocaleString(locale)} ECTS`, item.representatives.length ? item.representatives.map((representative) => representative.name).join(", ") : ""].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <span className={list.rowEnd}>
+                        <Link className={list.rowAction} href={`/materiais/?uc=${encodeURIComponent(item.code.toLocaleUpperCase("pt-PT"))}`} aria-label={`${t("community.units.studyMaterials")} · ${item.name}`}><FolderOpen aria-hidden="true" /><span>{t("community.units.studyMaterials")}</span></Link>
+                        <ArrowRight className={list.rowArrow} aria-hidden="true" />
+                      </span>
+                    </li>)}
+                  </ul>
+                </div>)
               )}
+              {!loading && <Pagination page={currentPage} totalItems={ordered.length} pageSize={UNIT_PAGE_SIZE} onChange={setPage} />}
             </section>
           </div>
         </AppShell>
@@ -408,24 +434,27 @@ export function CurricularUnitDetail({ id }: { id: string }) {
             ) : (
               data && (
                 <>
-                  <section className={`${styles.panel} ${styles.detailHero}`}>
-                    <SurfaceHeader
-                      headingLevel="h1"
-                      icon={<BookOpen />}
-                      eyebrow={data.unit.code}
-                      title={data.unit.name}
-                      actions={<div className={styles.detailStats}>
-                        <div className={styles.metric}><span>{t("community.units.credits")}</span><strong>{data.unit.ects} ECTS</strong></div>
-                        <div className={styles.metric}><span>{t("community.units.year")}</span><strong>{data.unit.year}.º</strong></div>
-                        <div className={styles.metric}><span>{t("community.units.semester")}</span><strong>{data.unit.semester}.º</strong></div>
-                      </div>}
-                    />
+                  <SurfaceHeader standalone headingLevel="h1" icon={<BookOpen />} eyebrow={data.unit.code} title={data.unit.name} />
+                  <Link className={list.back} href="/unidades-curriculares/"><ChevronLeft aria-hidden="true" />{t("community.units.back")}</Link>
+                  <section className={`${styles.panel} ${styles.summary}`} aria-label={data.unit.name}>
+                    <UnitThumb id={data.unit.id} code={data.unit.code} name={data.unit.name} size="large" />
+                    <dl className={styles.summaryFacts}>
+                      <div><dt>{t("community.units.year")}</dt><dd>{data.unit.year}.º</dd></div>
+                      <div><dt>{t("community.units.semester")}</dt><dd>{data.unit.semester}.º</dd></div>
+                      <div><dt>{t("community.units.credits")}</dt><dd>{data.unit.ects.toLocaleString(locale)} ECTS</dd></div>
+                      <div><dt>{t("community.units.representative")}</dt><dd>{data.unit.representatives.length ? data.unit.representatives.map((representative) => representative.name).join(", ") : t("community.units.noRepresentative")}</dd></div>
+                    </dl>
+                    <div className={styles.summaryActions}>
+                      <Link className="button button--primary button--compact" href={`/materiais/?uc=${encodeURIComponent(data.unit.code.toLocaleUpperCase("pt-PT"))}`}><FolderOpen aria-hidden="true" />{t("community.units.studyMaterials")}</Link>
+                      {data.unit.code === "NEURO" && <Link className="button button--secondary button--compact" href="/testes/"><ClipboardCheck aria-hidden="true" />{t("community.units.practiceTests")}</Link>}
+                    </div>
                   </section>
                   {data.academicContent.profile && <AcademicContentPanel content={data.academicContent} locale={locale} />}
                   {data.unit.code === "NEURO" && <QuestionBankSection unitId={data.unit.id} unitCode={data.unit.code} />}
                   <div className={styles.columns}>
                     <div className={styles.page}>
                       <DetailSection
+                        icon={<CalendarDays />}
                         title={t("community.units.upcoming")}
                        
                         empty={t("community.units.upcomingEmpty")}
@@ -446,6 +475,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                         ))}
                       </DetailSection>
                       <DetailSection
+                        icon={<Megaphone />}
                         title={t("community.units.notices")}
                        
                         empty={t("community.units.noticesEmpty")}
@@ -495,6 +525,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                         </div>
                       </section>}
                       <DetailSection
+                        icon={<FileText />}
                         title={t("community.units.documents")}
                        
                         empty={t("community.units.documentsEmpty")}
@@ -552,11 +583,11 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
     <SurfaceHeader icon={<GraduationCap />} title={`Informação académica${content.academicYear ? ` · ${content.academicYear}` : ""}`} headingId="academic-content-title" actions={<ValidationBadge status={profile.status} />} />
     <div className={styles.academicBlocks}>
       <article className={styles.academicBlock}>
-        <header><h3>Descrição</h3><ValidationBadge status={profile.status} /></header>
+        <h3>Descrição</h3>
         {profile.description ? <RichTextContent value={profile.description} className={styles.academicText} /> : empty}
       </article>
       <article className={styles.academicBlock}>
-        <header><h3>Presenças e faltas</h3><ValidationBadge status={profile.status} /></header>
+        <h3>Presenças e faltas</h3>
         <dl className={styles.academicFacts}>
           <div><dt>Presença obrigatória</dt><dd>{profile.attendanceRequired ? "Sim" : "Não indicada"}</dd></div>
           {profile.absenceLimit && <div><dt>Limite de faltas</dt><dd>{profile.absenceLimit}</dd></div>}
@@ -566,15 +597,15 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
         {profile.attendanceNotes && <RichTextContent value={profile.attendanceNotes} className={styles.academicText} />}
       </article>
       <article className={styles.academicBlock}>
-        <header><h3>Avaliação</h3><ValidationBadge status={profile.status} /></header>
+        <h3>Avaliação</h3>
         {content.evaluations.length ? <div className={styles.academicRows}>{content.evaluations.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong>{item.details && <RichTextContent value={item.details} className={styles.academicText} />}</div><span>{item.weight === null ? "Peso não indicado" : `${item.weight}%`}{item.minimumScore === null ? "" : ` · mínimo ${item.minimumScore}/20`}</span></div>)}</div> : empty}
       </article>
       <article className={styles.academicBlock}>
-        <header><h3>Frequências e exames</h3><ValidationBadge status={profile.status} /></header>
+        <h3>Frequências e exames</h3>
         {content.exams.length ? <div className={styles.academicRows}>{content.exams.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong><small>{examLabels[item.examType] || item.examType}{item.calendarEvent?.startsAt ? ` · ${new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "pt-PT", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Lisbon" }).format(new Date(item.calendarEvent.startsAt))}` : ""}{item.calendarEvent?.location ? ` · ${item.calendarEvent.location}` : ""}</small>{item.notes && <RichTextContent value={item.notes} className={styles.academicText} />}</div>{item.calendarEvent && <Link href="/calendario">Calendário <CalendarClock aria-hidden="true" /></Link>}</div>)}</div> : empty}
       </article>
       <article className={styles.academicBlock}>
-        <header><h3>Fontes e bibliografia</h3><ValidationBadge status={profile.status} /></header>
+        <h3>Fontes e bibliografia</h3>
         {content.sources.length ? <div className={styles.academicRows}>{content.sources.map(item => <div className={styles.academicRow} key={item.id}><div><strong>{item.title}</strong><small>{sourceLabels[item.sourceType] || item.sourceType}{item.pages ? ` · ${item.pages}` : ""}</small>{item.citation && <p>{item.citation}</p>}</div>{item.url && <a href={item.url} target="_blank" rel="noreferrer">Abrir <ArrowRight aria-hidden="true" /></a>}</div>)}</div> : empty}
       </article>
     </div>
@@ -583,10 +614,12 @@ function AcademicContentPanel({ content, locale }: { content: AcademicContent; l
 }
 
 function DetailSection({
+  icon,
   title,
   empty,
   children,
 }: {
+  icon: React.ReactNode;
   title: string;
   empty: string;
   children: React.ReactNode;
@@ -594,14 +627,11 @@ function DetailSection({
   const count = Array.isArray(children) ? children.length : 1;
   return (
     <section className={styles.panel}>
-      <SurfaceHeader icon={<BookOpen />} title={title} />
+      <SurfaceHeader icon={icon} title={title} meta={count ? String(count) : undefined} />
       {count ? (
         <div className={styles.sectionBody}>{children}</div>
       ) : (
-        <div className={styles.state}>
-          <BookOpen />
-          <strong>{empty}</strong>
-        </div>
+        <p className={styles.sectionEmpty}>{empty}</p>
       )}
     </section>
   );

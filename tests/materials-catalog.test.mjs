@@ -194,3 +194,56 @@ test("o builder cria um APKG com escolha múltipla, resposta curta, imagem e med
     db.close();
   }
 });
+
+test("o leitor de PDF usa a build legacy, camada de texto e realces por linha", async () => {
+  const readerStyles = await readFile(new URL("../components/material-pdf-reader.module.css", import.meta.url), "utf8");
+  const rectsMigration = await readFile(new URL("../migrations/0073_material_pdf_highlight_rects.sql", import.meta.url), "utf8");
+  // Map#getOrInsertComputed is missing in Safari and older browsers; the legacy build polyfills it.
+  assert.match(pdfReader, /pdfjs-dist\/legacy\/build\/pdf\.mjs/);
+  assert.match(pdfReader, /pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs/);
+  assert.doesNotMatch(pdfReader, /import\("pdfjs-dist"\)\.then/);
+  assert.match(pdfReader, /new pdfjs\.TextLayer\(/);
+  assert.match(pdfReader, /endOfContent/);
+  assert.match(pdfReader, /method: "PATCH"/);
+  assert.match(pdfReader, /IntersectionObserver/);
+  assert.match(pdfReader, /gu-pdf-page:/);
+  assert.match(readerStyles, /\.textLayer:global\(\.selecting\) :global\(\.endOfContent\) \{ top: 0; \}/);
+  assert.match(rectsMigration, /ALTER TABLE material_pdf_highlights ADD COLUMN rects TEXT/);
+  assert.match(worker, /request\.method === "PATCH"/);
+  assert.match(worker, /function highlightRects\(value: unknown\)/);
+  assert.match(worker, /missingRectsColumn/);
+  assert.match(worker, /SELECT \* FROM material_pdf_highlights WHERE user_id=\? AND material_id=\?/);
+});
+
+test("a migration 0073 acrescenta os retângulos sem perder realces existentes", async () => {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+  try {
+    db.run(`
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE material_catalog (id TEXT PRIMARY KEY);
+      INSERT INTO users VALUES ('user-1');
+      INSERT INTO material_catalog VALUES ('pdf-1');
+    `);
+    db.run(highlightsMigration);
+    db.run("INSERT INTO material_pdf_highlights(id,user_id,material_id,page_number,x,y,width,height,color,created_at,updated_at) VALUES('h-1','user-1','pdf-1',1,.1,.2,.3,.04,'gold',1,1)");
+    db.run(await readFile(new URL("../migrations/0073_material_pdf_highlight_rects.sql", import.meta.url), "utf8"));
+    db.run(`UPDATE material_pdf_highlights SET rects='[{"x":0.1,"y":0.2,"width":0.3,"height":0.02}]' WHERE id='h-1'`);
+    assert.equal(db.exec("SELECT COUNT(*) FROM material_pdf_highlights WHERE rects IS NOT NULL")[0].values[0][0], 1);
+  } finally {
+    db.close();
+  }
+});
+
+test("listas de materiais e UCs usam a paginação partilhada e o leitor tem modo página a página", async () => {
+  const library = await readFile(new URL("../components/material-library.tsx", import.meta.url), "utf8");
+  const units = await readFile(new URL("../components/curricular-unit-catalog.tsx", import.meta.url), "utf8");
+  for (const source of [component, library, units]) {
+    assert.match(source, /from "@\/components\/pagination"/);
+    assert.match(source, /<Pagination /);
+  }
+  assert.match(component, /pageGroups\.map/);
+  assert.match(pdfReader, /layout === "single"/);
+  assert.match(pdfReader, /gu-pdf-layout/);
+  assert.match(pdfReader, /Página a página/);
+});

@@ -790,7 +790,7 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 .page-heading p, .panel__header p { margin-bottom: 0; color: var(--muted); font-size: var(--font-size-body-emphasis); line-height: 1.6; }
 .page-heading__icon { width:52px; height:52px; display:grid; place-items:center; flex:0 0 auto; border-radius:14px; color:var(--color-accent-text); background:var(--gold-soft); }
 .page-heading__icon svg { width:23px; }
-.button { min-height: var(--control-height); display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--radius-control); font-size: var(--font-size-body-emphasis); font-weight: 800; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.button { min-height: var(--control-height); display: inline-flex; text-decoration: none; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid transparent; border-radius: var(--radius-control); font-size: var(--font-size-body-emphasis); font-weight: 800; cursor: pointer; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
 .button--primary { border-color: var(--color-accent); color: var(--color-text); background: var(--color-accent); }
 .button--primary:hover { border-color: var(--color-accent-hover); background: var(--color-accent-hover); }
 .button:disabled { border-color: var(--color-border); color: var(--color-text-disabled); background: var(--color-surface-muted); box-shadow: none; cursor: not-allowed; }

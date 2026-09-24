@@ -10,6 +10,11 @@ import { MaterialPdfReader } from "@/components/material-pdf-reader";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
 import { RecordSkeleton, recordHref, useHashRecord } from "@/components/record-list";
+import { UnitThumb } from "@/components/unit-thumb";
+import { clampPage, Pagination } from "@/components/pagination";
+
+const RESOURCE_PAGE_SIZE = 10;
+const UNIT_PAGE_SIZE = 12;
 
 export type MaterialCatalogTab = "overview" | "summaries" | "bibliography" | "anki" | "exams";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
@@ -124,6 +129,23 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     const order = (item: CatalogItem) => formats.indexOf(bibliographyFormat(item));
     return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => order(a) - order(b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
   }, [activeTab, t, visible]);
+  // Pagination runs over the grouped order, then each page is regrouped by book.
+  const [resourcePage, setResourcePage] = useState(1);
+  const [unitPage, setUnitPage] = useState(1);
+  useEffect(() => { setResourcePage(1); }, [activeTab, unitCode, search, lessonFilter, verificationFilter, recommendedOnly, formatFilter]);
+  useEffect(() => { setUnitPage(1); }, [unitSearch]);
+  const orderedResources = useMemo(() => groups.flatMap((group) => group.items.map((item) => ({ group, item }))), [groups]);
+  const currentResourcePage = clampPage(resourcePage, orderedResources.length, RESOURCE_PAGE_SIZE);
+  const pageGroups = useMemo(() => {
+    const slice = orderedResources.slice((currentResourcePage - 1) * RESOURCE_PAGE_SIZE, currentResourcePage * RESOURCE_PAGE_SIZE);
+    const result: Array<{ key: string; title: string; items: CatalogItem[] }> = [];
+    for (const { group, item } of slice) {
+      const last = result[result.length - 1];
+      if (last && last.key === group.key) last.items.push(item);
+      else result.push({ key: group.key, title: group.title, items: [item] });
+    }
+    return result;
+  }, [currentResourcePage, orderedResources]);
   const stats = useMemo(() => ({ summaries: unitItems.filter((item) => item.kind === "summary").length, bibliography: unitItems.filter((item) => item.kind === "bibliography").length, decks: unitDecks.length }), [unitDecks.length, unitItems]);
   const label = (item: CatalogItem) => item.kind === "summary" ? t("community.materials.catalog.tab.summaries") : item.kind === "bibliography" ? t("community.materials.catalog.tab.bibliography") : item.kind === "anki" ? t("community.materials.catalog.tab.anki") : t("community.materials.catalog.tab.overview");
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
@@ -184,8 +206,9 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   if (!selectedUnit) {
     const term = unitSearch.trim().toLocaleLowerCase("pt-PT");
     const matching = unitOptions.filter((unit) => !term || `${unit.code} ${unit.name}`.toLocaleLowerCase("pt-PT").includes(term));
+    const currentUnitPage = clampPage(unitPage, matching.length, UNIT_PAGE_SIZE);
     const unitGroups = new Map<string, MaterialUnitOption[]>();
-    for (const unit of matching) {
+    for (const unit of matching.slice((currentUnitPage - 1) * UNIT_PAGE_SIZE, currentUnitPage * UNIT_PAGE_SIZE)) {
       const key = unit.year && unit.semester ? `${unit.year}.º ano · ${unit.semester}.º semestre` : "";
       unitGroups.set(key, [...(unitGroups.get(key) || []), unit]);
     }
@@ -193,13 +216,13 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <FilterBar label={t("community.materials.catalog.unit.search")}>
         <FilterSearch label={t("community.materials.catalog.unit.search")} value={unitSearch} onChange={setUnitSearch} placeholder={t("community.materials.catalog.unit.searchPlaceholder")} />
       </FilterBar>
-      {loading && !units.length ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={styles.group} key={group || "all"}>
-        {group && <h3 className={styles.groupTitle}>{group}</h3>}
+      {loading && !units.length ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={list.group} key={group || "all"}>
+        {group && <h3 className={list.groupTitle}>{group}</h3>}
         <ul className={list.rows}>
           {groupUnits.map((unit) => {
             const total = countFor(unit);
             return <li className={list.row} key={unit.code} data-tone={total ? "accent" : undefined}>
-              <span className={list.rowIcon} aria-hidden="true"><GraduationCap /></span>
+              <UnitThumb id={unit.id} code={unit.code} name={unit.name} />
               <div className={list.rowMain}>
                 <h3><a className={`link-quiet ${list.titleLink}`} href={`?uc=${encodeURIComponent(normalizeMaterialUnitCode(unit.code))}`} onClick={(event) => { event.preventDefault(); onUnitChange(normalizeMaterialUnitCode(unit.code)); setUnitSearch(""); }}>{unit.name}</a></h3>
                 <p className={list.rowMeta}>{[unit.code === GENERAL_MATERIAL_UNIT ? "" : unit.code, total === 0 ? t("community.materials.catalog.unit.none") : total === 1 ? t("community.materials.catalog.unit.countOne") : t("community.materials.catalog.unit.count", { count: total })].filter(Boolean).join(" · ")}</p>
@@ -208,6 +231,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
           })}
         </ul>
       </div>) : <div className={list.empty}><GraduationCap /><strong>{t("community.materials.catalog.unit.empty")}</strong></div>}
+      {!loading && <Pagination page={currentUnitPage} totalItems={matching.length} pageSize={UNIT_PAGE_SIZE} onChange={setUnitPage} />}
     </section>;
   }
 
@@ -217,7 +241,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
     <section className={styles.catalog} aria-label={unitTitle}>
       <div className={styles.tabsRow}>
-        <h2 className={styles.unitTitle}>{unitTitle}</h2>
+        <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} />{unitTitle}</h2>
         <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
           {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>{tabLabel(tab)}</button>)}
         </nav>
@@ -238,17 +262,21 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
             <FilterCheckbox label={t("community.materials.catalog.recommendedOnly")} checked={recommendedOnly} onChange={setRecommendedOnly} />
           </FilterBar>
           <div className={styles.resourceList}>
-            {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? groups.map((group) => <div className={styles.group} key={group.key || "other"}>
-              {group.title && <h3 className={styles.groupTitle}>{group.title}</h3>}
+            {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? pageGroups.map((group) => <div className={list.group} key={group.key || "other"}>
+              {group.title && <h3 className={list.groupTitle}>{group.title}</h3>}
               <ul className={list.rows}>{group.items.map((item) => <li className={list.row} key={item.id} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
                 <span className={list.rowIcon} aria-hidden="true">{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</span>
                 <div className={list.rowMain}>
                   <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("recurso", item.id)} onClick={(event) => { event.preventDefault(); openResource(item.id); }}>{item.title}</a></h3>
                   <p className={list.rowMeta}>{resourceMeta(item)}</p>
                 </div>
-                <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
+                <span className={list.rowEnd}>
+                  {item.viewUrl && !(item.kind === "bibliography" && item.storage?.backend === "inline") && <button className={list.rowAction} type="button" onClick={() => setReader(item)} aria-label={`Ler e realçar · ${item.title}`}><Highlighter aria-hidden="true" /><span>Ler</span></button>}
+                  <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
+                </span>
               </li>)}</ul>
             </div>) : <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div>}
+            {!loading && !error && <Pagination page={currentResourcePage} totalItems={orderedResources.length} pageSize={RESOURCE_PAGE_SIZE} onChange={setResourcePage} />}
           </div>
         </>}
         {activeTab === "anki" && <>

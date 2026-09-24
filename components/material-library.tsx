@@ -45,6 +45,7 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useFloatingAction } from "@/components/floating-actions";
 import styles from "@/components/material-library.module.css";
 import list from "@/components/record-list.module.css";
+import { clampPage, Pagination } from "@/components/pagination";
 import { RecordSkeleton, initials, recordHref, useHashRecord } from "@/components/record-list";
 import { richTextPlainText } from "@/lib/announcement-content";
 
@@ -55,6 +56,7 @@ const FLOATING_VERSION_ICON = <UploadCloud aria-hidden="true" />;
 const statusTone: Record<string, string | undefined> = { pending: "accent", approved: "success", rejected: "danger", archived: undefined };
 
 type Status = "pending" | "approved" | "rejected" | "archived";
+const LIBRARY_PAGE_SIZE = 10;
 type Category = "exam" | "summary" | "notes" | "other";
 
 function MaterialThumbnail({ fileType, src, title }: { fileType: string; src: string; title: string }) {
@@ -403,6 +405,10 @@ export function MaterialLibrary() {
   );
   const interactiveStudyVisible = unitCode === "NEURO" && (filter === "all" || filter === "summary") && (!term || "neuroanatomia aula prática 1 resumo".includes(term));
   const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
+  const [libraryPage, setLibraryPage] = useState(1);
+  useEffect(() => { setLibraryPage(1); }, [filter, term, unitCode]);
+  const currentLibraryPage = clampPage(libraryPage, visible.length, LIBRARY_PAGE_SIZE);
+  const pageMaterials = visible.slice((currentLibraryPage - 1) * LIBRARY_PAGE_SIZE, currentLibraryPage * LIBRARY_PAGE_SIZE);
   const moderate = async (id: string, status: "approved" | "rejected" | "archived") => {
     setModerating(id);
     try {
@@ -626,7 +632,7 @@ export function MaterialLibrary() {
                 : loadError ? <div className={list.empty} role="alert"><FolderOpen /><strong>{t("community.materials.loadError")}</strong><button className={styles.emptyAction} type="button" onClick={() => void load()}>{t("community.materials.catalog.retry")}</button></div>
                 : libraryCount === 0 ? <div className={list.empty}><FolderOpen /><strong>{t("community.materials.empty")}</strong>{(filter !== "all" || query) && <button className={styles.emptyAction} type="button" onClick={() => { setFilter("all"); setQuery(""); }}><X aria-hidden="true" />{t("community.materials.all")}</button>}</div>
                 : <ul className={list.rows}>
-                  {interactiveStudyVisible && <li className={list.row} data-tone="success">
+                  {interactiveStudyVisible && currentLibraryPage === 1 && <li className={list.row} data-tone="success">
                     <span className={list.rowIcon} aria-hidden="true"><BookOpenCheck /></span>
                     <div className={list.rowMain}>
                       <h3><Link className={`link-quiet ${list.titleLink}`} href="/materiais/neuroanatomia/aula-1">Neuroanatomia · Aula prática 1</Link></h3>
@@ -634,7 +640,7 @@ export function MaterialLibrary() {
                     </div>
                     <span className={list.statusPill} data-tone="success">{t("community.materials.status.approved")}</span>
                   </li>}
-                  {visible.map((item) => <li className={list.row} key={item.id}>
+                  {pageMaterials.map((item) => <li className={list.row} key={item.id}>
                     <span className={list.rowIcon} aria-hidden="true">{item.fileType.startsWith("image/") ? <ImageIcon /> : <FileText />}</span>
                     <div className={list.rowMain}>
                       <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("material", item.id)} onClick={(event) => { event.preventDefault(); openMaterial(item.id); }}>{item.title}</a></h3>
@@ -643,6 +649,7 @@ export function MaterialLibrary() {
                     <span className={list.statusPill} data-tone={statusTone[item.status]}>{t(statusLabelKeys[item.status])}</span>
                   </li>)}
                 </ul>}
+              {!loading && !loadError && <Pagination page={currentLibraryPage} totalItems={visible.length} pageSize={LIBRARY_PAGE_SIZE} onChange={setLibraryPage} />}
             </section>}
             {!editor && openId && <>
               <button className={list.back} type="button" onClick={() => openMaterial(null)}><ChevronLeft aria-hidden="true" />{t("community.materials.all")}</button>
