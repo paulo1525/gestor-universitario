@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { Baby, Bone, BookOpen, Brain, ChartColumn, Dna, FlaskConical, HeartPulse, Microscope, Pill, ScanSearch, ShieldCheck, ShieldPlus, Stethoscope, type LucideIcon } from "lucide-react";
 import list from "@/components/record-list.module.css";
 
@@ -30,6 +31,5 @@ export function unitIcon(code?: string | null, name?: string | null): LucideIcon
 
 /** Leading visual of a curricular unit in lists and headers: an icon for the subject. */
 export function UnitThumb({ code, name, size = "row" }: { id?: string | null; code?: string | null; name?: string | null; size?: "row" | "large" }) {
-  const Icon = unitIcon(code, name);
-  return <span className={list.thumb} data-size={size} aria-hidden="true"><Icon /></span>;
+  return <span className={list.thumb} data-size={size} aria-hidden="true">{createElement(unitIcon(code, name))}</span>;
 }
