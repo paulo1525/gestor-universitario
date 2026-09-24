@@ -21,6 +21,8 @@ export function useHashRecord(prefix: string, { scroll = true }: { scroll?: bool
   const [openId, setOpenId] = useState<string | null>(() => idFromHash(prefix));
   useEffect(() => {
     const sync = () => setOpenId(idFromHash(prefix));
+    // After a client-side navigation the hash is only committed after the first render.
+    void Promise.resolve().then(sync);
     window.addEventListener("popstate", sync);
     window.addEventListener("hashchange", sync);
     return () => {

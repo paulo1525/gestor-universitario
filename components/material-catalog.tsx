@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Highlighter, Package } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterCheckbox, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
@@ -53,6 +53,9 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const { t } = useI18n();
   const tabLabel = (tab: MaterialCatalogTab) => t(`community.materials.catalog.tab.${tab}` as "community.materials.catalog.tab.overview");
   const [openResourceId, openResource] = useHashRecord("recurso");
+  // "#ler-<id>" (e.g. from the dashboard) opens the reading card with the PDF reader already open.
+  const [readRequestId] = useHashRecord("ler", { scroll: false });
+  const handledReadRequest = useRef<string | null>(null);
   const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "original" | "verified" | "pending">("all"), [recommendedOnly, setRecommendedOnly] = useState(false), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential"), [reader, setReader] = useState<CatalogItem | null>(null);
   const loadCatalog = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
@@ -72,6 +75,14 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
   }, [t]);
   useEffect(() => { const controller = new AbortController(); void loadCatalog(controller.signal); return () => controller.abort(); }, [catalogAttempt, loadCatalog]);
+  useEffect(() => {
+    if (!readRequestId || loading || handledReadRequest.current === readRequestId) return;
+    handledReadRequest.current = readRequestId;
+    const item = items.find((entry) => entry.id === readRequestId);
+    if (!item) return;
+    openResource(item.id);
+    if (item.viewUrl) setReader(item);
+  }, [items, loading, openResource, readRequestId]);
   useEffect(() => { setSearch(""); setLessonFilter(""); setVerificationFilter("all"); setRecommendedOnly(false); setFormatFilter("all"); }, [unitCode]);
 
   // The picker lists every active unit plus any unit that only exists in the catalogue.

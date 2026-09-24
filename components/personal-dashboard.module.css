@@ -56,7 +56,7 @@
   background: var(--surface);
   box-shadow: var(--shadow);
   text-decoration: none;
-  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  transition: border-color .16s ease, background .16s ease;
 }
 
 .summaryCard::after {
@@ -72,8 +72,7 @@
 
 .summaryCard:hover {
   border-color: #d7c879;
-  box-shadow: 0 11px 28px rgba(76, 60, 10, .08);
-  transform: translateY(-2px);
+  background: var(--color-surface-subtle);
 }
 
 .summaryCard:hover::after { opacity: 1; transform: scaleX(1); }
@@ -90,9 +89,6 @@
   background: var(--gold-soft);
 }
 
-.summaryIcon[data-tone="green"] { color: var(--color-success-text); background: #eaf6ef; }
-.summaryIcon[data-tone="blue"] { color: #2c66a0; background: #eaf2fb; }
-.summaryIcon[data-tone="violet"] { color: #654799; background: #f0eafa; }
 .summaryIcon svg { width: 20px; }
 .summaryCopy, .summaryCopy > span, .summaryCopy strong, .summaryCopy small { display: block; }
 .summaryCopy { min-width: 0; }
@@ -111,8 +107,7 @@
 
 .column {
   display: grid;
-  grid-row: span 3;
-  grid-template-rows: subgrid;
+  align-content: start;
   gap: 16px;
   min-width: 0;
 }
@@ -191,14 +186,14 @@
   align-items: center;
   gap: 13px;
   padding: 14px 18px;
-  border-bottom: 1px solid #eeede8;
+  border-bottom: 1px solid var(--color-border);
   color: inherit;
   text-decoration: none;
   transition: background .15s ease;
 }
 
 .item:last-child { border-bottom: 0; }
-.item:hover { background: #fffdf5; }
+.item:hover { background: var(--color-surface-subtle); }
 .item:focus-visible { position: relative; z-index: 1; outline: 3px solid rgba(213, 170, 16, .25); outline-offset: -3px; }
 
 .dateBox {
@@ -227,10 +222,7 @@
   background: #eef5f1;
 }
 
-.panel[data-kind="announcement"] .itemIcon { color: var(--color-accent-text); background: #fff7d9; }
-.panel[data-kind="poll"] .itemIcon { color: var(--color-success-text); background: #eaf6ef; }
-.panel[data-kind="request"] .itemIcon { color: #32658f; background: #eaf2fb; }
-.panel[data-kind="material"] .itemIcon { color: #694d96; background: #f1ebfa; }
+.itemIcon { color: var(--color-accent-text); background: var(--gold-soft); }
 .itemIcon svg { width: 17px; }
 .itemCopy { min-width: 0; }
 .itemCopy strong { display: block; overflow: hidden; font-size: var(--font-size-body-emphasis); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
@@ -248,8 +240,6 @@
 
 .itemMeta svg { width: 15px; }
 .badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; color: var(--color-accent-text); background: #fff0af; font-size: var(--font-size-caption); font-weight: 850; text-transform: uppercase; }
-.badge[data-tone="green"] { color: var(--color-success-text); background: #e8f5ed; }
-.badge[data-tone="blue"] { color: #245d89; background: #e8f2fa; }
 .unread { box-shadow: inset 3px 0 #d5aa10; }
 
 .empty,
@@ -281,7 +271,6 @@
 .error > svg { width: 25px; color: var(--color-accent-text); }
 .empty strong, .error strong { color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); }
 .empty > span:not(.stateIcon), .error span { max-width: 390px; font-size: var(--font-size-small); line-height: 1.5; }
-.spinner { animation: spin .8s linear infinite; }
 
 .cohortBody { padding: 16px; }
 .classMain { display: flex; align-items: center; gap: 14px; }
@@ -299,7 +288,35 @@
 .favorite { color: var(--color-accent-text); fill: #f5cf3d; }
 .retry { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--color-accent-text); background: #fff; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+/* Study panel: PDFs with highlights and learning paths in progress. */
+.studyItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+.studyItem:last-child { border-bottom: 0; }
+.studyItem > :first-child { justify-self: center; width: 32px; }
+.studyItem > .itemIcon:first-child { width: 44px; }
+.studyItem .itemIcon { width: 44px; height: 44px; }
+.studyItem :global(.button) { white-space: nowrap; }
+.studyItem :global(.button) svg { width: 14px; }
+.progress { display: block; height: 4px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--color-surface-muted); }
+.progress > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
+.emptyLine { margin: 0; padding: 16px 18px; color: var(--muted); font-size: var(--font-size-small); line-height: 1.5; }
+
+/* Quick access: plain list of destinations. */
+.quickList { display: grid; margin: 0; padding: 0; list-style: none; }
+.quickList li { border-bottom: 1px solid var(--color-border); }
+.quickList li:last-child { border-bottom: 0; }
+.quickList a { min-height: 46px; display: grid; grid-template-columns: 18px minmax(0, 1fr) 16px; align-items: center; gap: 12px; padding: 0 18px; color: var(--color-text); font-size: var(--font-size-body); font-weight: 700; text-decoration: none; }
+.quickList a:hover { background: var(--color-surface-subtle); }
+.quickList a:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
+.quickList a > svg:first-child { width: 17px; color: var(--color-accent-text); }
+.quickList a > svg:last-child { width: 15px; color: var(--color-text-subtle); }
 
 @media (max-width: 1180px) {
   .summaryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -333,13 +350,13 @@
   .summaryCopy small, .summaryArrow { display: block; }
   .panelBar { align-items: flex-start; }
   .panelTitle p { white-space: normal; }
-  .viewAll { min-width: 34px; overflow: hidden; padding: 0; font-size: 0; }
-  .viewAll svg { width: 16px; margin: auto; }
   .itemCopy p { display: none; }
   .itemMeta .badge { display: none; }
+  .studyItem { grid-template-columns: 40px minmax(0, 1fr); padding: 12px 14px; }
+  .studyItem > .itemIcon:first-child { width: 40px; height: 40px; }
+  .studyItem :global(.button) { grid-column: 1 / -1; width: 100%; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .summaryCard, .summaryCard::after, .summaryArrow { transition: none; }
-  .spinner { animation-duration: 1.6s; }
 }
