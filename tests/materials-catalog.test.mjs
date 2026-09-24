@@ -144,7 +144,12 @@ test("os PDFs abrem em modo inline e os realces privados persistem na D1", async
   assert.match(worker, /material_pdf_highlights/);
   assert.match(worker, /\/view/);
   assert.match(worker, /\/highlights/);
-  assert.match(component, /Abrir e realçar/);
+  // Annotate and download straight from the list; the annotator is its own page, opened in a new tab.
+  assert.match(component, /<span>Anotar<\/span>/);
+  assert.match(component, /<span>Descarregar<\/span>/);
+  assert.match(component, /href=\{materialReaderHref\(item\.id\)\} target="_blank"/);
+  assert.doesNotMatch(component, /<MaterialPdfReader/);
+  assert.match(worker, /async function catalogItem\(/);
   assert.match(pdfReader, /Camada de realces/);
   assert.match(pdfReader, /page, \.\.\.shape, color, note/);
 });

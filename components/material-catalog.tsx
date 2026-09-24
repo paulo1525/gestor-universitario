@@ -2,14 +2,15 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Highlighter, Package } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterCheckbox, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
-import { MaterialPdfReader } from "@/components/material-pdf-reader";
+import { materialReaderHref } from "@/lib/material-reader";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
-import { RecordSkeleton, recordHref, useHashRecord } from "@/components/record-list";
+import { RecordSkeleton, useHashRecord } from "@/components/record-list";
 import { UnitThumb } from "@/components/unit-thumb";
 import { clampPage, Pagination } from "@/components/pagination";
 
@@ -52,8 +53,11 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
 }) {
   const { t } = useI18n();
   const tabLabel = (tab: MaterialCatalogTab) => t(`community.materials.catalog.tab.${tab}` as "community.materials.catalog.tab.overview");
-  const [openResourceId, openResource] = useHashRecord("recurso");
-  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "original" | "verified" | "pending">("all"), [recommendedOnly, setRecommendedOnly] = useState(false), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential"), [reader, setReader] = useState<CatalogItem | null>(null);
+  // Older links (#recurso-<id>, #ler-<id>) now open the annotator page.
+  const [legacyResourceId] = useHashRecord("recurso", { scroll: false });
+  const [legacyReadId] = useHashRecord("ler", { scroll: false });
+  const router = useRouter();
+  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "original" | "verified" | "pending">("all"), [recommendedOnly, setRecommendedOnly] = useState(false), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential");
   const loadCatalog = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     setError("");
@@ -72,6 +76,10 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
   }, [t]);
   useEffect(() => { const controller = new AbortController(); void loadCatalog(controller.signal); return () => controller.abort(); }, [catalogAttempt, loadCatalog]);
+  useEffect(() => {
+    const legacyId = legacyReadId || legacyResourceId;
+    if (legacyId) router.replace(materialReaderHref(legacyId));
+  }, [legacyReadId, legacyResourceId, router]);
   useEffect(() => { setSearch(""); setLessonFilter(""); setVerificationFilter("all"); setRecommendedOnly(false); setFormatFilter("all"); }, [unitCode]);
 
   // The picker lists every active unit plus any unit that only exists in the catalogue.
@@ -163,44 +171,18 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const retryCatalog = () => setCatalogAttempt((attempt) => attempt + 1);
   const resourceMeta = (item: CatalogItem) => {
     const lessonsOf = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
-    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · ")].filter(Boolean).join(" · ");
+    const availability = item.viewUrl || item.downloadUrl ? "" : item.kind === "bibliography" && item.storage?.backend === "inline" ? "Referência bibliográfica apenas" : item.storage?.state !== "ready" ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable");
+    const printed = item.pages?.printedStart && !/\bpp?\./.test(item.title) ? `pp. ${item.pages.printedStart}–${item.pages.printedEnd || item.pages.printedStart}` : "";
+    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), printed, item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · "), availability].filter(Boolean).join(" · ");
   };
-  const openItem = openResourceId ? items.find((item) => item.id === openResourceId) ?? null : null;
-
-  if (openResourceId) {
-    const lessonsOf = openItem ? (openItem.lessonCodes?.length ? openItem.lessonCodes : openItem.lessonCode ? [openItem.lessonCode] : []) : [];
-    const metadataOnly = openItem?.kind === "bibliography" && openItem.storage?.backend === "inline";
-    const storagePending = openItem?.storage?.state !== "ready";
-    return <>
-      <button className={list.back} type="button" onClick={() => openResource(null)}><ChevronLeft aria-hidden="true" />{openItem ? tabLabel(openItem.kind === "bibliography" ? "bibliography" : "summaries") : t("community.materials.title")}</button>
-      <article className={`panel ${list.reading}`} aria-busy={loading}>
-        {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} rows={2} /> : !openItem ? <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div> : <>
-          <header className={list.byline}>
-            <span className={list.iconChip} aria-hidden="true">{openItem.kind === "bibliography" ? <BookOpen /> : <FileText />}</span>
-            <div>
-              <p className={list.bylineName}>{openItem.kind === "bibliography" ? formatBadge(bibliographyFormat(openItem)) : label(openItem)}{openItem.recommended && " · recomendado"}</p>
-              <p className={list.bylineMeta}>{[openItem.unitCode && `${openItem.unitCode}${openItem.unitName ? ` · ${openItem.unitName}` : ""}`, lessonsOf.join(" · ")].filter(Boolean).join(" · ")}</p>
-            </div>
-            <span className={list.statusPill} data-tone={openItem.verification === "verified" ? "success" : openItem.verification === "pending" ? "accent" : undefined}>{verificationLabel(openItem.verification)}</span>
-          </header>
-          <h2 className={list.readingTitle}>{openItem.title}</h2>
-          <span className={list.readingRule} aria-hidden="true" />
-          {openItem.description && <p className={list.readingBody}>{openItem.description}</p>}
-          {(openItem.source?.title || openItem.source?.author || openItem.pages?.printedStart || openItem.pages?.physicalStart || openItem.pages?.note) && <dl className={list.facts}>
-            {openItem.source?.title && <div><dt>Obra</dt><dd>{openItem.source.title}{openItem.source.edition ? ` · ${openItem.source.edition}` : ""}</dd></div>}
-            {openItem.source?.author && <div><dt>Autoria</dt><dd>{openItem.source.author}</dd></div>}
-            {(openItem.pages?.printedStart || openItem.pages?.printedEnd) && <div><dt>Páginas impressas</dt><dd>{openItem.pages?.printedStart}–{openItem.pages?.printedEnd}</dd></div>}
-            {(openItem.pages?.physicalStart || openItem.pages?.physicalEnd) && <div><dt>Páginas físicas</dt><dd>{openItem.pages?.physicalStart}–{openItem.pages?.physicalEnd}</dd></div>}
-            {openItem.pages?.note && <div><dt>Nota</dt><dd>{openItem.pages.note}</dd></div>}
-          </dl>}
-          <footer className={list.manageArea}>
-            <div className={styles.resourceActions}>{metadataOnly ? <span className={styles.pending}>Referência bibliográfica apenas; consulte a obra por uma via licenciada.</span> : <>{openItem.viewUrl && <button className="button button--primary button--compact" type="button" onClick={() => setReader(openItem)}><Highlighter aria-hidden="true" />Abrir e realçar</button>}{openItem.downloadUrl ? <a className="button button--secondary button--compact" href={openItem.downloadUrl} download={openItem.fileName}><Download aria-hidden="true" />Descarregar</a> : <span className={styles.pending}>{storagePending ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable")}</span>}</>}</div>
-          </footer>
-        </>}
-      </article>
-      {reader?.viewUrl && <MaterialPdfReader key={reader.id} materialId={reader.id} title={reader.title} viewUrl={reader.viewUrl} onClose={() => setReader(null)} />}
-    </>;
-  }
+  // Full reference (formerly the detail card) as the row's tooltip.
+  const resourceFacts = (item: CatalogItem) => [
+    item.source?.title && `Obra: ${item.source.title}${item.source.edition ? ` · ${item.source.edition}` : ""}`,
+    item.source?.author && `Autoria: ${item.source.author}`,
+    (item.pages?.printedStart || item.pages?.printedEnd) && `Páginas impressas: ${item.pages?.printedStart}–${item.pages?.printedEnd}`,
+    (item.pages?.physicalStart || item.pages?.physicalEnd) && `Páginas físicas: ${item.pages?.physicalStart}–${item.pages?.physicalEnd}`,
+    item.pages?.note && `Nota: ${item.pages.note}`,
+  ].filter(Boolean).join("\n") || undefined;
 
   // Step 1: choose the curricular unit.
   if (!selectedUnit) {
@@ -267,11 +249,14 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
               <ul className={list.rows}>{group.items.map((item) => <li className={list.row} key={item.id} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
                 <span className={list.rowIcon} aria-hidden="true">{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</span>
                 <div className={list.rowMain}>
-                  <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("recurso", item.id)} onClick={(event) => { event.preventDefault(); openResource(item.id); }}>{item.title}</a></h3>
-                  <p className={list.rowMeta}>{resourceMeta(item)}</p>
+                  <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink}`} href={materialReaderHref(item.id)} target="_blank" rel="noopener">{item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink}`} href={item.downloadUrl} download={item.fileName || true}>{item.title}</a> : <span className={list.titleLink}>{item.title}</span>}</h3>
+                  <p className={list.rowMeta} title={resourceFacts(item)}>{resourceMeta(item)}</p>
                 </div>
                 <span className={list.rowEnd}>
-                  {item.viewUrl && !(item.kind === "bibliography" && item.storage?.backend === "inline") && <button className={list.rowAction} type="button" onClick={() => setReader(item)} aria-label={`Ler e realçar · ${item.title}`}><Highlighter aria-hidden="true" /><span>Ler</span></button>}
+                  {(item.viewUrl || item.downloadUrl) && <span className={list.rowActions}>
+                    {item.viewUrl && <a className={list.rowAction} href={materialReaderHref(item.id)} target="_blank" rel="noopener" aria-label={`Anotar · ${item.title} (abre num novo separador)`} title="Anotar num novo separador"><Highlighter aria-hidden="true" /><span>Anotar</span></a>}
+                    {item.downloadUrl && <a className={list.rowAction} href={item.downloadUrl} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /><span>Descarregar</span></a>}
+                  </span>}
                   <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
                 </span>
               </li>)}</ul>
@@ -295,7 +280,6 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
           </ul>}
         </>}
       </div>
-      {reader?.viewUrl && <MaterialPdfReader key={reader.id} materialId={reader.id} title={reader.title} viewUrl={reader.viewUrl} onClose={() => setReader(null)} />}
     </section>
   </>;
 }

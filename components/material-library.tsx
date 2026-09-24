@@ -382,6 +382,11 @@ export function MaterialLibrary() {
   useEffect(() => {
     void load();
   }, [load]);
+  // After a client-side navigation (e.g. from the dashboard) the address is only committed after the first render.
+  useEffect(() => {
+    const code = normalizeMaterialUnitCode(new URLSearchParams(window.location.search).get("uc"));
+    if (code) void Promise.resolve().then(() => setUnitCode((current) => current || code));
+  }, []);
   const selectUnit = useCallback((code: string) => {
     setUnitCode(code);
     setActiveTab("overview");

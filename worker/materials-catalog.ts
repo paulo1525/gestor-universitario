@@ -222,6 +222,15 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
   return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
 }
 
+/** One published material, for the annotator page (/materiais/ler/?id=…). */
+async function catalogItem(request: Request, env: MaterialsCatalogEnv, id: string, enabled: ModuleChecker): Promise<Response> {
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  const item = await env.DB.prepare("SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id WHERE m.id=? AND m.publication_status='published'").bind(id).first<Record<string, unknown>>();
+  if (!item) return json({ error: "Material não encontrado." }, 404);
+  return json({ item: mapCatalogItem(item) });
+}
+
 async function anki(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!await enabled("materials.anki")) return disabled();
   if (!user) return unauthenticated();
@@ -497,7 +506,7 @@ async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: stri
 
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+\/(download|view|highlights)$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -510,6 +519,8 @@ export async function handleMaterialsCatalogRoute(request: Request, env: Materia
   if (viewer) return user ? viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled) : unauthenticated();
   const highlights = path.match(/^\/api\/material-catalog\/([^/]+)\/highlights$/);
   if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
+  const single = path.match(/^\/api\/material-catalog\/([^/]+)$/);
+  if (single) return user ? catalogItem(request, env, decodeURIComponent(single[1]), enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);
   if (deck) return user ? ankiDownload(request, env, decodeURIComponent(deck[1]), user, enabled) : unauthenticated();
   return json({ error: "Operação não suportada." }, 405);
