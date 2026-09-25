@@ -73,7 +73,7 @@ test("pesquisa, filtros e separadores não substituem o título das superfícies
     ["components/polls-hub.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
     ["components/documents-library.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
     ["components/commission-directory.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
-    ["components/material-library.tsx", /<section className=\{`panel \$\{list\.listPanel\}`\}[^>]*>\s*<FilterBar /],
+    ["components/material-library.tsx", /examsPanel=\{<div aria-busy=\{loading\}>\s*<FilterBar /],
     ["components/material-catalog.tsx", /role="tabpanel"[\s\S]*?<FilterBar /],
     ["components/placement-workbench.tsx", /title="Estudantes e resultados"[\s\S]*?actions=\{<label className="search-field"/],
     ["components/turmas-dashboard.tsx", /<section className=\{`panel \$\{styles\.listPanel\}`\}[^>]*>\s*<FilterBar /],

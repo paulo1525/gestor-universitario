@@ -621,18 +621,7 @@ export function MaterialLibrary() {
               onUnitChange={selectUnit}
               units={units}
               submissionCounts={submissionCounts}
-            />}
-            {submissionEnabled && editor && (
-              <MaterialUploadForm
-                units={units}
-                onClose={() => setEditor(false)}
-                onSubmitted={(count) => {
-                  setNotice({ kind: "success", message: t("community.materials.sent") + (count > 1 ? ` (${count})` : "") });
-                  void load();
-                }}
-              />
-            )}
-            {activeTab === "exams" && unitCode && !editor && !openId && <section className={`panel ${list.listPanel}`} aria-busy={loading}>
+              examsPanel={<div aria-busy={loading}>
               <FilterBar label={t("community.materials.filter")}>
                 <FilterSearch label={t("community.materials.search")} value={query} onChange={setQuery} placeholder={t("community.materials.search")} />
                 <FilterSelect label={t("community.materials.filter")} value={filter} onChange={setFilter} options={[{ value: "all", label: t("community.materials.all") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), ...Object.entries(categoryLabelKeys).filter(([value]) => canModerate || value !== "exam").map(([value, key]) => ({ value, label: t(key) }))]} />
@@ -659,7 +648,18 @@ export function MaterialLibrary() {
                   </li>)}
                 </ul>}
               {!loading && !loadError && <Pagination page={currentLibraryPage} totalItems={visible.length} pageSize={LIBRARY_PAGE_SIZE} onChange={setLibraryPage} />}
-            </section>}
+            </div>}
+            />}
+            {submissionEnabled && editor && (
+              <MaterialUploadForm
+                units={units}
+                onClose={() => setEditor(false)}
+                onSubmitted={(count) => {
+                  setNotice({ kind: "success", message: t("community.materials.sent") + (count > 1 ? ` (${count})` : "") });
+                  void load();
+                }}
+              />
+            )}
             {!editor && openId && <>
               <button className={list.back} type="button" onClick={() => openMaterial(null)}><ChevronLeft aria-hidden="true" />{t("community.materials.all")}</button>
               <article className={`panel ${list.reading}`} aria-busy={loading}>

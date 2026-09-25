@@ -84,6 +84,19 @@
   background: transparent;
 }
 
+.backLink,
+.overviewLink,
+.item,
+.groupButton {
+  transition: background-color .12s ease, color .12s ease;
+}
+
+/* Hover is a quiet light overlay; gold stays reserved for the current page. */
+.item:not(.active):hover > svg,
+.overviewLink:not(.active):hover > svg {
+  color: var(--gold);
+}
+
 .backLink:hover,
 .overviewLink:hover,
 .item:hover {
@@ -104,7 +117,9 @@
 }
 
 .overviewLink.active,
-.item.active {
+.overviewLink.active:hover,
+.item.active,
+.item.active:hover {
   color: var(--sidebar-active-text);
   background: var(--sidebar-active-bg);
 }
@@ -317,6 +332,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .backLink, .overviewLink, .item, .groupButton { transition: none; }
   .groupButton > svg:last-child,
   .groupItems {
     transition: none;

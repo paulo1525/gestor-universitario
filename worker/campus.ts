@@ -45,10 +45,10 @@ async function campus(request: Request, env: CampusEnv, url: URL, user: HubUser 
     ]);
     // Simple room list (room, building, optional teacher, classes) shown on "Salas e docentes".
     const [spacesResult, classesResult] = await Promise.all([
-      env.DB.prepare("SELECT id,room,building,teacher,classes,updated_at FROM campus_spaces WHERE active=1 ORDER BY building, room COLLATE NOCASE").all(),
+      env.DB.prepare("SELECT id,room,building,teacher,classes,subject,session,weekday,starts_at AS startsAt,ends_at AS endsAt,weeks,note,updated_at FROM campus_spaces WHERE active=1 ORDER BY building, room COLLATE NOCASE, weekday, starts_at").all(),
       env.DB.prepare("SELECT id FROM classes ORDER BY id").all(),
     ]);
-    const spaces = spacesResult.results.map((item) => { const space = row(item); let classes: number[] = []; try { const parsed = JSON.parse(String(space.classes || "[]")); if (Array.isArray(parsed)) classes = parsed.map(Number).filter(Number.isInteger); } catch { classes = []; } return { ...space, classes }; });
+    const spaces = spacesResult.results.map((item) => { const space = row(item); let classes: number[] = []; try { const parsed = JSON.parse(String(space.classes || "[]")); if (Array.isArray(parsed)) classes = parsed.map(Number).filter(Number.isInteger); } catch { classes = []; } let weeks: string[] | null = null; try { const parsed = space.weeks ? JSON.parse(String(space.weeks)) : null; if (Array.isArray(parsed)) weeks = parsed.map(String).filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)); } catch { weeks = null; } return { ...space, classes, weeks }; });
     const classIds = classesResult.results.map((item) => Number(row(item).id)).filter(Number.isInteger);
     const facultyUnits = new Map<string, Array<Record<string, unknown>>>();
     for (const item of linksResult.results) { const link = row(item); facultyUnits.set(String(link.faculty_id), [...(facultyUnits.get(String(link.faculty_id)) || []), { id: link.unit_id, code: link.code, name: link.name }]); }
@@ -74,11 +74,18 @@ async function campus(request: Request, env: CampusEnv, url: URL, user: HubUser 
   try {
     if (entity === "space") {
       const room = text(body.room, 60), building = text(body.building, 10), teacher = text(body.teacher, 160);
+      // Which class uses the room and when: optional, but a time needs a weekday and a valid HH:MM range.
+      const subject = text(body.subject, 80), session = text(body.session, 40), note = text(body.note, 200);
+      const weekday = body.weekday === "" || body.weekday === null || body.weekday === undefined ? null : Number(body.weekday);
+      const startsAt = text(body.startsAt, 5), endsAt = text(body.endsAt, 5), time = /^([01]\d|2[0-3]):[0-5]\d$/;
+      // Weeks are kept as sent by the importer; the editor leaves them untouched (NULL keeps the stored value).
+      const weeks = Array.isArray(body.weeks) ? JSON.stringify(body.weeks.map(String).filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)).slice(0, 60)) : null;
+      if ((weekday !== null && (!Number.isInteger(weekday) || weekday < 1 || weekday > 7)) || (startsAt && !time.test(startsAt)) || (endsAt && !time.test(endsAt)) || (startsAt && endsAt && endsAt <= startsAt) || (Boolean(startsAt) !== Boolean(endsAt))) return json({ error: "Indica um dia e um horário válidos." }, 400);
       const classes = Array.isArray(body.classes) ? [...new Set(body.classes.map(Number).filter((value) => Number.isInteger(value) && value >= 1 && value <= 20))].sort((a, b) => a - b) : [];
       if (!room || !["cim", "hsj"].includes(building)) return json({ error: "Indica a sala e o edifício." }, 400);
       const statement = method === "PUT"
-        ? env.DB.prepare("UPDATE campus_spaces SET room=?,building=?,teacher=?,classes=?,updated_by=?,updated_at=? WHERE id=? AND active=1").bind(room, building, teacher || null, JSON.stringify(classes), actor(user), now, id)
-        : env.DB.prepare("INSERT INTO campus_spaces(id,room,building,teacher,classes,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)").bind(id, room, building, teacher || null, JSON.stringify(classes), actor(user), actor(user), now, now);
+        ? env.DB.prepare("UPDATE campus_spaces SET room=?,building=?,teacher=?,classes=?,subject=?,session=?,weekday=?,starts_at=?,ends_at=?,note=?,weeks=COALESCE(?,weeks),updated_by=?,updated_at=? WHERE id=? AND active=1").bind(room, building, teacher || null, JSON.stringify(classes), subject || null, session || null, weekday, startsAt || null, endsAt || null, note || null, weeks, actor(user), now, id)
+        : env.DB.prepare("INSERT INTO campus_spaces(id,room,building,teacher,classes,subject,session,weekday,starts_at,ends_at,note,weeks,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, room, building, teacher || null, JSON.stringify(classes), subject || null, session || null, weekday, startsAt || null, endsAt || null, note || null, weeks, actor(user), actor(user), now, now);
       const result = await statement.run(); if (method === "PUT" && !result.meta.changes) return json({ error: "Sala não encontrada." }, 404);
     } else if (entity === "building") {
       const name = text(body.name, 120), code = text(body.code, 30).toUpperCase(), address = text(body.address, 240), mapUrl = text(body.mapUrl, 1000), accessibility = longText(body.accessibilityNotes, 2000);

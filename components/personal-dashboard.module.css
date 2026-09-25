@@ -37,7 +37,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--summary-columns, 4), minmax(0, 1fr));
   gap: 13px;
 }
 
@@ -105,6 +105,8 @@
   align-items: stretch;
   gap: 16px;
 }
+/* Panels hidden by disabled modules: an odd last panel takes the full row. */
+.contentGrid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 
 .panel {

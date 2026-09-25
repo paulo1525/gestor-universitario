@@ -62,6 +62,6 @@ test("a página pública pesquisa e separa por disciplina e os materiais têm a 
   // Drive-like navigation: subject folders → type folders → files, with the open folder in the address.
   assert.match(page, /url\.searchParams\.set\("pasta", value\)/);
   assert.match(page, /styles\.redacted/);
-  assert.match(catalog, /"overview" \| "summaries" \| "notes" \| "bibliography"/);
-  assert.match(catalog, /activeTab !== "notes" \|\| item\.summaryFormat === "notes"/);
+  assert.match(catalog, /"overview" \| "summaries" \| "notes" \| "slides" \| "compendiums" \| "bibliography"/);
+  assert.match(catalog, /item\.summaryFormat === "notes" \? "notes" : "summaries"/);
 });

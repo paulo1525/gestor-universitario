@@ -6,3 +6,5 @@ TURNSTILE_SECRET_KEY=segredo-turnstile-de-exemplo
 # Google Drive dos materiais do ano (opcional). Em produção, definir como segredos no Cloudflare.
 # GOOGLE_SERVICE_ACCOUNT_JSON={"client_email":"conta@projeto.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"}
 # GOOGLE_DRIVE_FOLDER_ID=id-da-pasta-raiz
+# Só local: entra automaticamente com esta conta em 127.0.0.1/localhost (ignorado noutros domínios).
+# LOCAL_AUTO_LOGIN_EMAIL=up202500000@up.pt

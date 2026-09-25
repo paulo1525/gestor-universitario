@@ -25,6 +25,8 @@ export interface Env {
   EMAIL_FROM: string;
   BOOTSTRAP_ADMIN_EMAIL?: string;
   AUTH_PEPPER: string;
+  /** Local development only (.dev.vars): signs in as this user on 127.0.0.1/localhost. Ignored on any other host. */
+  LOCAL_AUTO_LOGIN_EMAIL?: string;
   RESEND_API_KEY: string;
   TURNSTILE_SECRET_KEY: string;
   TURNSTILE_SITE_KEY: string;
@@ -483,12 +485,21 @@ function cookieValue(request: Request, name: string): string | null {
 }
 
 type CurrentUser = { id: string; email: string; fullName: string; role: string; fontScale: string; classRepresentative: boolean; representedClass: number | null; studyYear: number | null; commissionDepartment: string | null; commissionPosition: string | null; commissionPositionLabel: string | null; preview?:boolean; actorId?:string };
+/** Local-only automatic sign-in: needs LOCAL_AUTO_LOGIN_EMAIL in .dev.vars and a loopback host, so production never uses it. */
+async function localAutoLoginUser(request: Request, env: Env): Promise<CurrentUser | null> {
+  const email = (env.LOCAL_AUTO_LOGIN_EMAIL || "").trim().toLowerCase();
+  const host = new URL(request.url).hostname;
+  if (!email || !["127.0.0.1", "localhost", "[::1]"].includes(host)) return null;
+  const row = await env.DB.prepare("SELECT users.id,users.email,users.full_name,users.role,users.font_scale,users.class_representative,users.represented_class,users.study_year,users.commission_department,users.commission_position,commission_positions.label AS commission_position_label FROM users LEFT JOIN commission_positions ON commission_positions.code=users.commission_position WHERE lower(users.email)=? AND users.status='active'").bind(email).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; study_year: number | null; commission_department: string | null; commission_position: string | null; commission_position_label: string | null }>();
+  return row ? { id: row.id, email: row.email, fullName: row.full_name, role: row.role, fontScale: row.font_scale, classRepresentative: row.class_representative === 1, representedClass: row.represented_class, studyYear: row.study_year, commissionDepartment: row.commission_department, commissionPosition: row.commission_position, commissionPositionLabel: row.commission_position_label } : null;
+}
+
 async function currentUser(request: Request, env: Env): Promise<CurrentUser | null> {
   const token = cookieValue(request, SESSION_COOKIE);
-  if (!token) return null;
+  if (!token) return localAutoLoginUser(request, env);
   const row = await env.DB.prepare("SELECT users.id, users.email, users.full_name, users.role, users.font_scale, users.class_representative, users.represented_class, users.study_year, users.commission_department, users.commission_position, commission_positions.label AS commission_position_label, users.status, users.status_until, sessions.id AS session_id, sessions.last_seen_at FROM sessions JOIN users ON users.id = sessions.user_id LEFT JOIN commission_positions ON commission_positions.code = users.commission_position WHERE sessions.token_hash = ? AND sessions.expires_at > ?")
     .bind(await sha256(`${token}:${env.AUTH_PEPPER}`), Date.now()).first<{ id: string; email: string; full_name: string; role: string; font_scale: string; class_representative: number; represented_class: number | null; study_year: number | null; commission_department: string | null; commission_position: string | null; commission_position_label: string | null; status: string; status_until: number | null; session_id: string; last_seen_at: number }>();
-  if (!row) return null;
+  if (!row) return localAutoLoginUser(request, env);
   if (row.status !== "active" && !(row.status === "suspended" && row.status_until && row.status_until <= Date.now())) return null;
   if (row.status === "suspended" && row.status_until && row.status_until <= Date.now()) await env.DB.prepare("UPDATE users SET status = 'active', status_reason = NULL, status_until = NULL, updated_at = ? WHERE id = ?").bind(Date.now(), row.id).run();
   if (Date.now() - row.last_seen_at > 15 * 60_000) env.DB.prepare("UPDATE sessions SET last_seen_at = ? WHERE id = ?").bind(Date.now(), row.session_id).run().catch(() => undefined);

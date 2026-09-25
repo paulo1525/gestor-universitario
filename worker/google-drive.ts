@@ -8,7 +8,7 @@
  * type, size) and, on download, streams the file from Drive, so access control and redaction stay on the site.
  *
  * Expected layout:
- *   <root folder>/<UC: code or name, e.g. "NEURO" or "Neuroanatomia">/<type: Sumários | Resumos | Bibliografia | Anki | Exames | Outros>/<files…>
+ *   <root folder>/<UC: code or name, e.g. "NEURO" or "Neuroanatomia">/<type: Sumários | Resumos | PowerPoints | Compêndios | Bibliografia | Anki | Exames | Outros>/<files…>
  * Files directly inside a UC folder count as "Outros". Google Docs and Slides are exported as PDF.
  *
  * Configuration (Cloudflare secrets, never in the repository):
@@ -23,7 +23,7 @@ export type DriveEnv = {
 };
 
 type DriveFile = { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string };
-type Kind = { kind: "summary" | "bibliography" | "anki" | "exam" | "other"; summaryFormat: "lecture" | "notes" | null };
+type Kind = { kind: "summary" | "bibliography" | "anki" | "exam" | "other"; summaryFormat: "lecture" | "notes" | null; otherFormat?: "slides" | "compendium" };
 export type DriveSyncResult = { ok: boolean; files: number; archived: number; unmatched: string[]; message: string };
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -98,6 +98,8 @@ export function kindFromFolder(name: string): Kind {
   if (/^(bibliografia|livro)/.test(folder)) return { kind: "bibliography", summaryFormat: null };
   if (/^(anki|baralho)/.test(folder)) return { kind: "anki", summaryFormat: null };
   if (/^(exame|teste|frequencia)/.test(folder)) return { kind: "exam", summaryFormat: null };
+  if (/^(powerpoint|apresenta|slides|diapositivo)/.test(folder)) return { kind: "other", summaryFormat: null, otherFormat: "slides" };
+  if (/^compendio/.test(folder)) return { kind: "other", summaryFormat: null, otherFormat: "compendium" };
   return { kind: "other", summaryFormat: null };
 }
 
@@ -148,10 +150,10 @@ export async function syncDriveMaterials(env: DriveEnv): Promise<DriveSyncResult
         const exported = EXPORTABLE.has(file.mimeType), id = `drive-${file.id}`;
         const mime = exported ? "application/pdf" : file.mimeType, fileName = exported ? `${file.name}.pdf` : file.name;
         seen.push(id);
-        statements.push(env.DB.prepare(`INSERT INTO material_catalog(id,curricular_unit_id,material_kind,summary_format,title,description,file_name,mime_type,storage_backend,storage_key,storage_state,byte_size,verification_status,publication_status,created_at,updated_at)
-          VALUES (?,?,?,?,?,'',?,?,'external',?,'ready',?,'original','published',?,?)
-          ON CONFLICT(id) DO UPDATE SET curricular_unit_id=excluded.curricular_unit_id,material_kind=excluded.material_kind,summary_format=excluded.summary_format,title=excluded.title,file_name=excluded.file_name,mime_type=excluded.mime_type,storage_key=excluded.storage_key,storage_state='ready',byte_size=excluded.byte_size,publication_status='published',updated_at=excluded.updated_at`)
-          .bind(id, unitId, kind.kind, kind.summaryFormat, title(file.name), fileName, mime, `${exported ? "drive-export" : "drive"}:${file.id}`, file.size ? Number(file.size) : null, now, now));
+        statements.push(env.DB.prepare(`INSERT INTO material_catalog(id,curricular_unit_id,material_kind,summary_format,other_format,title,description,file_name,mime_type,storage_backend,storage_key,storage_state,byte_size,verification_status,publication_status,created_at,updated_at)
+          VALUES (?,?,?,?,?,?,'',?,?,'external',?,'ready',?,'original','published',?,?)
+          ON CONFLICT(id) DO UPDATE SET curricular_unit_id=excluded.curricular_unit_id,material_kind=excluded.material_kind,summary_format=excluded.summary_format,other_format=excluded.other_format,title=excluded.title,file_name=excluded.file_name,mime_type=excluded.mime_type,storage_key=excluded.storage_key,storage_state='ready',byte_size=excluded.byte_size,publication_status='published',updated_at=excluded.updated_at`)
+          .bind(id, unitId, kind.kind, kind.summaryFormat, kind.otherFormat ?? null, title(file.name), fileName, mime, `${exported ? "drive-export" : "drive"}:${file.id}`, file.size ? Number(file.size) : null, now, now));
       }
     }
   }

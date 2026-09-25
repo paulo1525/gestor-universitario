@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Download, File, FileImage, FileText, Folder, Globe, House, Lock, LogIn, Package, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, Download, File, FileImage, FileText, Folder, Globe, House, Lock, LogIn, Package, Presentation, RefreshCw, Search } from "lucide-react";
 import { AppToast, type ToastKind } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
 import { clampPage, Pagination } from "@/components/pagination";
@@ -13,9 +13,9 @@ import styles from "@/components/public-materials.module.css";
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
 const FILES_PAGE_SIZE = 10;
 
-type Section = "summaries" | "notes" | "bibliography" | "anki" | "other";
-const SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki", "other"];
-// Folders shown in every subject, even when empty; "Outros" only appears when it has files.
+type Section = "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
+const SECTIONS: Section[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
+// Folders shown in every subject, even when empty; the others only appear when they have files.
 const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
 type Entry = { section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
@@ -51,6 +51,7 @@ function fileDate(value?: number | null) {
 
 function FileIcon({ entry }: { entry: Entry }) {
   if (entry.section === "anki" || entry.mime === "application/apkg") return <Package aria-hidden="true" />;
+  if (entry.section === "slides") return <Presentation aria-hidden="true" />;
   if (entry.mime?.startsWith("image/")) return <FileImage aria-hidden="true" />;
   if (entry.mime === "application/pdf") return <FileText aria-hidden="true" />;
   return <File aria-hidden="true" />;

@@ -31,6 +31,7 @@ async function database() {
   db.run(await read("../migrations/0065_material_bibliography_formats.sql"));
   db.run(await read("../migrations/0074_public_materials_and_notes.sql"));
   db.run(await read("../migrations/0075_drive_sync_state.sql"));
+  db.run(await read("../migrations/0076_neuro_slides_and_summaries.sql"));
   return db;
 }
 
@@ -62,6 +63,8 @@ test("as pastas do Drive mapeiam para tipos e UCs", () => {
   assert.equal(kindFromFolder("Anki").kind, "anki");
   assert.equal(kindFromFolder("Exames antigos").kind, "exam");
   assert.equal(kindFromFolder("Diversos").kind, "other");
+  assert.deepEqual(kindFromFolder("PowerPoints"), { kind: "other", summaryFormat: null, otherFormat: "slides" });
+  assert.deepEqual(kindFromFolder("Compêndios"), { kind: "other", summaryFormat: null, otherFormat: "compendium" });
   const units = [{ id: "u1", code: "NEURO", name: "Neuroanatomia" }, { id: "u2", code: "FIS1", name: "Fisiologia I" }];
   assert.equal(matchUnit("NEURO", units), "u1");
   assert.equal(matchUnit("neuroanatomia", units), "u1");
