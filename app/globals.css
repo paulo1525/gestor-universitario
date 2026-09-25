@@ -39,7 +39,7 @@
      a future theme can change either area without selector-level overrides. */
   --sidebar-bg: #111111;
   --sidebar-surface: #191919;
-  --sidebar-surface-hover: #202020;
+  --sidebar-surface-hover: rgb(246 201 69 / 16%);
   --sidebar-surface-control: #292929;
   --sidebar-border: #303030;
   --sidebar-text: #c9c9c9;
