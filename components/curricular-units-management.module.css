@@ -4,9 +4,10 @@
   padding: 0;
 }
 
+/* Fields carry the padding so the footer (FormActions) spans the whole card, flush with its edges. */
 .form {
   margin: 0;
-  padding: 20px;
+  padding: 0;
 }
 
 .formGrid {
@@ -14,6 +15,7 @@
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: start;
   gap: 16px;
+  padding: 20px;
 }
 
 .formGrid label,
@@ -65,12 +67,10 @@
 .semesterField { grid-column: span 4; }
 .representativeField { grid-column: 1 / -1; }
 
+/* A field group, not a card inside the card: a separator above is enough. */
 .representativeField {
-  margin-top: 2px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-subtle);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
 .representativeSelectors {
@@ -117,7 +117,8 @@
 
 /* The open unit is edited inside the reading card. */
 .readingEditor { justify-self: stretch; margin: 0 calc(var(--space-5) * -1); }
-.readingEditor .form { padding: 0 var(--space-5) var(--space-5); }
+.readingEditor .formGrid { padding: 0 var(--space-5) var(--space-5); }
+.reading.reading > .readingEditor:last-child { margin-bottom: 0; }
 
 @media (max-width: 1080px) {
   .formGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -130,7 +131,7 @@
 }
 
 @media (max-width: 720px) {
-  .form { padding: 14px; }
+  .formGrid { padding: 14px; }
   .formGrid,
   .representativeSelectors { grid-template-columns: 1fr; }
   .nameField,
@@ -140,7 +141,7 @@
   .yearField,
   .semesterField { grid-column: auto; }
   .readingEditor { margin-inline: calc(var(--space-4) * -1); }
-  .readingEditor .form { padding: 0 var(--space-4) var(--space-4); }
+  .readingEditor .formGrid { padding: 0 var(--space-4) var(--space-4); }
 }
 
 /* List/detail model (same anatomy as Pedidos e Avisos). */
