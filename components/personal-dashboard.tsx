@@ -125,7 +125,7 @@ function StudyPanel({ reading }: { reading: Reading[] }) {
           <Link className="button button--secondary button--compact" href="/testes/aprender/"><BrainCircuit aria-hidden="true" />{t("personalDashboard.study.resume")}</Link>
         </div>;
       })}
-    </div> : <p className={styles.emptyLine}>{t("personalDashboard.study.empty")}</p>}
+    </div> : <div className={styles.empty} role="status"><span className={styles.stateIcon} aria-hidden="true"><BookOpenCheck /></span><strong>{t("personalDashboard.study.empty")}</strong></div>}
   </section>;
 }
 

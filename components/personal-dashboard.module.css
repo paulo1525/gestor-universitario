@@ -92,7 +92,7 @@
 .summaryIcon svg { width: 20px; }
 .summaryCopy, .summaryCopy > span, .summaryCopy strong, .summaryCopy small { display: block; }
 .summaryCopy { min-width: 0; }
-.summaryCopy > span { color: var(--muted); font-size: var(--font-size-small); font-weight: 850; letter-spacing: .045em; text-transform: uppercase; }
+.summaryCopy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--font-size-small); font-weight: 850; letter-spacing: .045em; text-transform: uppercase; }
 .summaryCopy strong { margin-top: 5px; font: 800 25px/1 var(--font-display), sans-serif; }
 .summaryCopy small { margin-top: 5px; overflow: hidden; color: var(--muted); font-size: var(--font-size-small); line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .summaryArrow { width: 16px; color: #aaa79e; transition: color .16s ease, transform .16s ease; }
@@ -105,14 +105,18 @@
   gap: 16px;
 }
 
+/* Both columns end on the same line: the last block of each grows and centres its empty state. */
 .column {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-width: 0;
 }
+.column > :last-child { flex: 1 1 auto; }
 
 .panel {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -256,6 +260,8 @@
   text-align: center;
 }
 
+.panel > .empty { flex: 1 1 auto; }
+
 .stateIcon {
   width: 36px;
   height: 36px;
@@ -306,7 +312,6 @@
 .studyItem :global(.button) svg { width: 14px; }
 .progress { display: block; height: 4px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--color-surface-muted); }
 .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
-.emptyLine { margin: 0; padding: 16px 18px; color: var(--muted); font-size: var(--font-size-small); line-height: 1.5; }
 
 /* Quick access: plain list of destinations. */
 .quickList { display: grid; margin: 0; padding: 0; list-style: none; }
@@ -345,9 +350,11 @@
 }
 
 @media (max-width: 480px) {
-  .summaryGrid { grid-template-columns: 1fr; }
-  .summaryCard { min-height: 86px; grid-template-columns: 40px minmax(0, 1fr) 16px; }
-  .summaryCopy small, .summaryArrow { display: block; }
+  /* Two by two: the four numbers stay on one screen. */
+  .summaryGrid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summaryCard { min-height: 0; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding: 12px; }
+  .summaryIcon { width: 36px; height: 36px; border-radius: 10px; }
+  .summaryIcon svg { width: 17px; }
   .panelBar { align-items: flex-start; }
   .panelTitle p { white-space: normal; }
   .itemCopy p { display: none; }
