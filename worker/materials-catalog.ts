@@ -12,6 +12,7 @@ export type MaterialsCatalogUser = {
 export type MaterialsCatalogEnv = {
   DB: D1Database;
   MATERIALS_BUCKET?: R2Bucket;
+  AUTH_RATE_LIMITER?: RateLimit;
 };
 
 type ModuleChecker = (key: string) => Promise<boolean>;
@@ -71,6 +72,8 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     lessonCodes,
     kind: item.material_kind,
     bibliographyFormat: item.material_kind === "bibliography" ? bibliographyFormat(item) : null,
+    summaryFormat: item.material_kind === "summary" ? (item.summary_format === "notes" ? "notes" : "lecture") : null,
+    publicAccess: Number(item.public_access) === 1,
     title: item.title,
     description: item.description,
     fileName: item.file_name,
@@ -104,6 +107,7 @@ function mapDeck(item: Record<string, unknown>, lessonRows: Array<Record<string,
     mediaCount: Number(item.media_count || 0),
     storage: { backend: item.storage_backend, state: item.storage_state, ready: item.storage_state === "ready", size: item.byte_size, checksum: item.checksum_sha256 },
     downloadUrl: item.storage_state === "ready" ? `/api/material-anki/${encodeURIComponent(String(item.id))}/download` : null,
+    publicAccess: Number(item.public_access) === 1,
     status: item.publication_status,
     sourceFileName: item.source_file_name,
     lessons: lessonRows.filter((lesson) => String(lesson.deck_id) === String(item.id)).map((lesson) => ({ id: lesson.lesson_id, code: lesson.code, title: lesson.title, cardCount: Number(lesson.card_count || 0) })),
@@ -380,21 +384,23 @@ export async function objectDownload(request: Request, env: MaterialsCatalogEnv,
   return new Response(object.body, { status: range ? 206 : 200, headers });
 }
 
-async function download(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
+async function download(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
   if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
-  const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status,public_access FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const denied = await anonymousDenied(request, env, user, item);
+  if (denied) return denied;
   if (!item) return json({ error: "Material não encontrado." }, 404);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este ficheiro está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
 }
 
-async function viewPdf(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
+async function viewPdf(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
   if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
-  const item = await env.DB.prepare("SELECT file_name,mime_type,storage_backend,storage_key,storage_state FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const item = await env.DB.prepare("SELECT file_name,mime_type,storage_backend,storage_key,storage_state,public_access FROM material_catalog WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const denied = await anonymousDenied(request, env, user, item);
+  if (denied) return denied;
   if (!item || item.mime_type !== "application/pdf") return json({ error: "PDF não encontrado." }, 404);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este PDF ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material.pdf"), "application/pdf", "inline");
@@ -494,34 +500,110 @@ async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: str
   return json({ highlight: { id: finalId, page, x, y, width, height, rects: storedRects, color, selectedText, note, createdAt: now, updatedAt: now } }, 201);
 }
 
-async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
-  if (!user) return unauthenticated();
+async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!await enabled("materials.anki")) return disabled();
   if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "Operação não suportada." }, 405);
-  const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status FROM material_anki_decks WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const item = await env.DB.prepare("SELECT id,file_name,mime_type,storage_backend,storage_key,storage_state,publication_status,public_access FROM material_anki_decks WHERE id=? AND publication_status='published'").bind(id).first<Record<string, unknown>>();
+  const denied = await anonymousDenied(request, env, user, item);
+  if (denied) return denied;
   if (!item) return json({ error: "Baralho Anki não encontrado." }, 404);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este baralho está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
 }
 
+/**
+ * Without a session only items marked public can be downloaded, and each visitor (by IP) is rate limited.
+ * A restricted or unknown item answers the same 401, so ids cannot be probed.
+ */
+async function anonymousDenied(request: Request, env: MaterialsCatalogEnv, user: MaterialsCatalogUser | null, item: Record<string, unknown> | null): Promise<Response | null> {
+  if (user) return null;
+  if (!item || Number(item.public_access) !== 1) return unauthenticated();
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  if (env.AUTH_RATE_LIMITER && !(await env.AUTH_RATE_LIMITER.limit({ key: `public-material:${ip}` })).success) return json({ error: "Demasiados downloads seguidos. Tente novamente dentro de um minuto." }, 429);
+  return null;
+}
+
+type PublicSection = "summaries" | "notes" | "bibliography" | "anki" | "other";
+const PUBLIC_SECTION_ORDER: PublicSection[] = ["summaries", "notes", "bibliography", "anki", "other"];
+
+function publicSection(item: Record<string, unknown>): PublicSection {
+  if (item.material_kind === "summary") return item.summary_format === "notes" ? "notes" : "summaries";
+  if (item.material_kind === "bibliography") return "bibliography";
+  if (item.material_kind === "anki") return "anki";
+  return "other";
+}
+
+/**
+ * Public page of the year's materials (/materiais-do-ano). Everything published and downloadable is listed;
+ * visitors without a session receive only a placeholder (section and unit, never the title, id or link) for items that are not public.
+ * Managers can switch an item between public and session-only.
+ */
+async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!await enabled("materials.catalog") || !await enabled("materials.library")) return disabled();
+  const manager = isManager(user);
+  if (request.method === "PATCH") {
+    if (!user) return unauthenticated();
+    if (!manager) return json({ error: "Sem permissão para alterar o acesso." }, 403);
+    const body = await request.json().catch(() => null) as { id?: unknown; type?: unknown; public?: unknown } | null;
+    const id = text(body?.id, 160), type = body?.type === "anki" ? "anki" : body?.type === "catalog" ? "catalog" : "";
+    if (!id || !type || typeof body?.public !== "boolean") return json({ error: "Pedido inválido." }, 400);
+    const now = Date.now();
+    const result = await env.DB.prepare(`UPDATE ${type === "anki" ? "material_anki_decks" : "material_catalog"} SET public_access=?,updated_by=?,updated_at=? WHERE id=? AND publication_status='published'`).bind(body.public ? 1 : 0, user.id, now, id).run();
+    if (!result.meta.changes) return json({ error: "Material não encontrado." }, 404);
+    await env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'material_public_access_updated',?,?)").bind(user.id, JSON.stringify({ id, type, public: body.public }), now).run();
+    return json({ ok: true });
+  }
+  if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  const ankiEnabled = await enabled("materials.anki");
+  const [catalogRows, deckRows] = await Promise.all([
+    env.DB.prepare("SELECT m.id,m.material_kind,m.summary_format,m.bibliography_format,m.title,m.mime_type,m.file_name,m.storage_backend,m.storage_state,m.external_url,m.public_access,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
+    ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
+  ]);
+  type Entry = { section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean };
+  type Unit = { key: string; code: string; name: string; year: number | null; semester: number | null; entries: Entry[] };
+  const units = new Map<string, Unit>();
+  const unitFor = (item: Record<string, unknown>) => {
+    const key = String(item.unit_id || "general");
+    if (!units.has(key)) units.set(key, { key, code: String(item.unit_code || ""), name: String(item.unit_name || "Geral"), year: item.study_year == null ? null : Number(item.study_year), semester: item.semester == null ? null : Number(item.semester), entries: [] });
+    return units.get(key)!;
+  };
+  const add = (item: Record<string, unknown>, entry: Omit<Entry, "locked">) => {
+    const isPublic = Number(item.public_access) === 1;
+    // The redaction happens here, on the server: a locked entry carries only its section.
+    unitFor(item).entries.push(user || isPublic ? { ...entry, locked: false, isPublic: manager ? isPublic : undefined } : { section: entry.section, locked: true });
+  };
+  for (const raw of catalogRows.results) {
+    const item = row(raw), id = String(item.id), external = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url) ? item.external_url : null;
+    const href = external || `/api/material-catalog/${encodeURIComponent(id)}/${item.mime_type === "application/pdf" ? "view" : "download"}`;
+    add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download` });
+  }
+  for (const raw of deckRows.results) {
+    const item = row(raw), id = String(item.id), download = `/api/material-anki/${encodeURIComponent(id)}/download`;
+    add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download });
+  }
+  const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked)) }));
+  return json({ units: ordered, authenticated: Boolean(user), canManage: manager });
+}
+
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (path === "/api/material-catalog") return user ? catalog(request, env, url, user, enabled) : unauthenticated();
   if (path === "/api/material-anki") return user ? anki(request, env, url, user, enabled) : unauthenticated();
+  if (path === "/api/public-materials") return publicMaterials(request, env, user, enabled);
   const item = path.match(/^\/api\/material-catalog\/([^/]+)\/download$/);
-  if (item) return user ? download(request, env, decodeURIComponent(item[1]), user, enabled) : unauthenticated();
+  if (item) return download(request, env, decodeURIComponent(item[1]), user, enabled);
   const viewer = path.match(/^\/api\/material-catalog\/([^/]+)\/view$/);
-  if (viewer) return user ? viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled) : unauthenticated();
+  if (viewer) return viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled);
   const highlights = path.match(/^\/api\/material-catalog\/([^/]+)\/highlights$/);
   if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
   const single = path.match(/^\/api\/material-catalog\/([^/]+)$/);
   if (single) return user ? catalogItem(request, env, decodeURIComponent(single[1]), enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);
-  if (deck) return user ? ankiDownload(request, env, decodeURIComponent(deck[1]), user, enabled) : unauthenticated();
+  if (deck) return ankiDownload(request, env, decodeURIComponent(deck[1]), user, enabled);
   return json({ error: "Operação não suportada." }, 405);
 }

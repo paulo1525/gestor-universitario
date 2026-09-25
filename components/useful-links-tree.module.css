@@ -189,6 +189,11 @@
 
 .lock { width: 14px; height: 14px; flex: 0 0 auto; color: var(--color-text-subtle); }
 
+/* Redacted row: the item exists but its name stays hidden until the visitor signs in. */
+.lockedRow .chip { color: var(--color-text-subtle); background: var(--color-surface-muted); }
+.lockedRow .chip svg { width: 16px; height: 16px; }
+.redacted { display: block; width: min(62%, 220px); height: 12px; margin: 3px 0 2px; border-radius: 4px; background: repeating-linear-gradient(90deg, var(--color-border-strong) 0 18px, var(--color-border) 18px 22px); }
+
 .arrowLink {
   display: grid;
   width: 28px;
@@ -280,3 +285,18 @@
 @media (prefers-reduced-motion: reduce) {
   .row { transition: none; }
 }
+
+/* Materials of the year: search and one button per subject. */
+.filters { display: grid; gap: var(--space-3); margin-bottom: var(--space-5); }
+.search { position: relative; display: block; }
+.search svg { position: absolute; top: 50%; left: 12px; width: 16px; height: 16px; color: var(--color-text-subtle); transform: translateY(-50%); pointer-events: none; }
+.search input { width: 100%; min-height: 44px; padding: 0 12px 0 38px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; font-size: var(--font-size-body); }
+.search input:focus { border-color: var(--color-focus); outline: none; box-shadow: var(--focus-ring); }
+.disciplines { display: flex; flex-wrap: wrap; gap: 6px; }
+.disciplines button { min-height: 32px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-muted); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 750; cursor: pointer; }
+.disciplines button:hover { border-color: var(--color-border-hover); color: var(--color-text); }
+.disciplines button[aria-pressed="true"] { border-color: var(--color-text); color: var(--color-text); }
+.disciplines button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.subgroup { display: grid; gap: var(--space-2); }
+.subgroup + .subgroup { margin-top: var(--space-2); }
+.subgroupLabel { margin: 0; padding: 0 2px; color: var(--color-text-subtle); font-size: var(--font-size-caption); font-weight: 750; }

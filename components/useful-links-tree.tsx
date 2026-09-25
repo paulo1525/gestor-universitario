@@ -17,9 +17,9 @@ const SKELETON_ROWS = [0, 1, 2, 3, 4];
 export const USEFUL_LINKS_PUBLIC_PATH = "/links-uteis/";
 
 type TreeLink = { id: string; title: string; url: string; description: string; category: string; priority: string; visibility: string; status: string; unitId: string | null; requiresLogin: boolean };
-type TreeState = { status: "loading" | "ready" | "unavailable"; links: TreeLink[]; authenticated: boolean; restricted: boolean; canManage: boolean };
+type TreeState = { status: "loading" | "ready" | "unavailable"; links: TreeLink[]; locked: Record<string, number>; authenticated: boolean; restricted: boolean; canManage: boolean };
 type ApiLink = { id: string | number; title?: string; url?: string; description?: string; category?: string; priority?: string; visibility?: string; status?: string; unitId?: string | number | null; requiresLogin?: boolean };
-type ApiPayload = { links?: ApiLink[]; authenticated?: boolean; restricted?: boolean; canManage?: boolean; error?: string };
+type ApiPayload = { links?: ApiLink[]; locked?: Record<string, number>; authenticated?: boolean; restricted?: boolean; canManage?: boolean; error?: string };
 type Editor = { key: number; link: TreeLink | null; draft: UsefulLinkDraft };
 type Notice = { kind: ToastKind; message: string } | null;
 
@@ -57,7 +57,7 @@ function wantsCreate() {
 
 export function UsefulLinksTree() {
   const { t } = useI18n();
-  const [state, setState] = useState<TreeState>({ status: "loading", links: [], authenticated: false, restricted: false, canManage: false });
+  const [state, setState] = useState<TreeState>({ status: "loading", links: [], locked: {}, authenticated: false, restricted: false, canManage: false });
   const [pendingCreate] = useState(wantsCreate);
   const editorSeq = useRef(0);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -73,7 +73,7 @@ export function UsefulLinksTree() {
       if (!response.ok) throw new Error(String(response.status));
       const data = await response.json() as ApiPayload;
       const links = (data.links ?? []).filter((item) => typeof item.url === "string" && item.url.startsWith("https://")).map(normalise);
-      setState({ status: "ready", links, authenticated: data.authenticated === true, restricted: data.restricted === true, canManage: data.canManage === true });
+      setState({ status: "ready", links, locked: data.authenticated === true ? {} : data.locked ?? {}, authenticated: data.authenticated === true, restricted: data.restricted === true, canManage: data.canManage === true });
       return data.canManage === true;
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) setState((current) => ({ ...current, status: current.status === "ready" ? "ready" : "unavailable" }));
@@ -156,11 +156,15 @@ export function UsefulLinksTree() {
       const key = (USEFUL_LINK_CATEGORIES as readonly string[]).includes(item.category) ? item.category : "other";
       byCategory.set(key, [...(byCategory.get(key) ?? []), item]);
     }
-    return USEFUL_LINK_CATEGORIES.filter((key) => byCategory.has(key)).map((key) => ({
+    const lockedIn = (key: string) => key === "other"
+      ? Object.entries(state.locked).filter(([category]) => !(USEFUL_LINK_CATEGORIES as readonly string[]).includes(category) || category === "other").reduce((sum, [, count]) => sum + count, 0)
+      : state.locked[key] ?? 0;
+    return USEFUL_LINK_CATEGORIES.filter((key) => byCategory.has(key) || lockedIn(key) > 0).map((key) => ({
       key,
       links: (byCategory.get(key) ?? []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2)),
+      locked: lockedIn(key),
     }));
-  }, [state.links]);
+  }, [state.links, state.locked]);
 
   const showLabels = groups.length > 1;
   const signInHref = `/login/?next=${encodeURIComponent(USEFUL_LINKS_PUBLIC_PATH)}`;
@@ -215,6 +219,19 @@ export function UsefulLinksTree() {
                         </span>
                       )}
                       <a className={styles.arrowLink} href={item.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true"><ArrowUpRight className={styles.arrow} /></a>
+                    </li>
+                  ))}
+                  {/* Session-only links, redacted: the server never sends their titles or URLs to visitors. */}
+                  {Array.from({ length: group.locked }, (_, index) => (
+                    <li className={`${styles.row} ${styles.lockedRow}`} key={`locked-${index}`}>
+                      <Link className={styles.link} href={signInHref}>
+                        <span className={styles.chip} aria-hidden="true"><Lock /></span>
+                        <span className={styles.copy}>
+                          <span className={styles.redacted} aria-hidden="true" />
+                          <small>{t("links.tree.lockedHint")}</small>
+                          <span className="sr-only">{t("links.tree.locked")}</span>
+                        </span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
