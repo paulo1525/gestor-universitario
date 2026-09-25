@@ -40,8 +40,8 @@
   --sidebar-bg: #111111;
   --sidebar-surface: #191919;
   /* Hover: matte yellow, quieter than the vivid gold of the active item; text turns dark on it. */
-  --sidebar-surface-hover: #d8c88f;
-  --sidebar-text-hover: #1d1b14;
+  --sidebar-surface-hover: rgba(255, 255, 255, .08);
+  --sidebar-text-hover: #ffffff;
   --sidebar-surface-control: #292929;
   --sidebar-border: #303030;
   --sidebar-text: #c9c9c9;

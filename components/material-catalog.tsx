@@ -1,11 +1,11 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Highlighter, Package } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Highlighter, Library, NotebookPen, Package, Presentation, ScrollText, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
-import { FilterBar, FilterCheckbox, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
+import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
 import { materialReaderHref } from "@/lib/material-reader";
 import styles from "@/components/material-catalog.module.css";
@@ -17,20 +17,34 @@ import { clampPage, Pagination } from "@/components/pagination";
 const RESOURCE_PAGE_SIZE = 10;
 const UNIT_PAGE_SIZE = 12;
 
-export type MaterialCatalogTab = "overview" | "summaries" | "notes" | "bibliography" | "anki" | "exams";
+export type MaterialCatalogTab = "overview" | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "exams";
+/** List sections backed by catalogue items; every item belongs to exactly one. */
+type CatalogSection = "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "other";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
-type CatalogItem = { id: string; kind: string; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
+type CatalogItem = { id: string; kind: string; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: MaterialCatalogTab[] = ["overview", "summaries", "notes", "bibliography", "anki", "exams"];
+const tabs: MaterialCatalogTab[] = ["overview", "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
+const listSections: Exclude<CatalogSection, "other">[] = ["summaries", "notes", "slides", "compendiums", "bibliography"];
+const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
 export const GENERAL_MATERIAL_UNIT = "__general";
 
 export function normalizeMaterialUnitCode(value: string | null | undefined) {
   return String(value || "").trim().toLocaleUpperCase("pt-PT");
+}
+
+/** PowerPoints and compendiums come from other_format (migration 0076); loose .pptx files and titled compendiums are recognised too. */
+function catalogSection(item: CatalogItem): CatalogSection {
+  if (item.otherFormat === "compendium") return "compendiums";
+  if (item.otherFormat === "slides" || /\.pptx?$/i.test(item.fileName || "") || /presentation|powerpoint/i.test(item.mimeType || "")) return "slides";
+  if (item.kind === "bibliography") return "bibliography";
+  if (/comp[êe]ndio/i.test(item.title)) return "compendiums";
+  if (item.kind === "summary") return item.summaryFormat === "notes" ? "notes" : "summaries";
+  return "other";
 }
 
 function bibliographyFormat(item: CatalogItem): BibliographyFormat {
@@ -43,13 +57,15 @@ function bibliographyFormat(item: CatalogItem): BibliographyFormat {
  * Materials: the curricular unit is chosen first, then its summaries, bibliography,
  * Anki packages and exams follow the list → reading-card model.
  */
-export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange, units, submissionCounts }: {
+export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange, units, submissionCounts, examsPanel }: {
   activeTab: MaterialCatalogTab;
   onTabChange: (tab: MaterialCatalogTab) => void;
   unitCode: string;
   onUnitChange: (code: string) => void;
   units: MaterialUnitOption[];
   submissionCounts: Record<string, number>;
+  /** Exams list, owned by the library and rendered inside this card. */
+  examsPanel?: ReactNode;
 }) {
   const { t } = useI18n();
   const tabLabel = (tab: MaterialCatalogTab) => t(`community.materials.catalog.tab.${tab}` as "community.materials.catalog.tab.overview");
@@ -57,7 +73,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const [legacyResourceId] = useHashRecord("recurso", { scroll: false });
   const [legacyReadId] = useHashRecord("ler", { scroll: false });
   const router = useRouter();
-  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "original" | "verified" | "pending">("all"), [recommendedOnly, setRecommendedOnly] = useState(false), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential");
+  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "recommended" | "original" | "verified" | "pending">("all"), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential");
   const loadCatalog = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     setError("");
@@ -80,7 +96,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     const legacyId = legacyReadId || legacyResourceId;
     if (legacyId) router.replace(materialReaderHref(legacyId));
   }, [legacyReadId, legacyResourceId, router]);
-  useEffect(() => { setSearch(""); setLessonFilter(""); setVerificationFilter("all"); setRecommendedOnly(false); setFormatFilter("all"); }, [unitCode]);
+  useEffect(() => { setSearch(""); setLessonFilter(""); setVerificationFilter("all"); setFormatFilter("all"); }, [unitCode]);
 
   // The picker lists every active unit plus any unit that only exists in the catalogue.
   const unitOptions = useMemo(() => {
@@ -109,21 +125,18 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     return catalogCount + deckCount + (submissionCounts[code] || 0);
   }, [decks, items, submissionCounts]);
 
-  const kind = activeTab === "summaries" || activeTab === "notes" ? "summary" : activeTab === "bibliography" ? "bibliography" : "";
+  const listTab = (listSections as string[]).includes(activeTab);
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase("pt-PT");
     return unitItems.filter((item) => {
       const itemLessons = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
       const searchable = `${item.title} ${item.description || ""} ${item.unitCode || ""} ${item.source?.title || ""} ${item.source?.author || ""} ${item.pages?.note || ""}`.toLocaleLowerCase("pt-PT");
-      return (!kind || item.kind === kind) &&
-        (activeTab !== "summaries" || item.summaryFormat !== "notes") &&
-        (activeTab !== "notes" || item.summaryFormat === "notes") &&
+      return (!listTab || catalogSection(item) === activeTab) &&
         (!normalizedSearch || searchable.includes(normalizedSearch)) &&
         (!lessonFilter || itemLessons.includes(lessonFilter)) &&
-        (verificationFilter === "all" || item.verification === verificationFilter) &&
-        (!recommendedOnly || item.recommended);
+        (verificationFilter === "all" || (verificationFilter === "recommended" ? item.recommended : item.verification === verificationFilter));
     });
-  }, [activeTab, kind, lessonFilter, recommendedOnly, search, unitItems, verificationFilter]);
+  }, [activeTab, listTab, lessonFilter, search, unitItems, verificationFilter]);
   const formatCounts = useMemo(() => Object.fromEntries(formats.map((format) => [format, filtered.filter((item) => bibliographyFormat(item) === format).length])) as Record<BibliographyFormat, number>, [filtered]);
   const visible = useMemo(() => activeTab === "bibliography" && formatFilter !== "all" ? filtered.filter((item) => bibliographyFormat(item) === formatFilter) : filtered, [activeTab, filtered, formatFilter]);
   // Bibliography is read book by book: the complete work, then its excerpts and translations.
@@ -142,7 +155,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   // Pagination runs over the grouped order, then each page is regrouped by book.
   const [resourcePage, setResourcePage] = useState(1);
   const [unitPage, setUnitPage] = useState(1);
-  useEffect(() => { setResourcePage(1); }, [activeTab, unitCode, search, lessonFilter, verificationFilter, recommendedOnly, formatFilter]);
+  useEffect(() => { setResourcePage(1); }, [activeTab, unitCode, search, lessonFilter, verificationFilter, formatFilter]);
   useEffect(() => { setUnitPage(1); }, [unitSearch]);
   const orderedResources = useMemo(() => groups.flatMap((group) => group.items.map((item) => ({ group, item }))), [groups]);
   const currentResourcePage = clampPage(resourcePage, orderedResources.length, RESOURCE_PAGE_SIZE);
@@ -156,8 +169,12 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
     return result;
   }, [currentResourcePage, orderedResources]);
-  const stats = useMemo(() => ({ summaries: unitItems.filter((item) => item.kind === "summary" && item.summaryFormat !== "notes").length, notes: unitItems.filter((item) => item.kind === "summary" && item.summaryFormat === "notes").length, bibliography: unitItems.filter((item) => item.kind === "bibliography").length, decks: unitDecks.length }), [unitDecks.length, unitItems]);
-  const label = (item: CatalogItem) => item.kind === "summary" ? t(item.summaryFormat === "notes" ? "community.materials.catalog.tab.notes" : "community.materials.catalog.tab.summaries") : item.kind === "bibliography" ? t("community.materials.catalog.tab.bibliography") : item.kind === "anki" ? t("community.materials.catalog.tab.anki") : t("community.materials.catalog.tab.overview");
+  const stats = useMemo(() => {
+    const counts: Record<CatalogSection, number> = { summaries: 0, notes: 0, slides: 0, compendiums: 0, bibliography: 0, other: 0 };
+    for (const item of unitItems) counts[catalogSection(item)] += 1;
+    return { ...counts, anki: unitDecks.length };
+  }, [unitDecks.length, unitItems]);
+  const label = (item: CatalogItem) => { const section = catalogSection(item); return section === "other" ? t("community.materials.catalog.tab.overview") : tabLabel(section); };
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
@@ -224,7 +241,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   return <>
     <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
     <section className={styles.catalog} aria-label={unitTitle}>
-      <div className={styles.tabsRow}>
+      <div className={styles.head}>
         <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} />{unitTitle}</h2>
         <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
           {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>{tabLabel(tab)}</button>)}
@@ -234,22 +251,21 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <div id={`material-panel-${activeTab}`} role="tabpanel" aria-labelledby={`material-tab-${activeTab}`} tabIndex={-1}>
         {activeTab === "overview" && <>
           {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : <>
-            <div className={styles.overviewList}><button type="button" className={styles.overviewRow} onClick={() => onTabChange("summaries")}><FileText className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("summaries")}</strong></span><span className={styles.overviewCount}>{stats.summaries}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("notes")}><FileText className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("notes")}</strong></span><span className={styles.overviewCount}>{stats.notes}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("bibliography")}><BookOpen className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("bibliography")}</strong></span><span className={styles.overviewCount}>{stats.bibliography}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("anki")}><Package className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("anki")}</strong></span><span className={styles.overviewCount}>{stats.decks}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button></div>
+            <div className={styles.overviewList}>{([...listSections, "anki"] as const).map((section) => { const Icon = SECTION_ICON[section]; return <button key={section} type="button" className={styles.overviewRow} onClick={() => onTabChange(section)}><Icon className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel(section)}</strong></span><span className={styles.overviewCount}>{stats[section]}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button>; })}</div>
           </>}
         </>}
-        {(activeTab === "summaries" || activeTab === "notes" || activeTab === "bibliography") && <>
+        {listTab && <>
           <FilterBar label={t("community.materials.catalog.search")}>
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
-            {activeTab === "bibliography" && <FilterSelect label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={(value) => setFormatFilter(value as typeof formatFilter)} options={[{ value: "all", label: `${t("community.materials.catalog.format.all")} (${filtered.length})` }, ...formats.map((format) => ({ value: format, label: `${formatLabel(format)} (${formatCounts[format]})` }))]} />}
+            {activeTab === "bibliography" && <FilterSegmented label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={setFormatFilter} options={[{ value: "all", label: t("community.materials.catalog.format.all") }, ...formats.map((format) => ({ value: format, label: formatLabel(format), count: formatCounts[format] }))]} />}
             {unitLessons.length > 0 && <FilterSelect label={t("community.materials.catalog.lesson")} value={lessonFilter} onChange={setLessonFilter} defaultValue="" options={[{ value: "", label: t("community.materials.catalog.allLessons") }, ...unitLessons.map((lesson) => ({ value: lesson.code, label: `${lesson.code} · ${lesson.title}` }))]} />}
-            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, { value: "verified", label: t("community.materials.catalog.verified") }, { value: "original", label: t("community.materials.catalog.original") }, { value: "pending", label: t("community.materials.catalog.pending") }]} />
-            <FilterCheckbox label={t("community.materials.catalog.recommendedOnly")} checked={recommendedOnly} onChange={setRecommendedOnly} />
+            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, { value: "recommended", label: t("community.materials.catalog.recommendedOnly") }, { value: "verified", label: t("community.materials.catalog.verified") }, { value: "original", label: t("community.materials.catalog.original") }, { value: "pending", label: t("community.materials.catalog.pending") }]} />
           </FilterBar>
           <div className={styles.resourceList}>
             {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? pageGroups.map((group) => <div className={list.group} key={group.key || "other"}>
               {group.title && <h3 className={list.groupTitle}>{group.title}</h3>}
               <ul className={list.rows}>{group.items.map((item) => <li className={list.row} key={item.id} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
-                <span className={list.rowIcon} aria-hidden="true">{item.kind === "bibliography" ? <BookOpen /> : <FileText />}</span>
+                <span className={list.rowIcon} aria-hidden="true">{(() => { const Icon = SECTION_ICON[catalogSection(item)]; return <Icon />; })()}</span>
                 <div className={list.rowMain}>
                   <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink}`} href={materialReaderHref(item.id)} target="_blank" rel="noopener">{item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink}`} href={item.downloadUrl} download={item.fileName || true}>{item.title}</a> : <span className={list.titleLink}>{item.title}</span>}</h3>
                   <p className={list.rowMeta} title={resourceFacts(item)}>{resourceMeta(item)}</p>
@@ -281,6 +297,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
             </li>
           </ul>}
         </>}
+        {activeTab === "exams" && examsPanel}
       </div>
     </section>
   </>;

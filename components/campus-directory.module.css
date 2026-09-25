@@ -26,3 +26,75 @@
 @media (max-width: 560px) {
   .facts > div { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Weekly board: week navigator, then days × time slots (reads like the source timetables). */
+.weekBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.weekNav { display: flex; align-items: center; gap: var(--space-1); }
+.weekStep { display: grid; width: var(--control-height-sm); height: var(--control-height-sm); place-items: center; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); cursor: pointer; }
+.weekStep:hover { background: var(--color-surface-subtle); }
+.weekStep svg { width: 16px; height: 16px; }
+.weekLabel { min-width: 170px; padding: 0 var(--space-2); color: var(--color-text); font-size: var(--font-size-body-emphasis); text-align: center; }
+.weekToday { min-height: var(--control-height-sm); margin-left: var(--space-1); padding: 0 10px; border: 0; border-radius: var(--radius-control); color: var(--color-accent-text); background: var(--color-accent-soft); font: inherit; font-size: var(--font-size-small); font-weight: 750; cursor: pointer; }
+.weekBar :global(.filter-segmented) svg { width: 14px; height: 14px; }
+.weekStep:focus-visible, .weekToday:focus-visible, .chip:focus-visible, .roomSession:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+.board { display: grid; overflow-x: auto; }
+.boardHead, .boardRow { display: grid; grid-template-columns: 64px repeat(var(--board-days, 5), minmax(150px, 1fr)); }
+.boardHead { position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.dayHead { display: grid; gap: 1px; padding: var(--space-2) var(--space-2); border-left: 1px solid var(--color-border); }
+.dayHead strong { color: var(--color-text); font-size: var(--font-size-small); font-weight: 800; text-transform: capitalize; }
+.dayHead small { color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.dayHead[data-today] { box-shadow: inset 0 -2px 0 var(--color-accent); }
+.boardRow + .boardRow { border-top: 1px solid var(--color-border); }
+.slotHead { display: grid; align-content: start; gap: 1px; padding: var(--space-2); }
+.slotHead strong { color: var(--color-text); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
+.slotHead small { color: var(--color-text-muted); font-size: var(--font-size-caption); font-variant-numeric: tabular-nums; }
+.cell { display: grid; align-content: start; gap: 6px; min-width: 0; padding: var(--space-2); border-left: 1px solid var(--color-border); }
+.cellLabel { display: none; }
+
+.chip { display: grid; gap: 2px; min-width: 0; padding: 6px 8px; border: 1px solid var(--color-border); border-left: 3px solid var(--chip-accent, var(--color-border-strong)); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; text-align: left; cursor: pointer; }
+.chip:hover { border-color: var(--color-border-strong); background: var(--color-surface-subtle); }
+.chipTop { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.chipTop strong { overflow: hidden; font-size: var(--font-size-small); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.chipMeta { color: var(--color-text-muted); font-size: var(--font-size-caption); line-height: 1.35; }
+.chipNote { color: var(--color-accent-text); font-size: var(--font-size-caption); font-weight: 700; line-height: 1.35; }
+.tag { flex: none; padding: 1px 6px; border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface-muted); font-size: var(--font-size-caption); font-weight: 800; }
+.tag[data-kind="practical"] { color: var(--color-accent-text); background: var(--gold-soft); }
+.tag[data-kind="practical-2"] { color: #1d5f86; background: var(--blue-soft); }
+.tag[data-kind="mixed"] { color: var(--color-success-text); background: var(--green-soft); }
+.tag[data-kind="assessment"] { color: var(--color-danger-text); background: #fde9e6; }
+.chip[data-kind="practical"] { --chip-accent: var(--color-accent); }
+.chip[data-kind="practical-2"] { --chip-accent: #2679aa; }
+.chip[data-kind="mixed"] { --chip-accent: var(--color-success, #2f8a57); }
+.chip[data-kind="theory"] { --chip-accent: var(--color-text-muted); }
+.chip[data-kind="assessment"] { --chip-accent: var(--color-danger-text); }
+
+/* Per-room view: each room with its classes of the week. */
+.roomGroups { display: grid; }
+.roomGroup + .roomGroup { border-top: 1px solid var(--color-border); }
+.roomHead { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-5) var(--space-1); }
+.roomHead svg { width: 16px; height: 16px; color: var(--color-accent-text); }
+.roomHead h3 { margin: 0; color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 800; }
+.roomHead small { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.roomSessions { margin: 0; padding: 0 0 var(--space-2); list-style: none; }
+.roomSession { display: grid; grid-template-columns: 150px 52px minmax(0, 1fr); align-items: center; gap: var(--space-3); width: 100%; padding: 6px var(--space-5); border: 0; color: var(--color-text); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.roomSession:hover { background: var(--color-surface-subtle); }
+.roomWhen, .roomWhat { display: grid; gap: 1px; min-width: 0; }
+.roomWhen strong { font-size: var(--font-size-small); text-transform: capitalize; }
+.roomWhen small, .roomWhat small { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.roomWhat strong { font-size: var(--font-size-small); }
+.roomSession .tag { justify-self: start; }
+
+/* Phones: the board becomes a day-by-day list of the slots that have classes. */
+@media (max-width: 760px) {
+  .board { display: flex; flex-direction: column; overflow: visible; }
+  .boardHead, .slotHead { display: none; }
+  .boardRow { display: contents; }
+  .cell { border-left: 0; border-top: 1px solid var(--color-border); padding: var(--space-3); }
+  .cell[data-empty] { display: none; }
+  .cellLabel { display: block; color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .weekLabel { min-width: 0; }
+  .roomHead, .roomSession { padding-inline: var(--space-4); }
+  .roomSession { grid-template-columns: 96px 44px minmax(0, 1fr); gap: var(--space-2); }
+}
+:global(html[data-theme="forum"]) .chip[data-kind="practical"] { --chip-accent: #2679aa; }

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { AlertCircle, BookOpenCheck, BrainCircuit, CalendarDays, ChevronRight, ClipboardCheck, GraduationCap, Highlighter, Inbox, LayoutDashboard, Megaphone, RefreshCw, Star, Vote } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AppShell } from "@/components/app-shell";
 import { SurfaceHeader } from "@/components/surface-header";
 import { useAuth } from "@/components/auth-context";
+import { useModules } from "@/components/module-context";
 import { useI18n } from "@/components/i18n-context";
 import { materialReaderHref } from "@/lib/material-reader";
 import { UnitThumb } from "@/components/unit-thumb";
@@ -51,9 +52,12 @@ export function PersonalDashboard() {
   const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/dashboard/personal", { cache: "no-store" }), payload = await response.json().catch(() => ({})) as unknown; if (!response.ok) throw new Error(text(object(payload), "error", "message") || t("personalDashboard.loadError")); setData(normalise(payload)); } catch (cause) { setError(cause instanceof Error ? cause.message : t("personalDashboard.loadError")); } finally { setLoading(false); } }, [t]);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
   const firstName = user?.fullName?.trim().split(/\s+/)[0] || "";
+  // Cards and panels follow the modules: a disabled module disappears from the dashboard.
+  const { access, loading: modulesLoading } = useModules();
+  const on = (key: string) => access[key] === true;
   const summaries = [
-    { href: "/calendario", icon: CalendarDays, label: t("personalDashboard.summary.events"), value: data?.events.length || 0, help: t("personalDashboard.summary.eventsHelp"), tone: "gold" }, { href: "/inqueritos", icon: ClipboardCheck, label: t("personalDashboard.summary.polls"), value: data?.polls.length || 0, help: t("personalDashboard.summary.pollsHelp"), tone: "gold" }, { href: "/materiais", icon: Highlighter, label: t("personalDashboard.summary.materials"), value: data?.highlightTotal || 0, help: t("personalDashboard.summary.materialsHelp"), tone: "gold" }, { href: "/testes", icon: BrainCircuit, label: t("personalDashboard.summary.quizzes"), value: data?.completedQuizAttempts || 0, help: t("personalDashboard.summary.quizzesHelp"), tone: "gold" },
-  ];
+    { module: "calendar.events", href: "/calendario", icon: CalendarDays, label: t("personalDashboard.summary.events"), value: data?.events.length || 0, help: t("personalDashboard.summary.eventsHelp"), tone: "gold" }, { module: "polls.voting", href: "/inqueritos", icon: ClipboardCheck, label: t("personalDashboard.summary.polls"), value: data?.polls.length || 0, help: t("personalDashboard.summary.pollsHelp"), tone: "gold" }, { module: "materials.library", href: "/materiais", icon: Highlighter, label: t("personalDashboard.summary.materials"), value: data?.highlightTotal || 0, help: t("personalDashboard.summary.materialsHelp"), tone: "gold" }, { module: "quizzes.practice", href: "/testes", icon: BrainCircuit, label: t("personalDashboard.summary.quizzes"), value: data?.completedQuizAttempts || 0, help: t("personalDashboard.summary.quizzesHelp"), tone: "gold" },
+  ].filter((summary) => on(summary.module));
   const priorityLabel = (value: string) => {
     const normalized = value.trim().toLocaleLowerCase("en");
     if (normalized === "urgent") return t("notifications.priority.urgent");
@@ -81,10 +85,10 @@ export function PersonalDashboard() {
   };
   return <AppShell active="overview" breadcrumb="Dashboard"><div className={styles.dashboard}>
     <header className={styles.heading}><div className={styles.headingCopy}><span className={styles.headingIcon}><LayoutDashboard /></span><div><span className="eyebrow">{t("personalDashboard.eyebrow")}</span><h1>{firstName ? t("personalDashboard.greeting", { name: firstName }) : t("personalDashboard.title")}</h1></div></div></header>
-    {loading ? <div className={styles.panel}><RecordSkeleton label={t("personalDashboard.loading")} rows={4} /></div> : error ? <div className={`${styles.panel} ${styles.error}`} role="alert"><AlertCircle /><strong>{t("personalDashboard.loadError")}</strong><span>{error}</span><button className={styles.retry} type="button" onClick={() => void load()}><RefreshCw size={13} /> {t("personalDashboard.retry")}</button></div> : data && <><section className={styles.summaryGrid} aria-label={t("personalDashboard.eyebrow")}>{summaries.map(({ href, icon: Icon, label, value, help, tone }) => <Link href={href} className={styles.summaryCard} key={href} aria-label={`${label}: ${value}`}><span className={styles.summaryIcon} data-tone={tone} aria-hidden="true"><Icon /></span><span className={styles.summaryCopy}><span>{label}</span><strong>{value}</strong><small>{help}</small></span><ChevronRight className={styles.summaryArrow} aria-hidden="true" /></Link>)}</section><div className={styles.contentGrid}>
-<StudyPanel reading={data.reading} />{listPanel(t("personalDashboard.events.title"), t("personalDashboard.events.subtitle"), "/calendario", CalendarDays, data.events, "event")}
-{listPanel(t("personalDashboard.announcements.title"), t("personalDashboard.announcements.subtitle"), "/avisos", Megaphone, data.announcements, "announcement")}{listPanel(t("personalDashboard.polls.title"), t("personalDashboard.polls.subtitle"), "/inqueritos", Vote, data.polls, "poll")}
-{listPanel(t("personalDashboard.requests.title"), t("personalDashboard.requests.subtitle"), "/pedidos", Inbox, data.requests, "request")}{listPanel(t("personalDashboard.materials.title"), t("personalDashboard.materials.subtitle"), "/materiais", Star, data.materials, "material")}
+    {loading || modulesLoading ? <div className={styles.panel}><RecordSkeleton label={t("personalDashboard.loading")} rows={4} /></div> : error ? <div className={`${styles.panel} ${styles.error}`} role="alert"><AlertCircle /><strong>{t("personalDashboard.loadError")}</strong><span>{error}</span><button className={styles.retry} type="button" onClick={() => void load()}><RefreshCw size={13} /> {t("personalDashboard.retry")}</button></div> : data && <>{summaries.length > 0 && <section className={styles.summaryGrid} style={{ "--summary-columns": summaries.length } as CSSProperties} aria-label={t("personalDashboard.eyebrow")}>{summaries.map(({ href, icon: Icon, label, value, help, tone }) => <Link href={href} className={styles.summaryCard} key={href} aria-label={`${label}: ${value}`}><span className={styles.summaryIcon} data-tone={tone} aria-hidden="true"><Icon /></span><span className={styles.summaryCopy}><span>{label}</span><strong>{value}</strong><small>{help}</small></span><ChevronRight className={styles.summaryArrow} aria-hidden="true" /></Link>)}</section>}<div className={styles.contentGrid}>
+{(on("materials.library") || on("quizzes.learning")) && <StudyPanel reading={on("materials.library") ? data.reading : []} materials={on("materials.library")} learning={on("quizzes.learning")} />}{on("calendar.events") && listPanel(t("personalDashboard.events.title"), t("personalDashboard.events.subtitle"), "/calendario", CalendarDays, data.events, "event")}
+{on("announcements.feed") && listPanel(t("personalDashboard.announcements.title"), t("personalDashboard.announcements.subtitle"), "/avisos", Megaphone, data.announcements, "announcement")}{on("polls.voting") && listPanel(t("personalDashboard.polls.title"), t("personalDashboard.polls.subtitle"), "/inqueritos", Vote, data.polls, "poll")}
+{on("requests.submission") && listPanel(t("personalDashboard.requests.title"), t("personalDashboard.requests.subtitle"), "/pedidos", Inbox, data.requests, "request")}{on("materials.library") && listPanel(t("personalDashboard.materials.title"), t("personalDashboard.materials.subtitle"), "/materiais", Star, data.materials, "material")}
 </div></>}
   </div></AppShell>;
 }
@@ -94,22 +98,23 @@ function storedPage(id: string) {
 }
 
 /** What the student was studying: PDFs with highlights and interactive paths in progress. */
-function StudyPanel({ reading }: { reading: Reading[] }) {
+function StudyPanel({ reading, materials, learning }: { reading: Reading[]; materials: boolean; learning: boolean }) {
   const { t } = useI18n();
   const [modules, setModules] = useState<LearningModule[]>([]);
   const [pages, setPages] = useState<Record<string, number>>({});
   useEffect(() => {
+    if (!learning) return;
     const controller = new AbortController();
     fetch("/api/learning-modules", { cache: "no-store", signal: controller.signal })
       .then(async (response) => response.ok ? (await response.json() as { modules?: LearningModule[] }).modules ?? [] : [])
       .then((items) => setModules(items.filter((item) => item.progress?.status === "active").slice(0, 2)))
       .catch(() => undefined);
     return () => controller.abort();
-  }, []);
+  }, [learning]);
   useEffect(() => { void Promise.resolve().then(() => setPages(Object.fromEntries(reading.map((item) => [item.id, storedPage(item.id)])))); }, [reading]);
   const hasContent = reading.length > 0 || modules.length > 0;
   return <section className={styles.panel} data-kind="study" aria-labelledby="dashboard-study-title">
-    <SurfaceHeader className={styles.panelHeader} title={t("personalDashboard.study.title")} headingId="dashboard-study-title" actions={<Link className={styles.viewAll} href="/materiais">{t("personalDashboard.study.materials")}<ChevronRight aria-hidden="true" /></Link>} />
+    <SurfaceHeader className={styles.panelHeader} title={t("personalDashboard.study.title")} headingId="dashboard-study-title" actions={materials ? <Link className={styles.viewAll} href="/materiais">{t("personalDashboard.study.materials")}<ChevronRight aria-hidden="true" /></Link> : undefined} />
     {hasContent ? <div className={styles.list}>
       {reading.map((item) => <div className={styles.studyItem} key={item.id}>
         <UnitThumb code={item.unitCode} name={item.unitName} />
