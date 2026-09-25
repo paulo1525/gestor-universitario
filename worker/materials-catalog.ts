@@ -563,10 +563,10 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const ankiEnabled = await enabled("materials.anki");
   const [catalogRows, deckRows] = await Promise.all([
-    env.DB.prepare("SELECT m.id,m.material_kind,m.summary_format,m.bibliography_format,m.title,m.mime_type,m.file_name,m.storage_backend,m.storage_state,m.external_url,m.public_access,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
-    ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
+    env.DB.prepare("SELECT m.id,m.material_kind,m.summary_format,m.bibliography_format,m.title,m.mime_type,m.file_name,m.storage_backend,m.storage_state,m.external_url,m.public_access,m.byte_size,m.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
+    ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
   ]);
-  type Entry = { section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean };
+  type Entry = { section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
   type Unit = { key: string; code: string; name: string; year: number | null; semester: number | null; entries: Entry[] };
   const units = new Map<string, Unit>();
   const unitFor = (item: Record<string, unknown>) => {
@@ -582,11 +582,11 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   for (const raw of catalogRows.results) {
     const item = row(raw), id = String(item.id), external = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url) ? item.external_url : null;
     const href = external || `/api/material-catalog/${encodeURIComponent(id)}/${item.mime_type === "application/pdf" ? "view" : "download"}`;
-    add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download` });
+    add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download`, mime: String(item.mime_type || ""), size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
   for (const raw of deckRows.results) {
     const item = row(raw), id = String(item.id), download = `/api/material-anki/${encodeURIComponent(id)}/download`;
-    add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download });
+    add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download, mime: "application/apkg", size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
   const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked)) }));
   return json({ units: ordered, authenticated: Boolean(user), canManage: manager, drive: manager ? await driveSyncStatus(env) : undefined });
