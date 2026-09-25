@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
+import { driveConfigured, driveDownload, driveSyncStatus, isDriveKey, runDriveSync } from "@/worker/google-drive";
 
 export type MaterialsCatalogUser = {
   id: string;
@@ -13,7 +14,11 @@ export type MaterialsCatalogEnv = {
   DB: D1Database;
   MATERIALS_BUCKET?: R2Bucket;
   AUTH_RATE_LIMITER?: RateLimit;
+  GOOGLE_SERVICE_ACCOUNT_JSON?: string;
+  GOOGLE_DRIVE_FOLDER_ID?: string;
 };
+
+type WaitUntil = (promise: Promise<unknown>) => void;
 
 type ModuleChecker = (key: string) => Promise<boolean>;
 type ApiCard = {
@@ -391,6 +396,7 @@ async function download(request: Request, env: MaterialsCatalogEnv, id: string, 
   const denied = await anonymousDenied(request, env, user, item);
   if (denied) return denied;
   if (!item) return json({ error: "Material não encontrado." }, 404);
+  if (item.storage_state === "ready" && isDriveKey(item.storage_key)) return driveDownload(request, env, item.storage_key, String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este ficheiro está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material"), String(item.mime_type || "application/octet-stream"));
 }
@@ -402,6 +408,7 @@ async function viewPdf(request: Request, env: MaterialsCatalogEnv, id: string, u
   const denied = await anonymousDenied(request, env, user, item);
   if (denied) return denied;
   if (!item || item.mime_type !== "application/pdf") return json({ error: "PDF não encontrado." }, 404);
+  if (item.storage_state === "ready" && isDriveKey(item.storage_key)) return driveDownload(request, env, item.storage_key, String(item.file_name || "material.pdf"), "application/pdf", "inline");
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este PDF ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "material.pdf"), "application/pdf", "inline");
 }
@@ -582,16 +589,39 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download });
   }
   const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked)) }));
-  return json({ units: ordered, authenticated: Boolean(user), canManage: manager });
+  return json({ units: ordered, authenticated: Boolean(user), canManage: manager, drive: manager ? await driveSyncStatus(env) : undefined });
+}
+
+/** Starts a background Drive sync when the index is older than the sync interval (checked with one read). */
+async function refreshDriveInBackground(env: MaterialsCatalogEnv, waitUntil?: WaitUntil) {
+  if (!waitUntil || !driveConfigured(env)) return;
+  const row = await env.DB.prepare("SELECT last_started_at,last_status FROM drive_sync_state WHERE id='materials'").first<{ last_started_at: number; last_status: string }>().catch(() => null);
+  if (row && (row.last_status === "running" || Number(row.last_started_at) > Date.now() - 30 * 60 * 1000)) return;
+  waitUntil(runDriveSync(env).catch((reason) => console.error("drive_sync_failed", reason instanceof Error ? reason.message : reason)));
+}
+
+/** GET: sync status; POST: sync now. Managers only. */
+async function driveSyncRoute(request: Request, env: MaterialsCatalogEnv, user: MaterialsCatalogUser | null): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!isManager(user)) return json({ error: "Sem permissão." }, 403);
+  if (request.method === "GET") return json(await driveSyncStatus(env));
+  if (request.method !== "POST") return json({ error: "Operação não suportada." }, 405);
+  if (!driveConfigured(env)) return json({ error: "O Google Drive ainda não está configurado." }, 409);
+  const result = await runDriveSync(env, { force: true });
+  if (!result) return json({ error: "Já está a decorrer uma sincronização. Tenta daqui a pouco." }, 409);
+  await env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'drive_materials_synced',?,?)").bind(user.id, JSON.stringify(result), Date.now()).run();
+  return json({ ...result, status: await driveSyncStatus(env) }, result.ok ? 200 : 502);
 }
 
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
-export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker): Promise<Response> {
+export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker, waitUntil?: WaitUntil): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "") || "/";
+  if (path === "/api/drive-sync") return driveSyncRoute(request, env, user);
+  if (request.method === "GET" && (path === "/api/material-catalog" || path === "/api/public-materials")) await refreshDriveInBackground(env, waitUntil);
   if (path === "/api/material-catalog") return user ? catalog(request, env, url, user, enabled) : unauthenticated();
   if (path === "/api/material-anki") return user ? anki(request, env, url, user, enabled) : unauthenticated();
   if (path === "/api/public-materials") return publicMaterials(request, env, user, enabled);

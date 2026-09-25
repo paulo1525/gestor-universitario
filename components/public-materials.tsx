@@ -3,20 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Globe, House, Lock, LogIn, Search } from "lucide-react";
+import { Download, Globe, House, Lock, LogIn, RefreshCw, Search } from "lucide-react";
 import { AppToast, type ToastKind } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
+import { clampPage, Pagination } from "@/components/pagination";
 import { materialReaderHref } from "@/lib/material-reader";
 import styles from "@/components/useful-links-tree.module.css";
 
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
 const SKELETON_ROWS = [0, 1, 2, 3, 4];
+const MATERIALS_PAGE_SIZE = 15;
 
 type Section = "summaries" | "notes" | "bibliography" | "anki" | "other";
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
 type Entry = { section: Section; locked: boolean; more?: number; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean };
 type Unit = { key: string; code: string; name: string; entries: Entry[] };
-type State = { status: "loading" | "ready" | "unavailable"; units: Unit[]; authenticated: boolean; canManage: boolean };
+type Drive = { configured: boolean; lastFinishedAt: number | null; status: string; message: string; files: number };
+type State = { status: "loading" | "ready" | "unavailable"; units: Unit[]; authenticated: boolean; canManage: boolean; drive?: Drive };
 
 function normalize(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-PT");
@@ -53,8 +56,10 @@ export function PublicMaterials() {
   const [query, setQuery] = useState("");
   // The chosen subject lives in the address (?disciplina=NEURO) so a filtered link can be shared.
   const [discipline, setDiscipline] = useState(initialDiscipline);
+  const [page, setPage] = useState(1);
   const chooseDiscipline = (key: string) => {
     setDiscipline(key);
+    setPage(1);
     const url = new URL(window.location.href);
     if (key) url.searchParams.set("disciplina", key); else url.searchParams.delete("disciplina");
     window.history.replaceState(window.history.state, "", url);
@@ -64,8 +69,8 @@ export function PublicMaterials() {
     try {
       const response = await fetch("/api/public-materials", { cache: "no-store", credentials: "same-origin", signal });
       if (!response.ok) throw new Error(String(response.status));
-      const data = await response.json() as { units?: Unit[]; authenticated?: boolean; canManage?: boolean };
-      setState({ status: "ready", units: (data.units ?? []).filter((unit) => unit.entries.length), authenticated: data.authenticated === true, canManage: data.canManage === true });
+      const data = await response.json() as { units?: Unit[]; authenticated?: boolean; canManage?: boolean; drive?: Drive };
+      setState({ status: "ready", units: (data.units ?? []).filter((unit) => unit.entries.length), authenticated: data.authenticated === true, canManage: data.canManage === true, drive: data.drive });
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) setState((current) => ({ ...current, status: current.status === "ready" ? "ready" : "unavailable" }));
     }
@@ -101,6 +106,34 @@ export function PublicMaterials() {
     .filter((unit) => !discipline || unitKey(unit) === discipline)
     .map((unit) => ({ ...unit, entries: term ? unit.entries.filter((entry) => !entry.locked && normalize(`${entry.title ?? ""} ${t(`publicMaterials.section.${entry.section}` as "publicMaterials.section.summaries")} ${unit.code} ${unit.name}`).includes(term)) : unit.entries }))
     .filter((unit) => unit.entries.length), [discipline, state.units, t, term]);
+  // Pagination runs over rows (after collapsing redacted ones) across subjects and sections; titles repeat when a group continues.
+  const rows = useMemo(() => visibleUnits.flatMap((unit) => sectionsOf(unit.entries).flatMap(([section, entries]) => compactLocked(entries).map((entry) => ({ unit, section, entry })))), [visibleUnits]);
+  const currentPage = clampPage(page, rows.length, MATERIALS_PAGE_SIZE);
+  const pageUnits = useMemo(() => {
+    const result: Array<{ unit: Unit; sections: Array<[Section, Entry[]]> }> = [];
+    for (const row of rows.slice((currentPage - 1) * MATERIALS_PAGE_SIZE, currentPage * MATERIALS_PAGE_SIZE)) {
+      let group = result[result.length - 1];
+      if (!group || group.unit.key !== row.unit.key) { group = { unit: row.unit, sections: [] }; result.push(group); }
+      const last = group.sections[group.sections.length - 1];
+      if (last && last[0] === row.section) last[1].push(row.entry); else group.sections.push([row.section, [row.entry]]);
+    }
+    return result;
+  }, [currentPage, rows]);
+  const [syncing, setSyncing] = useState(false);
+  const syncDrive = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch("/api/drive-sync", { method: "POST" });
+      const data = await response.json().catch(() => ({})) as { error?: string; message?: string; files?: number };
+      if (!response.ok) throw new Error(data.error || data.message || t("publicMaterials.drive.error"));
+      setNotice({ kind: "success", message: t("publicMaterials.drive.done", { count: data.files ?? 0 }) });
+      await load();
+    } catch (error) {
+      setNotice({ kind: "error", message: error instanceof Error ? error.message : t("publicMaterials.drive.error") });
+    } finally {
+      setSyncing(false);
+    }
+  };
   const signInHref = `/login/?next=${encodeURIComponent(PUBLIC_MATERIALS_PATH)}`;
   const hasLocked = state.units.some((unit) => unit.entries.some((entry) => entry.locked));
   const sectionLabel = (section: Section) => t(`publicMaterials.section.${section}` as "publicMaterials.section.summaries");
@@ -124,6 +157,14 @@ export function PublicMaterials() {
 
         {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
 
+        {state.canManage && state.drive && <div className={styles.driveBar} role="status">
+          <span>
+            <strong>{t("publicMaterials.drive.title")}</strong>
+            <small>{!state.drive.configured ? t("publicMaterials.drive.notConfigured") : state.drive.status === "error" ? state.drive.message : state.drive.lastFinishedAt ? `${t("publicMaterials.drive.last", { date: new Date(Number(state.drive.lastFinishedAt)).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" }) })}${state.drive.message && state.drive.message !== "Sincronizado." ? ` · ${state.drive.message}` : ""}` : t("publicMaterials.drive.never")}</small>
+          </span>
+          {state.drive.configured && <button className={styles.signIn} type="button" onClick={() => void syncDrive()} disabled={syncing}><RefreshCw aria-hidden="true" />{syncing ? t("publicMaterials.drive.syncing") : t("publicMaterials.drive.sync")}</button>}
+        </div>}
+
         {state.status === "loading" ? (
           <div className={styles.list} aria-busy="true" aria-label={t("publicMaterials.title")}>
             {SKELETON_ROWS.map((row) => <span className={`${styles.row} ${styles.skeleton}`} key={row}><span className={styles.link}><span className={styles.chip} /><span className={styles.copy}><span className={styles.skeletonLine} /><span className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} /></span></span></span>)}
@@ -138,7 +179,7 @@ export function PublicMaterials() {
             <label className={styles.search}>
               <Search aria-hidden="true" />
               <span className="sr-only">{t("publicMaterials.search")}</span>
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("publicMaterials.searchPlaceholder")} />
+              <input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder={t("publicMaterials.searchPlaceholder")} />
             </label>
             {state.units.length > 1 && <div className={styles.disciplines} role="group" aria-label={t("publicMaterials.disciplines")}>
               <button type="button" aria-pressed={!discipline} onClick={() => chooseDiscipline("")}>{t("publicMaterials.allDisciplines")}</button>
@@ -146,14 +187,14 @@ export function PublicMaterials() {
             </div>}
           </div>
           {visibleUnits.length === 0 ? <p className={styles.message} role="status">{t("publicMaterials.noResults")}</p> : <div className={styles.groups}>
-            {visibleUnits.map((unit) => {
+            {pageUnits.map(({ unit, sections }) => {
               const label = unit.code ? `${unit.code} · ${unit.name}` : unit.name || t("publicMaterials.general");
               return <section className={styles.group} key={unit.key} aria-label={label}>
                 <h2 className={styles.groupLabel}>{label}</h2>
-                {sectionsOf(unit.entries).map(([section, entries]) => <div className={styles.subgroup} key={section}>
+                {sections.map(([section, entries]) => <div className={styles.subgroup} key={section}>
                 <h3 className={styles.subgroupLabel}>{sectionLabel(section)}</h3>
                 <ul className={styles.list}>
-                  {compactLocked(entries).map((entry, index) => entry.locked ? (
+                  {entries.map((entry, index) => entry.locked ? (
                     <li className={`${styles.row} ${styles.lockedRow}`} key={`locked-${index}`}>
                       <Link className={styles.link} href={signInHref}>
                         <span className={styles.chip} aria-hidden="true"><Lock /></span>
@@ -187,6 +228,7 @@ export function PublicMaterials() {
                 </div>)}
               </section>;
             })}
+            <div className={styles.pager}><Pagination page={currentPage} totalItems={rows.length} pageSize={MATERIALS_PAGE_SIZE} onChange={setPage} /></div>
           </div>}
           </>
         )}

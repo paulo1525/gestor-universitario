@@ -18,7 +18,7 @@ export type HubUser = {
   actorId?: string;
 };
 
-type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket; AUTH_RATE_LIMITER?: RateLimit };
+type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket; AUTH_RATE_LIMITER?: RateLimit; GOOGLE_SERVICE_ACCOUNT_JSON?: string; GOOGLE_DRIVE_FOLDER_ID?: string };
 type ModuleChecker = (key: string) => Promise<boolean>;
 
 const MATERIAL_MIMES = new Set([
@@ -1315,9 +1315,9 @@ export function isAcademicHubPath(pathname: string): boolean {
   return isMaterialsCatalogPath(path) || isMaterialUploadPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/requests/comments" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
-export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker, waitUntil?: (promise: Promise<unknown>) => void): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
-  if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled);
+  if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled, waitUntil);
   if (pathname === "/api/calendar-events") return calendar(request, env, url, user, enabled);
   if (pathname === "/api/calendar-subscription" || pathname === "/api/calendar-subscriptions") return calendarSubscription(request, env, url, user, enabled);
   if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);

@@ -300,3 +300,11 @@
 .subgroup { display: grid; gap: var(--space-2); }
 .subgroup + .subgroup { margin-top: var(--space-2); }
 .subgroupLabel { margin: 0; padding: 0 2px; color: var(--color-text-subtle); font-size: var(--font-size-caption); font-weight: 750; }
+.driveBar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); padding: 10px 12px; border: 1px dashed var(--color-border-strong); border-radius: var(--radius-panel); background: var(--color-surface); }
+.driveBar > span { display: grid; gap: 2px; min-width: 0; }
+.driveBar strong { font-size: var(--font-size-small); }
+.driveBar small { color: var(--color-text-muted); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
+.driveBar button { flex: 0 0 auto; cursor: pointer; }
+.driveBar button:disabled { opacity: .6; cursor: progress; }
+/* Shared pagination, without the panel band: these pages sit on the plain background. */
+.pager > nav { margin-top: var(--space-2); border: 0; background: transparent; }

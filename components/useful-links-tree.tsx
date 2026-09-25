@@ -8,12 +8,14 @@ import { AppToast, type ToastKind } from "@/components/app-toast";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useFloatingAction } from "@/components/floating-actions";
 import { useI18n } from "@/components/i18n-context";
+import { clampPage, Pagination } from "@/components/pagination";
 import { EMPTY_USEFUL_LINK_DRAFT, USEFUL_LINK_CATEGORIES, UsefulLinkEditor, type UsefulLinkDraft } from "@/components/useful-link-editor";
 import styles from "@/components/useful-links-tree.module.css";
 
 const FLOATING_CREATE_ICON = <Plus aria-hidden="true" />;
 const PRIORITY_ORDER: Record<string, number> = { urgent: 0, important: 1, normal: 2 };
 const SKELETON_ROWS = [0, 1, 2, 3, 4];
+const LINKS_PAGE_SIZE = 12;
 export const USEFUL_LINKS_PUBLIC_PATH = "/links-uteis/";
 
 type TreeLink = { id: string; title: string; url: string; description: string; category: string; priority: string; visibility: string; status: string; unitId: string | null; requiresLogin: boolean };
@@ -150,22 +152,39 @@ export function UsefulLinksTree() {
     }
   };
 
+  const { links: stateLinks, locked: stateLocked } = state;
   const groups = useMemo(() => {
     const byCategory = new Map<string, TreeLink[]>();
-    for (const item of state.links) {
+    for (const item of stateLinks) {
       const key = (USEFUL_LINK_CATEGORIES as readonly string[]).includes(item.category) ? item.category : "other";
       byCategory.set(key, [...(byCategory.get(key) ?? []), item]);
     }
     const lockedIn = (key: string) => key === "other"
-      ? Object.entries(state.locked).filter(([category]) => !(USEFUL_LINK_CATEGORIES as readonly string[]).includes(category) || category === "other").reduce((sum, [, count]) => sum + count, 0)
-      : state.locked[key] ?? 0;
+      ? Object.entries(stateLocked).filter(([category]) => !(USEFUL_LINK_CATEGORIES as readonly string[]).includes(category) || category === "other").reduce((sum, [, count]) => sum + count, 0)
+      : stateLocked[key] ?? 0;
     return USEFUL_LINK_CATEGORIES.filter((key) => byCategory.has(key) || lockedIn(key) > 0).map((key) => ({
       key,
       links: (byCategory.get(key) ?? []).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2)),
       locked: lockedIn(key),
     }));
-  }, [state.links, state.locked]);
+  }, [stateLinks, stateLocked]);
 
+  // Pagination runs over rows (links and redacted placeholders) across categories; a category title repeats when it continues on the next page.
+  const [page, setPage] = useState(1);
+  const rows = useMemo(() => groups.flatMap((group) => [
+    ...group.links.map((link) => ({ group: group.key, link, locked: -1 })),
+    ...Array.from({ length: group.locked }, (_, index) => ({ group: group.key, link: null as TreeLink | null, locked: index })),
+  ]), [groups]);
+  const currentPage = clampPage(page, rows.length, LINKS_PAGE_SIZE);
+  const pageGroups = useMemo(() => {
+    const result: Array<{ key: (typeof USEFUL_LINK_CATEGORIES)[number]; links: TreeLink[]; locked: number }> = [];
+    for (const row of rows.slice((currentPage - 1) * LINKS_PAGE_SIZE, currentPage * LINKS_PAGE_SIZE)) {
+      let group = result[result.length - 1];
+      if (!group || group.key !== row.group) { group = { key: row.group, links: [], locked: 0 }; result.push(group); }
+      if (row.link) group.links.push(row.link); else group.locked += 1;
+    }
+    return result;
+  }, [currentPage, rows]);
   const showLabels = groups.length > 1;
   const signInHref = `/login/?next=${encodeURIComponent(USEFUL_LINKS_PUBLIC_PATH)}`;
 
@@ -196,7 +215,7 @@ export function UsefulLinksTree() {
           <p className={styles.message}>{t("links.emptyNone")}</p>
         ) : (
           <div className={styles.groups}>
-            {groups.map((group) => (
+            {pageGroups.map((group) => (
               <section className={styles.group} key={group.key} aria-label={t(`links.category.${group.key}`)}>
                 {showLabels && <h2 className={styles.groupLabel}>{t(`links.category.${group.key}`)}</h2>}
                 <ul className={styles.list}>
@@ -237,6 +256,7 @@ export function UsefulLinksTree() {
                 </ul>
               </section>
             ))}
+            <div className={styles.pager}><Pagination page={currentPage} totalItems={rows.length} pageSize={LINKS_PAGE_SIZE} onChange={setPage} /></div>
           </div>
         )}
       </div>
