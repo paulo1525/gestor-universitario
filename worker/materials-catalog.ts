@@ -579,6 +579,9 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     // The redaction happens here, on the server: a locked entry carries only its section.
     unitFor(item).entries.push(user || isPublic ? { ...entry, locked: false, isPublic: manager ? isPublic : undefined } : { section: entry.section, locked: true });
   };
+  // Every active subject is a folder, even while it has no files yet (ordered by year, semester and name).
+  const unitRows = await env.DB.prepare("SELECT id AS unit_id,code AS unit_code,name AS unit_name,study_year,semester FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE").all();
+  for (const raw of unitRows.results) unitFor(row(raw));
   for (const raw of catalogRows.results) {
     const item = row(raw), id = String(item.id), external = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url) ? item.external_url : null;
     const href = external || `/api/material-catalog/${encodeURIComponent(id)}/${item.mime_type === "application/pdf" ? "view" : "download"}`;

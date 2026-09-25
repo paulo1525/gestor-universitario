@@ -15,6 +15,8 @@ const FILES_PAGE_SIZE = 10;
 
 type Section = "summaries" | "notes" | "bibliography" | "anki" | "other";
 const SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki", "other"];
+// Folders shown in every subject, even when empty; "Outros" only appears when it has files.
+const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
 type Entry = { section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
 type Unit = { key: string; code: string; name: string; entries: Entry[] };
@@ -70,7 +72,7 @@ export function PublicMaterials() {
       const response = await fetch("/api/public-materials", { cache: "no-store", credentials: "same-origin", signal });
       if (!response.ok) throw new Error(String(response.status));
       const data = await response.json() as { units?: Unit[]; authenticated?: boolean; canManage?: boolean; drive?: Drive };
-      setState({ status: "ready", units: (data.units ?? []).filter((unit) => unit.entries.length), authenticated: data.authenticated === true, canManage: data.canManage === true, drive: data.drive });
+      setState({ status: "ready", units: data.units ?? [], authenticated: data.authenticated === true, canManage: data.canManage === true, drive: data.drive });
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) setState((current) => ({ ...current, status: current.status === "ready" ? "ready" : "unavailable" }));
     }
@@ -129,7 +131,7 @@ export function PublicMaterials() {
 
   const sectionLabel = (section: Section) => t(`publicMaterials.section.${section}` as "publicMaterials.section.summaries");
   const unit = state.units.find((item) => unitKey(item) === place.unit) ?? null;
-  const section = unit && place.section && unit.entries.some((entry) => entry.section === place.section) ? place.section : "";
+  const section = unit && place.section ? place.section : "";
   const term = normalize(query.trim());
 
   // What the current view lists: search results across every folder, or the files of the open type folder.
@@ -200,7 +202,7 @@ export function PublicMaterials() {
           </ul>
         ) : !term && unit && !section ? (
           <ul className={styles.folders}>
-            {SECTIONS.filter((key) => unit.entries.some((entry) => entry.section === key)).map((key) => {
+            {SECTIONS.filter((key) => FIXED_SECTIONS.includes(key) || unit.entries.some((entry) => entry.section === key)).map((key) => {
               const entries = unit.entries.filter((entry) => entry.section === key);
               return <li key={key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(unit), section: key })}>
                 <Folder aria-hidden="true" />
@@ -209,7 +211,7 @@ export function PublicMaterials() {
             })}
           </ul>
         ) : files.length === 0 ? (
-          <p className={styles.message} role="status">{t("publicMaterials.noResults")}</p>
+          <p className={styles.message} role="status">{t(term ? "publicMaterials.noResults" : "publicMaterials.emptyFolder")}</p>
         ) : (
           <div className={styles.files}>
             <div className={styles.fileHead} aria-hidden="true"><span>{t("publicMaterials.column.name")}</span><span>{t("publicMaterials.column.size")}</span><span>{t("publicMaterials.column.date")}</span><span /></div>

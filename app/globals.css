@@ -39,7 +39,9 @@
      a future theme can change either area without selector-level overrides. */
   --sidebar-bg: #111111;
   --sidebar-surface: #191919;
-  --sidebar-surface-hover: rgb(246 201 69 / 16%);
+  /* Hover: matte yellow, quieter than the vivid gold of the active item; text turns dark on it. */
+  --sidebar-surface-hover: #d8c88f;
+  --sidebar-text-hover: #1d1b14;
   --sidebar-surface-control: #292929;
   --sidebar-border: #303030;
   --sidebar-text: #c9c9c9;
@@ -635,7 +637,7 @@ a { color: inherit; }
 .brand__name { font-family: var(--font-display), sans-serif; font-size: var(--font-size-body-emphasis); font-weight: 800; line-height: 1.25; }
 .brand__context { margin-top: 3px; color: var(--sidebar-text-muted); font-size: var(--font-size-caption); }
 .icon-button.sidebar__close { display: none !important; margin-left: auto; border-color: var(--sidebar-border); color: var(--sidebar-text-strong) !important; background: var(--sidebar-surface-control); }
-.icon-button.sidebar__close:hover { border-color: var(--sidebar-border); color: var(--sidebar-text-strong) !important; background: var(--sidebar-surface-hover); }
+.icon-button.sidebar__close:hover { border-color: var(--sidebar-border); color: var(--sidebar-text-hover, var(--sidebar-text-strong)) !important; background: var(--sidebar-surface-hover); }
 .sidebar__close > svg { width: 18px; height: 18px; }
 .sidebar__collapse { display: none; }
 .nav-list { display: flex; overflow-y: auto; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 14px; padding: 18px 4px 12px 0; overscroll-behavior-y: contain; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #4d4d4d transparent; -webkit-overflow-scrolling: touch; }
@@ -647,7 +649,7 @@ a { color: inherit; }
 .nav-label { padding: 0 12px 8px; color: var(--sidebar-label); font-size: var(--font-size-small); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .nav-list a { min-height: var(--control-height-lg); display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: var(--radius-control); color: var(--sidebar-text); font-size: var(--font-size-body-emphasis); font-weight: 600; text-decoration: none; }
 .nav-list a>svg{flex:0 0 auto}.nav-list a>span:not(.nav-count){display:grid;min-width:0;gap:2px}.nav-list a strong{overflow:hidden;color:inherit;font-size:var(--font-size-body-emphasis);line-height:1.15;text-overflow:ellipsis;white-space:nowrap}.nav-list a small{overflow:hidden;color:var(--color-text-subtle);font-size:var(--font-size-caption);font-weight:500;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}.nav-list a:hover small{color:#bdbdbd}.nav-list a.is-active small{color:var(--color-accent-text)}.nav-section--workflow{padding:12px 0;border-top:1px solid #2d2d2d;border-bottom:1px solid #2d2d2d}
-.nav-list a:hover { color: var(--sidebar-text-strong); background: var(--sidebar-surface-hover); }
+.nav-list a:hover { color: var(--sidebar-text-hover, var(--sidebar-text-strong)); background: var(--sidebar-surface-hover); }
 .nav-list a.is-active { color: var(--sidebar-active-text); background: var(--sidebar-active-bg); }
 .nav-count { min-width: 24px; margin-left: auto; padding: 2px 7px; border-radius: 999px; color: #d7d7d7; background: #303030; font-size: var(--font-size-small); text-align: center; }
 .is-active .nav-count { color: #fff; background: #111; }
@@ -1660,7 +1662,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   }
 
   .sidebar__collapse:hover {
-    color: var(--sidebar-text-strong);
+    color: var(--sidebar-text-hover, var(--sidebar-text-strong));
     background: var(--sidebar-surface-hover);
   }
 
