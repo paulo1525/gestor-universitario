@@ -47,6 +47,18 @@ function catalogSection(item: CatalogItem): CatalogSection {
   return "other";
 }
 
+/** Reading order: theory lessons (AT1, AT2… AT10), then practical ones (AP1…), then the rest by title with natural numbers. */
+const LESSON_PREFIX_ORDER = ["AT", "AP"];
+function lessonOrder(item: CatalogItem): [number, number] {
+  const code = item.lessonCodes?.[0] || item.lessonCode || item.title;
+  const match = /^\s*(A[TP])\s*0*(\d+)/i.exec(code || "");
+  return match ? [LESSON_PREFIX_ORDER.indexOf(match[1].toUpperCase()), Number(match[2])] : [LESSON_PREFIX_ORDER.length, 0];
+}
+function compareCatalogItems(a: CatalogItem, b: CatalogItem) {
+  const [prefixA, numberA] = lessonOrder(a), [prefixB, numberB] = lessonOrder(b);
+  return prefixA - prefixB || numberA - numberB || a.title.localeCompare(b.title, "pt-PT", { numeric: true, sensitivity: "base" });
+}
+
 function bibliographyFormat(item: CatalogItem): BibliographyFormat {
   if (item.bibliographyFormat && formats.includes(item.bibliographyFormat)) return item.bibliographyFormat;
   if (/tradu[çc][ãa]o|translation/i.test(`${item.title} ${item.description || ""}`)) return "translation";
@@ -135,7 +147,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
         (!normalizedSearch || searchable.includes(normalizedSearch)) &&
         (!lessonFilter || itemLessons.includes(lessonFilter)) &&
         (verificationFilter === "all" || (verificationFilter === "recommended" ? item.recommended : item.verification === verificationFilter));
-    });
+    }).sort(compareCatalogItems);
   }, [activeTab, listTab, lessonFilter, search, unitItems, verificationFilter]);
   const formatCounts = useMemo(() => Object.fromEntries(formats.map((format) => [format, filtered.filter((item) => bibliographyFormat(item) === format).length])) as Record<BibliographyFormat, number>, [filtered]);
   const visible = useMemo(() => activeTab === "bibliography" && formatFilter !== "all" ? filtered.filter((item) => bibliographyFormat(item) === formatFilter) : filtered, [activeTab, filtered, formatFilter]);
@@ -150,7 +162,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       map.get(key)!.items.push(item);
     }
     const order = (item: CatalogItem) => formats.indexOf(bibliographyFormat(item));
-    return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => order(a) - order(b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
+    return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => order(a) - order(b) || compareCatalogItems(a, b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
   }, [activeTab, t, visible]);
   // Pagination runs over the grouped order, then each page is regrouped by book.
   const [resourcePage, setResourcePage] = useState(1);
@@ -169,6 +181,21 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
     return result;
   }, [currentResourcePage, orderedResources]);
+  // Summaries and slides show the bibliography excerpts of the same lesson, so each lesson reads as one set.
+  const bibliographyByLesson = useMemo(() => {
+    const map = new Map<string, CatalogItem[]>();
+    for (const item of unitItems) {
+      if (catalogSection(item) !== "bibliography" || (!item.viewUrl && !item.downloadUrl)) continue;
+      for (const code of item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : []) map.set(code, [...(map.get(code) || []), item]);
+    }
+    return map;
+  }, [unitItems]);
+  const linkedBibliography = (item: CatalogItem) => {
+    const codes = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
+    return [...new Map(codes.flatMap((code) => bibliographyByLesson.get(code) || []).map((excerpt) => [excerpt.id, excerpt])).values()];
+  };
+  /** "Gray’s Anatomy · pp. 227–236": the book and the pages of the excerpt. */
+  const excerptLabel = (excerpt: CatalogItem) => [(excerpt.source?.title || excerpt.title).split(/[:—]/)[0].trim(), /pp?\.\s*[^—·]+$/.exec(excerpt.title)?.[0].trim()].filter(Boolean).join(" · ");
   const stats = useMemo(() => {
     const counts: Record<CatalogSection, number> = { summaries: 0, notes: 0, slides: 0, compendiums: 0, bibliography: 0, other: 0 };
     for (const item of unitItems) counts[catalogSection(item)] += 1;
@@ -269,6 +296,10 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
                 <div className={list.rowMain}>
                   <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink}`} href={materialReaderHref(item.id)} target="_blank" rel="noopener">{item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink}`} href={item.downloadUrl} download={item.fileName || true}>{item.title}</a> : <span className={list.titleLink}>{item.title}</span>}</h3>
                   <p className={list.rowMeta} title={resourceFacts(item)}>{resourceMeta(item)}</p>
+                  {activeTab !== "bibliography" && linkedBibliography(item).length > 0 && <p className={styles.linkedBibliography}>
+                    <BookOpen aria-hidden="true" /><span className={styles.linkedLabel}>{tabLabel("bibliography")}</span>
+                    {linkedBibliography(item).map((excerpt) => <a key={excerpt.id} className={styles.linkedChip} href={excerpt.viewUrl ? materialReaderHref(excerpt.id) : excerpt.downloadUrl || undefined} target={excerpt.viewUrl ? "_blank" : undefined} rel="noopener" download={excerpt.viewUrl ? undefined : excerpt.fileName || true} title={excerpt.title}>{excerptLabel(excerpt)}</a>)}
+                  </p>}
                 </div>
                 <span className={list.rowEnd}>
                   {(item.viewUrl || item.downloadUrl) && <span className={list.rowActions}>

@@ -100,3 +100,7 @@
   .fileMeta { display: none; }
 }
 @media (max-width: 420px) { .folders { grid-template-columns: 1fr; } }
+
+/* Subject folders grouped by semester. */
+.semesters { display: grid; gap: var(--space-5); }
+.semesterTitle { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
