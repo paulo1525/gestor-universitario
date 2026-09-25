@@ -33,7 +33,8 @@ const COLORS: Array<{ value: HighlightColor; label: string }> = [
 ];
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const PAGE_GAP = 16;
-const COMPACT_QUERY = "(max-width: 900px), (pointer: coarse)";
+// Only narrow screens get the bottom sheet; touch laptops keep the floating popover above the selection.
+const COMPACT_QUERY = "(max-width: 900px)";
 
 // The legacy build ships the polyfills (e.g. Map#getOrInsertComputed) that
 // Safari and older Chromium/Firefox releases still lack.

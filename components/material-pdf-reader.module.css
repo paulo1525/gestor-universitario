@@ -31,8 +31,8 @@
 .pageField input { width: 52px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-weight: 800; text-align: center; }
 .zoomSelect { height: 36px; min-width: 150px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-size: var(--font-size-body); font-weight: 750; }
 .pageField input:focus, .zoomSelect:focus, .search input:focus, .noteInput:focus { border-color: var(--color-focus); outline: 0; box-shadow: var(--focus-ring); }
-.toolButton { display: inline-flex; height: 36px; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--muted); background: var(--surface); font: inherit; font-size: var(--font-size-body); font-weight: 800; cursor: pointer; }
-.toolButton svg { width: 15px; height: 15px; }
+.toolButton { display: inline-flex; flex: none; height: 36px; align-items: center; gap: 6px; white-space: nowrap; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--muted); background: var(--surface); font: inherit; font-size: var(--font-size-body); font-weight: 800; cursor: pointer; }
+.toolButton svg { flex: none; width: 15px; height: 15px; }
 .toolButton[aria-pressed="true"] { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--line)); color: var(--color-accent-text); background: var(--color-accent-soft); }
 .swatches { display: flex; gap: 6px; margin-left: 4px; }
 .swatch { width: 24px; height: 24px; flex: none; padding: 0; border: 2px solid var(--surface); border-radius: 999px; background: var(--hl); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
@@ -160,7 +160,9 @@
 }
 /* Finger-sized targets (WCAG 2.5.8) on touch screens. */
 @media (pointer: coarse) {
-  .iconButton, .toolButton { width: 44px; height: 44px; }
+  .iconButton { width: 44px; height: 44px; }
+  /* Labelled tools keep their text: only the minimum size grows (touch laptops included). */
+  .toolButton { min-width: 44px; height: 44px; }
   .pageField input, .zoomSelect, .search input { height: 44px; }
   .swatch { width: 32px; height: 32px; }
   .itemSwatches { gap: 12px; }
