@@ -11,7 +11,7 @@ import { materialReaderHref } from "@/lib/material-reader";
 import styles from "@/components/public-materials.module.css";
 
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
-const FILES_PAGE_SIZE = 20;
+const FILES_PAGE_SIZE = 10;
 
 type Section = "summaries" | "notes" | "bibliography" | "anki" | "other";
 const SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki", "other"];
