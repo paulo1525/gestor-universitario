@@ -6,6 +6,7 @@ import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
+import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
 
 type HighlightColor = "gold" | "blue" | "green" | "rose";
 type Rect = { x: number; y: number; width: number; height: number };
@@ -93,11 +94,29 @@ function storageSet(key: string, value: string) {
   try { window.localStorage.setItem(key, value); } catch { /* private mode: position is not remembered */ }
 }
 
+const megabytes = (bytes: number) => (bytes / 1_048_576).toLocaleString("pt-PT", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** Download progress over the page placeholder: real percentage while bytes arrive, then a short "preparing" state. */
+function PdfLoadingBar({ progress, preparing }: { progress: PdfLoadProgress | null; preparing: boolean }) {
+  const known = Boolean(progress?.total);
+  const percent = progress?.phase === "cached" || preparing ? 100 : known ? Math.min(100, Math.round((progress!.loaded / progress!.total!) * 100)) : null;
+  const label = preparing ? (progress?.phase === "cached" ? "A abrir a partir deste dispositivo…" : "A preparar as páginas…")
+    : !progress || progress.phase === "checking" ? "A abrir o PDF…"
+    : progress.phase === "cached" ? "A abrir a partir deste dispositivo…"
+    : known ? `${megabytes(progress.loaded)} de ${megabytes(progress.total!)} MB` : `${megabytes(progress.loaded)} MB`;
+  return <div className={styles.loading} role="progressbar" aria-label="A carregar o PDF" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined} aria-valuetext={label}>
+    <div className={styles.loadingTrack} data-indeterminate={percent === null || undefined} data-preparing={preparing || undefined}><span style={{ width: `${percent ?? 35}%` }} /></div>
+    <p className={styles.loadingLabel}><span>{label}</span>{percent !== null && !preparing && <strong>{percent}%</strong>}</p>
+  </div>;
+}
+
 /** Full-page annotator (/materiais/ler/): the PDF on the left, highlights and notes on the right. */
 export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fileName, onClose }: { materialId: string; title: string; viewUrl: string; downloadUrl?: string | null; fileName?: string; onClose: () => void }) {
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [pdfjs, setPdfjs] = useState<PdfJs | null>(null);
   const [pdfError, setPdfError] = useState("");
+  const [loadProgress, setLoadProgress] = useState<PdfLoadProgress | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [baseSize, setBaseSize] = useState<PageSize | null>(null);
   const [pageSizes, setPageSizes] = useState<Record<number, PageSize>>({});
   const [zoom, setZoom] = useState<Zoom>(() => {
@@ -149,10 +168,19 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   useEffect(() => {
     let active = true;
     let loadingTask: ReturnType<PdfJs["getDocument"]> | undefined;
+    const controller = new AbortController();
+    setLoadProgress(null);
+    setPreparing(false);
+    // The file comes from this device's cache when unchanged (304), otherwise it downloads with progress.
+    const bytes = loadPdfBytes(viewUrl, (progress) => { if (active) setLoadProgress(progress); }, controller.signal);
     loadPdfJs().then(async (library) => {
       if (!active) return;
       setPdfjs(library);
-      loadingTask = library.getDocument({ url: viewUrl, withCredentials: true, disableRange: true, disableStream: true });
+      const data = await bytes;
+      if (!active) return;
+      setLoadProgress((current) => current && { ...current, phase: current.phase === "cached" ? "cached" : "downloading", loaded: current.total ?? current.loaded });
+      setPreparing(true);
+      loadingTask = library.getDocument({ data });
       const document = await loadingTask.promise;
       const first = await document.getPage(1);
       const size = first.getViewport({ scale: 1 });
@@ -160,9 +188,9 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       setBaseSize({ width: size.width, height: size.height });
       setPdfDocument(document);
     }).catch((reason) => {
-      if (active) setPdfError(reason instanceof Error && reason.message ? reason.message : "Não foi possível abrir o PDF.");
+      if (active && !(reason instanceof DOMException && reason.name === "AbortError")) setPdfError(reason instanceof Error && reason.message ? reason.message : "Não foi possível abrir o PDF.");
     });
-    return () => { active = false; void loadingTask?.destroy(); };
+    return () => { active = false; controller.abort(); void loadingTask?.destroy(); };
   }, [viewUrl]);
 
   useEffect(() => {
@@ -600,7 +628,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       <div className={styles.workspace}>
         <div ref={scrollerRef} className={styles.scroller} data-tool={tool} onScroll={() => { updateCurrentPage(); }} onPointerUp={() => window.setTimeout(captureSelection, 0)} onKeyUp={(event) => { if (event.shiftKey) captureSelection(); }}>
           {pdfError ? <div className={styles.pdfError} role="alert"><strong>Não foi possível abrir este PDF.</strong><span>{pdfError}</span><a className="button button--secondary button--compact" href={viewUrl} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />Abrir o PDF original</a></div>
-            : !pdfDocument || !pdfjs || !baseSize ? <div className={styles.pages} aria-busy="true"><div className={styles.pagePlaceholder} style={{ width: Math.min(760, Math.max(280, viewport.width - 48)), aspectRatio: "1 / 1.414" }} /></div>
+            : !pdfDocument || !pdfjs || !baseSize ? <div className={styles.pages} aria-busy="true"><div className={styles.pagePlaceholder} style={{ width: Math.min(760, Math.max(280, viewport.width - 48)), aspectRatio: "1 / 1.414" }}><PdfLoadingBar progress={loadProgress} preparing={preparing} /></div></div>
               : <div className={styles.pages}>
                 {(layout === "single" ? [Math.min(currentPage, numPages)] : Array.from({ length: numPages }, (_, index) => index + 1)).map((page) => {
                   const size = pageSizes[page] ?? baseSize;
