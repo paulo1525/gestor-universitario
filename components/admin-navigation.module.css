@@ -226,6 +226,27 @@
   background: var(--gold);
 }
 
+/* Item with a secondary link on the right (e.g. Materiais de estudo ↗ Materiais do ano). */
+.itemWithAction { position: relative; }
+.itemWithAction > .item { padding-right: 28px; }
+.itemAction {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--radius-control);
+  color: var(--sidebar-text);
+  opacity: .75;
+  transform: translateY(-50%);
+}
+.itemAction:hover { color: var(--sidebar-text-strong); background: var(--sidebar-surface-hover); opacity: 1; }
+.itemAction:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; opacity: 1; }
+.itemAction svg { width: 14px; height: 14px; }
+.itemWithAction:has(.active) .itemAction { color: var(--sidebar-active-text); }
+
 @media (min-width: 821px) {
   :global(.sidebar--collapsed) .navigation {
     gap: 4px;
@@ -268,6 +289,9 @@
     margin-inline: auto;
     padding: 0;
   }
+
+  :global(.sidebar--collapsed) .itemAction { display: none; }
+  :global(.sidebar--collapsed) .itemWithAction > .item { padding-right: 0; }
 
   :global(.sidebar--collapsed) .backLink > span,
   :global(.sidebar--collapsed) .overviewLink > span,
