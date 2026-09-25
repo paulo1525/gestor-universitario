@@ -224,12 +224,15 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
     values.push(String(association.code));
     lessonCodesByMaterial.set(materialId, values);
   }
+  // Stars are personal: only the signed-in user's favourites, and only while the favourites module is on.
+  const favoritesEnabled = await enabled("materials.favorites");
+  const favoriteIds = favoritesEnabled ? new Set((await env.DB.prepare("SELECT material_id FROM material_catalog_favorites WHERE user_id=?").bind(user.id).all()).results.map((item) => String(row(item).material_id))) : new Set<string>();
   const catalogItems = itemsResult.results.map((item) => {
     const material = row(item);
-    return mapCatalogItem(material, lessonCodesByMaterial.get(String(material.id)) || []);
+    return { ...mapCatalogItem(material, lessonCodesByMaterial.get(String(material.id)) || []), favorite: favoriteIds.has(String(material.id)) };
   });
   const decks = deckResult.results.map((item) => mapDeck(row(item), deckLessonsResult.results.map(row)));
-  return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
+  return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { favorites: favoritesEnabled, manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
 }
 
 /** One published material, for the annotator page (/materiais/ler/?id=…). */
@@ -619,9 +622,23 @@ async function driveSyncRoute(request: Request, env: MaterialsCatalogEnv, user: 
   return json({ ...result, status: await driveSyncStatus(env) }, result.ok ? 200 : 502);
 }
 
+/** Star or unstar one published catalogue material for the signed-in user (POST adds, DELETE removes). */
+async function catalogFavorite(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!await enabled("materials.catalog") || !await enabled("materials.favorites")) return disabled();
+  if (request.method !== "POST" && request.method !== "DELETE") return json({ error: "Operação não suportada." }, 405);
+  const materialId = text(id, 160);
+  if (request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM material_catalog_favorites WHERE user_id=? AND material_id=?").bind(user.id, materialId).run();
+    return json({ ok: true, favorite: false });
+  }
+  if (!await env.DB.prepare("SELECT id FROM material_catalog WHERE id=? AND publication_status='published'").bind(materialId).first()) return json({ error: "Material não encontrado." }, 404);
+  await env.DB.prepare("INSERT OR IGNORE INTO material_catalog_favorites(user_id,material_id,created_at) VALUES (?,?,?)").bind(user.id, materialId, Date.now()).run();
+  return json({ ok: true, favorite: true });
+}
+
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights|favorite))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker, waitUntil?: WaitUntil): Promise<Response> {
@@ -637,6 +654,8 @@ export async function handleMaterialsCatalogRoute(request: Request, env: Materia
   if (viewer) return viewPdf(request, env, decodeURIComponent(viewer[1]), user, enabled);
   const highlights = path.match(/^\/api\/material-catalog\/([^/]+)\/highlights$/);
   if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
+  const favorite = path.match(/^\/api\/material-catalog\/([^/]+)\/favorite$/);
+  if (favorite) return user ? catalogFavorite(request, env, decodeURIComponent(favorite[1]), user, enabled) : unauthenticated();
   const single = path.match(/^\/api\/material-catalog\/([^/]+)$/);
   if (single) return user ? catalogItem(request, env, decodeURIComponent(single[1]), enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);
