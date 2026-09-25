@@ -48,7 +48,11 @@
 .pages { display: grid; justify-items: center; gap: 16px; padding: 16px 24px 40px; }
 .page { position: relative; flex: none; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 18%), 0 6px 18px rgb(0 0 0 / 8%); }
 .page:not([data-rendered]) { background: linear-gradient(#fff, #fff) padding-box, repeating-linear-gradient(180deg, transparent 0 28px, rgb(0 0 0 / 4%) 28px 38px) content-box; }
-.pager { display: flex; align-items: center; justify-content: center; gap: var(--space-4); color: var(--muted); font-size: var(--font-size-body); font-weight: 800; font-variant-numeric: tabular-nums; }
+/* Page-by-page navigation floats at the bottom of the reading area, over the page. */
+.pager { position: sticky; bottom: var(--space-4); z-index: 15; display: flex; width: max-content; max-width: calc(100% - 16px); align-items: center; justify-content: center; gap: var(--space-1); margin: var(--space-3) auto 0; padding: 4px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: 0 8px 24px rgb(0 0 0 / 16%); backdrop-filter: blur(6px); font-size: var(--font-size-body); font-weight: 800; font-variant-numeric: tabular-nums; }
+.pager > span { padding: 0 var(--space-2); white-space: nowrap; }
+.pager :global(.button) { border-color: transparent; border-radius: 999px; background: transparent; box-shadow: none; }
+.pager :global(.button:hover:not(:disabled)) { background: var(--color-surface-subtle); }
 .pagePlaceholder { max-width: 100%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 18%); }
 .canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .highlightLayer { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
