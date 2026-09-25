@@ -1243,7 +1243,7 @@ async function personalDashboard(env: HubEnv, user: HubUser | null, enabled: Mod
     : { results: [] as unknown[] };
   const recentReading = readingResult.results.map((item) => { const row = rowObject(item); return { id: row.material_id, title: row.title, kind: row.material_kind, unitCode: row.unit_code, unitName: row.unit_name, highlightCount: Number(row.highlight_count || 0), lastActivity: row.last_activity }; });
   const highlightTotal = readingEnabled
-    ? Number((await env.DB.prepare("SELECT COUNT(*) AS n FROM material_pdf_highlights WHERE user_id=?").bind(user.id).first<{ n: number }>().catch(() => null))?.n || 0)
+    ? Number((await env.DB.prepare("SELECT COUNT(*) AS n FROM material_pdf_highlights h JOIN material_catalog m ON m.id=h.material_id AND m.publication_status='published' WHERE h.user_id=?").bind(user.id).first<{ n: number }>().catch(() => null))?.n || 0)
     : 0;
   return json({ generatedAt: now, recentReading, highlightTotal, unreadNotifications: notificationItems.length, completedQuizAttempts, summary: { unreadNotifications: notificationItems.length, upcomingEvents: upcomingEvents.length, openRequests: requestItems.length, activePolls: pendingPolls.length, favoriteMaterials: favoriteMaterials.length, completedQuizAttempts }, notifications: notificationItems.slice(0, 8), upcomingEvents, requests: requestItems, recentRequests: requestItems, polls: pendingPolls, activePolls: pendingPolls, favoriteMaterials, urgentAnnouncements: announcementItems, announcements: announcementItems, recentAnnouncements: announcementItems, classId, classInfo: classSummary, classSummary, preferences: classPreferences, classPreferences, management: isCommission(user) });
 }
