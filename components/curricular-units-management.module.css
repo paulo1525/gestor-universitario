@@ -190,4 +190,7 @@
   .manageArea { margin-inline: calc(var(--space-4) * -1); padding-inline: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) { .row { transition: none; } }
-.rows .row { grid-template-columns: auto minmax(0, 1fr); }
+/* Fixed code column: every unit name starts on the same axis, whatever the code length. */
+.rows .row { grid-template-columns: 104px minmax(0, 1fr); }
+.rows .code { justify-self: stretch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .rows .row { grid-template-columns: 84px minmax(0, 1fr); } }
