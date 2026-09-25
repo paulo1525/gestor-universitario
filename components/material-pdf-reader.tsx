@@ -3,7 +3,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
@@ -19,11 +19,11 @@ type Highlight = Rect & {
   note?: string | null;
   createdAt?: number;
 };
-type Tool = "text" | "area";
+type Tool = "none" | "text" | "area";
 type Layout = "scroll" | "single";
 type Zoom = "width" | "page" | number;
 type PageSize = { width: number; height: number };
-type PendingSelection = { page: number; rects: Rect[]; text: string; anchor: { left: number; top: number } };
+type PendingSelection = { page: number; rects: Rect[]; text: string; color: HighlightColor };
 type PdfJs = typeof import("pdfjs-dist");
 
 const COLORS: Array<{ value: HighlightColor; label: string }> = [
@@ -34,7 +34,7 @@ const COLORS: Array<{ value: HighlightColor; label: string }> = [
 ];
 const ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const PAGE_GAP = 16;
-// Only narrow screens get the bottom sheet; touch laptops keep the floating popover above the selection.
+// Narrow screens use the compact reader layout.
 const COMPACT_QUERY = "(max-width: 900px)";
 
 // The legacy build ships the polyfills (e.g. Map#getOrInsertComputed) that
@@ -126,7 +126,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
-  const [tool, setTool] = useState<Tool>("text");
+  const [tool, setTool] = useState<Tool>("none");
   // Continuous scroll or one page at a time; the choice is remembered.
   const [layout, setLayout] = useState<Layout>(() => typeof window !== "undefined" && storageGet("gu-pdf-layout") === "single" ? "single" : "scroll");
   const [color, setColor] = useState<HighlightColor>("gold");
@@ -140,7 +140,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [removing, setRemoving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 900px)").matches);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
-  // Touch screens and narrow windows get the bottom action sheet and larger targets.
+  // Narrow windows use the compact sidebar and larger touch targets.
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches);
   // Polite announcements for screen readers (selection ready, highlight saved or removed).
   const [announcement, setAnnouncement] = useState("");
@@ -362,18 +362,20 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     }
   };
 
-  // Text selection inside a page becomes a pending highlight with a colour popover.
+  // Text selection is only highlighted after the user activates a highlight mode.
+  // Once active, the selected colour is applied immediately; the temporary mark
+  // keeps the feedback instant while the annotation is persisted.
   const captureSelection = useCallback(() => {
     if (tool !== "text") return;
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) { setPending(null); return; }
+    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
     const range = selection.getRangeAt(0);
     const startElement = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
     const endElement = range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
     const pageElement = startElement?.closest<HTMLElement>("[data-pdf-page]");
     const scroller = scrollerRef.current;
     // Only selections that start and end on the same PDF page become highlights.
-    if (!pageElement || !scroller || !scroller.contains(pageElement) || endElement?.closest("[data-pdf-page]") !== pageElement) { setPending(null); return; }
+    if (!pageElement || !scroller || !scroller.contains(pageElement) || endElement?.closest("[data-pdf-page]") !== pageElement) return;
     const page = Number(pageElement.dataset.pdfPage);
     const bounds = pageElement.getBoundingClientRect();
     const rects = mergeLineRects(Array.from(range.getClientRects())
@@ -381,26 +383,19 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       .filter((rect) => rect.width > 1 && rect.height > 1 && rect.height < bounds.height * 0.1 && rect.bottom > bounds.top && rect.top < bounds.bottom)
       .map((rect) => ({ x: (rect.left - bounds.left) / bounds.width, y: (rect.top - bounds.top) / bounds.height, width: rect.width / bounds.width, height: rect.height / bounds.height })));
     const text = selection.toString().replace(/\s+/g, " ").trim();
-    if (!rects.length || !text) { setPending(null); return; }
-    const last = range.getClientRects()[range.getClientRects().length - 1] ?? bounds;
-    const host = scroller.getBoundingClientRect();
-    const half = Math.min(120, host.width / 2 - 8);
-    setAnnouncement("Texto selecionado. Escolhe uma cor para realçar.");
-    setPending({ page, rects, text: text.slice(0, 2000), anchor: { left: Math.min(host.width - half, Math.max(half, last.right - host.left)), top: last.bottom - host.top + scroller.scrollTop + 8 } });
-  }, [tool]);
-
-  const commitPending = useCallback(async (highlightColor: HighlightColor) => {
-    if (!pending) return;
-    setColor(highlightColor);
-    const selection = pending;
-    setPending(null);
-    window.getSelection()?.removeAllRanges();
-    await createHighlight(selection.page, selection.rects, selection.text, highlightColor);
+    if (!rects.length || !text) return;
+    const next: PendingSelection = { page, rects, text: text.slice(0, 2000), color };
+    setPending(next);
+    selection.removeAllRanges();
+    setAnnouncement(`A guardar realce na página ${page}.`);
     setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches);
-  }, [createHighlight, pending]);
+    void createHighlight(next.page, next.rects, next.text, next.color).finally(() => {
+      setPending((current) => current === next ? null : current);
+    });
+  }, [color, createHighlight, tool]);
 
   // Touch selections are adjusted with the system handles, which fire no pointerup on the page:
-  // once the selection settles it becomes a pending highlight too. Mouse drags still wait for pointerup.
+  // once the selection settles it becomes a highlight too. Mouse drags still wait for pointerup.
   useEffect(() => {
     let timer = 0, pointerDown = false;
     const onDown = () => { pointerDown = true; };
@@ -420,7 +415,6 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     return () => { window.clearTimeout(timer); document.removeEventListener("selectionchange", onChange); window.removeEventListener("pointerdown", onDown, true); window.removeEventListener("pointerup", onUp, true); window.removeEventListener("pointercancel", onUp, true); };
   }, [captureSelection]);
 
-  const cancelPending = useCallback(() => { setPending(null); window.getSelection()?.removeAllRanges(); }, []);
 
   const selectHighlight = useCallback((highlight: Highlight, scroll = true) => {
     setActiveId(highlight.id);
@@ -476,7 +470,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       const target = event.target as HTMLElement | null;
       const typing = Boolean(target?.closest("input, textarea, [contenteditable='true']"));
       if (event.key === "Escape") {
-        if (pending) { setPending(null); window.getSelection()?.removeAllRanges(); }
+        setTool("none");
+        window.getSelection()?.removeAllRanges();
         return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); searchRef.current?.focus(); searchRef.current?.select(); return; }
@@ -487,13 +482,13 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       if (event.key === "+" || event.key === "=") stepZoom(1);
       else if (event.key === "-") stepZoom(-1);
       else if (event.key === "0") changeZoom("width");
-      else if (event.key.toLowerCase() === "h") setTool((current) => current === "text" ? "area" : "text");
+      else if (event.key.toLowerCase() === "h") setTool((current) => current === "area" ? "none" : "area");
       else if (event.key === "ArrowRight" || event.key === "n") scrollToPage(Math.min(numPages, currentPage + 1));
       else if (event.key === "ArrowLeft" || event.key === "p") scrollToPage(Math.max(1, currentPage - 1));
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [changeZoom, currentPage, numPages, pending, removeTarget, scrollToPage, stepZoom]);
+  }, [changeZoom, currentPage, numPages, removeTarget, scrollToPage, stepZoom]);
 
   // Same technique as the pdf.js viewer: while selecting, the page-sized
   // `endOfContent` element follows the selection end so dragging across the
@@ -609,10 +604,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
           <button className={styles.toolButton} type="button" aria-pressed={layout === "single"} onClick={() => changeLayout("single")} title="Uma página de cada vez"><RectangleVertical /><span className={styles.toolLabel}>Página a página</span></button>
         </div>
         <div className={styles.group} data-group="mark" role="group" aria-label="Modo de realce">
-          <button className={styles.toolButton} type="button" aria-pressed={tool === "text"} onClick={() => setTool("text")} title="Selecionar texto para realçar"><MousePointer2 /><span className={styles.toolLabel}>Texto</span></button>
-          <button className={styles.toolButton} type="button" aria-pressed={tool === "area"} onClick={() => { setTool("area"); setPending(null); setAnnouncement("Modo zona: arrasta sobre a página para marcar uma zona."); }} title="Desenhar uma zona (H)"><SquareDashed /><span className={styles.toolLabel}>Zona</span></button>
+          <button className={styles.toolButton} type="button" aria-pressed={tool === "text"} onClick={() => { const next = tool === "text" ? "none" : "text"; setTool(next); setPending(null); setAnnouncement(next === "text" ? "Realce de texto ativo. Seleciona texto para aplicar a cor escolhida." : "Realce desativado."); }} title="Ativar ou desativar realce de texto"><MousePointer2 /><span className={styles.toolLabel}>Texto</span></button>
+          <button className={styles.toolButton} type="button" aria-pressed={tool === "area"} onClick={() => { const next = tool === "area" ? "none" : "area"; setTool(next); setPending(null); setAnnouncement(next === "area" ? "Modo zona: arrasta sobre a página para marcar uma zona." : "Realce desativado."); }} title="Ativar ou desativar realce de zona (H)"><SquareDashed /><span className={styles.toolLabel}>Zona</span></button>
           <div className={styles.swatches} role="radiogroup" aria-label="Cor do realce">
-            {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatch} data-color={entry.value} aria-checked={color === entry.value} aria-label={entry.label} title={entry.label} onClick={() => setColor(entry.value)} />)}
+            {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatch} data-color={entry.value} aria-checked={tool !== "none" && color === entry.value} aria-label={entry.label} title={entry.label} onClick={() => { setColor(entry.value); if (tool === "none") setTool("text"); setAnnouncement(`Realce ${entry.label.toLowerCase()} ativo.`); }} />)}
           </div>
         </div>
         </div>
@@ -648,6 +643,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
                     color={color}
                     searchTerm={searchState.query}
                     pendingRects={pending?.page === page ? pending.rects : null}
+                    pendingColor={pending?.page === page ? pending.color : null}
                     onSelectHighlight={(highlight) => selectHighlight(highlight, false)}
                     onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches); }}
                   />;
@@ -658,18 +654,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
                   <button className="button button--secondary button--compact" type="button" onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage >= numPages}>Seguinte<ChevronRight aria-hidden="true" /></button>
                 </nav>}
               </div>}
-          {pending && <div className={styles.selectionPopover} data-compact={compact || undefined} style={compact ? undefined : { left: pending.anchor.left, top: pending.anchor.top }} role="group" aria-label="Realçar seleção" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
-            {compact && <p className={styles.popoverExcerpt}>{pending.text}</p>}
-            <div className={styles.popoverColors}>
-              {COLORS.map((entry) => <button key={entry.value} type="button" className={compact ? styles.colorChoice : styles.swatch} data-color={entry.value} aria-label={`Realçar a ${entry.label.toLowerCase()}`} title={`Realçar a ${entry.label.toLowerCase()}`} onClick={() => void commitPending(entry.value)}>{compact && <><span className={styles.dot} data-color={entry.value} aria-hidden="true" />{entry.label}</>}</button>)}
-            </div>
-            <span className={styles.popoverDivider} aria-hidden="true" />
-            <div className={styles.popoverActions}>
-              <button type="button" className={styles.popoverAction} onClick={() => { void navigator.clipboard?.writeText(pending.text); setPending(null); setAnnouncement("Texto copiado."); }}><Copy aria-hidden="true" />Copiar</button>
-              {compact && <button type="button" className={styles.popoverAction} onClick={cancelPending}><X aria-hidden="true" />Cancelar</button>}
-            </div>
-          </div>}
-          {tool === "area" && <p className={styles.toolHint}>Arrasta sobre a página para marcar uma zona. Toca em <strong>Texto</strong> para voltar a deslocar.</p>}
+          {tool === "area" && <p className={styles.toolHint}>Arrasta sobre a página para marcar uma zona. Toca novamente em <strong>Zona</strong> ou prime Esc para sair.</p>}
           {saving && <span className={styles.saving} aria-hidden="true">A guardar realce</span>}
           <p className={styles.srOnly} role="status" aria-live="polite">{saving ? "A guardar realce…" : announcement}</p>
         </div>
@@ -688,7 +673,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
           {error && <p className={styles.error} role="alert">{error}<button type="button" onClick={() => setError("")} aria-label="Fechar aviso"><X /></button></p>}
           <div className={styles.highlightList}>
             {highlightsLoading ? <div className={styles.listSkeleton} aria-busy="true"><span /><span /><span /></div>
-              : !listed.length ? <div className={styles.emptyList}><Highlighter aria-hidden="true" /><strong>{highlights.length ? "Sem realces nesta cor" : "Ainda sem realces"}</strong><span>{highlights.length ? "" : "Seleciona texto no PDF e escolhe uma cor."}</span></div>
+              : !listed.length ? <div className={styles.emptyList}><Highlighter aria-hidden="true" /><strong>{highlights.length ? "Sem realces nesta cor" : "Ainda sem realces"}</strong><span>{highlights.length ? "" : "Ativa uma cor de realce e seleciona texto no PDF."}</span></div>
                 : listedGroups.map(([page, items]) => <section key={page} className={styles.pageGroup}>
                   <button type="button" className={styles.pageGroupTitle} onClick={() => scrollToPage(page)}>Página {page}<span>{items.length}</span></button>
                   {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onColor={(value) => void updateHighlight(highlight, { color: value })} onNote={(value) => void updateHighlight(highlight, { note: value })} onRemove={() => setRemoveTarget(highlight)} />)}
@@ -742,12 +727,13 @@ type PdfPageProps = {
   color: HighlightColor;
   searchTerm: string;
   pendingRects: Rect[] | null;
+  pendingColor: HighlightColor | null;
   onSelectHighlight: (highlight: Highlight) => void;
   onDrawArea: (rect: Rect) => void;
 };
 
 /** One page: canvas + selectable text layer + highlights. Renders only near the viewport. */
-const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimatedSize, onSize, registerRef, scrollRoot, highlights, activeId, tool, color, searchTerm, pendingRects, onSelectHighlight, onDrawArea }: PdfPageProps) {
+const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimatedSize, onSize, registerRef, scrollRoot, highlights, activeId, tool, color, searchTerm, pendingRects, pendingColor, onSelectHighlight, onDrawArea }: PdfPageProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -826,7 +812,7 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
     style={{ width, height, "--total-scale-factor": scale, "--scale-round-x": "1px", "--scale-round-y": "1px" } as CSSProperties}
     onClick={(event) => {
       // Highlights never block text selection; a plain click on one selects it.
-      if (tool !== "text" || !window.getSelection()?.isCollapsed) return;
+      if (tool === "area" || !window.getSelection()?.isCollapsed) return;
       const bounds = event.currentTarget.getBoundingClientRect();
       const x = (event.clientX - bounds.left) / bounds.width, y = (event.clientY - bounds.top) / bounds.height;
       const hit = [...highlights].reverse().find((highlight) => highlightRects(highlight).some((rect) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height));
@@ -837,7 +823,7 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
     <div ref={textRef} className={`textLayer ${styles.textLayer}`} aria-label={`Texto da página ${page}`} onPointerDown={(event) => event.currentTarget.classList.add("selecting")} />
     <div className={styles.highlightLayer} aria-hidden="true">
       {highlights.flatMap((highlight) => highlightRects(highlight).map((rect, index) => <span key={`${highlight.id}-${index}`} className={styles.mark} data-color={highlight.color} data-active={activeId === highlight.id || undefined} style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />))}
-      {pendingRects?.map((rect, index) => <span key={`pending-${index}`} className={styles.mark} data-color={color} data-pending style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />)}
+      {pendingRects?.map((rect, index) => <span key={`pending-${index}`} className={styles.mark} data-color={pendingColor ?? color} data-pending style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />)}
     </div>
     {tool === "area" && <div
       className={styles.drawLayer}
