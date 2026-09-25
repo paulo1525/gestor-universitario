@@ -41,6 +41,7 @@ html[data-theme="forum"] {
   --sidebar-bg: #17334f;
   --sidebar-surface: #1c3d5d;
   --sidebar-surface-hover: #244d73;
+  --sidebar-text-hover: #ffffff;
   --sidebar-surface-control: #214566;
   --sidebar-border: #315778;
   --sidebar-text: #c8d9e8;

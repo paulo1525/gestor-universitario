@@ -14,6 +14,7 @@ import {
   BookOpenCheck,
   Check,
   Download,
+  ExternalLink,
   FileText,
   FolderOpen,
   Image as ImageIcon,
@@ -50,6 +51,7 @@ import { RecordSkeleton, initials, recordHref, useHashRecord } from "@/component
 import { richTextPlainText } from "@/lib/announcement-content";
 
 const FLOATING_CREATE_ICON = <Pencil aria-hidden="true" />;
+const FLOATING_PUBLIC_ICON = <ExternalLink aria-hidden="true" />;
 const FLOATING_APPROVE_ICON = <Check aria-hidden="true" />;
 const FLOATING_REJECT_ICON = <X aria-hidden="true" />;
 const FLOATING_VERSION_ICON = <UploadCloud aria-hidden="true" />;
@@ -584,6 +586,8 @@ export function MaterialLibrary() {
   };
   const openItem = openId ? materials.find((item) => item.id === openId) ?? null : null;
   const authorOf = (item: Material) => personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber, anonymous: item.anonymous, anonymousLabel: t("community.materials.anonymousShare") }, { revealIdentifier: canModerate, locale });
+  // Shortcut to the public, Drive-like page of the year's materials (opens in a new tab).
+  useFloatingAction(!editor && !openId ? { id: "public-materials", label: t("nav.materials.public"), icon: FLOATING_PUBLIC_ICON, onClick: () => { window.open("/materiais-do-ano/", "_blank", "noopener"); } } : null);
   useFloatingAction(submissionEnabled && !editor && !openId ? { id: "share-material", label: t("community.materials.share"), icon: FLOATING_CREATE_ICON, onClick: () => setEditor(true) } : null);
   // Actions on the open material live in the floating menu.
   const pendingItem = canModerate && !editor && openItem?.status === "pending" && moderating !== openItem.id ? openItem : null;
