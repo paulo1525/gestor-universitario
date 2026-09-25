@@ -58,3 +58,11 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 850px) { .ankiWorkspace { grid-template-columns: 1fr; } .builderPreview { align-items: flex-start; flex-direction: column; } .cardTypeSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; } }
 @media (max-width: 560px) { .resultCount { align-self: flex-start; } .resource { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 13px; } .resourceIcon { width: 34px; height: 34px; } .resourceHeading { flex-direction: column; gap: 6px; } .resourceActions { align-items: stretch; flex-direction: column; } .resourceActions .button { width: 100%; justify-content: center; } .cardTypeSummary { grid-template-columns: 1fr; } .ankiMain, .ankiAside { padding: 14px; } .segmented { align-items: stretch; } .segmented .controlLabel { width: 100%; margin: 0 4px 2px; } .segmented button { flex: 1 1 0; } .downloadGenerated { width: 100%; justify-content: center; } .notice { align-items: flex-start; flex-direction: column; } .notice > .button { width: 100%; justify-content: center; } }
+
+/* Bibliography excerpts of the same lesson, under a summary or slides row. */
+.linkedBibliography { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 4px 0 0; color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.linkedBibliography > svg { width: 13px; height: 13px; color: var(--color-accent-text); }
+.linkedLabel { font-weight: 800; }
+.linkedChip { max-width: 260px; overflow: hidden; padding: 1px 8px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface); font-weight: 700; text-decoration: none; text-overflow: ellipsis; white-space: nowrap; }
+.linkedChip:hover { border-color: var(--color-accent); color: var(--color-text); }
+.linkedChip:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }

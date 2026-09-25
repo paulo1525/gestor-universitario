@@ -19,7 +19,21 @@ const SECTIONS: Section[] = ["summaries", "notes", "slides", "compendiums", "bib
 const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
 type Entry = { section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
-type Unit = { key: string; code: string; name: string; entries: Entry[] };
+type Unit = { key: string; code: string; name: string; year?: number | null; semester?: number | null; entries: Entry[] };
+
+/** Subjects grouped by year and semester (in order), each group sorted by number of files, then by code. */
+function semesterGroups(units: Unit[]) {
+  const groups = new Map<string, { key: string; label: string; order: number; units: Unit[] }>();
+  for (const unit of units) {
+    const known = Boolean(unit.year && unit.semester);
+    const key = known ? `${unit.year}-${unit.semester}` : "other";
+    if (!groups.has(key)) groups.set(key, { key, label: known ? `${unit.year}.º ano · ${unit.semester}.º semestre` : "", order: known ? Number(unit.year) * 10 + Number(unit.semester) : Number.MAX_SAFE_INTEGER, units: [] });
+    groups.get(key)!.units.push(unit);
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.order - b.order)
+    .map((group) => ({ ...group, units: group.units.sort((a, b) => b.entries.length - a.entries.length || (a.code || a.name).localeCompare(b.code || b.name, "pt-PT", { numeric: true })) }));
+}
 type Drive = { configured: boolean; lastFinishedAt: number | null; status: string; message: string; files: number };
 type State = { status: "loading" | "ready" | "unavailable"; units: Unit[]; authenticated: boolean; canManage: boolean; drive?: Drive };
 type Place = { unit: string; section: Section | "" };
@@ -195,12 +209,18 @@ export function PublicMaterials() {
         ) : state.units.length === 0 ? (
           <p className={styles.message}>{t("publicMaterials.empty")}</p>
         ) : !term && !unit ? (
-          <ul className={styles.folders}>
-            {state.units.map((item) => <li key={item.key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(item), section: "" })}>
-              <Folder aria-hidden="true" />
-              <span><strong>{item.code || item.name || t("publicMaterials.general")}</strong><small>{item.code ? `${item.name} · ` : ""}{count(item.entries)}</small></span>
-            </button></li>)}
-          </ul>
+          // One block per semester; inside it, the subjects with more files come first.
+          <div className={styles.semesters}>
+            {semesterGroups(state.units).map((group) => <section key={group.key} aria-label={group.label || t("publicMaterials.general")}>
+              {group.label && <h3 className={styles.semesterTitle}>{group.label}</h3>}
+              <ul className={styles.folders}>
+                {group.units.map((item) => <li key={item.key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(item), section: "" })}>
+                  <Folder aria-hidden="true" />
+                  <span><strong>{item.code || item.name || t("publicMaterials.general")}</strong><small>{item.code ? `${item.name} · ` : ""}{count(item.entries)}</small></span>
+                </button></li>)}
+              </ul>
+            </section>)}
+          </div>
         ) : !term && unit && !section ? (
           <ul className={styles.folders}>
             {SECTIONS.filter((key) => FIXED_SECTIONS.includes(key) || unit.entries.some((entry) => entry.section === key)).map((key) => {

@@ -594,7 +594,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     const item = row(raw), id = String(item.id), download = `/api/material-anki/${encodeURIComponent(id)}/download`;
     add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download, mime: "application/apkg", size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
-  const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked)) }));
+  const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked) || String(a.title || "").localeCompare(String(b.title || ""), "pt-PT", { numeric: true, sensitivity: "base" })) }));
   return json({ units: ordered, authenticated: Boolean(user), canManage: manager, drive: manager ? await driveSyncStatus(env) : undefined });
 }
 
