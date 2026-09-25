@@ -98,21 +98,14 @@
 .summaryArrow { width: 16px; color: #aaa79e; transition: color .16s ease, transform .16s ease; }
 .summaryCard:hover .summaryArrow { color: var(--color-accent-text); transform: translateX(2px); }
 
+/* Blocks in pairs: each row shares one height, so nothing is left hanging. */
 .contentGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.28fr) minmax(330px, .72fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 16px;
 }
 
-/* Both columns end on the same line: the last block of each grows and centres its empty state. */
-.column {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-.column > :last-child { flex: 1 1 auto; }
 
 .panel {
   display: flex;
@@ -165,22 +158,23 @@
 .panelTitle p { margin: 4px 0 0; overflow: hidden; color: var(--muted); font-size: var(--font-size-small); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 
 .viewAll {
-  min-height: 32px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex: 0 0 auto;
-  padding: 0 9px;
-  border-radius: 8px;
-  color: var(--color-accent-text);
+  color: var(--color-text-muted);
   font-size: var(--font-size-small);
-  font-weight: 850;
+  font-weight: 700;
+  text-decoration: none;
   white-space: nowrap;
 }
 
-.viewAll:hover { background: var(--gold-soft); }
+.viewAll:hover { color: var(--color-accent-text); }
 .viewAll:focus-visible { outline: 3px solid rgba(213, 170, 16, .25); outline-offset: 1px; }
-.viewAll svg { width: 13px; }
+.viewAll svg { width: 14px; }
+.panelHeader.panelHeader { grid-template-columns: minmax(0, 1fr) auto; }
+.panelHeader.panelHeader :global(.surface-header__aside) { grid-column: auto; justify-content: flex-end; }
+.panelHeader.panelHeader :global(.surface-header__aside) > a { flex: 0 0 auto; }
 .list { display: grid; }
 
 .item {
@@ -197,6 +191,7 @@
 }
 
 .item:last-child { border-bottom: 0; }
+.item.plainItem { grid-template-columns: minmax(0, 1fr) auto; }
 .item:hover { background: var(--color-surface-subtle); }
 .item:focus-visible { position: relative; z-index: 1; outline: 3px solid rgba(213, 170, 16, .25); outline-offset: -3px; }
 
@@ -290,8 +285,6 @@
 .classActions a:hover { border-color: #cfb84f; background: var(--gold-soft); }
 .classActions a:focus-visible { outline: 3px solid rgba(213, 170, 16, .25); outline-offset: 2px; }
 .classActions svg { width: 14px; }
-.materialItem { grid-template-columns: 40px minmax(0, 1fr) auto; }
-.favorite { color: var(--color-accent-text); fill: #f5cf3d; }
 .retry { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--color-accent-text); background: #fff; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
 
 /* Study panel: PDFs with highlights and learning paths in progress. */
@@ -313,24 +306,12 @@
 .progress { display: block; height: 4px; margin-top: 7px; overflow: hidden; border-radius: 999px; background: var(--color-surface-muted); }
 .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
 
-/* Quick access: plain list of destinations. */
-.quickList { display: grid; margin: 0; padding: 0; list-style: none; }
-.quickList li { border-bottom: 1px solid var(--color-border); }
-.quickList li:last-child { border-bottom: 0; }
-.quickList a { min-height: 46px; display: grid; grid-template-columns: 18px minmax(0, 1fr) 16px; align-items: center; gap: 12px; padding: 0 18px; color: var(--color-text); font-size: var(--font-size-body); font-weight: 700; text-decoration: none; }
-.quickList a:hover { background: var(--color-surface-subtle); }
-.quickList a:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -3px; }
-.quickList a > svg:first-child { width: 17px; color: var(--color-accent-text); }
-.quickList a > svg:last-child { width: 15px; color: var(--color-text-subtle); }
-
 @media (max-width: 1180px) {
   .summaryGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .contentGrid { grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); }
 }
 
 @media (max-width: 940px) {
   .contentGrid { grid-template-columns: 1fr; }
-  .column { grid-row: auto; grid-template-rows: none; }
 }
 
 @media (max-width: 700px) {
