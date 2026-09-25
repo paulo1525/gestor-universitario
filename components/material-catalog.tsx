@@ -17,15 +17,15 @@ import { clampPage, Pagination } from "@/components/pagination";
 const RESOURCE_PAGE_SIZE = 10;
 const UNIT_PAGE_SIZE = 12;
 
-export type MaterialCatalogTab = "overview" | "summaries" | "bibliography" | "anki" | "exams";
+export type MaterialCatalogTab = "overview" | "summaries" | "notes" | "bibliography" | "anki" | "exams";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
-type CatalogItem = { id: string; kind: string; bibliographyFormat?: BibliographyFormat | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
+type CatalogItem = { id: string; kind: string; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: MaterialCatalogTab[] = ["overview", "summaries", "bibliography", "anki", "exams"];
+const tabs: MaterialCatalogTab[] = ["overview", "summaries", "notes", "bibliography", "anki", "exams"];
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
 export const GENERAL_MATERIAL_UNIT = "__general";
 
@@ -109,19 +109,21 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     return catalogCount + deckCount + (submissionCounts[code] || 0);
   }, [decks, items, submissionCounts]);
 
-  const kind = activeTab === "summaries" ? "summary" : activeTab === "bibliography" ? "bibliography" : "";
+  const kind = activeTab === "summaries" || activeTab === "notes" ? "summary" : activeTab === "bibliography" ? "bibliography" : "";
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase("pt-PT");
     return unitItems.filter((item) => {
       const itemLessons = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
       const searchable = `${item.title} ${item.description || ""} ${item.unitCode || ""} ${item.source?.title || ""} ${item.source?.author || ""} ${item.pages?.note || ""}`.toLocaleLowerCase("pt-PT");
       return (!kind || item.kind === kind) &&
+        (activeTab !== "summaries" || item.summaryFormat !== "notes") &&
+        (activeTab !== "notes" || item.summaryFormat === "notes") &&
         (!normalizedSearch || searchable.includes(normalizedSearch)) &&
         (!lessonFilter || itemLessons.includes(lessonFilter)) &&
         (verificationFilter === "all" || item.verification === verificationFilter) &&
         (!recommendedOnly || item.recommended);
     });
-  }, [kind, lessonFilter, recommendedOnly, search, unitItems, verificationFilter]);
+  }, [activeTab, kind, lessonFilter, recommendedOnly, search, unitItems, verificationFilter]);
   const formatCounts = useMemo(() => Object.fromEntries(formats.map((format) => [format, filtered.filter((item) => bibliographyFormat(item) === format).length])) as Record<BibliographyFormat, number>, [filtered]);
   const visible = useMemo(() => activeTab === "bibliography" && formatFilter !== "all" ? filtered.filter((item) => bibliographyFormat(item) === formatFilter) : filtered, [activeTab, filtered, formatFilter]);
   // Bibliography is read book by book: the complete work, then its excerpts and translations.
@@ -154,8 +156,8 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
     return result;
   }, [currentResourcePage, orderedResources]);
-  const stats = useMemo(() => ({ summaries: unitItems.filter((item) => item.kind === "summary").length, bibliography: unitItems.filter((item) => item.kind === "bibliography").length, decks: unitDecks.length }), [unitDecks.length, unitItems]);
-  const label = (item: CatalogItem) => item.kind === "summary" ? t("community.materials.catalog.tab.summaries") : item.kind === "bibliography" ? t("community.materials.catalog.tab.bibliography") : item.kind === "anki" ? t("community.materials.catalog.tab.anki") : t("community.materials.catalog.tab.overview");
+  const stats = useMemo(() => ({ summaries: unitItems.filter((item) => item.kind === "summary" && item.summaryFormat !== "notes").length, notes: unitItems.filter((item) => item.kind === "summary" && item.summaryFormat === "notes").length, bibliography: unitItems.filter((item) => item.kind === "bibliography").length, decks: unitDecks.length }), [unitDecks.length, unitItems]);
+  const label = (item: CatalogItem) => item.kind === "summary" ? t(item.summaryFormat === "notes" ? "community.materials.catalog.tab.notes" : "community.materials.catalog.tab.summaries") : item.kind === "bibliography" ? t("community.materials.catalog.tab.bibliography") : item.kind === "anki" ? t("community.materials.catalog.tab.anki") : t("community.materials.catalog.tab.overview");
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
@@ -232,10 +234,10 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <div id={`material-panel-${activeTab}`} role="tabpanel" aria-labelledby={`material-tab-${activeTab}`} tabIndex={-1}>
         {activeTab === "overview" && <>
           {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={styles.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : <>
-            <div className={styles.overviewList}><button type="button" className={styles.overviewRow} onClick={() => onTabChange("summaries")}><FileText className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("summaries")}</strong></span><span className={styles.overviewCount}>{stats.summaries}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("bibliography")}><BookOpen className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("bibliography")}</strong></span><span className={styles.overviewCount}>{stats.bibliography}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("anki")}><Package className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("anki")}</strong></span><span className={styles.overviewCount}>{stats.decks}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button></div>
+            <div className={styles.overviewList}><button type="button" className={styles.overviewRow} onClick={() => onTabChange("summaries")}><FileText className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("summaries")}</strong></span><span className={styles.overviewCount}>{stats.summaries}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("notes")}><FileText className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("notes")}</strong></span><span className={styles.overviewCount}>{stats.notes}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("bibliography")}><BookOpen className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("bibliography")}</strong></span><span className={styles.overviewCount}>{stats.bibliography}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button><button type="button" className={styles.overviewRow} onClick={() => onTabChange("anki")}><Package className={styles.overviewIcon} aria-hidden="true" /><span className={styles.overviewText}><strong>{tabLabel("anki")}</strong></span><span className={styles.overviewCount}>{stats.decks}</span><ArrowRight className={styles.overviewArrow} aria-hidden="true" /></button></div>
           </>}
         </>}
-        {(activeTab === "summaries" || activeTab === "bibliography") && <>
+        {(activeTab === "summaries" || activeTab === "notes" || activeTab === "bibliography") && <>
           <FilterBar label={t("community.materials.catalog.search")}>
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
             {activeTab === "bibliography" && <FilterSelect label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={(value) => setFormatFilter(value as typeof formatFilter)} options={[{ value: "all", label: `${t("community.materials.catalog.format.all")} (${filtered.length})` }, ...formats.map((format) => ({ value: format, label: `${formatLabel(format)} (${formatCounts[format]})` }))]} />}

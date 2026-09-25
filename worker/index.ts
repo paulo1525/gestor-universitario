@@ -29,6 +29,9 @@ export interface Env {
   TURNSTILE_SECRET_KEY: string;
   TURNSTILE_SITE_KEY: string;
   MAINTENANCE_MODE: string;
+  // Google Drive storage of the year's materials (worker/google-drive.ts); both are secrets.
+  GOOGLE_SERVICE_ACCOUNT_JSON?: string;
+  GOOGLE_DRIVE_FOLDER_ID?: string;
 }
 
 type UserRow = {
@@ -1615,7 +1618,7 @@ async function handleCurricularUnits(request: Request, env: Env, user: CurrentUs
   return json({ error: "Operação não suportada." }, 405);
 }
 
-async function routeApi(request: Request, env: Env, url: URL): Promise<Response> {
+async function routeApi(request: Request, env: Env, url: URL, ctx?: ExecutionContext): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
   if (request.method === "GET" && pathname === "/api/config") {
@@ -1678,7 +1681,7 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
   }
   if (isAcademicHubPath(pathname)) {
     const user = await currentUser(request, env);
-    return handleAcademicHubRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
+    return handleAcademicHubRoute(request, env, url, user, (key) => isModuleEnabled(env, key), ctx ? (promise) => ctx.waitUntil(promise) : undefined);
   }
   if (isCampusPath(pathname)) {
     const user = await currentUser(request, env);
@@ -1712,13 +1715,13 @@ async function routeApi(request: Request, env: Env, url: URL): Promise<Response>
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const metrics: QueryMetrics = { count: 0, startedAt: performance.now(), statements: [] };
     const measuredEnv = { ...env, DB: instrumentDatabase(env.DB, metrics) };
     try {
       if (url.pathname.startsWith("/api/")) {
-        const response = withSecurity(await routeApi(request, measuredEnv, url));
+        const response = withSecurity(await routeApi(request, measuredEnv, url, ctx));
         response.headers.set("server-timing", `d1;dur=${(performance.now() - metrics.startedAt).toFixed(1)};desc=\"${metrics.count} queries\"`);
         response.headers.set("x-db-query-count", String(metrics.count));
         if (request.headers.get("x-debug-db") === "1") console.log("db_metrics", JSON.stringify({ path: url.pathname, queries: metrics.count, durationMs: performance.now() - metrics.startedAt, statements: metrics.statements }));

@@ -1,0 +1,102 @@
+/* Public, Drive-like browser of the year's materials. Lives outside the AppShell and
+   only consumes the theme tokens from app/globals.css and app/theme-forum.css. */
+
+.page { min-height: 100dvh; color: var(--color-text); background: var(--color-bg); }
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(0, 560px) auto;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 10px var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; }
+.brand img { flex: none; border-radius: 50%; }
+.brand span { display: grid; min-width: 0; }
+.brand strong { font-family: var(--font-display), sans-serif; font-size: var(--font-size-body-emphasis); font-weight: 800; white-space: nowrap; }
+.brand small { color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 650; white-space: nowrap; }
+
+.search { position: relative; display: block; width: 100%; }
+.search svg { position: absolute; top: 50%; left: 12px; width: 16px; height: 16px; color: var(--color-text-subtle); transform: translateY(-50%); pointer-events: none; }
+.search input { width: 100%; min-height: 40px; padding: 0 12px 0 38px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface-subtle); font: inherit; font-size: var(--font-size-body); }
+.search input:focus { border-color: var(--color-focus); outline: none; background: var(--color-surface); box-shadow: var(--focus-ring); }
+
+.topActions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.iconButton, .textButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--control-height-sm); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 750; text-decoration: none; cursor: pointer; }
+.iconButton { width: var(--control-height-sm); color: var(--color-text-muted); }
+.textButton { padding: 0 var(--space-3); white-space: nowrap; }
+.iconButton svg, .textButton svg { width: 15px; height: 15px; flex: none; }
+.iconButton:hover, .textButton:hover { border-color: var(--color-border-hover); }
+.textButton:disabled { opacity: .6; cursor: progress; }
+
+.body { display: grid; gap: var(--space-4); width: 100%; max-width: 1080px; margin: 0 auto; padding: var(--space-5) var(--space-5) 96px; }
+
+.driveBar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 12px; border: 1px dashed var(--color-border-strong); border-radius: var(--radius-panel); background: var(--color-surface); }
+.driveBar > span { display: grid; gap: 2px; min-width: 0; }
+.driveBar strong { font-size: var(--font-size-small); }
+.driveBar small { color: var(--color-text-muted); font-size: var(--font-size-caption); overflow-wrap: anywhere; }
+
+/* Path: Materiais do ano › NEURO · Neuroanatomia › Resumos */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 32px; font-family: var(--font-display), sans-serif; font-size: var(--font-size-heading-3); font-weight: 800; }
+.crumbs > svg { width: 16px; height: 16px; color: var(--color-text-subtle); }
+.crumbs button { padding: 2px 6px; border: 0; border-radius: var(--radius-control); color: var(--color-text-muted); background: transparent; font: inherit; cursor: pointer; }
+.crumbs button:hover { color: var(--color-text); background: var(--color-surface-subtle); }
+.crumbs [aria-current="page"] { color: var(--color-text); }
+.crumbs > span { padding: 2px 6px; }
+
+/* Folders */
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.folder { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 64px; padding: 12px 14px; border: 1px solid var(--surface-card-border); border-radius: var(--radius-panel); color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-panel); font: inherit; text-align: left; cursor: pointer; }
+.folder:hover { border-color: var(--color-border-hover); background: var(--color-surface-subtle); }
+.folder:focus-visible, .crumbs button:focus-visible, .fileName:focus-visible, .fileActions :is(a, button):focus-visible, .iconButton:focus-visible, .textButton:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.folder > svg { width: 22px; height: 22px; flex: none; color: var(--color-accent-text); fill: var(--color-accent-soft); }
+.folder > span { display: grid; gap: 2px; min-width: 0; }
+.folder strong { overflow: hidden; font-size: var(--font-size-body-emphasis); font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.folder small { overflow: hidden; color: var(--color-text-muted); font-size: var(--font-size-small); text-overflow: ellipsis; white-space: nowrap; }
+.skeleton { background: var(--color-surface-subtle); box-shadow: none; }
+
+/* Files: name | size | date | actions */
+.files { overflow: hidden; border: 1px solid var(--surface-card-border); border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.files ul { margin: 0; padding: 0; list-style: none; }
+.fileHead, .file { display: grid; grid-template-columns: minmax(0, 1fr) 90px 120px 76px; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); }
+.fileHead { min-height: 38px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.file { min-height: 52px; border-bottom: 1px solid var(--color-border); }
+.file:last-child { border-bottom: 0; }
+.file:hover { background: var(--color-surface-subtle); }
+.fileName { display: flex; align-items: center; gap: var(--space-3); min-width: 0; align-self: stretch; color: inherit; text-decoration: none; }
+.fileName > svg { width: 18px; height: 18px; flex: none; color: var(--color-text-muted); }
+.fileName > span { display: grid; gap: 2px; min-width: 0; }
+.fileName strong { overflow: hidden; font-size: var(--font-size-body); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.fileName small { color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.fileMeta { color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fileActions { display: flex; justify-content: flex-end; gap: 2px; }
+.fileActions :is(a, button) { display: grid; width: 32px; height: 32px; place-items: center; padding: 0; border: 0; border-radius: var(--radius-control); color: var(--color-text-muted); background: transparent; cursor: pointer; }
+.fileActions :is(a, button):hover { color: var(--color-text); background: var(--color-surface-muted); }
+.fileActions svg { width: 16px; height: 16px; }
+.fileActions button:disabled { opacity: .5; cursor: progress; }
+
+/* Redacted file: the item exists but its name stays hidden until the visitor signs in. */
+.locked .fileName > svg { color: var(--color-text-subtle); }
+.redacted { display: block; width: min(60%, 240px); height: 11px; border-radius: 4px; background: repeating-linear-gradient(90deg, var(--color-border-strong) 0 18px, var(--color-border) 18px 22px); }
+
+.message { margin: 0; padding: var(--space-6) 0; color: var(--color-text-muted); text-align: center; }
+
+@media (max-width: 720px) {
+  .topBar { grid-template-columns: minmax(0, 1fr) auto; padding: 10px var(--space-4); }
+  .search { grid-column: 1 / -1; grid-row: 2; }
+  .brand small { display: none; }
+  .body { padding: var(--space-4) var(--space-4) 96px; }
+  .crumbs { font-size: var(--font-size-body-emphasis); }
+  .folders { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  .fileHead { display: none; }
+  .file { grid-template-columns: minmax(0, 1fr) auto; padding: 8px var(--space-3); }
+  .fileMeta { display: none; }
+}
+@media (max-width: 420px) { .folders { grid-template-columns: 1fr; } }

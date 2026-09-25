@@ -189,6 +189,11 @@
 
 .lock { width: 14px; height: 14px; flex: 0 0 auto; color: var(--color-text-subtle); }
 
+/* Redacted row: the item exists but its name stays hidden until the visitor signs in. */
+.lockedRow .chip { color: var(--color-text-subtle); background: var(--color-surface-muted); }
+.lockedRow .chip svg { width: 16px; height: 16px; }
+.redacted { display: block; width: min(62%, 220px); height: 12px; margin: 3px 0 2px; border-radius: 4px; background: repeating-linear-gradient(90deg, var(--color-border-strong) 0 18px, var(--color-border) 18px 22px); }
+
 .arrowLink {
   display: grid;
   width: 28px;
@@ -280,3 +285,6 @@
 @media (prefers-reduced-motion: reduce) {
   .row { transition: none; }
 }
+
+/* Shared pagination, without the panel band: these pages sit on the plain background. */
+.pager > nav { margin-top: var(--space-2); border: 0; background: transparent; }

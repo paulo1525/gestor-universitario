@@ -18,7 +18,7 @@ export type HubUser = {
   actorId?: string;
 };
 
-type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket };
+type HubEnv = { DB: D1Database; AUTH_PEPPER: string; MATERIALS_BUCKET?: R2Bucket; AUTH_RATE_LIMITER?: RateLimit; GOOGLE_SERVICE_ACCOUNT_JSON?: string; GOOGLE_DRIVE_FOLDER_ID?: string };
 type ModuleChecker = (key: string) => Promise<boolean>;
 
 const MATERIAL_MIMES = new Set([
@@ -1161,9 +1161,11 @@ async function usefulLinks(request: Request, env: HubEnv, url: URL, user: HubUse
     const scope = !user ? USEFUL_LINKS_ANONYMOUS_SCOPE : management ? "1=1" : `l.status='published' AND (l.visibility!='cc' OR ${isCommission(user) ? "1=1" : "1=0"})`;
     const result = await env.DB.prepare(`SELECT l.*,cu.code AS unit_code,cu.name AS unit_name FROM useful_links l LEFT JOIN curricular_units cu ON cu.id=l.curricular_unit_id WHERE ${scope} AND (?='' OR l.curricular_unit_id=?) AND (?='' OR l.category=?) AND (?='' OR l.priority=?) ORDER BY CASE l.priority WHEN 'urgent' THEN 0 WHEN 'important' THEN 1 ELSE 2 END,cu.name COLLATE NOCASE,l.title COLLATE NOCASE`).bind(unitId, unitId, category, category, priority, priority).all();
     if (!user) {
-      // Only a boolean is disclosed so the page can offer "Entrar"; titles, counts and URLs stay private.
-      const restricted = await env.DB.prepare(`SELECT 1 AS found FROM useful_links l WHERE l.status='published' AND l.visibility!='cc' AND NOT (${USEFUL_LINKS_ANONYMOUS_SCOPE}) LIMIT 1`).first();
-      return json({ links: result.results.map(usefulLinkDto), restricted: Boolean(restricted), authenticated: false, canManage: false, capabilities: { manage: false } });
+      // Session-only links are shown redacted: visitors get how many there are per category, never titles or URLs.
+      // Commission-only links stay invisible.
+      const lockedRows = await env.DB.prepare(`SELECT l.category,COUNT(*) AS n FROM useful_links l WHERE l.status='published' AND l.visibility!='cc' AND NOT (${USEFUL_LINKS_ANONYMOUS_SCOPE}) GROUP BY l.category`).all();
+      const locked = Object.fromEntries(lockedRows.results.map((item) => { const row = rowObject(item); return [String(row.category), Number(row.n) || 0]; }));
+      return json({ links: result.results.map(usefulLinkDto), locked, restricted: Object.keys(locked).length > 0, authenticated: false, canManage: false, capabilities: { manage: false } });
     }
     // The linktree shows inline editing only when the caller may manage and the management module is on.
     const manageable = canManage && (management || await enabled("useful_links.management"));
@@ -1313,9 +1315,9 @@ export function isAcademicHubPath(pathname: string): boolean {
   return isMaterialsCatalogPath(path) || isMaterialUploadPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/requests/comments" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
-export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker, waitUntil?: (promise: Promise<unknown>) => void): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
-  if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled);
+  if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled, waitUntil);
   if (pathname === "/api/calendar-events") return calendar(request, env, url, user, enabled);
   if (pathname === "/api/calendar-subscription" || pathname === "/api/calendar-subscriptions") return calendarSubscription(request, env, url, user, enabled);
   if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);
