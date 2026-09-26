@@ -50,8 +50,12 @@ function catalogSection(item: CatalogItem): CatalogSection {
 /** Reading order: theory lessons (AT1, AT2… AT10), then practical ones (AP1…), then the rest by title with natural numbers. */
 const LESSON_PREFIX_ORDER = ["AT", "AP"];
 function lessonOrder(item: CatalogItem): [number, number] {
-  const code = item.lessonCodes?.[0] || item.lessonCode || item.title;
-  const match = /^\s*(A[TP])\s*0*(\d+)/i.exec(code || "");
+  // Prefer the lesson explicitly named in the material title. Some PDFs are linked
+  // to complementary lessons too (for example AP4 also linked to AT7), and those
+  // secondary associations must not move the PDF out of its visible AP/AT order.
+  const titleMatch = /\b(A[TP])\s*0*(\d+)\b/i.exec(item.title);
+  const code = titleMatch?.[0] || item.lessonCodes?.[0] || item.lessonCode || "";
+  const match = /^\s*(A[TP])\s*0*(\d+)/i.exec(code);
   return match ? [LESSON_PREFIX_ORDER.indexOf(match[1].toUpperCase()), Number(match[2])] : [LESSON_PREFIX_ORDER.length, 0];
 }
 function compareCatalogItems(a: CatalogItem, b: CatalogItem) {
