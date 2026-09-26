@@ -9,9 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import Link from "next/link";
 import {
-  BookOpenCheck,
   Check,
   Download,
   ExternalLink,
@@ -410,8 +408,7 @@ export function MaterialLibrary() {
         .filter((item) => !term || [item.title, richTextPlainText(item.description), item.fileName, item.unit?.code, item.unit?.name, item.anonymous ? "" : item.authorName].join(" ").toLocaleLowerCase(locale).includes(term)),
     [materials, filter, term, locale, unitCode],
   );
-  const interactiveStudyVisible = unitCode === "NEURO" && (filter === "all" || filter === "summary") && (!term || "neuroanatomia aula prática 1 resumo".includes(term));
-  const libraryCount = visible.length + (interactiveStudyVisible ? 1 : 0);
+  const libraryCount = visible.length;
   const [libraryPage, setLibraryPage] = useState(1);
   useEffect(() => { setLibraryPage(1); }, [filter, term, unitCode]);
   const currentLibraryPage = clampPage(libraryPage, visible.length, LIBRARY_PAGE_SIZE);
@@ -630,14 +627,6 @@ export function MaterialLibrary() {
                 : loadError ? <div className={list.empty} role="alert"><FolderOpen /><strong>{t("community.materials.loadError")}</strong><button className={styles.emptyAction} type="button" onClick={() => void load()}>{t("community.materials.catalog.retry")}</button></div>
                 : libraryCount === 0 ? <div className={list.empty}><FolderOpen /><strong>{t("community.materials.empty")}</strong>{(filter !== "all" || query) && <button className={styles.emptyAction} type="button" onClick={() => { setFilter("all"); setQuery(""); }}><X aria-hidden="true" />{t("community.materials.all")}</button>}</div>
                 : <ul className={list.rows}>
-                  {interactiveStudyVisible && currentLibraryPage === 1 && <li className={list.row} data-tone="success">
-                    <span className={list.rowIcon} aria-hidden="true"><BookOpenCheck /></span>
-                    <div className={list.rowMain}>
-                      <h3><Link className={`link-quiet ${list.titleLink}`} href="/materiais/neuroanatomia/aula-1">Neuroanatomia · Aula prática 1</Link></h3>
-                      <p className={list.rowMeta}>{t("community.materials.category.summary")} · Neuroanatomia · Leitura online</p>
-                    </div>
-                    <span className={list.statusPill} data-tone="success">{t("community.materials.status.approved")}</span>
-                  </li>}
                   {pageMaterials.map((item) => <li className={list.row} key={item.id}>
                     <span className={list.rowIcon} aria-hidden="true">{item.fileType.startsWith("image/") ? <ImageIcon /> : <FileText />}</span>
                     <div className={list.rowMain}>
