@@ -144,10 +144,13 @@ test("os PDFs abrem em modo inline e os realces privados persistem na D1", async
   assert.match(worker, /material_pdf_highlights/);
   assert.match(worker, /\/view/);
   assert.match(worker, /\/highlights/);
-  // The row/title opens the reader; the list keeps only the direct download action.
+  // The row/title opens the reader; the list keeps only a compact direct-download icon.
   assert.doesNotMatch(component, /<span>Anotar<\/span>/);
   assert.doesNotMatch(component, /Highlighter/);
-  assert.match(component, /<span>Descarregar<\/span>/);
+  assert.doesNotMatch(component, /<span>Descarregar<\/span>/);
+  assert.match(component, /data-icon-only="true"/);
+  assert.match(component, /className=\{list\.statusIcon\}/);
+  assert.match(component, /<Check aria-hidden="true" \/>/);
   assert.match(component, /href=\{materialReaderHref\(item\.id\)\} target="_blank"/);
   assert.doesNotMatch(component, /<MaterialPdfReader/);
   assert.match(worker, /async function catalogItem\(/);
@@ -175,6 +178,11 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", async
   const recordListStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
   assert.match(recordListStyles, /row:has\(\.rowActions\) \.rowEnd \{[^}]*flex-wrap: wrap/);
   assert.match(recordListStyles, /rowEnd > \.statusPill \{ margin-left: auto/);
+  assert.match(recordListStyles, /rowAction\[data-icon-only="true"\] \{ width: 30px; min-height: 30px/);
+  assert.match(recordListStyles, /statusIcon \{[^}]*width: 30px; height: 30px/);
+  assert.match(recordListStyles, /statusIcon \{ width: 36px; height: 36px; \}/);
+  assert.match(component, /LESSON_PREFIX_ORDER = \["AT", "AP"\]/);
+  assert.match(component, /items: group\.items\.sort\(\(a, b\) => compareCatalogItems\(a, b\) \|\| order\(a\) - order\(b\)\)/);
 });
 
 test("o builder cria um APKG com escolha múltipla, resposta curta, imagem e media", async () => {
