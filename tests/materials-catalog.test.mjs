@@ -160,7 +160,7 @@ test("a gestão do catálogo fica limitada a administradores e à direção", ()
   assert.doesNotMatch(worker, /user\.commissionDepartment === "management" \|\| user\.commissionPosition/);
 });
 
-test("o catálogo mantém os estados e a navegação de tabs acessíveis", () => {
+test("o catálogo mantém os estados e a navegação de tabs acessíveis", async () => {
   assert.match(component, /role="tablist"/);
   assert.match(component, /aria-controls=\{`material-panel-\$\{tab\}`\}/);
   assert.match(component, /tabIndex=\{activeTab === tab \? 0 : -1\}/);
