@@ -49,14 +49,18 @@ function catalogSection(item: CatalogItem): CatalogSection {
 
 /** Reading order: theory lessons (AT1, AT2… AT10), then practical ones (AP1…), then the rest by title with natural numbers. */
 const LESSON_PREFIX_ORDER = ["AT", "AP"];
-function lessonOrder(item: CatalogItem): [number, number] {
+function primaryLessonCode(item: CatalogItem): string {
   // Prefer the lesson explicitly named in the material title. Some PDFs are linked
   // to complementary lessons too (for example AP4 also linked to AT7), and those
   // secondary associations must not move the PDF out of its visible AP/AT order.
   const titleMatch = /\b(A[TP])\s*0*(\d+)\b/i.exec(item.title);
-  const code = titleMatch?.[0] || item.lessonCodes?.[0] || item.lessonCode || "";
-  const match = /^\s*(A[TP])\s*0*(\d+)/i.exec(code);
-  return match ? [LESSON_PREFIX_ORDER.indexOf(match[1].toUpperCase()), Number(match[2])] : [LESSON_PREFIX_ORDER.length, 0];
+  const raw = titleMatch?.[0] || item.lessonCodes?.[0] || item.lessonCode || "";
+  const match = /^\s*(A[TP])\s*0*(\d+)/i.exec(raw);
+  return match ? `${match[1].toUpperCase()}${Number(match[2])}` : "";
+}
+function lessonOrder(item: CatalogItem): [number, number] {
+  const match = /^(A[TP])(\d+)$/.exec(primaryLessonCode(item));
+  return match ? [LESSON_PREFIX_ORDER.indexOf(match[1]), Number(match[2])] : [LESSON_PREFIX_ORDER.length, 0];
 }
 function compareCatalogItems(a: CatalogItem, b: CatalogItem) {
   const [prefixA, numberA] = lessonOrder(a), [prefixB, numberB] = lessonOrder(b);
@@ -156,9 +160,35 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   }, [activeTab, listTab, lessonFilter, search, unitItems, verificationFilter]);
   const formatCounts = useMemo(() => Object.fromEntries(formats.map((format) => [format, filtered.filter((item) => bibliographyFormat(item) === format).length])) as Record<BibliographyFormat, number>, [filtered]);
   const visible = useMemo(() => activeTab === "bibliography" && formatFilter !== "all" ? filtered.filter((item) => bibliographyFormat(item) === formatFilter) : filtered, [activeTab, filtered, formatFilter]);
-  // Bibliography is read book by book: the complete work, then its excerpts and translations.
+  // Translation-only view is organized by lesson so the sequence is visibly chronological.
+  // Other bibliography views stay grouped by book.
   const groups = useMemo(() => {
     if (activeTab !== "bibliography") return [{ key: "all", title: "", items: visible }];
+
+    if (formatFilter === "translation") {
+      const byLesson = new Map<string, { key: string; title: string; items: CatalogItem[] }>();
+      for (const item of visible) {
+        const code = primaryLessonCode(item);
+        const key = code || "other";
+        const title = code || t("community.materials.catalog.otherSources");
+        if (!byLesson.has(key)) byLesson.set(key, { key, title, items: [] });
+        byLesson.get(key)!.items.push(item);
+      }
+      return [...byLesson.values()]
+        .map((group) => ({
+          ...group,
+          items: group.items.sort((a, b) =>
+            (a.source?.title || "").localeCompare(b.source?.title || "", "pt-PT", { numeric: true, sensitivity: "base" }) ||
+            a.title.localeCompare(b.title, "pt-PT", { numeric: true, sensitivity: "base" }),
+          ),
+        }))
+        .sort((a, b) => {
+          const firstA = a.items[0], firstB = b.items[0];
+          if (!firstA || !firstB) return a.title.localeCompare(b.title, "pt-PT", { numeric: true });
+          return compareCatalogItems(firstA, firstB);
+        });
+    }
+
     const map = new Map<string, { key: string; title: string; items: CatalogItem[] }>();
     for (const item of visible) {
       const key = item.source?.title ? `${item.source.title}|${item.source.edition || ""}` : "";
@@ -168,8 +198,8 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     }
     const order = (item: CatalogItem) => formats.indexOf(bibliographyFormat(item));
     return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => compareCatalogItems(a, b) || order(a) - order(b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
-  }, [activeTab, t, visible]);
-  // Pagination runs over the grouped order, then each page is regrouped by book.
+  }, [activeTab, formatFilter, t, visible]);
+  // Pagination runs over the current grouped order and preserves those groups per page.
   const [resourcePage, setResourcePage] = useState(1);
   const [unitPage, setUnitPage] = useState(1);
   useEffect(() => { setResourcePage(1); }, [activeTab, unitCode, search, lessonFilter, verificationFilter, formatFilter]);
