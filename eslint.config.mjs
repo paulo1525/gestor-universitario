@@ -13,6 +13,7 @@ export default defineConfig([
     "output/**",
     "tmp/**",
     "build/**",
+    "public/pdfjs/**",
     "next-env.d.ts",
   ]),
 ]);
