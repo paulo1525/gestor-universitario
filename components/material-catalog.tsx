@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, Check, ChevronLeft, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -163,7 +163,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       map.get(key)!.items.push(item);
     }
     const order = (item: CatalogItem) => formats.indexOf(bibliographyFormat(item));
-    return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => order(a) - order(b) || compareCatalogItems(a, b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
+    return [...map.values()].map((group) => ({ ...group, items: group.items.sort((a, b) => compareCatalogItems(a, b) || order(a) - order(b)) })).sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.title.localeCompare(b.title, "pt-PT"));
   }, [activeTab, t, visible]);
   // Pagination runs over the grouped order, then each page is regrouped by book.
   const [resourcePage, setResourcePage] = useState(1);
@@ -317,9 +317,11 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
                 <span className={list.rowEnd}>
                   {favoritesEnabled && <button type="button" className={`${list.rowAction} ${styles.star}`} aria-pressed={Boolean(item.favorite)} aria-label={`${t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} · ${item.title}`} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} onClick={() => void toggleFavorite(item)}><Star aria-hidden="true" /></button>}
                   {item.downloadUrl && <span className={list.rowActions}>
-                    <a className={list.rowAction} href={item.downloadUrl} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /><span>Descarregar</span></a>
+                    <a className={list.rowAction} data-icon-only="true" href={item.downloadUrl} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /></a>
                   </span>}
-                  <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
+                  {item.verification === "verified"
+                    ? <span className={list.statusIcon} data-tone="success" role="img" aria-label={verificationLabel(item.verification)} title={verificationLabel(item.verification)}><Check aria-hidden="true" /></span>
+                    : <span className={list.statusPill} data-tone={item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>}
                 </span>
               </li>)}</ul>
             </div>) : <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div>}
