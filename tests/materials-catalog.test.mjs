@@ -144,8 +144,9 @@ test("os PDFs abrem em modo inline e os realces privados persistem na D1", async
   assert.match(worker, /material_pdf_highlights/);
   assert.match(worker, /\/view/);
   assert.match(worker, /\/highlights/);
-  // Annotate and download straight from the list; the annotator is its own page, opened in a new tab.
-  assert.match(component, /<span>Anotar<\/span>/);
+  // The row/title opens the reader; the list keeps only the direct download action.
+  assert.doesNotMatch(component, /<span>Anotar<\/span>/);
+  assert.doesNotMatch(component, /Highlighter/);
   assert.match(component, /<span>Descarregar<\/span>/);
   assert.match(component, /href=\{materialReaderHref\(item\.id\)\} target="_blank"/);
   assert.doesNotMatch(component, /<MaterialPdfReader/);
@@ -171,6 +172,9 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", () =>
   assert.match(styles, /scrollbar-width:\s*none/);
   assert.match(styles, /@media \(max-width: 560px\)/);
   assert.match(styles, /resourceActions \.button \{ width: 100%/);
+  const recordListStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
+  assert.match(recordListStyles, /row:has\(\.rowActions\) \.rowEnd \{[^}]*flex-wrap: wrap/);
+  assert.match(recordListStyles, /rowEnd > \.statusPill \{ margin-left: auto/);
 });
 
 test("o builder cria um APKG com escolha múltipla, resposta curta, imagem e media", async () => {
