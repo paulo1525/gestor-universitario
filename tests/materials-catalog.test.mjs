@@ -182,8 +182,13 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", async
   assert.match(recordListStyles, /statusIcon \{[^}]*width: 30px; height: 30px/);
   assert.match(recordListStyles, /statusIcon \{ width: 36px; height: 36px; \}/);
   assert.match(component, /LESSON_PREFIX_ORDER = \["AT", "AP"\]/);
+  assert.match(component, /function primaryLessonCode\(item: CatalogItem\)/);
   assert.match(component, /const titleMatch = \/\\b\(A\[TP\]\)\\s\*0\*\(\\d\+\)\\b\/i\.exec\(item\.title\)/);
   assert.match(component, /titleMatch\?\.\[0\] \|\| item\.lessonCodes\?\.\[0\] \|\| item\.lessonCode/);
+  assert.match(component, /if \(formatFilter === "translation"\)/);
+  assert.match(component, /const byLesson = new Map/);
+  assert.match(component, /const code = primaryLessonCode\(item\)/);
+  assert.match(component, /return compareCatalogItems\(firstA, firstB\)/);
   assert.match(component, /items: group\.items\.sort\(\(a, b\) => compareCatalogItems\(a, b\) \|\| order\(a\) - order\(b\)\)/);
 });
 
