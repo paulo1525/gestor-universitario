@@ -177,7 +177,7 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", async
   assert.match(styles, /resourceActions \.button \{ width: 100%/);
   const recordListStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
   assert.match(recordListStyles, /row:has\(\.rowActions\) \.rowEnd \{[^}]*flex-wrap: wrap/);
-  assert.match(recordListStyles, /rowEnd > \.statusPill \{ margin-left: auto/);
+  assert.match(recordListStyles, /rowEnd > \.statusPill, \.row:has\(\.rowActions\) \.rowEnd > \.statusIcon \{ margin-left: auto/);
   assert.match(recordListStyles, /rowAction\[data-icon-only="true"\] \{ width: 30px; min-height: 30px/);
   assert.match(recordListStyles, /statusIcon \{[^}]*width: 30px; height: 30px/);
   assert.match(recordListStyles, /statusIcon \{ width: 36px; height: 36px; \}/);
