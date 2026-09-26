@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download,
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
+import { pdfJsAssetOptions } from "@/lib/pdfjs-assets.mjs";
 
 type HighlightColor = "gold" | "blue" | "green" | "rose";
 type Rect = { x: number; y: number; width: number; height: number };
@@ -180,7 +181,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       if (!active) return;
       setLoadProgress((current) => current && { ...current, phase: current.phase === "cached" ? "cached" : "downloading", loaded: current.total ?? current.loaded });
       setPreparing(true);
-      loadingTask = library.getDocument({ data });
+      loadingTask = library.getDocument({ data, ...pdfJsAssetOptions(library.version, window.location.origin) });
       const document = await loadingTask.promise;
       const first = await document.getPage(1);
       const size = first.getViewport({ scale: 1 });

@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build",
+    "dev": "node scripts/prepare-pdfjs-assets.mjs && next dev --hostname 127.0.0.1",
+    "build": "node scripts/prepare-pdfjs-assets.mjs && next build",
     "lint": "eslint .",
     "test": "node --test tests/*.test.mjs",
     "test:local:setup": "node scripts/setup-local-test.mjs",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "preview": "node scripts/prepare-pdfjs-assets.mjs && opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && wrangler deploy",
     "db:migrate:remote": "wrangler d1 migrations apply gestor-universitario-prod --remote",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview"
+    "cf:build": "node scripts/prepare-pdfjs-assets.mjs && opennextjs-cloudflare build",
+    "cf:preview": "node scripts/prepare-pdfjs-assets.mjs && opennextjs-cloudflare build && opennextjs-cloudflare preview"
   },
   "dependencies": {
     "fflate": "^0.8.3",
