@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Highlighter, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronLeft, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -316,9 +316,8 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
                 </div>
                 <span className={list.rowEnd}>
                   {favoritesEnabled && <button type="button" className={`${list.rowAction} ${styles.star}`} aria-pressed={Boolean(item.favorite)} aria-label={`${t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} · ${item.title}`} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} onClick={() => void toggleFavorite(item)}><Star aria-hidden="true" /></button>}
-                  {(item.viewUrl || item.downloadUrl) && <span className={list.rowActions}>
-                    {item.viewUrl && <a className={list.rowAction} href={materialReaderHref(item.id)} target="_blank" rel="noopener" aria-label={`Anotar · ${item.title} (abre num novo separador)`} title="Anotar num novo separador"><Highlighter aria-hidden="true" /><span>Anotar</span></a>}
-                    {item.downloadUrl && <a className={list.rowAction} href={item.downloadUrl} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /><span>Descarregar</span></a>}
+                  {item.downloadUrl && <span className={list.rowActions}>
+                    <a className={list.rowAction} href={item.downloadUrl} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /><span>Descarregar</span></a>
                   </span>}
                   <span className={list.statusPill} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>
                 </span>
