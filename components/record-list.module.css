@@ -106,7 +106,7 @@
   .row:has(.rowActions) { grid-template-columns: auto minmax(0, 1fr); }
   .row:has(.rowActions) .rowEnd { grid-column: 2; min-width: 0; width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px; }
   .row:has(.rowActions) .rowActions { flex-wrap: wrap; }
-  .row:has(.rowActions) .rowEnd > .statusPill { margin-left: auto; }
+  .row:has(.rowActions) .rowEnd > .statusPill, .row:has(.rowActions) .rowEnd > .statusIcon { margin-left: auto; }
   .row:has(.rowActions) .rowAction { width: auto; min-height: 36px; padding: 0 12px; }
   .row:has(.rowActions) .rowAction[data-icon-only="true"] { width: 36px; padding: 0; }
   .row:has(.rowActions) .rowAction span { display: inline; }
