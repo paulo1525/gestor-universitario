@@ -294,6 +294,8 @@ test("a biblioteca usa navegação em linhas e o leitor respeita preferências d
   assert.match(pdfReader, /onPointerEnter=\{\(\) => \{ if \(immersiveFullscreen\) setChromeVisible\(true\); \}\}/);
   assert.match(pdfReader, /onPointerLeave=\{\(\) => \{ if \(immersiveFullscreen\) setChromeVisible\(false\); \}\}/);
   assert.match(readerStyles, /data-chrome-visible="true"/);
+  assert.match(readerStyles, /\.reader\[data-fullscreen="true"\] \.sidebar \{ position: absolute; z-index: 50; inset: auto 0 0;/);
+  assert.match(pdfReader, /compact \|\| immersiveFullscreen/);
   assert.doesNotMatch(readerStyles, /topChrome:focus-within/);
   assert.doesNotMatch(readerStyles, /@media \(hover: none\)/);
   assert.match(readerStyles, /transform: translateY\(-100%\)/);
