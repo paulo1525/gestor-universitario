@@ -143,6 +143,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [removing, setRemoving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [browserFullscreen, setBrowserFullscreen] = useState(false);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
   // Narrow windows use the compact sidebar and larger touch targets.
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches);
@@ -162,10 +163,23 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
-    const syncFullscreen = () => setFullscreen(document.fullscreenElement === dialogRef.current);
+    const syncFullscreen = () => {
+      setFullscreen(document.fullscreenElement === dialogRef.current);
+      const browserChromeHidden =
+        !document.fullscreenElement &&
+        window.outerWidth > 0 &&
+        window.outerHeight > 0 &&
+        window.innerWidth >= window.outerWidth - 16 &&
+        window.innerHeight >= window.outerHeight - 16;
+      setBrowserFullscreen(browserChromeHidden);
+    };
     document.addEventListener("fullscreenchange", syncFullscreen);
+    window.addEventListener("resize", syncFullscreen);
     syncFullscreen();
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      window.removeEventListener("resize", syncFullscreen);
+    };
   }, []);
   const setSidebarPreference = useCallback((open: boolean) => {
     setSidebarOpen(open);
@@ -598,9 +612,11 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
 
   const zoomLabel = zoom === "width" ? "Largura" : zoom === "page" ? "Página" : `${Math.round(zoom * 100)}%`;
   const zoomValue = typeof zoom === "number" ? String(zoom) : zoom;
+  const immersiveFullscreen = fullscreen || browserFullscreen;
 
   return <div className={styles.pageRoot}>
-    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={fullscreen || undefined}>
+    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={immersiveFullscreen || undefined}>
+      <div className={styles.topRevealZone} aria-hidden="true" />
       <div className={styles.topChrome}>
       <header className={styles.header}>
         <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Voltar aos materiais" title="Voltar aos materiais"><ArrowLeft /></button>
