@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle2, ChevronLeft, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -29,7 +29,8 @@ type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: MaterialCatalogTab[] = ["overview", "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
+const tabs: MaterialCatalogTab[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
+const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck };
 const listSections: Exclude<CatalogSection, "other">[] = ["summaries", "notes", "slides", "compendiums", "bibliography"];
 const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
@@ -335,13 +336,22 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <div className={styles.head}>
         <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
         <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
-          {tabs.map((tab) => <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}><span>{tabLabel(tab)}</span><span className={styles.tabCount}>{tab === "overview" ? unitItems.length : tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab]}</span></button>)}
+          {tabs.map((tab) => {
+            const Icon = TAB_ICON[tab as Exclude<MaterialCatalogTab, "overview">];
+            const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
+            return <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>
+              <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
+              <span className={styles.tabLabel}>{tabLabel(tab)}</span>
+              <span className={styles.tabCount}>{count}</span>
+              <ChevronRight className={styles.tabChevron} aria-hidden="true" />
+            </button>;
+          })}
         </nav>
       </div>
       {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
       <div id={`material-panel-${activeTab}`} role="tabpanel" aria-labelledby={`material-tab-${activeTab}`} tabIndex={-1}>
         {listTab && <>
-          <FilterBar label={t("community.materials.catalog.search")}>
+          <FilterBar label={t("community.materials.catalog.search")} className={`${styles.catalogFilters} ${activeTab === "bibliography" ? styles.bibliographyFilters : ""}`}>
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
             {activeTab === "bibliography" && <FilterSegmented label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={setFormatFilter} options={[{ value: "all", label: t("community.materials.catalog.format.all") }, ...formats.map((format) => ({ value: format, label: formatLabel(format), count: formatCounts[format] }))]} />}
             {unitLessons.length > 0 && <FilterSelect label={t("community.materials.catalog.lesson")} value={lessonFilter} onChange={setLessonFilter} defaultValue="" options={[{ value: "", label: t("community.materials.catalog.allLessons") }, ...unitLessons.map((lesson) => ({ value: lesson.code, label: `${lesson.code} · ${lesson.title}` }))]} />}
