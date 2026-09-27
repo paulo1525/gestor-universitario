@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
@@ -154,7 +154,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     return catalogCount + deckCount + (submissionCounts[code] || 0);
   }, [decks, items, submissionCounts]);
 
-  const listTab = activeTab === "overview" || (listSections as string[]).includes(activeTab);
+  const listTab = (listSections as string[]).includes(activeTab);
   const filtered = useMemo(() => {
     const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-PT");
     const normalizedSearch = normalizeSearch(search.trim());
@@ -249,15 +249,6 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: Exclude<MaterialCatalogTab, "overview">) => {
-    const index = tabs.indexOf(tab);
-    const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
-    if (nextIndex < 0) return;
-    event.preventDefault();
-    const next = tabs[nextIndex];
-    onTabChange(next);
-    window.requestAnimationFrame(() => document.getElementById(`material-tab-${next}`)?.focus());
-  };
   // Optimistic star: flips at once and reverts if the server refuses.
   const toggleFavorite = async (item: CatalogItem) => {
     const next = !item.favorite;
@@ -328,28 +319,45 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     </section>;
   }
 
-  // Step 2: the unit's materials.
+  // Step 2: choose a material type. Files stay hidden until a type is opened.
   const unitTitle = selectedUnit.code === GENERAL_MATERIAL_UNIT ? selectedUnit.name : `${selectedUnit.code} · ${selectedUnit.name}`;
+  if (activeTab === "overview") {
+    return <>
+      <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
+      <section className={styles.catalog} aria-label={unitTitle}>
+        <div className={styles.head}>
+          <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
+          <nav className={styles.tabs} aria-label={t("community.materials.title")}>
+            {tabs.map((tab) => {
+              const Icon = TAB_ICON[tab];
+              const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
+              return <button id={`material-tab-${tab}`} key={tab} type="button" className={styles.tab} onClick={() => onTabChange(tab)}>
+                <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
+                <span className={styles.tabLabel}>{tabLabel(tab)}</span>
+                <span className={styles.tabCount}>{count}</span>
+                <ChevronRight className={styles.tabChevron} aria-hidden="true" />
+              </button>;
+            })}
+          </nav>
+        </div>
+        {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
+      </section>
+    </>;
+  }
+
+  const ActiveIcon = TAB_ICON[activeTab as Exclude<MaterialCatalogTab, "overview">];
   return <>
-    <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
-    <section className={styles.catalog} aria-label={unitTitle}>
-      <div className={styles.head}>
-        <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
-        <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
-          {tabs.map((tab) => {
-            const Icon = TAB_ICON[tab];
-            const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
-            return <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>
-              <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
-              <span className={styles.tabLabel}>{tabLabel(tab)}</span>
-              <span className={styles.tabCount}>{count}</span>
-              <ChevronRight className={styles.tabChevron} aria-hidden="true" />
-            </button>;
-          })}
-        </nav>
+    <button className={list.back} type="button" onClick={() => onTabChange("overview")}><ChevronLeft aria-hidden="true" />Tipos de documento</button>
+    <section className={styles.catalog} aria-label={`${unitTitle} · ${tabLabel(activeTab)}`}>
+      <div className={styles.detailHead}>
+        <span className={styles.tabIcon} aria-hidden="true"><ActiveIcon /></span>
+        <div>
+          <span className={styles.detailUnit}>{selectedUnit.name}</span>
+          <h2>{tabLabel(activeTab)}</h2>
+        </div>
       </div>
       {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
-      <div id={`material-panel-${activeTab}`} role="tabpanel" aria-labelledby={`material-tab-${activeTab}`} tabIndex={-1}>
+      <div id={`material-panel-${activeTab}`} tabIndex={-1}>
         {listTab && <>
           <FilterBar label={t("community.materials.catalog.search")} className={`${styles.catalogFilters} ${activeTab === "bibliography" ? styles.bibliographyFilters : ""}`}>
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
