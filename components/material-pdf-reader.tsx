@@ -590,6 +590,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
         if (document.fullscreenElement) await document.exitFullscreen();
         await element.requestFullscreen();
       }
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     } catch {
       setAnnouncement("Não foi possível alterar o modo de ecrã inteiro.");
     }
