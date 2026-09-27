@@ -29,7 +29,7 @@ type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: MaterialCatalogTab[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
+const tabs: Exclude<MaterialCatalogTab, "overview">[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
 const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck };
 const listSections: Exclude<CatalogSection, "other">[] = ["summaries", "notes", "slides", "compendiums", "bibliography"];
 const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
@@ -249,7 +249,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: MaterialCatalogTab) => {
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: Exclude<MaterialCatalogTab, "overview">) => {
     const index = tabs.indexOf(tab);
     const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
     if (nextIndex < 0) return;
@@ -337,7 +337,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
         <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
         <nav className={styles.tabs} role="tablist" aria-label={t("community.materials.title")}>
           {tabs.map((tab) => {
-            const Icon = TAB_ICON[tab as Exclude<MaterialCatalogTab, "overview">];
+            const Icon = TAB_ICON[tab];
             const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
             return <button id={`material-tab-${tab}`} key={tab} type="button" role="tab" className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ""}`} aria-selected={activeTab === tab} aria-controls={`material-panel-${tab}`} tabIndex={activeTab === tab ? 0 : -1} onKeyDown={(event) => handleTabKeyDown(event, tab)} onClick={() => onTabChange(tab)}>
               <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
