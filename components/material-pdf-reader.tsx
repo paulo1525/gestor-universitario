@@ -4,7 +4,7 @@ import { trackMaterialView } from "@/lib/material-views";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Maximize2, Minimize2, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
@@ -38,6 +38,7 @@ const ZOOM_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const PAGE_GAP = 16;
 // Narrow screens use the compact reader layout.
 const COMPACT_QUERY = "(max-width: 900px)";
+const SIDEBAR_STORAGE_KEY = "gu-pdf-highlights-sidebar";
 
 // The legacy build ships the polyfills (e.g. Map#getOrInsertComputed) that
 // Safari and older Chromium/Firefox releases still lack.
@@ -140,7 +141,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [activeId, setActiveId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Highlight | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 900px)").matches);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
   // Narrow windows use the compact sidebar and larger touch targets.
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches);
@@ -159,6 +161,20 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const numPages = pdfDocument?.numPages ?? 0;
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const syncFullscreen = () => setFullscreen(document.fullscreenElement === dialogRef.current);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    syncFullscreen();
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+  const setSidebarPreference = useCallback((open: boolean) => {
+    setSidebarOpen(open);
+    storageSet(SIDEBAR_STORAGE_KEY, open ? "open" : "closed");
+  }, []);
+  useEffect(() => {
+    const saved = storageGet(SIDEBAR_STORAGE_KEY);
+    setSidebarOpen(saved === "open" ? true : saved === "closed" ? false : window.matchMedia("(min-width: 900px)").matches);
+  }, []);
   useEffect(() => {
     const media = window.matchMedia(COMPACT_QUERY);
     const sync = () => setCompact(media.matches);
@@ -391,7 +407,6 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     setPending(next);
     selection.removeAllRanges();
     setAnnouncement(`A guardar realce na página ${page}.`);
-    setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches);
     void createHighlight(next.page, next.rects, next.text, next.color).finally(() => {
       setPending((current) => current === next ? null : current);
     });
@@ -421,7 +436,6 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
 
   const selectHighlight = useCallback((highlight: Highlight, scroll = true) => {
     setActiveId(highlight.id);
-    setSidebarOpen(true);
     if (scroll) {
       const element = pageRefs.current.get(highlight.page);
       scrollToPage(highlight.page, "smooth", element ? Math.max(0, highlight.y * element.offsetHeight - 80) : 0);
@@ -566,18 +580,36 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     scrollToPage(page);
   };
 
+  const toggleFullscreen = async () => {
+    const element = dialogRef.current;
+    if (!element) return;
+    try {
+      if (document.fullscreenElement === element) {
+        await document.exitFullscreen();
+      } else {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        await element.requestFullscreen();
+      }
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    } catch {
+      setAnnouncement("Não foi possível alterar o modo de ecrã inteiro.");
+    }
+  };
+
   const zoomLabel = zoom === "width" ? "Largura" : zoom === "page" ? "Página" : `${Math.round(zoom * 100)}%`;
   const zoomValue = typeof zoom === "number" ? String(zoom) : zoom;
 
   return <div className={styles.pageRoot}>
-    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"}>
+    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={fullscreen || undefined}>
+      <div className={styles.topChrome}>
       <header className={styles.header}>
         <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Voltar aos materiais" title="Voltar aos materiais"><ArrowLeft /></button>
         <div className={styles.headerTitle}><span>Anotador</span><h1 id="material-pdf-title" title={title}>{title}</h1></div>
         <div className={styles.headerActions}>
           {downloadUrl && <a className={styles.iconButton} href={downloadUrl} download={fileName || true} aria-label="Descarregar PDF" title="Descarregar PDF"><Download /></a>}
           <a className={styles.iconButton} href={viewUrl} target="_blank" rel="noopener noreferrer" aria-label="Abrir PDF original num novo separador" title="Abrir PDF original"><ExternalLink /></a>
-          <button className={styles.iconButton} type="button" onClick={() => setSidebarOpen((open) => !open)} aria-pressed={sidebarOpen} aria-controls="pdf-highlights-panel" aria-label={sidebarOpen ? "Esconder realces" : "Mostrar realces"} title={sidebarOpen ? "Esconder realces" : "Mostrar realces"}>{sidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}<span className={styles.badgeCount}>{highlights.length}</span></button>
+          <button className={styles.iconButton} type="button" onClick={() => void toggleFullscreen()} aria-pressed={fullscreen} aria-label={fullscreen ? "Sair do ecrã inteiro" : "Abrir em ecrã inteiro"} title={fullscreen ? "Sair do ecrã inteiro" : "Ecrã inteiro"}>{fullscreen ? <Minimize2 /> : <Maximize2 />}</button>
+          <button className={styles.iconButton} type="button" onClick={() => setSidebarPreference(!sidebarOpen)} aria-pressed={sidebarOpen} aria-controls="pdf-highlights-panel" aria-label={sidebarOpen ? "Esconder realces" : "Mostrar realces"} title={sidebarOpen ? "Esconder realces" : "Mostrar realces"}>{sidebarOpen ? <PanelRightClose /> : <PanelRightOpen />}<span className={styles.badgeCount}>{highlights.length}</span></button>
         </div>
       </header>
       <div className={styles.toolbar} role="toolbar" aria-label="Ferramentas de leitura">
@@ -623,6 +655,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
           <button className={styles.iconButton} type="submit" disabled={!searchState.pages.length} aria-label="Resultado seguinte"><ChevronDown /></button>
         </form>
       </div>
+      </div>
       <div className={styles.workspace}>
         <div ref={scrollerRef} className={styles.scroller} data-tool={tool} onScroll={() => { updateCurrentPage(); }} onPointerUp={() => window.setTimeout(captureSelection, 0)} onKeyUp={(event) => { if (event.shiftKey) captureSelection(); }}>
           {pdfError ? <div className={styles.pdfError} role="alert"><strong>Não foi possível abrir este PDF.</strong><span>{pdfError}</span><a className="button button--secondary button--compact" href={viewUrl} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden="true" />Abrir o PDF original</a></div>
@@ -648,7 +681,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
                     pendingRects={pending?.page === page ? pending.rects : null}
                     pendingColor={pending?.page === page ? pending.color : null}
                     onSelectHighlight={(highlight) => selectHighlight(highlight, false)}
-                    onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); setSidebarOpen((open) => open || window.matchMedia("(min-width: 900px)").matches); }}
+                    onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); }}
                   />;
                 })}
                 {layout === "single" && <nav className={styles.pager} aria-label="Navegação entre páginas">
@@ -666,7 +699,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
             <div><ListTree aria-hidden="true" /><h3>Realces</h3><span className={styles.sidebarCount}>{highlights.length}</span></div>
             <div className={styles.sidebarActions}>
               <button className="button button--secondary button--compact" type="button" onClick={exportNotes} disabled={!listed.length}><Download aria-hidden="true" />Exportar</button>
-              {compact && <button className={styles.iconButton} type="button" onClick={() => setSidebarOpen(false)} aria-label="Fechar realces"><X /></button>}
+              {compact && <button className={styles.iconButton} type="button" onClick={() => setSidebarPreference(false)} aria-label="Fechar realces"><X /></button>}
             </div>
           </header>
           <div className={styles.colorFilter} role="group" aria-label="Filtrar por cor">

@@ -1,6 +1,13 @@
 /* Leitor de PDF dos materiais: documento contínuo à esquerda, realces e notas à direita. */
 .pageRoot { position: fixed; inset: 0; display: grid; background: var(--surface); }
-.reader { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); user-select: none; width: 100%; height: 100dvh; overflow: hidden; background: var(--surface); }
+.reader { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); user-select: none; width: 100%; height: 100dvh; overflow: hidden; background: var(--surface); }
+.topChrome { position: relative; z-index: 40; min-width: 0; background: var(--surface); }
+.reader[data-fullscreen="true"] { grid-template-rows: minmax(0, 1fr); }
+.reader[data-fullscreen="true"] .workspace { grid-row: 1; }
+.reader[data-fullscreen="true"] .topChrome { position: absolute; inset: 0 0 auto; z-index: 60; transform: translateY(calc(-100% + 8px)); transition: transform .18s ease; box-shadow: 0 8px 24px rgb(0 0 0 / 14%); }
+.reader[data-fullscreen="true"] .topChrome::after { position: absolute; top: 100%; right: 0; left: 0; height: 14px; content: ""; }
+.reader[data-fullscreen="true"] .topChrome:hover,
+.reader[data-fullscreen="true"] .topChrome:focus-within { transform: translateY(0); }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Highlight palette: functional colours shared by swatches, marks and list items. */
@@ -178,8 +185,11 @@
   .pageGroupTitle { min-height: 40px; }
   .highlightItem { gap: 8px; padding: 10px 10px 10px 12px; }
 }
+@media (hover: none) {
+  .reader[data-fullscreen="true"] .topChrome { transform: none; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .mark { transition: none; }
+  .mark, .reader[data-fullscreen="true"] .topChrome { transition: none; }
 }
 
 /* Annotator page states (loading error, material without PDF). */

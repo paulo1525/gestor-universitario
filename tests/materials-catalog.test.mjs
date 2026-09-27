@@ -271,3 +271,20 @@ test("listas de materiais e UCs usam a paginação partilhada e o leitor tem mod
   assert.match(pdfReader, /gu-pdf-layout/);
   assert.match(pdfReader, /Página a página/);
 });
+
+test("a biblioteca usa navegação em linhas e o leitor respeita preferências de visualização", async () => {
+  const library = await readFile(new URL("../components/material-library.tsx", import.meta.url), "utf8");
+  const readerStyles = await readFile(new URL("../components/material-pdf-reader.module.css", import.meta.url), "utf8");
+
+  assert.doesNotMatch(component, /const tabs:[^\n]*\["overview"/);
+  assert.match(component, /className=\{styles\.tabIcon\}/);
+  assert.match(styles, /\.catalogFilters :global\(\.filter-bar__controls\)/);
+  assert.match(library, /openId \? "exams" : "summaries"/);
+
+  assert.match(pdfReader, /SIDEBAR_STORAGE_KEY = "gu-pdf-highlights-sidebar"/);
+  assert.match(pdfReader, /storageSet\(SIDEBAR_STORAGE_KEY, open \? "open" : "closed"\)/);
+  assert.doesNotMatch(pdfReader, /setSidebarOpen\(\(open\) => open \|\| window\.matchMedia/);
+  assert.match(pdfReader, /requestFullscreen\(\)/);
+  assert.match(readerStyles, /\.reader\[data-fullscreen="true"\] \.topChrome:hover/);
+});
+
