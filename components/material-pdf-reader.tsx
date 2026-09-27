@@ -141,13 +141,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [activeId, setActiveId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Highlight | null>(null);
   const [removing, setRemoving] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const saved = storageGet(SIDEBAR_STORAGE_KEY);
-    if (saved === "open") return true;
-    if (saved === "closed") return false;
-    return window.matchMedia("(min-width: 900px)").matches;
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
   // Narrow windows use the compact sidebar and larger touch targets.
@@ -176,6 +170,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const setSidebarPreference = useCallback((open: boolean) => {
     setSidebarOpen(open);
     storageSet(SIDEBAR_STORAGE_KEY, open ? "open" : "closed");
+  }, []);
+  useEffect(() => {
+    const saved = storageGet(SIDEBAR_STORAGE_KEY);
+    setSidebarOpen(saved === "open" ? true : saved === "closed" ? false : window.matchMedia("(min-width: 900px)").matches);
   }, []);
   useEffect(() => {
     const media = window.matchMedia(COMPACT_QUERY);
