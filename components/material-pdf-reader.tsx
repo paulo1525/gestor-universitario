@@ -144,6 +144,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [browserFullscreen, setBrowserFullscreen] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
   // Narrow windows use the compact sidebar and larger touch targets.
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.matchMedia(COMPACT_QUERY).matches);
@@ -181,6 +182,11 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       window.removeEventListener("resize", syncFullscreen);
     };
   }, []);
+  useEffect(() => {
+    if (fullscreen || browserFullscreen) setChromeVisible(false);
+    else setChromeVisible(true);
+  }, [browserFullscreen, fullscreen]);
+
   const setSidebarPreference = useCallback((open: boolean) => {
     setSidebarOpen(open);
     storageSet(SIDEBAR_STORAGE_KEY, open ? "open" : "closed");
@@ -604,6 +610,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
         if (document.fullscreenElement) await document.exitFullscreen();
         await element.requestFullscreen();
       }
+      setChromeVisible(false);
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     } catch {
       setAnnouncement("Não foi possível alterar o modo de ecrã inteiro.");
@@ -615,9 +622,9 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const immersiveFullscreen = fullscreen || browserFullscreen;
 
   return <div className={styles.pageRoot}>
-    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={immersiveFullscreen || undefined}>
-      <div className={styles.topRevealZone} aria-hidden="true" />
-      <div className={styles.topChrome}>
+    <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={immersiveFullscreen || undefined} data-chrome-visible={immersiveFullscreen && chromeVisible ? "true" : undefined}>
+      <div className={styles.topRevealZone} aria-hidden="true" onPointerEnter={() => { if (immersiveFullscreen) setChromeVisible(true); }} />
+      <div className={styles.topChrome} onPointerLeave={() => { if (immersiveFullscreen) setChromeVisible(false); }}>
       <header className={styles.header}>
         <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Voltar aos materiais" title="Voltar aos materiais"><ArrowLeft /></button>
         <div className={styles.headerTitle}><span>Anotador</span><h1 id="material-pdf-title" title={title}>{title}</h1></div>
