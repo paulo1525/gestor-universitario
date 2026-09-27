@@ -722,7 +722,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
             <div><ListTree aria-hidden="true" /><h3>Realces</h3><span className={styles.sidebarCount}>{highlights.length}</span></div>
             <div className={styles.sidebarActions}>
               <button className="button button--secondary button--compact" type="button" onClick={exportNotes} disabled={!listed.length}><Download aria-hidden="true" />Exportar</button>
-              {compact && <button className={styles.iconButton} type="button" onClick={() => setSidebarPreference(false)} aria-label="Fechar realces"><X /></button>}
+              {(compact || immersiveFullscreen) && <button className={styles.iconButton} type="button" onClick={() => setSidebarPreference(false)} aria-label="Fechar realces"><X /></button>}
             </div>
           </header>
           <div className={styles.colorFilter} role="group" aria-label="Filtrar por cor">
