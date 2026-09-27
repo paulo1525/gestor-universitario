@@ -93,7 +93,7 @@ test("os downloads preparados não expõem os pacotes protegidos", () => {
   assert.match(worker, /WHERE id=\? AND publication_status='published'/);
   assert.match(worker, /item\.storage_state !== "ready"/);
   // The unit's prepared package is a plain download link; nothing is built on the device.
-  assert.match(component, /selectedDeck\?\.downloadUrl \? <a className="button button--secondary button--compact" href=\{selectedDeck\.downloadUrl\} download>/);
+  assert.match(component, /selectedDeck\?\.downloadUrl \? <a className="button button--secondary button--compact" href=\{selectedDeck\.downloadUrl\} onClick=\{[^\n]+\} download>/);
   assert.match(component, /Referência bibliográfica apenas/);
   assert.doesNotMatch(component, /buildMaterialApkg|materialApkgBlob|URL\.createObjectURL|MaterialCompendiumExport/);
   assert.match(component, /verificationFilter/);
@@ -150,7 +150,7 @@ test("os PDFs abrem em modo inline e os realces privados persistem na D1", async
   assert.doesNotMatch(component, /<span>Descarregar<\/span>/);
   assert.match(component, /data-icon-only="true"/);
   assert.match(component, /className=\{list\.statusIcon\}/);
-  assert.match(component, /<Check aria-hidden="true" \/>/);
+  assert.match(component, /<CheckCircle2 aria-hidden="true" \/>/);
   assert.match(component, /href=\{materialReaderHref\(item\.id\)\} target="_blank"/);
   assert.doesNotMatch(component, /<MaterialPdfReader/);
   assert.match(worker, /async function catalogItem\(/);
@@ -172,9 +172,9 @@ test("o catálogo mantém os estados e a navegação de tabs acessíveis", async
   assert.match(component, /retryCatalog/);
   // The curricular unit is chosen before the tabs appear.
   assert.match(component, /if \(!selectedUnit\) \{/);
-  assert.match(styles, /scrollbar-width:\s*none/);
-  assert.match(styles, /@media \(max-width: 560px\)/);
-  assert.match(styles, /resourceActions \.button \{ width: 100%/);
+  assert.match(styles, /\.tabs \{[^}]*flex-wrap: wrap/);
+  assert.match(styles, /@media \(max-width: 640px\)/);
+  assert.match(styles, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   const recordListStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
   assert.match(recordListStyles, /row:has\(\.rowActions\) \.rowEnd \{[^}]*flex-wrap: wrap/);
   assert.match(recordListStyles, /rowEnd > \.statusPill, \.row:has\(\.rowActions\) \.rowEnd > \.statusIcon \{ margin-left: auto/);

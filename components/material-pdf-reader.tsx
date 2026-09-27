@@ -1,4 +1,5 @@
 "use client";
+import { trackMaterialView } from "@/lib/material-views";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
@@ -188,11 +189,12 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       if (!active) return;
       setBaseSize({ width: size.width, height: size.height });
       setPdfDocument(document);
+      void trackMaterialView(materialId);
     }).catch((reason) => {
       if (active && !(reason instanceof DOMException && reason.name === "AbortError")) setPdfError(reason instanceof Error && reason.message ? reason.message : "Não foi possível abrir o PDF.");
     });
     return () => { active = false; controller.abort(); void loadingTask?.destroy(); };
-  }, [viewUrl]);
+  }, [viewUrl, materialId]);
 
   useEffect(() => {
     const controller = new AbortController();
