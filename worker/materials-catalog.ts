@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { materialViewCounts, recordMaterialView } from "./material-views";
 import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
 import { driveConfigured, driveDownload, driveSyncStatus, isDriveKey, runDriveSync } from "@/worker/google-drive";
 
@@ -12,6 +13,7 @@ export type MaterialsCatalogUser = {
 
 export type MaterialsCatalogEnv = {
   DB: D1Database;
+  AUTH_PEPPER?: string;
   MATERIALS_BUCKET?: R2Bucket;
   AUTH_RATE_LIMITER?: RateLimit;
   GOOGLE_SERVICE_ACCOUNT_JSON?: string;
@@ -227,11 +229,12 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
   // Stars are personal: only the signed-in user's favourites, and only while the favourites module is on.
   const favoritesEnabled = await enabled("materials.favorites");
   const favoriteIds = favoritesEnabled ? new Set((await env.DB.prepare("SELECT material_id FROM material_catalog_favorites WHERE user_id=?").bind(user.id).all()).results.map((item) => String(row(item).material_id))) : new Set<string>();
+  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog"), materialViewCounts(env, "anki")]);
   const catalogItems = itemsResult.results.map((item) => {
     const material = row(item);
-    return { ...mapCatalogItem(material, lessonCodesByMaterial.get(String(material.id)) || []), favorite: favoriteIds.has(String(material.id)) };
+    return { ...mapCatalogItem(material, lessonCodesByMaterial.get(String(material.id)) || []), favorite: favoriteIds.has(String(material.id)), views: catalogViews ? catalogViews.get(String(material.id)) || 0 : null };
   });
-  const decks = deckResult.results.map((item) => mapDeck(row(item), deckLessonsResult.results.map(row)));
+  const decks = deckResult.results.map((item) => ({ ...mapDeck(row(item), deckLessonsResult.results.map(row)), views: deckViews ? deckViews.get(String(row(item).id)) || 0 : null }));
   return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { favorites: favoritesEnabled, manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
 }
 
@@ -241,7 +244,8 @@ async function catalogItem(request: Request, env: MaterialsCatalogEnv, id: strin
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const item = await env.DB.prepare("SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id WHERE m.id=? AND m.publication_status='published'").bind(id).first<Record<string, unknown>>();
   if (!item) return json({ error: "Material não encontrado." }, 404);
-  return json({ item: mapCatalogItem(item) });
+  const views = await materialViewCounts(env, "catalog");
+  return json({ item: { ...mapCatalogItem(item), views: views ? views.get(id) || 0 : null } });
 }
 
 async function anki(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
@@ -572,7 +576,8 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     env.DB.prepare("SELECT m.id,m.material_kind,m.summary_format,m.bibliography_format,m.other_format,m.title,m.mime_type,m.file_name,m.storage_backend,m.storage_state,m.external_url,m.public_access,m.byte_size,m.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
     ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
   ]);
-  type Entry = { section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
+  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog"), materialViewCounts(env, "anki")]);
+  type Entry = { views?: number | null; section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
   type Unit = { key: string; code: string; name: string; year: number | null; semester: number | null; entries: Entry[] };
   const units = new Map<string, Unit>();
   const unitFor = (item: Record<string, unknown>) => {
@@ -582,6 +587,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   };
   const add = (item: Record<string, unknown>, entry: Omit<Entry, "locked">) => {
     const isPublic = Number(item.public_access) === 1;
+    entry = { ...entry, views: (entry.type === "anki" ? deckViews : catalogViews)?.get(String(entry.id)) ?? ((entry.type === "anki" ? deckViews : catalogViews) ? 0 : null) };
     // The redaction happens here, on the server: a locked entry carries only its section.
     unitFor(item).entries.push(user || isPublic ? { ...entry, locked: false, isPublic: manager ? isPublic : undefined } : { section: entry.section, locked: true });
   };
@@ -638,11 +644,13 @@ async function catalogFavorite(request: Request, env: MaterialsCatalogEnv, id: s
 
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights|favorite))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return /^\/api\/material-views\/(catalog|anki)\/[^/]+$/.test(path) || path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights|favorite))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker, waitUntil?: WaitUntil): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "") || "/";
+  const viewCounter = path.match(/^\/api\/material-views\/(catalog|anki)\/([^/]+)$/);
+  if (viewCounter) return recordMaterialView(request, env, viewCounter[1] as "catalog" | "anki", decodeURIComponent(viewCounter[2]), user, enabled);
   if (path === "/api/drive-sync") return driveSyncRoute(request, env, user);
   if (request.method === "GET" && (path === "/api/material-catalog" || path === "/api/public-materials")) await refreshDriveInBackground(env, waitUntil);
   if (path === "/api/material-catalog") return user ? catalog(request, env, url, user, enabled) : unauthenticated();

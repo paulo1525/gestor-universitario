@@ -7,6 +7,8 @@ import { ChevronRight, Download, File, FileImage, FileText, Folder, Globe, House
 import { AppToast, type ToastKind } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
 import { clampPage, Pagination } from "@/components/pagination";
+import { MaterialViews } from "@/components/material-views";
+import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views";
 import { materialReaderHref } from "@/lib/material-reader";
 import styles from "@/components/public-materials.module.css";
 
@@ -18,7 +20,7 @@ const SECTIONS: Section[] = ["summaries", "notes", "slides", "compendiums", "bib
 // Folders shown in every subject, even when empty; the others only appear when they have files.
 const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
-type Entry = { section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
+type Entry = { views?: number | null; section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
 type Unit = { key: string; code: string; name: string; year?: number | null; semester?: number | null; entries: Entry[] };
 
 /** Subjects grouped by year and semester (in order), each group sorted by number of files, then by code. */
@@ -102,6 +104,9 @@ export function PublicMaterials() {
     return () => { controller.abort(); window.removeEventListener("popstate", onPop); };
   }, [load]);
 
+  useEffect(() => subscribeMaterialViews(({ id, type, views }) => {
+    setState((current) => ({ ...current, units: current.units.map((unit) => ({ ...unit, entries: unit.entries.map((entry) => entry.id === id && entry.type === type ? { ...entry, views: Math.max(entry.views || 0, views) } : entry) })) }));
+  }), []);
   const open = (next: Place) => {
     setPlace(next);
     setPage(1);
@@ -162,6 +167,11 @@ export function PublicMaterials() {
   const hasLocked = state.units.some((item) => item.entries.some((entry) => entry.locked));
   // Signed-in users read PDFs in the annotator; visitors open the public file directly.
   const openHref = (entry: Entry) => state.authenticated && entry.type === "catalog" && entry.id && entry.href?.endsWith("/view") ? materialReaderHref(entry.id) : entry.href ?? "#";
+  const recordOpening = async (entry: Entry, reader = false) => {
+    if (reader || !entry.id || !entry.type) return;
+    const views = await trackMaterialView(entry.id, entry.type);
+    if (views !== null) setState((current) => ({ ...current, units: current.units.map((unit) => ({ ...unit, entries: unit.entries.map((item) => item.id === entry.id && item.type === entry.type ? { ...item, views } : item) })) }));
+  };
   const count = (entries: Entry[]) => t(entries.length === 1 ? "publicMaterials.fileOne" : "publicMaterials.files", { count: entries.length });
 
   return (
@@ -247,16 +257,16 @@ export function PublicMaterials() {
                 </li>
               ) : (
                 <li className={styles.file} key={`${entry.type}-${entry.id}`}>
-                  <a className={styles.fileName} href={openHref(entry)} target="_blank" rel="noopener">
+                  <a className={styles.fileName} href={openHref(entry)} onClick={() => void recordOpening(entry, openHref(entry).startsWith("/materiais/ler"))} target="_blank" rel="noopener">
                     <FileIcon entry={entry} />
-                    <span><strong>{entry.title}</strong>{term && <small>{owner.code || owner.name} › {sectionLabel(entry.section)}</small>}</span>
+                    <span><strong>{entry.title}</strong><MaterialViews count={entry.views} />{term && <small>{owner.code || owner.name} › {sectionLabel(entry.section)}</small>}</span>
                     <span className="sr-only"> ({t("links.opensInNewTab")})</span>
                   </a>
                   <span className={styles.fileMeta}>{fileSize(entry.size)}</span>
                   <span className={styles.fileMeta}>{fileDate(entry.updatedAt)}</span>
                   <span className={styles.fileActions}>
                     {state.canManage && <button type="button" disabled={busy === entry.id} onClick={() => void toggle(entry)} aria-pressed={entry.isPublic === true} aria-label={`${t(entry.isPublic ? "publicMaterials.isPublic" : "publicMaterials.isPrivate")}: ${entry.title}`} title={t(entry.isPublic ? "publicMaterials.isPublic" : "publicMaterials.isPrivate")}>{entry.isPublic ? <Globe aria-hidden="true" /> : <Lock aria-hidden="true" />}</button>}
-                    {entry.download && <a href={entry.download} download aria-label={`${t("publicMaterials.download")}: ${entry.title}`} title={t("publicMaterials.download")}><Download aria-hidden="true" /></a>}
+                    {entry.download && <a href={entry.download} onClick={() => void recordOpening(entry)} download aria-label={`${t("publicMaterials.download")}: ${entry.title}`} title={t("publicMaterials.download")}><Download aria-hidden="true" /></a>}
                   </span>
                 </li>
               ))}

@@ -1,5 +1,14 @@
 export const COMMUNITY_MESSAGES = {
   "pt-PT": {
+    "community.materials.views.one": "1 visualização",
+    "community.materials.views.count": "{count} visualizações",
+    "community.materials.views.rule": "Aberturas repetidas do mesmo material são agrupadas durante 30 minutos. Contagem desde a ativação desta funcionalidade.",
+    "community.materials.catalog.allFiles": "Todos os ficheiros",
+    "community.materials.catalog.sort": "Ordenar",
+    "community.materials.catalog.sort.lesson": "Por aula",
+    "community.materials.catalog.sort.views": "Mais vistos",
+    "community.materials.catalog.sort.recent": "Mais recentes",
+
     "community.common.optional": "opcional",
     "community.common.cancel": "Cancelar",
     "community.common.close": "Fechar",
@@ -358,6 +367,15 @@ export const COMMUNITY_MESSAGES = {
     "community.calendar.deleted": "Evento eliminado."
   },
   en: {
+    "community.materials.views.one": "1 view",
+    "community.materials.views.count": "{count} views",
+    "community.materials.views.rule": "Repeated openings of the same material are grouped for 30 minutes. Counts start when this feature is enabled.",
+    "community.materials.catalog.allFiles": "All files",
+    "community.materials.catalog.sort": "Sort",
+    "community.materials.catalog.sort.lesson": "By lesson",
+    "community.materials.catalog.sort.views": "Most viewed",
+    "community.materials.catalog.sort.recent": "Most recent",
+
     "community.units.emptyInitial": "No curricular units yet.",
     "community.units.filters": "Search and filter",
     "community.units.filtersHint": "Refine the catalogue by name, code, representative or study year.",
