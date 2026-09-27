@@ -163,18 +163,18 @@ test("a gestão do catálogo fica limitada a administradores e à direção", ()
   assert.doesNotMatch(worker, /user\.commissionDepartment === "management" \|\| user\.commissionPosition/);
 });
 
-test("o catálogo mantém os estados e a navegação de tabs acessíveis", async () => {
-  assert.match(component, /role="tablist"/);
-  assert.match(component, /aria-controls=\{`material-panel-\$\{tab\}`\}/);
-  assert.match(component, /tabIndex=\{activeTab === tab \? 0 : -1\}/);
-  assert.match(component, /ArrowRight/);
-  assert.match(component, /role="tabpanel"/);
+test("o catálogo mantém os estados e a navegação de tipos acessíveis", async () => {
+  assert.match(component, /<nav className=\{styles\.tabs\} aria-label=\{t\("community\.materials\.title"\)\}>/);
+  assert.match(component, /<button id=\{`material-tab-\$\{tab\}`\} key=\{tab\} type="button"/);
+  assert.match(component, /onClick=\{\(\) => onTabChange\(tab\)\}/);
+  assert.match(component, /<button className=\{list\.back\} type="button" onClick=\{\(\) => onTabChange\("overview"\)\}/);
+  assert.match(component, /<div id=\{`material-panel-\$\{activeTab\}`\} tabIndex=\{-1\}>/);
   assert.match(component, /retryCatalog/);
   // The curricular unit is chosen before the tabs appear.
   assert.match(component, /if \(!selectedUnit\) \{/);
-  assert.match(styles, /\.tabs \{[^}]*flex-wrap: wrap/);
+  assert.match(styles, /\.tabs \{ display: grid;/);
   assert.match(styles, /@media \(max-width: 640px\)/);
-  assert.match(styles, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.tab \{ display: grid; grid-template-columns: 36px minmax\(0, 1fr\) auto 16px/);
   const recordListStyles = await readFile(new URL("../components/record-list.module.css", import.meta.url), "utf8");
   assert.match(recordListStyles, /row:has\(\.rowActions\) \.rowEnd \{[^}]*flex-wrap: wrap/);
   assert.match(recordListStyles, /rowEnd > \.statusPill, \.row:has\(\.rowActions\) \.rowEnd > \.statusIcon \{ margin-left: auto/);
