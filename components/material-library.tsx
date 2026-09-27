@@ -326,7 +326,7 @@ export function MaterialLibrary() {
     [versionNotes, setVersionNotes] = useState(""),
     [publishingVersion, setPublishingVersion] = useState(false),
     [filter, setFilter] = useState("all"),
-    [activeTab, setActiveTab] = useState<MaterialCatalogTab>(() => openId ? "exams" : "overview"),
+    [activeTab, setActiveTab] = useState<MaterialCatalogTab>(() => openId ? "exams" : "summaries"),
     // The selected unit lives in the address (?uc=) so a shared or reloaded link keeps the same context.
     [unitCode, setUnitCode] = useState(() => typeof window === "undefined" ? "" : normalizeMaterialUnitCode(new URLSearchParams(window.location.search).get("uc")));
   const load = useCallback(async () => {
@@ -389,7 +389,7 @@ export function MaterialLibrary() {
   }, []);
   const selectUnit = useCallback((code: string) => {
     setUnitCode(code);
-    setActiveTab("overview");
+    setActiveTab("summaries");
     const url = new URL(window.location.href);
     if (code) url.searchParams.set("uc", code);
     else url.searchParams.delete("uc");
