@@ -7,9 +7,7 @@
 .reader[data-fullscreen="true"] .workspace { grid-row: 1; }
 .reader[data-fullscreen="true"] .topRevealZone { position: absolute; z-index: 61; top: 0; right: 0; left: 0; display: block; height: 14px; }
 .reader[data-fullscreen="true"] .topChrome { position: absolute; inset: 0 0 auto; z-index: 60; transform: translateY(-100%); pointer-events: none; transition: transform .18s ease; box-shadow: 0 8px 24px rgb(0 0 0 / 14%); }
-.reader[data-fullscreen="true"] .topRevealZone:hover + .topChrome,
-.reader[data-fullscreen="true"] .topChrome:hover,
-.reader[data-fullscreen="true"] .topChrome:focus-within { transform: translateY(0); pointer-events: auto; }
+.reader[data-fullscreen="true"][data-chrome-visible="true"] .topChrome { transform: translateY(0); pointer-events: auto; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Highlight palette: functional colours shared by swatches, marks and list items. */
@@ -186,10 +184,6 @@
   .addNote, .note { min-height: 36px; }
   .pageGroupTitle { min-height: 40px; }
   .highlightItem { gap: 8px; padding: 10px 10px 10px 12px; }
-}
-@media (hover: none) {
-  .reader[data-fullscreen="true"] .topRevealZone { display: none; }
-  .reader[data-fullscreen="true"] .topChrome { transform: none; pointer-events: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mark, .reader[data-fullscreen="true"] .topChrome { transition: none; }

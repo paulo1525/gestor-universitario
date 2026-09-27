@@ -290,7 +290,12 @@ test("a biblioteca usa navegação em linhas e o leitor respeita preferências d
   assert.match(pdfReader, /requestFullscreen\(\)/);
   assert.match(pdfReader, /browserFullscreen/);
   assert.match(pdfReader, /window\.innerHeight >= window\.outerHeight - 16/);
-  assert.match(readerStyles, /\.reader\[data-fullscreen="true"\] \.topRevealZone:hover \+ \.topChrome/);
+  assert.match(pdfReader, /chromeVisible/);
+  assert.match(pdfReader, /onPointerEnter=\{\(\) => \{ if \(immersiveFullscreen\) setChromeVisible\(true\); \}\}/);
+  assert.match(pdfReader, /onPointerLeave=\{\(\) => \{ if \(immersiveFullscreen\) setChromeVisible\(false\); \}\}/);
+  assert.match(readerStyles, /data-chrome-visible="true"/);
+  assert.doesNotMatch(readerStyles, /topChrome:focus-within/);
+  assert.doesNotMatch(readerStyles, /@media \(hover: none\)/);
   assert.match(readerStyles, /transform: translateY\(-100%\)/);
 });
 
