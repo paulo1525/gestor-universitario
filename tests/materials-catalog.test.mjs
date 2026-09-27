@@ -279,12 +279,18 @@ test("a biblioteca usa navegação em linhas e o leitor respeita preferências d
   assert.doesNotMatch(component, /const tabs:[^\n]*\["overview"/);
   assert.match(component, /className=\{styles\.tabIcon\}/);
   assert.match(styles, /\.catalogFilters :global\(\.filter-bar__controls\)/);
-  assert.match(library, /openId \? "exams" : "summaries"/);
+  assert.match(library, /openId \? "exams" : "overview"/);
+  assert.match(component, /if \(activeTab === "overview"\)/);
+  assert.match(component, /Tipos de documento/);
+  assert.match(component, /const listTab = \(listSections as string\[\]\)\.includes\(activeTab\)/);
 
   assert.match(pdfReader, /SIDEBAR_STORAGE_KEY = "gu-pdf-highlights-sidebar"/);
   assert.match(pdfReader, /storageSet\(SIDEBAR_STORAGE_KEY, open \? "open" : "closed"\)/);
   assert.doesNotMatch(pdfReader, /setSidebarOpen\(\(open\) => open \|\| window\.matchMedia/);
   assert.match(pdfReader, /requestFullscreen\(\)/);
-  assert.match(readerStyles, /\.reader\[data-fullscreen="true"\] \.topChrome:hover/);
+  assert.match(pdfReader, /browserFullscreen/);
+  assert.match(pdfReader, /window\.innerHeight >= window\.outerHeight - 16/);
+  assert.match(readerStyles, /\.reader\[data-fullscreen="true"\] \.topRevealZone:hover \+ \.topChrome/);
+  assert.match(readerStyles, /transform: translateY\(-100%\)/);
 });
 
