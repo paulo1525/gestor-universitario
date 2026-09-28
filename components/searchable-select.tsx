@@ -22,9 +22,9 @@ function optionsFrom(children: ReactNode): Option[] {
   });
 }
 
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; rootClassName?: string; allowCustomValue?: boolean; placeholder?: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; rootClassName?: string; allowCustomValue?: boolean; placeholder?: string; maxLength?: number };
 
-export function SearchableSelect({ children, value, defaultValue, onChange, id, name, className, rootClassName, allowCustomValue = false, placeholder, disabled, required, style, "aria-label": ariaLabel, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }: Props) {
+export function SearchableSelect({ children, value, defaultValue, onChange, id, name, className, rootClassName, allowCustomValue = false, placeholder, maxLength, disabled, required, style, "aria-label": ariaLabel, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }: Props) {
   const generatedId = useId();
   const inputId = id || `searchable-select-${generatedId}`;
   const listId = `${inputId}-options`;
@@ -84,7 +84,7 @@ export function SearchableSelect({ children, value, defaultValue, onChange, id, 
   };
 
   return <div ref={rootRef} className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} style={style}>
-    <input ref={inputRef} id={inputId} className={`${styles.input}${className ? ` ${className}` : ""}`} type="text" role="combobox" aria-label={ariaLabel} aria-invalid={ariaInvalid} aria-describedby={ariaDescribedBy} aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined} value={open ? query : displayValue} placeholder={placeholder ?? selected?.label} disabled={disabled} autoComplete="off"
+    <input ref={inputRef} id={inputId} className={`${styles.input}${className ? ` ${className}` : ""}`} type="text" role="combobox" aria-label={ariaLabel} aria-invalid={ariaInvalid} aria-describedby={ariaDescribedBy} aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined} value={open ? query : displayValue} placeholder={placeholder ?? selected?.label} maxLength={maxLength} disabled={disabled} autoComplete="off"
       required={required && !selectedValue} onFocus={() => { if (!open) show(); }} onClick={() => { if (!open) show(); }} onChange={event => { const nextValue = event.target.value; setQuery(nextValue); setActive(0); if (allowCustomValue) { if (value === undefined) setUncontrolled(nextValue); onChange?.({ target: { value: nextValue, name }, currentTarget: { value: nextValue, name } } as ChangeEvent<HTMLSelectElement>); } if (!open) { updatePosition(); setOpen(true); } }} onKeyDown={event => {
         if (event.key === "Escape") { event.preventDefault(); setOpen(false); setQuery(""); }
         else if (event.key === "ArrowDown") { event.preventDefault(); if (!open) show(); else setActive(current => Math.min(matches.length - 1, current + 1)); }
