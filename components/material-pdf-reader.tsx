@@ -1,4 +1,6 @@
 "use client";
+
+import { SearchableSelect } from "@/components/searchable-select";
 import { trackMaterialView } from "@/lib/material-views";
 /* eslint-disable react-hooks/set-state-in-effect */
 
@@ -649,12 +651,12 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
         <div className={styles.group}>
           <button className={styles.iconButton} type="button" onClick={() => stepZoom(-1)} disabled={scale <= ZOOM_STEPS[0] + 0.01} aria-label="Reduzir" title="Reduzir (−)"><Minus /></button>
           <label htmlFor="pdf-zoom" className={styles.srOnly}>Zoom</label>
-          <select id="pdf-zoom" className={styles.zoomSelect} value={ZOOM_STEPS.includes(Number(zoomValue)) || zoom === "width" || zoom === "page" ? zoomValue : "custom"} onChange={(event) => changeZoom(event.target.value === "width" || event.target.value === "page" ? event.target.value : Number(event.target.value))}>
+          <SearchableSelect id="pdf-zoom" className={styles.zoomSelect} rootClassName={styles.zoomSelectRoot} value={ZOOM_STEPS.includes(Number(zoomValue)) || zoom === "width" || zoom === "page" ? zoomValue : "custom"} onChange={(event) => changeZoom(event.target.value === "width" || event.target.value === "page" ? event.target.value : Number(event.target.value))}>
             <option value="width">Ajustar à largura</option>
             <option value="page">Página inteira</option>
             {ZOOM_STEPS.map((step) => <option key={step} value={String(step)}>{Math.round(step * 100)}%</option>)}
             {typeof zoom === "number" && !ZOOM_STEPS.includes(zoom) && <option value="custom">{zoomLabel}</option>}
-          </select>
+          </SearchableSelect>
           <button className={styles.iconButton} type="button" onClick={() => stepZoom(1)} disabled={scale >= ZOOM_STEPS[ZOOM_STEPS.length - 1] - 0.01} aria-label="Ampliar" title="Ampliar (+)"><Plus /></button>
         </div>
         <div className={styles.group} role="group" aria-label="Apresentação">

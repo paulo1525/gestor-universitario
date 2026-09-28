@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Bold, ChevronLeft, Italic, Link2, List, ListOrdered, Megaphone, MessageCircle, Pencil, RotateCcw, Search, Underline } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -359,8 +361,8 @@ export function AnnouncementsBoard() {
       <SurfaceHeader icon={<Megaphone />} title={t(editingId ? "announcements.editor.editTitle" : "announcements.editor.title")} actions={<FormCloseButton onClick={closeEditor} label={t("common.close")} disabled={submitting} />} />
       <div className={styles.fields}>
         <label className={`${styles.field} ${styles.wide}`}><span className={styles.fieldLabel}>{t("announcements.editor.titleLabel")}</span><input value={title} onChange={event => setTitle(event.target.value)} maxLength={140} required placeholder={t("announcements.editor.titlePlaceholder")} /></label>
-        <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.priority")}</span><select value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">{priorityLabels.normal}</option><option value="important">{priorityLabels.important}</option><option value="urgent">{priorityLabels.urgent}</option></select></label>
-        <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.audience")}</span><select value={audienceScope} onChange={event => setAudienceScope(event.target.value as "all" | "year")}><option value="all">{t("announcements.editor.audienceAll")}</option><option value="year">{t("announcements.editor.audienceYear")}</option></select></label>
+        <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.priority")}</span><SearchableSelect value={priority} onChange={event => setPriority(event.target.value as Priority)}><option value="normal">{priorityLabels.normal}</option><option value="important">{priorityLabels.important}</option><option value="urgent">{priorityLabels.urgent}</option></SearchableSelect></label>
+        <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.audience")}</span><SearchableSelect value={audienceScope} onChange={event => setAudienceScope(event.target.value as "all" | "year")}><option value="all">{t("announcements.editor.audienceAll")}</option><option value="year">{t("announcements.editor.audienceYear")}</option></SearchableSelect></label>
         {audienceScope === "year" && <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.audienceYear")}</span><input type="number" min={1} max={6} value={audienceYear} onChange={event => setAudienceYear(event.target.value)} placeholder={t("announcements.editor.audienceYearPlaceholder")} required /></label>}
         <label className={styles.field}><span className={styles.fieldLabel}>{t("announcements.editor.visibleUntil")} <small>({t("common.optional")})</small></span><input type="datetime-local" value={expiresAt} min={minimumExpiry} onChange={event => setExpiresAt(event.target.value)} /></label>
         <div className={`${styles.field} ${styles.wide}`}><span className={styles.fieldLabel}>{t("announcements.editor.content")}</span><div className={styles.richEditor}>

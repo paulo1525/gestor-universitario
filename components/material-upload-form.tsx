@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { CheckCircle2, FileArchive, FileText, Image as ImageIcon, Layers, LoaderCircle, Presentation, RotateCcw, Upload, X } from "lucide-react";
 import { type DragEvent, useRef, useState } from "react";
 import { CancelButton, FormActions, FormCloseButton, SubmitButton } from "@/components/form-actions";
@@ -205,21 +207,21 @@ export function MaterialUploadForm({ units, onClose, onSubmitted }: { units: Uni
                     ? <span className={styles.kind}>{t("community.materials.upload.photos", { count: row.files.length })}</span>
                     : row.kind === "zip"
                       ? <span className={styles.kind}>{t("community.materials.category.other")}</span>
-                      : <select value={row.category} disabled={locked} onChange={(event) => update(row.id, { category: event.target.value as MaterialCategory })} aria-label={t("community.materials.field.type")}>
+                      : <SearchableSelect value={row.category} disabled={locked} onChange={(event) => update(row.id, { category: event.target.value as MaterialCategory })} aria-label={t("community.materials.field.type")}>
                         {(["summary", "notes", "other"] as const).map((category) => <option key={category} value={category}>{t(`community.materials.category.${category}`)}</option>)}
-                      </select>}
-                <select value={row.unitId} disabled={locked} onChange={(event) => update(row.id, { unitId: event.target.value })} aria-label={t("community.materials.field.unit")}>
+                      </SearchableSelect>}
+                <SearchableSelect value={row.unitId} disabled={locked} onChange={(event) => update(row.id, { unitId: event.target.value })} aria-label={t("community.materials.field.unit")}>
                   <option value="" disabled>{t("community.materials.field.unit")}</option>
                   {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}
-                </select>
+                </SearchableSelect>
               </div>}
               {row.kind === "image" && !locked && !rejected && <div className={styles.fields}>
-                <select value={row.sitting} onChange={(event) => update(row.id, { sitting: event.target.value })} aria-label={t("community.materials.examSitting")}>
+                <SearchableSelect value={row.sitting} onChange={(event) => update(row.id, { sitting: event.target.value })} aria-label={t("community.materials.examSitting")}>
                   {(["unknown", "normal", "resit", "special", "continuous"] as const).map((value) => <option key={value} value={value}>{value === "unknown" ? t("community.materials.examSitting") : t(`community.materials.examSitting${value[0].toUpperCase()}${value.slice(1)}` as "community.materials.examSittingNormal")}</option>)}
-                </select>
-                <select value={row.component} onChange={(event) => update(row.id, { component: event.target.value })} aria-label={t("community.materials.examComponent")}>
+                </SearchableSelect>
+                <SearchableSelect value={row.component} onChange={(event) => update(row.id, { component: event.target.value })} aria-label={t("community.materials.examComponent")}>
                   {(["unknown", "theory", "practical", "mixed"] as const).map((value) => <option key={value} value={value}>{value === "unknown" ? t("community.materials.examComponent") : t(`community.materials.examComponent${value[0].toUpperCase()}${value.slice(1)}` as "community.materials.examComponentTheory")}</option>)}
-                </select>
+                </SearchableSelect>
                 <input type="date" value={row.examDate} onChange={(event) => update(row.id, { examDate: event.target.value })} aria-label={t("community.materials.examDate")} />
                 <input type="number" min={1} max={500} value={row.questionCount} onChange={(event) => update(row.id, { questionCount: event.target.value })} aria-label={t("community.materials.questionCount")} placeholder={t("community.materials.questionCount")} />
               </div>}

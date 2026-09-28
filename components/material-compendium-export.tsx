@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileDown, Image as ImageIcon, LoaderCircle } from "lucide-react";
 import {
@@ -237,8 +239,8 @@ export function MaterialCompendiumExport({ cards, unitId, unitCode, unitName, le
     </div>
     <div className={styles.options}>
       <label className={styles.checkbox}><input type="checkbox" checked={includeSolutions} onChange={(event) => setIncludeSolutions(event.target.checked)} /><span><strong>Incluir soluções</strong><small>{includeSolutions ? "Respostas e opções corretas visíveis" : "Só perguntas e opções, sem respostas"}</small></span></label>
-      {showImageFilter && <label className={styles.selectField}><span>Imagens</span><select value={imageFilter} onChange={(event) => setImageFilter(event.target.value as typeof imageFilter)}><option value="all">Com e sem imagem</option><option value="with">Apenas com imagem</option><option value="without">Apenas sem imagem</option></select></label>}
-      {showSolutionFilter && <label className={styles.selectField}><span>Respostas</span><select value={solutionFilter} onChange={(event) => setSolutionFilter(event.target.value as typeof solutionFilter)}><option value="all">Com e sem resposta</option><option value="with">Apenas com resposta</option><option value="without">Apenas sem resposta</option></select></label>}
+      {showImageFilter && <label className={styles.selectField}><span>Imagens</span><SearchableSelect value={imageFilter} onChange={(event) => setImageFilter(event.target.value as typeof imageFilter)}><option value="all">Com e sem imagem</option><option value="with">Apenas com imagem</option><option value="without">Apenas sem imagem</option></SearchableSelect></label>}
+      {showSolutionFilter && <label className={styles.selectField}><span>Respostas</span><SearchableSelect value={solutionFilter} onChange={(event) => setSolutionFilter(event.target.value as typeof solutionFilter)}><option value="all">Com e sem resposta</option><option value="with">Apenas com resposta</option><option value="without">Apenas sem resposta</option></SearchableSelect></label>}
     </div>
     <div className={styles.summary}><span>{filteredEntries.length} perguntas selecionadas</span><span>{includeQuestionBank ? "Materiais + banco de questões" : "Materiais carregados"}</span></div>
     {questionBankError && <p className={styles.error} role="alert">{questionBankError}</p>}

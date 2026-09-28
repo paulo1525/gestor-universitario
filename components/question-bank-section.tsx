@@ -1,4 +1,6 @@
 "use client";
+
+import { SearchableSelect } from "@/components/searchable-select";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
@@ -144,10 +146,10 @@ export function QuestionBankSection({ unitId, unitCode }: { unitId: string; unit
       <div className={styles.toolbar}>
         <label className={styles.field}>
           <span>Fonte</span>
-          <select value={sourceId} onChange={(event) => { setSourceId(event.target.value); setPage(1); }}>
+          <SearchableSelect value={sourceId} onChange={(event) => { setSourceId(event.target.value); setPage(1); }}>
             <option value="">Todas as fontes</option>
             {(data?.sources ?? []).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Pesquisar perguntas</span>
@@ -158,81 +160,81 @@ export function QuestionBankSection({ unitId, unitCode }: { unitId: string; unit
         </label>
         <label className={styles.field}>
           <span>Capítulo</span>
-          <select value={topicId} onChange={(event) => { setTopicId(event.target.value); setPage(1); }}>
+          <SearchableSelect value={topicId} onChange={(event) => { setTopicId(event.target.value); setPage(1); }}>
             <option value="">Todos os capítulos</option>
             {(data?.topics ?? []).map((topic) => <option key={topic.id} value={topic.id}>Cap. {topic.chapterNumber} · {topic.title} ({topic.questionCount})</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Subtema</span>
-          <select value={subtopic} onChange={(event) => { setSubtopic(event.target.value); setPage(1); }}>
+          <SearchableSelect value={subtopic} onChange={(event) => { setSubtopic(event.target.value); setPage(1); }}>
             <option value="">Todos os subtemas</option>
             {(data?.facets.subtopics ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Ano letivo</span>
-          <select value={academicYear} onChange={(event) => { setAcademicYear(event.target.value); setPage(1); }}>
+          <SearchableSelect value={academicYear} onChange={(event) => { setAcademicYear(event.target.value); setPage(1); }}>
             <option value="">Todos os anos</option>
             {(data?.facets.academicYears ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Tipo de pergunta</span>
-          <select value={responseType} onChange={(event) => { setResponseType(event.target.value); setPage(1); }}>
+          <SearchableSelect value={responseType} onChange={(event) => { setResponseType(event.target.value); setPage(1); }}>
             <option value="">Todos os tipos</option>
             {(data?.facets.responseTypes ?? []).map((item) => <option key={item} value={item}>{item === "short_answer" ? "Resposta curta" : item === "multiple_choice" ? "Escolha múltipla" : "Caso clínico"}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Avaliação</span>
-          <select value={assessment} onChange={(event) => { setAssessment(event.target.value); setPage(1); }}>
+          <SearchableSelect value={assessment} onChange={(event) => { setAssessment(event.target.value); setPage(1); }}>
             <option value="">Todas as avaliações</option>
             {(data?.facets.assessments ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Época / aula</span>
-          <select value={session} onChange={(event) => { setSession(event.target.value); setPage(1); }}>
+          <SearchableSelect value={session} onChange={(event) => { setSession(event.target.value); setPage(1); }}>
             <option value="">Todas as épocas</option>
             {(data?.facets.sessions ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
         {data?.facets.pages?.length ? <label className={styles.field}>
           <span>Página de origem</span>
-          <select value={sourcePage} onChange={(event) => { setSourcePage(event.target.value); setPage(1); }}>
+          <SearchableSelect value={sourcePage} onChange={(event) => { setSourcePage(event.target.value); setPage(1); }}>
             <option value="">Todas as páginas</option>
             {data.facets.pages.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </SearchableSelect>
         </label> : null}
         {data?.capabilities?.filters?.images ? <label className={styles.field}>
           <span>Imagens</span>
-          <select value={imageFilter} onChange={(event) => { setImageFilter(event.target.value); setPage(1); }}>
+          <SearchableSelect value={imageFilter} onChange={(event) => { setImageFilter(event.target.value); setPage(1); }}>
             <option value="all">Com e sem imagens</option>
             <option value="with">Com imagens ({data?.facets.images.with ?? 0})</option>
             <option value="without">Sem imagens ({data?.facets.images.without ?? 0})</option>
-          </select>
+          </SearchableSelect>
         </label> : null}
         <label className={styles.field}>
           <span>Filtro de soluções</span>
-          <select value={solutionFilter} onChange={(event) => { setSolutionFilter(event.target.value); setPage(1); }}>
+          <SearchableSelect value={solutionFilter} onChange={(event) => { setSolutionFilter(event.target.value); setPage(1); }}>
             <option value="all">Com e sem soluções</option>
             <option value="with">Com soluções ({data?.facets.solutions.with ?? 0})</option>
             <option value="without">Sem soluções ({data?.facets.solutions.without ?? 0})</option>
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Mostrar respostas</span>
-          <select value={includeSolutions ? "with" : "without"} onChange={(event) => setIncludeSolutions(event.target.value === "with")}>
+          <SearchableSelect value={includeSolutions ? "with" : "without"} onChange={(event) => setIncludeSolutions(event.target.value === "with")}>
             <option value="with">Mostrar soluções</option>
             <option value="without">Ocultar soluções</option>
-          </select>
+          </SearchableSelect>
         </label>
         <label className={styles.field}>
           <span>Por página</span>
-          <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+          <SearchableSelect value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
             {[10, 20, 50, 100].map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
+          </SearchableSelect>
         </label>
       </div>
 

@@ -87,7 +87,49 @@ async function unitChoices(env: HubEnv): Promise<Array<Record<string, unknown>>>
 }
 
 function eventDto(row: Record<string, unknown>) {
-  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, organizer: row.organizer, scope: "commission", visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+}
+
+async function personalCalendar(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("calendar.events")) return disabled();
+  if (request.method === "GET") {
+    const from = Number(url.searchParams.get("from") || 0), to = Number(url.searchParams.get("to") || 4102444800000);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return json({ error: "Intervalo inválido." }, 400);
+    const result = await env.DB.prepare("SELECT e.*,cu.code AS unit_code,cu.name AS unit_name FROM personal_calendar_events e LEFT JOIN curricular_units cu ON cu.id=e.curricular_unit_id WHERE e.owner_id=? AND e.ends_at>=? AND e.starts_at<=? ORDER BY e.starts_at LIMIT 1000").bind(user.id, from, to).all();
+    return json({ events: result.results.map(item => ({ ...eventDto(rowObject(item)), scope: "personal", visibility: "private", status: "scheduled" })) });
+  }
+  const body = await bodyJson(request);
+  if (!body) return json({ error: "Pedido JSON inválido." }, 400);
+  const id = text(body.id, 80);
+  if (request.method === "DELETE") {
+    if (!id) return json({ error: "Evento não encontrado." }, 404);
+    const result = await env.DB.prepare("DELETE FROM personal_calendar_events WHERE id=? AND owner_id=?").bind(id, user.id).run();
+    return result.meta.changes ? json({ ok: true }) : json({ error: "Evento não encontrado." }, 404);
+  }
+  if (request.method === "PATCH") {
+    const startsAt = timestamp(body.startsAt), endsAt = body.endsAt === null ? startsAt : timestamp(body.endsAt);
+    if (!id || startsAt === null || endsAt === null || endsAt < startsAt) return json({ error: "Datas do evento inválidas." }, 400);
+    const result = await env.DB.prepare("UPDATE personal_calendar_events SET starts_at=?,ends_at=?,updated_at=? WHERE id=? AND owner_id=?").bind(startsAt, endsAt, Date.now(), id, user.id).run();
+    return result.meta.changes ? json({ ok: true, id, startsAt, endsAt }) : json({ error: "Evento não encontrado." }, 404);
+  }
+  if (!["POST", "PUT"].includes(request.method)) return json({ error: "Operação não suportada." }, 405);
+  const title = text(body.title, 160), description = sanitizeRichTextHtml(longText(body.description, 12000));
+  const type = text(body.type, 30), unitId = text(body.unitId, 80);
+  const startsAt = timestamp(body.startsAt), endsAt = body.endsAt == null ? startsAt : timestamp(body.endsAt);
+  const location = text(body.location, 200), organizer = text(body.organizer, 120);
+  if (title.length < 3 || richTextPlainText(description).length > 2000 || !["study", "personal", "social", "academic_group", "meeting"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
+  const now = Date.now();
+  if (request.method === "POST") {
+    const newId = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO personal_calendar_events (id,owner_id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,organizer,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(newId, user.id, title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, now, now).run();
+    return json({ ok: true, id: newId }, 201);
+  }
+  if (!id) return json({ error: "Evento não encontrado." }, 404);
+  const result = await env.DB.prepare("UPDATE personal_calendar_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,location=?,organizer=?,updated_at=? WHERE id=? AND owner_id=?")
+    .bind(title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, now, id, user.id).run();
+  return result.meta.changes ? json({ ok: true, id }) : json({ error: "Evento não encontrado." }, 404);
 }
 
 async function calendar(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -131,16 +173,16 @@ async function calendar(request: Request, env: HubEnv, url: URL, user: HubUser |
   const type = text(body.type ?? body.eventType, 30) || "event";
   const unitId = text(body.unitId ?? body.curricularUnitId, 80);
   const startsAt = timestamp(body.startsAt), endsAt = timestamp(body.endsAt) ?? startsAt;
-  const location = text(body.location, 200), visibility = text(body.visibility, 20) || "students";
+  const location = text(body.location, 200), visibility = text(body.visibility, 20) || "students", organizer = text(body.organizer, 120);
   const status = text(body.status, 20) || "scheduled";
   if (title.length < 3 || richTextPlainText(description).length > 2000 || !["assessment", "exam", "deadline", "academic", "meeting", "event", "evaluation"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !["public", "students", "cc"].includes(visibility) || !["scheduled", "cancelled"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
   const now = Date.now();
   if (request.method === "POST") {
-    await env.DB.prepare("INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(id, title, description, type, unitId || null, startsAt, endsAt, location || null, visibility, status, actor(user), actor(user), now, now).run();
+    await env.DB.prepare("INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,organizer,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, visibility, status, actor(user), actor(user), now, now).run();
   } else {
-    const result = await env.DB.prepare("UPDATE academic_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,location=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?")
-      .bind(title, description, type, unitId || null, startsAt, endsAt, location || null, visibility, status, actor(user), now, id).run();
+    const result = await env.DB.prepare("UPDATE academic_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,location=?,organizer=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?")
+      .bind(title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, visibility, status, actor(user), now, id).run();
     if (!result.meta.changes) return json({ error: "Evento não encontrado." }, 404);
   }
   const conflicts = ["assessment", "exam", "evaluation"].includes(type) ? await env.DB.prepare("SELECT id,title,starts_at,ends_at FROM academic_events WHERE id!=? AND event_type IN ('assessment','exam','evaluation') AND status='scheduled' AND starts_at<? AND ends_at>? ORDER BY starts_at LIMIT 20").bind(id, endsAt, startsAt).all() : { results: [] };
@@ -1312,13 +1354,14 @@ async function search(env: HubEnv, url: URL, user: HubUser | null, enabled: Modu
 
 export function isAcademicHubPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  return isMaterialsCatalogPath(path) || isMaterialUploadPath(path) || path === "/api/calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/requests/comments" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
+  return isMaterialsCatalogPath(path) || isMaterialUploadPath(path) || path === "/api/calendar-events" || path === "/api/personal-calendar-events" || path === "/api/calendar-subscription" || path === "/api/calendar-subscriptions" || path === "/api/calendar-feed.ics" || path === "/api/documents" || path === "/api/requests" || path === "/api/requests/reveal" || path === "/api/requests/comments" || path === "/api/commission-directory" || path === "/api/curricular-units" || path === "/api/admin/curricular-unit-content" || /^\/api\/curricular-units\/[^/]+$/.test(path) || /^\/api\/curricular-units\/[^/]+\/academic-content$/.test(path) || path === "/api/polls" || /^\/api\/polls\/[^/]+\/vote$/.test(path) || path === "/api/dashboard" || path === "/api/dashboard/personal" || path === "/api/notifications" || path === "/api/notification-preferences" || path === "/api/search" || path === "/api/material-submissions" || path === "/api/material-favorites" || path === "/api/material-feedback" || /^\/api\/material-submissions\/[^/]+\/versions$/.test(path) || path === "/api/useful-links";
 }
 
 export async function handleAcademicHubRoute(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker, waitUntil?: (promise: Promise<unknown>) => void): Promise<Response> {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (isMaterialsCatalogPath(pathname)) return handleMaterialsCatalogRoute(request, env, url, user, enabled, waitUntil);
   if (pathname === "/api/calendar-events") return calendar(request, env, url, user, enabled);
+  if (pathname === "/api/personal-calendar-events") return personalCalendar(request, env, url, user, enabled);
   if (pathname === "/api/calendar-subscription" || pathname === "/api/calendar-subscriptions") return calendarSubscription(request, env, url, user, enabled);
   if (pathname === "/api/calendar-feed.ics" && request.method === "GET") return calendarFeed(env, url, enabled);
   if (pathname === "/api/documents") return documents(request, env, url, user, enabled);

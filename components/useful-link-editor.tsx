@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { CancelButton, FormCloseButton, SubmitButton } from "@/components/form-actions";
 import { useEscapeKey } from "@/components/use-escape-key";
@@ -70,7 +72,7 @@ export function UsefulLinkEditor({ open, editing, initial, busy, error, onClose,
             <label className={styles.field} htmlFor={`${fieldId}-title`}><span>{t("links.field.title")}</span><input ref={firstFieldRef} id={`${fieldId}-title`} value={draft.title} onChange={(event) => set("title", event.target.value)} minLength={3} maxLength={160} required /></label>
             <label className={styles.field} htmlFor={`${fieldId}-url`}><span>{t("links.field.link")}</span><input id={`${fieldId}-url`} type="url" inputMode="url" value={draft.url} onChange={(event) => set("url", event.target.value)} maxLength={1500} pattern="https://.*" required /></label>
             <label className={styles.field} htmlFor={`${fieldId}-description`}><span>{t("links.field.description")}</span><input id={`${fieldId}-description`} value={draft.description} onChange={(event) => set("description", event.target.value)} maxLength={160} /></label>
-            <label className={styles.field} htmlFor={`${fieldId}-category`}><span>{t("links.field.category")}</span><select id={`${fieldId}-category`} value={draft.category} onChange={(event) => set("category", event.target.value)}>{USEFUL_LINK_CATEGORIES.map((value) => <option key={value} value={value}>{t(`links.category.${value}`)}</option>)}</select></label>
+            <label className={styles.field} htmlFor={`${fieldId}-category`}><span>{t("links.field.category")}</span><SearchableSelect id={`${fieldId}-category`} value={draft.category} onChange={(event) => set("category", event.target.value)}>{USEFUL_LINK_CATEGORIES.map((value) => <option key={value} value={value}>{t(`links.category.${value}`)}</option>)}</SearchableSelect></label>
             <div className={styles.checks}>
               <label className={styles.check}><input type="checkbox" checked={draft.ccOnly || draft.requiresLogin} disabled={draft.ccOnly} onChange={(event) => set("requiresLogin", event.target.checked)} /><span>{t("links.field.requiresLogin")}</span></label>
               <label className={styles.check}><input type="checkbox" checked={draft.ccOnly} onChange={(event) => set("ccOnly", event.target.checked)} /><span>{t("links.field.ccOnly")}</span></label>

@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ContactRound, ExternalLink, Files, House, LayoutDashboard, Library, LoaderCircle, Megaphone, MessageSquareText, RefreshCw, Search, UsersRound, Vote, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/auth-context";
@@ -244,7 +246,7 @@ export function ModuleManagement() {
             <small>{homeStatus}</small>
           </div>
           <div className={styles.homeControl}>
-            <select
+            <SearchableSelect
               id="module-homepage"
               aria-label={t("admin.modules.homeSelect")}
               value={home?.configuredModuleKey ?? ""}
@@ -255,7 +257,7 @@ export function ModuleManagement() {
               {modules.filter((module) => module.homepageEligible).map((module) => (
                 <option value={module.key} key={module.key}>{adminDataLabel(locale, "module", module.key) || module.label}</option>
               ))}
-            </select>
+            </SearchableSelect>
             {savingHome && <LoaderCircle className={styles.spin} aria-hidden="true" />}
           </div>
         </div>

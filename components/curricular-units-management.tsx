@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Award, BookOpen, CalendarRange, ChevronLeft, FileText, GraduationCap, Hash, Library, Pencil, Search, ShieldCheck, UserRound } from "lucide-react";
@@ -311,8 +313,8 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
       <label className={styles.codeField}><FormLabel icon={Hash}>{t("classes.units.code")}</FormLabel><input value={form.code} onChange={event => field("code", event.target.value.toUpperCase())} maxLength={20} placeholder={t("classes.units.codePlaceholder")} aria-invalid={Boolean(errors.code)} />{errors.code && <small>{errors.code}</small>}</label>
       <label className={styles.nameField}><FormLabel icon={BookOpen}>{t("classes.units.name")}</FormLabel><input value={form.name} onChange={event => field("name", event.target.value)} maxLength={160} placeholder={t("classes.units.namePlaceholder")} aria-invalid={Boolean(errors.name)} />{errors.name && <small>{errors.name}</small>}</label>
       <label className={styles.ectsField}><FormLabel icon={Award}>{t("classes.units.ects")}</FormLabel><input type="number" value={form.ects} onChange={event => field("ects", event.target.valueAsNumber)} min="0.5" max="60" step="0.5" aria-invalid={Boolean(errors.ects)} />{errors.ects && <small>{errors.ects}</small>}</label>
-      <label className={styles.yearField}><FormLabel icon={GraduationCap}>{t("classes.units.year")}</FormLabel><select value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{t("classes.units.yearValue", { year })}</option>)}</select>{errors.year && <small>{errors.year}</small>}</label>
-      <label className={styles.semesterField}><FormLabel icon={CalendarRange}>{t("classes.units.semester")}</FormLabel><select value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>{t("classes.units.semesterValue", { semester: 1 })}</option><option value={2}>{t("classes.units.semesterValue", { semester: 2 })}</option></select>{errors.semester && <small>{errors.semester}</small>}</label>
+      <label className={styles.yearField}><FormLabel icon={GraduationCap}>{t("classes.units.year")}</FormLabel><SearchableSelect value={form.year} onChange={event => field("year", Number(event.target.value))} aria-invalid={Boolean(errors.year)}>{[1, 2, 3, 4, 5, 6].map(year => <option value={year} key={year}>{t("classes.units.yearValue", { year })}</option>)}</SearchableSelect>{errors.year && <small>{errors.year}</small>}</label>
+      <label className={styles.semesterField}><FormLabel icon={CalendarRange}>{t("classes.units.semester")}</FormLabel><SearchableSelect value={form.semester} onChange={event => field("semester", Number(event.target.value))} aria-invalid={Boolean(errors.semester)}><option value={1}>{t("classes.units.semesterValue", { semester: 1 })}</option><option value={2}>{t("classes.units.semesterValue", { semester: 2 })}</option></SearchableSelect>{errors.semester && <small>{errors.semester}</small>}</label>
       <div className={styles.representativeField}>
         <FormLabel icon={UserRound} optional>{t("classes.units.committeeRepresentatives")}</FormLabel>
         <div className={styles.representativeSelectors}>
@@ -321,10 +323,10 @@ function UnitEditor({ form, setForm, errors, representatives, saving, submitLabe
             const otherSelected = form.representativeUserIds[index === 0 ? 1 : 0];
             return <label key={index}>
               <span>{t("classes.units.representativeNumber", { number: index + 1 })}</span>
-              <select value={selected} onChange={event => representativeField(index, event.target.value)}>
+              <SearchableSelect value={selected} onChange={event => representativeField(index, event.target.value)}>
                 <option value="">{t("classes.units.noRepresentativeOption")}</option>
                 {representatives.map(representative => <option value={representative.id} key={representative.id} disabled={representative.id === otherSelected}>{representative.fullName} · {representative.email}</option>)}
-              </select>
+              </SearchableSelect>
             </label>;
           })}
         </div>

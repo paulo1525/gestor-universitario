@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlignLeft,
@@ -237,9 +239,9 @@ export function DocumentsLibrary() {
               <SurfaceHeader icon={<FileArchive />} title="Novo documento" actions={<FormCloseButton onClick={() => setEditor(false)} label="Fechar" disabled={saving} />} />
               <div className={styles.formGrid}>
                 <label className={styles.wide}><span><Type />{"Título"}</span><input required maxLength={180} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
-                <label><span><Tags />Tipo</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
-                <label><span><Eye />Visibilidade</span><select value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })}><option value="authenticated">Estudantes autenticados</option><option value="commission">{"Apenas Comissão de Curso"}</option><option value="public">{"Público"}</option></select></label>
-                <label className={styles.wide}><span><GraduationCap />Unidade curricular <small>(opcional)</small></span><select value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}><option value="">Documento geral</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"·"} {unit.name}</option>)}</select></label>
+                <label><span><Tags />Tipo</span><SearchableSelect value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>{Object.entries(typeLabels).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</SearchableSelect></label>
+                <label><span><Eye />Visibilidade</span><SearchableSelect value={form.visibility} onChange={(event) => setForm({ ...form, visibility: event.target.value })}><option value="authenticated">Estudantes autenticados</option><option value="commission">{"Apenas Comissão de Curso"}</option><option value="public">{"Público"}</option></SearchableSelect></label>
+                <label className={styles.wide}><span><GraduationCap />Unidade curricular <small>(opcional)</small></span><SearchableSelect value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}><option value="">Documento geral</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} {"·"} {unit.name}</option>)}</SearchableSelect></label>
                 <label className={styles.full}><span><AlignLeft />{"Descrição"} <small>(opcional)</small></span><textarea rows={3} maxLength={1500} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
                 <div className={styles.full}>
                   <FileUploadField

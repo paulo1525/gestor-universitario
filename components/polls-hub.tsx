@@ -1,4 +1,6 @@
 "use client";
+
+import { SearchableSelect } from "@/components/searchable-select";
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -404,7 +406,7 @@ export function PollsHub() {
                   </div>
                   <aside className={styles.editorAside}>
                     <label className={styles.field}><FormLabel icon={CalendarClock} optional>{t("polls.editor.endsAt")}</FormLabel><input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} /></label>
-                    <label className={styles.field}><FormLabel icon={Eye}>{t("polls.editor.results")}</FormLabel><select value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">{t("polls.editor.afterVote")}</option><option value="always">{t("polls.editor.always")}</option><option value="after_close">{t("polls.editor.afterClose")}</option><option value="cc">{t("polls.editor.onlyCommittee")}</option></select></label>
+                    <label className={styles.field}><FormLabel icon={Eye}>{t("polls.editor.results")}</FormLabel><SearchableSelect value={form.resultsVisibility} onChange={(event) => setForm((current) => ({ ...current, resultsVisibility: event.target.value as Poll["resultsVisibility"] }))}><option value="after_vote">{t("polls.editor.afterVote")}</option><option value="always">{t("polls.editor.always")}</option><option value="after_close">{t("polls.editor.afterClose")}</option><option value="cc">{t("polls.editor.onlyCommittee")}</option></SearchableSelect></label>
                     <div className={styles.privacyCard}><ShieldCheck /><div><strong>{t("polls.editor.anonymous")}</strong></div></div>
                     <label className={`${styles.toggleCard} ${optionsLocked ? styles.disabled : ""}`}><input type="checkbox" checked={form.allowMultiple} disabled={optionsLocked} onChange={(event) => setForm((current) => ({ ...current, allowMultiple: event.target.checked }))} /><span><strong>{t("polls.editor.multiple")}</strong></span></label>
                   </aside>

@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { CalendarRange, ChevronLeft, ChevronRight, DoorOpen, MapPinned, Pencil, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -330,11 +332,11 @@ function SpaceEditor({ editor, classIds, saving, buildingLabel, onClose, onSave 
       </header>
       <form id="campus-space-form" className={styles.form} data-app-modal-body onSubmit={submit}>
         <label className={styles.field}><span>{t("campus.spaces.room")}</span><input ref={roomRef} value={form.room} maxLength={60} required onChange={event => setForm({ ...form, room: event.target.value })} /></label>
-        <label className={styles.field}><span>{t("campus.spaces.building")}</span><select value={form.building} onChange={event => setForm({ ...form, building: event.target.value as Building })}><option value="cim">{buildingLabel("cim")}</option><option value="hsj">{buildingLabel("hsj")}</option></select></label>
+        <label className={styles.field}><span>{t("campus.spaces.building")}</span><SearchableSelect value={form.building} onChange={event => setForm({ ...form, building: event.target.value as Building })}><option value="cim">{buildingLabel("cim")}</option><option value="hsj">{buildingLabel("hsj")}</option></SearchableSelect></label>
         <label className={styles.field}><span>{t("campus.spaces.teacher")} <small>({t("common.optional")})</small></span><input value={form.teacher} maxLength={160} onChange={event => setForm({ ...form, teacher: event.target.value })} /></label>
         <label className={styles.field}><span>{t("campus.spaces.subject")} <small>({t("common.optional")})</small></span><input value={form.subject} maxLength={80} onChange={event => setForm({ ...form, subject: event.target.value })} /></label>
         <label className={styles.field}><span>{t("campus.spaces.session")} <small>({t("common.optional")})</small></span><input value={form.session} maxLength={40} onChange={event => setForm({ ...form, session: event.target.value })} /></label>
-        <label className={styles.field}><span>{t("campus.spaces.weekday")} <small>({t("common.optional")})</small></span><select value={form.weekday} onChange={event => setForm({ ...form, weekday: event.target.value })}><option value="">—</option>{WEEKDAYS.map(day => <option key={day} value={day}>{weekdayName(day, locale)}</option>)}</select></label>
+        <label className={styles.field}><span>{t("campus.spaces.weekday")} <small>({t("common.optional")})</small></span><SearchableSelect value={form.weekday} onChange={event => setForm({ ...form, weekday: event.target.value })}><option value="">—</option>{WEEKDAYS.map(day => <option key={day} value={day}>{weekdayName(day, locale)}</option>)}</SearchableSelect></label>
         <label className={styles.field}><span>{t("campus.spaces.startsAt")}</span><input type="time" value={form.startsAt} onChange={event => setForm({ ...form, startsAt: event.target.value })} /></label>
         <label className={styles.field}><span>{t("campus.spaces.endsAt")}</span><input type="time" value={form.endsAt} min={form.startsAt || undefined} onChange={event => setForm({ ...form, endsAt: event.target.value })} /></label>
         <label className={styles.field}><span>{t("campus.spaces.note")} <small>({t("common.optional")})</small></span><input value={form.note} maxLength={200} onChange={event => setForm({ ...form, note: event.target.value })} /></label>

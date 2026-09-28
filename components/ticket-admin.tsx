@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, CircleDot, LoaderCircle, MessageSquareText, Search, Ticket, Trash2, Wrench, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -161,7 +163,7 @@ export function TicketAdmin() {
           {openItem.execution_result && <p className={styles.execution}><Wrench aria-hidden="true" />{openItem.execution_result}</p>}
           <footer className={styles.manageArea}>
             <div className={styles.manageFields}>
-              <label><FormLabel icon={CircleDot}>{t("classes.tickets.decisionStatus")}</FormLabel><select value={openItem.status} disabled={terminal} onChange={(event) => update(openItem.id, { status: event.target.value })}><option value="pending">{t("classes.tickets.status.pending")}</option><option value="approved">{t("classes.tickets.approveExecute")}</option><option value="rejected">{t("classes.tickets.reject")}</option>{["executed", "execution_error"].includes(openItem.status) && <option value={openItem.status}>{labels[openItem.status]}</option>}</select></label>
+              <label><FormLabel icon={CircleDot}>{t("classes.tickets.decisionStatus")}</FormLabel><SearchableSelect value={openItem.status} disabled={terminal} onChange={(event) => update(openItem.id, { status: event.target.value })}><option value="pending">{t("classes.tickets.status.pending")}</option><option value="approved">{t("classes.tickets.approveExecute")}</option><option value="rejected">{t("classes.tickets.reject")}</option>{["executed", "execution_error"].includes(openItem.status) && <option value={openItem.status}>{labels[openItem.status]}</option>}</SearchableSelect></label>
             </div>
             <label className={styles.reasoning}><FormLabel icon={MessageSquareText}>{t("classes.tickets.reasoning")}</FormLabel><RichTextEditor value={openItem.response || ""} onChange={(response) => update(openItem.id, { response })} ariaLabel={t("classes.tickets.reasoningAria", { name: openItem.student_name ? studentOf(openItem).name : authorOf(openItem).name })} placeholder={t("classes.tickets.reasoningPlaceholder")} maxLength={5000} minHeight="compact" disabled={terminal} onInvalidLink={() => setNotice(t("classes.tickets.invalidLink"))} /></label>
             <div className={styles.manageActions}><button className="button button--primary button--compact" type="button" disabled={saving === openItem.id || terminal} onClick={() => { if (openItem.status === "rejected") setRejectTarget(openItem); else void save(openItem); }}>{saving === openItem.id ? <LoaderCircle className="spin" /> : <Check />}{t("classes.tickets.save")}</button></div>
