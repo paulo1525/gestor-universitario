@@ -13,7 +13,7 @@ const exported = {};
 vm.runInNewContext(compiled, {
   exports: exported,
   require(specifier) {
-    if (specifier === "@/lib/announcement-content") return { sanitizeRichTextHtml: value => value, richTextPlainText: value => value.replace(/<[^>]*>/g, "") };
+    if (specifier === "@/lib/announcement-content") return { sanitizeRichTextHtml: value => value, richTextPlainText: value => value };
     if (specifier === "./materials-catalog") return { isMaterialsCatalogPath: () => false };
     if (specifier === "./material-uploads") return { isMaterialUploadPath: () => false };
     return {};
