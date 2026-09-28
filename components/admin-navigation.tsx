@@ -152,11 +152,11 @@ export function AdminNavigation({ active, collapsed, onNavigate }: { active: App
   ], [access, canManageModules, canManageUnits, copy]);
 
   return <div className={styles.navigation} data-collapsed={collapsed}>
-    <Link className={styles.backLink} href="/" title={collapsed ? copy.back : undefined} onClick={onNavigate}>
+    <Link prefetch={false} className={styles.backLink} href="/" title={collapsed ? copy.back : undefined} onClick={onNavigate}>
       <ArrowLeft aria-hidden="true" />
       <span>{copy.back}</span>
     </Link>
-    <Link className={`${styles.overviewLink}${normalizedPathname === "/admin" ? ` ${styles.active}` : ""}`} href="/admin" aria-current={normalizedPathname === "/admin" ? "page" : undefined} title={collapsed ? copy.overview : undefined} onClick={onNavigate}>
+    <Link prefetch={false} className={`${styles.overviewLink}${normalizedPathname === "/admin" ? ` ${styles.active}` : ""}`} href="/admin" aria-current={normalizedPathname === "/admin" ? "page" : undefined} title={collapsed ? copy.overview : undefined} onClick={onNavigate}>
       <BarChart3 aria-hidden="true" />
       <span>{copy.overview}</span>
     </Link>
@@ -185,7 +185,7 @@ export function AdminNavigation({ active, collapsed, onNavigate }: { active: App
             {items.map(item => {
               const Icon = item.icon;
               const selected = normalizedPathname === item.href || (item.active === active && !["admin", "dashboard"].includes(item.active));
-              return <Link className={`${styles.item}${selected ? ` ${styles.active}` : ""}`} href={item.href} aria-current={selected ? "page" : undefined} title={collapsed ? item.label : undefined} tabIndex={!expanded && !collapsed ? -1 : undefined} onClick={onNavigate} key={item.href}>
+              return <Link prefetch={false} className={`${styles.item}${selected ? ` ${styles.active}` : ""}`} href={item.href} aria-current={selected ? "page" : undefined} title={collapsed ? item.label : undefined} tabIndex={!expanded && !collapsed ? -1 : undefined} onClick={onNavigate} key={item.href}>
                 <Icon aria-hidden="true" />
                 <span>{item.label}</span>
               </Link>;
