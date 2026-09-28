@@ -146,6 +146,7 @@ const statements = [
   "DELETE FROM course_requests",
   "DELETE FROM academic_documents",
   "DELETE FROM academic_events",
+  "DELETE FROM personal_calendar_events",
   "DELETE FROM announcement_curricular_units",
   "DELETE FROM announcements",
   "DELETE FROM curricular_unit_representatives",

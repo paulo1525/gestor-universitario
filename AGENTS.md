@@ -105,3 +105,13 @@ Quando uma versão alterar o esquema da base de dados, aplicar as migrations D1 
 - Não inventar um tema próprio para cada módulo: não criar heroes escuros, gradientes decorativos, cartões promocionais, paletas, sombras ou raios novos sem pedido explícito do utilizador.
 - Reutilizar os padrões globais de cabeçalho, cartões de estatística, painéis, botões, formulários e tabelas antes de criar CSS local.
 - Validar visualmente no Chrome em desktop e mobile e comparar diretamente com as páginas de referência antes de considerar a alteração concluída.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

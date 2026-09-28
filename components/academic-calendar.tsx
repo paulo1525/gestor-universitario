@@ -1,22 +1,27 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BookOpen,
   CalendarDays,
   CalendarClock,
+  CircleHelp,
   ChevronLeft,
   ChevronRight,
   Clock3,
   FileText,
   LayoutGrid,
   List,
+  LockKeyhole,
   MapPin,
   Pencil,
   PencilLine,
   Shapes,
   Trash2,
+  UsersRound,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
@@ -68,7 +73,7 @@ const emptyEventForm: EventForm = { title: "", description: "", type: "study", s
 const sharedEventLabelKeys = { assessment: "community.calendar.type.assessment", exam: "community.calendar.type.exam", deadline: "community.calendar.type.deadline", academic: "community.calendar.type.academic", meeting: "community.calendar.type.meeting", event: "community.calendar.type.event", evaluation: "community.calendar.type.evaluation" } as const;
 const privateEventLabelKeys = { study: "community.calendar.type.study", personal: "community.calendar.type.personal", social: "community.calendar.type.social", academic_group: "community.calendar.type.academic_group", meeting: "community.calendar.type.meeting" } as const;
 const eventLabelKeys = { ...sharedEventLabelKeys, ...privateEventLabelKeys };
-const academicGroups = ["TUFMED — Tuna Feminina de Medicina", "TMP — Tuna de Medicina do Porto", "GATU", "Comissão de Praxe", "Comissão Organizadora de Noites Académicas"];
+const academicGroups = ["TUFMED — Tuna Feminina de Medicina do Porto", "TMP — Tuna de Medicina do Porto", "GATU", "Comissão de Praxe", "Comissão Organizadora de Noites Académicas"];
 
 const weekDayKeys = ["community.calendar.week.mon", "community.calendar.week.tue", "community.calendar.week.wed", "community.calendar.week.thu", "community.calendar.week.fri", "community.calendar.week.sat", "community.calendar.week.sun"] as const;
 
@@ -467,15 +472,19 @@ export function AcademicCalendar() {
   };
 
   const renderEventFields = (mode: "create" | "edit") => <div className={styles.formGrid}>
-    {mode === "create" && canManage && <label className={styles.full}><FormLabel icon={CalendarDays}>{t("community.calendar.scope")}</FormLabel><select value={form.scope} onChange={event => setForm(current => ({ ...current, scope: event.target.value as EventForm["scope"], type: event.target.value === "personal" ? "study" : "academic", unitId: "", organizer: "" }))}><option value="personal">{t("community.calendar.scope.personalOption")}</option><option value="commission">{t("community.calendar.scope.commissionOption")}</option></select></label>}
-    {form.scope === "personal" && <p className={styles.privacyNote}>{t("community.calendar.privateNotice")}</p>}
-    <label className={styles.wide}><FormLabel icon={PencilLine}>{t("community.calendar.title")}</FormLabel><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={t("community.calendar.titlePlaceholder")} /></label>
-    <label><FormLabel icon={Shapes}>{t("community.calendar.type")}</FormLabel><select value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value, organizer: event.target.value === "academic" || event.target.value === "academic_group" ? current.organizer : "" }))}>{Object.entries(form.scope === "personal" ? privateEventLabelKeys : sharedEventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</select></label>
-    <label><FormLabel icon={BookOpen}>{t("community.calendar.unit")}</FormLabel><select value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">{t("community.calendar.general")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</select></label>
+    <fieldset className={`${styles.full} ${styles.scopeField}`} aria-label={t("community.calendar.scope")}>
+      <legend className={styles.scopeLegend}>{t("community.calendar.scope")} <span className={`preference-help-wrap ${styles.scopeHelp}`}><button type="button" className="preference-help-button" aria-label={t("community.calendar.scopeHelp")} aria-describedby="calendar-scope-help"><CircleHelp aria-hidden="true" /></button><span className="preference-help-tooltip" id="calendar-scope-help" role="tooltip">{t(form.scope === "personal" ? "community.calendar.privateNotice" : "community.calendar.sharedNotice")}</span></span></legend>
+      {mode === "create" && canManage ? <div className={styles.scopeOptions}>
+        {(["personal", "commission"] as const).map(scope => <label key={scope} className={`${styles.scopeChoice} ${form.scope === scope ? styles.scopeChoiceActive : ""}`}><input type="radio" name="calendar-scope" value={scope} checked={form.scope === scope} onChange={() => setForm(current => ({ ...current, scope, type: scope === "personal" ? "study" : "academic", unitId: "", organizer: "" }))} />{scope === "personal" ? <LockKeyhole aria-hidden="true" /> : <UsersRound aria-hidden="true" />}<span>{scopeLabel(scope)}</span></label>)}
+      </div> : <span className={styles.scopeValue}>{scopeLabel(form.scope)}</span>}
+    </fieldset>
+    <label className={styles.full}><FormLabel icon={PencilLine}>{t("community.calendar.title")}</FormLabel><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={t(form.scope === "personal" ? "community.calendar.personalTitlePlaceholder" : "community.calendar.titlePlaceholder")} /></label>
+    <label><FormLabel icon={Shapes}>{t("community.calendar.type")}</FormLabel><SearchableSelect value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value, organizer: event.target.value === "academic" || event.target.value === "academic_group" ? current.organizer : "" }))}>{Object.entries(form.scope === "personal" ? privateEventLabelKeys : sharedEventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</SearchableSelect></label>
+    <label><FormLabel icon={BookOpen}>{t("community.calendar.unit")}</FormLabel><SearchableSelect value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">{t("community.calendar.general")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</SearchableSelect></label>
     {(form.type === "academic" || form.type === "academic_group") && <label className={styles.full}><FormLabel icon={Shapes} optional>{t("community.calendar.organizer")}</FormLabel><input list="calendar-academic-groups" maxLength={120} value={form.organizer} onChange={event => setForm(current => ({ ...current, organizer: event.target.value }))} placeholder={t("community.calendar.organizerPlaceholder")} /><datalist id="calendar-academic-groups">{academicGroups.map(group => <option key={group} value={group} />)}</datalist></label>}
     <label><FormLabel icon={Clock3}>{t("community.calendar.start")}</FormLabel><input required type="datetime-local" value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
     <label><FormLabel icon={CalendarClock} optional>{t("community.calendar.end")}</FormLabel><input type="datetime-local" min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
-    <label className={styles.wide}><FormLabel icon={MapPin} optional>{t("community.calendar.locationOptional")}</FormLabel><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
+    <label className={styles.full}><FormLabel icon={MapPin} optional>{t("community.calendar.locationOptional")}</FormLabel><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
     <div className={`${styles.full} ${styles.richTextField}`}><FormLabel icon={FileText} optional>{t("community.calendar.descriptionLabel")}</FormLabel><RichTextEditor value={form.description} onChange={description => setForm(current => ({ ...current, description }))} ariaLabel={t("community.calendar.descriptionLabel")} maxLength={2000} minHeight="compact" onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por http://, https:// ou mailto:." })} /></div>
   </div>;
 

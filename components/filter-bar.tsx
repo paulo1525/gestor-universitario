@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { ChevronDown, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/components/i18n-context";
@@ -216,10 +218,9 @@ export function FilterSelect({
     <div className={`filter-field filter-field--secondary${isActive ? " is-active" : ""}`}>
       <label className="filter-field__label" htmlFor={id}>{label}</label>
       <div className="filter-field__control">
-        <select id={id} value={value} onChange={event => onChange(event.target.value)}>
+        <SearchableSelect id={id} value={value} onChange={event => onChange(event.target.value)}>
           {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        <ChevronDown className="filter-field__chevron" aria-hidden="true" />
+        </SearchableSelect>
       </div>
     </div>
   );

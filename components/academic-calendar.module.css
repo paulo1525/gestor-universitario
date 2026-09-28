@@ -3,9 +3,19 @@
 /* Event form fields: the shared modal rules style labels and controls; only the grid is local. */
 .formGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3) var(--space-4); }
 .formGrid label, .richTextField { display:grid; align-content:start; gap:6px; min-width:0; }
-.wide { grid-column:span 1; }
 .full { grid-column:1/-1; }
-.privacyNote { grid-column:1/-1; margin:0; color:var(--color-text-muted); font-size:var(--font-size-small); }
+.scopeField { min-width:0; margin:0; padding:0; border:0; }
+.scopeLegend { margin-bottom:6px; padding:0; color:var(--color-text); font-size:var(--font-size-body); font-weight:800; }
+.scopeHelp { margin-left:5px; vertical-align:middle; }
+.scopeHelp :global(.preference-help-tooltip) { top:-13px; right:auto; left:calc(100% + 10px); }
+.scopeHelp :global(.preference-help-tooltip)::before { top:10px; right:100%; bottom:auto; left:auto; border-bottom-color:transparent; border-right-color:#292925; }
+.scopeOptions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
+.formGrid .scopeChoice { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:var(--control-height); padding:8px 12px; border:1px solid var(--color-border); border-radius:var(--radius-control); color:var(--color-text-muted); background:var(--color-surface); font-size:var(--font-size-body); font-weight:750; cursor:pointer; }
+.scopeChoice input { position:absolute; width:1px; height:1px; opacity:0; }
+.scopeChoice svg { width:16px; height:16px; flex:none; }
+.formGrid .scopeChoiceActive { border-color:var(--gold); color:var(--color-text); background:var(--gold-soft); }
+.formGrid .scopeChoice:focus-within { outline:2px solid var(--gold); outline-offset:2px; box-shadow:var(--focus-ring-accent); }
+.scopeValue { display:inline-flex; align-items:center; min-height:var(--control-height); padding:0 12px; border:1px solid var(--color-border); border-radius:var(--radius-control); color:var(--color-text-soft); background:var(--color-surface-subtle); font-size:var(--font-size-body); font-weight:750; }
 
 .calendarShell { overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
 .toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 1.15rem; border-bottom:1px solid #e7e8e2; }
@@ -116,7 +126,9 @@
 @media (max-width:760px) {
 
   .formGrid { grid-template-columns:1fr; }
-  .wide,.full { grid-column:1; }
+  .full { grid-column:1; }
+  .scopeHelp :global(.preference-help-tooltip) { top:calc(100% + 9px); left:0; }
+  .scopeHelp :global(.preference-help-tooltip)::before { top:auto; right:auto; bottom:100%; left:9px; border-right-color:transparent; border-bottom-color:#292925; }
   .toolbar { align-items:stretch; flex-direction:column; }
   .toolbarActions { width:100%; justify-content:space-between; margin-left:0; }
   .monthNavigation { display:grid; grid-template-columns:auto auto auto 1fr; }
@@ -136,6 +148,7 @@
   .eventPill[data-event-type="exam"] { background:#d64e64; }
   .eventPill[data-event-type="deadline"] { background:#c9a922; }
   .eventPill[data-event-type="meeting"] { background:#5c73df; }
+  .eventPill[data-event-scope="personal"] { outline:1px dashed var(--color-text-muted); outline-offset:2px; }
   .dayEvents { flex-direction:row; flex-wrap:wrap; justify-content:center; gap:.18rem; }
   .moreEvents { display:none; }
   .dayEventList { grid-template-columns:1fr; }

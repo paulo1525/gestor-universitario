@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
+import { SearchableSelect } from "@/components/searchable-select";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -211,7 +213,7 @@ export function DistributionPreflight({
         </div>
         <label>
           {t("classes.preflight.priority")}
-          <select
+          <SearchableSelect
             aria-label={t("classes.preflight.priorityAria")}
             value={severity}
             onChange={(event) => setSeverity(event.target.value as typeof severity)}
@@ -219,11 +221,11 @@ export function DistributionPreflight({
             <option value="all">{t("classes.preflight.allFeminine")}</option>
             <option value="blocker">{t("classes.preflight.blockersOption")}</option>
             <option value="warning">{t("classes.preflight.warnings")}</option>
-          </select>
+          </SearchableSelect>
         </label>
         <label>
           {t("classes.preflight.category")}
-          <select
+          <SearchableSelect
             aria-label={t("classes.preflight.categoryAria")}
             value={category}
             onChange={(event) => setCategory(event.target.value)}
@@ -234,11 +236,11 @@ export function DistributionPreflight({
                 {classDataLabel(locale, "preflightGroup", code) || code.replaceAll("_", " ")}
               </option>
             ))}
-          </select>
+          </SearchableSelect>
         </label>
         <label>
           {t("classes.preflight.perPage")}
-          <select
+          <SearchableSelect
             aria-label={t("classes.preflight.perPageAria")}
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
@@ -246,7 +248,7 @@ export function DistributionPreflight({
             <option value="10">10</option>
             <option value="25">25</option>
             <option value="50">50</option>
-          </select>
+          </SearchableSelect>
         </label>
       </div>
 
