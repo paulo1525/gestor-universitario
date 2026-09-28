@@ -5,6 +5,7 @@
 .formGrid label, .richTextField { display:grid; align-content:start; gap:6px; min-width:0; }
 .wide { grid-column:span 1; }
 .full { grid-column:1/-1; }
+.privacyNote { grid-column:1/-1; margin:0; color:var(--color-text-muted); font-size:var(--font-size-small); }
 
 .calendarShell { overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
 .toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 1.15rem; border-bottom:1px solid #e7e8e2; }
@@ -50,6 +51,7 @@
 .eventPill[data-event-type="exam"] { color:var(--color-danger-text); background:#ffebee; border-color:#d64e64; }
 .eventPill[data-event-type="deadline"] { color:var(--color-accent-text); background:#fff8d9; border-color:#c9a922; }
 .eventPill[data-event-type="meeting"] { color:#30479a; background:#ecf0ff; border-color:#5c73df; }
+.eventPill[data-event-scope="personal"] { border-left-style:dashed; }
 .eventDot { display:none; }
 .moreEvents { padding:.1rem .25rem; color:var(--color-text-muted); font-size:.63rem; font-weight:800; }
 
@@ -64,6 +66,7 @@
 .dayEventCard[data-event-type="exam"] { border-left-color:#d64e64; }
 .dayEventCard[data-event-type="deadline"] { border-left-color:#c9a922; }
 .dayEventCard[data-event-type="meeting"] { border-left-color:#5c73df; }
+.dayEventCard[data-event-scope="personal"] { border-left-style:dashed; }
 .dayEventCard > span:nth-child(2) { display:flex; flex-direction:column; gap:.2rem; min-width:0; }
 .dayEventCard strong { overflow:hidden; font-size:.8rem; text-overflow:ellipsis; white-space:nowrap; }
 .dayEventCard small { overflow:hidden; color:var(--color-text-muted); font-size:.68rem; text-overflow:ellipsis; white-space:nowrap; }
@@ -205,6 +208,7 @@
 .agendaRow[data-event-type="exam"] { --status-color: #d64e64; }
 .agendaRow[data-event-type="deadline"] { --status-color: #c9a922; }
 .agendaRow[data-event-type="meeting"] { --status-color: #5c73df; }
+.agendaRow[data-event-scope="personal"] { --status-color: var(--color-accent); }
 .rowLink { position: relative; z-index: 1; color: inherit; text-decoration: none; }
 .rowLink:hover { color: var(--color-accent-text); text-decoration: underline; text-underline-offset: 2px; }
 .typePill[data-event-type="assessment"] { color: #9a4d12; background: #fff0e3; }
