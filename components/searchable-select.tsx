@@ -22,9 +22,9 @@ function optionsFrom(children: ReactNode): Option[] {
   });
 }
 
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; rootClassName?: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; rootClassName?: string; allowCustomValue?: boolean; placeholder?: string; maxLength?: number };
 
-export function SearchableSelect({ children, value, defaultValue, onChange, id, name, className, rootClassName, disabled, required, style, "aria-label": ariaLabel, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }: Props) {
+export function SearchableSelect({ children, value, defaultValue, onChange, id, name, className, rootClassName, allowCustomValue = false, placeholder, maxLength, disabled, required, style, "aria-label": ariaLabel, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy }: Props) {
   const generatedId = useId();
   const inputId = id || `searchable-select-${generatedId}`;
   const listId = `${inputId}-options`;
@@ -45,7 +45,7 @@ export function SearchableSelect({ children, value, defaultValue, onChange, id, 
   }, [required, selectedValue]);
 
   const matches = useMemo(() => options.filter(option => option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())), [options, query]);
-  const displayValue = selectedValue ? selected?.label ?? "" : "";
+  const displayValue = selectedValue ? selected?.label ?? (allowCustomValue ? selectedValue : "") : "";
   const updatePosition = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -84,15 +84,15 @@ export function SearchableSelect({ children, value, defaultValue, onChange, id, 
   };
 
   return <div ref={rootRef} className={`${styles.root}${rootClassName ? ` ${rootClassName}` : ""}`} style={style}>
-    <input ref={inputRef} id={inputId} className={`${styles.input}${className ? ` ${className}` : ""}`} type="text" role="combobox" aria-label={ariaLabel} aria-invalid={ariaInvalid} aria-describedby={ariaDescribedBy} aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined} value={open ? query : displayValue} placeholder={selected?.label} disabled={disabled} autoComplete="off"
-      required={required && !selectedValue} onFocus={() => { if (!open) show(); }} onClick={() => { if (!open) show(); }} onChange={event => { setQuery(event.target.value); setActive(0); if (!open) { updatePosition(); setOpen(true); } }} onKeyDown={event => {
+    <input ref={inputRef} id={inputId} className={`${styles.input}${className ? ` ${className}` : ""}`} type="text" role="combobox" aria-label={ariaLabel} aria-invalid={ariaInvalid} aria-describedby={ariaDescribedBy} aria-autocomplete="list" aria-expanded={open} aria-controls={open ? listId : undefined} aria-activedescendant={open && matches[active] ? `${listId}-${active}` : undefined} value={open ? query : displayValue} placeholder={placeholder ?? selected?.label} maxLength={maxLength} disabled={disabled} autoComplete="off"
+      required={required && !selectedValue} onFocus={() => { if (!open) show(); }} onClick={() => { if (!open) show(); }} onChange={event => { const nextValue = event.target.value; setQuery(nextValue); setActive(0); if (allowCustomValue) { if (value === undefined) setUncontrolled(nextValue); onChange?.({ target: { value: nextValue, name }, currentTarget: { value: nextValue, name } } as ChangeEvent<HTMLSelectElement>); } if (!open) { updatePosition(); setOpen(true); } }} onKeyDown={event => {
         if (event.key === "Escape") { event.preventDefault(); setOpen(false); setQuery(""); }
         else if (event.key === "ArrowDown") { event.preventDefault(); if (!open) show(); else setActive(current => Math.min(matches.length - 1, current + 1)); }
         else if (event.key === "ArrowUp") { event.preventDefault(); if (!open) show(); else setActive(current => Math.max(0, current - 1)); }
         else if (event.key === "Enter" && open) { event.preventDefault(); if (matches[active]) choose(matches[active]); }
         else if (event.key === "Tab") { setOpen(false); setQuery(""); }
       }} />
-    <select hidden name={name} value={selectedValue} disabled={disabled} tabIndex={-1} aria-hidden="true" className={styles.native} onChange={onChange}>{children}</select>
+    <select hidden name={name} value={selectedValue} disabled={disabled} tabIndex={-1} aria-hidden="true" className={styles.native} onChange={onChange}>{allowCustomValue && selectedValue && !selected ? <option value={selectedValue}>{selectedValue}</option> : null}{children}</select>
     <ChevronDown aria-hidden="true" className={styles.chevron} />
     {open && typeof document !== "undefined" && createPortal(<div ref={listRef} id={listId} role="listbox" className={styles.list} style={{ left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight }}>
       {matches.length ? matches.map((option, index) => <button id={`${listId}-${index}`} key={`${option.value}-${index}`} type="button" role="option" aria-selected={option.value === selectedValue} disabled={option.disabled} className={`${styles.option}${index === active ? ` ${styles.active}` : ""}`} onMouseDown={event => event.preventDefault()} onClick={() => choose(option)} onMouseEnter={() => setActive(index)}>{option.label}</button>) : <div className={styles.empty}>Sem resultados</div>}
