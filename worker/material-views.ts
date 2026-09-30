@@ -12,9 +12,13 @@ function missingMigration(reason: unknown) {
 }
 
 /** One batched read per list, never one query per material. Null means unavailable, not zero. */
-export async function materialViewCounts(env: Env, type: MaterialViewType): Promise<Map<string, number> | null> {
+export async function materialViewCounts(env: Env, type: MaterialViewType, resourceIds?: string[]): Promise<Map<string, number> | null> {
+  if (resourceIds && !resourceIds.length) return new Map();
   try {
-    const rows = await env.DB.prepare("SELECT resource_id,views FROM material_view_totals WHERE resource_type=?").bind(type).all<{ resource_id: string; views: number }>();
+    const statement = resourceIds
+      ? env.DB.prepare("SELECT resource_id,views FROM material_view_totals WHERE resource_type=? AND resource_id IN (SELECT value FROM json_each(?))").bind(type, JSON.stringify(resourceIds))
+      : env.DB.prepare("SELECT resource_id,views FROM material_view_totals WHERE resource_type=?").bind(type);
+    const rows = await statement.all<{ resource_id: string; views: number }>();
     return new Map(rows.results.map((row) => [row.resource_id, Number(row.views)]));
   } catch (reason) {
     if (!missingMigration(reason)) throw reason;
