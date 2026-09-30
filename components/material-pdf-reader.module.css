@@ -91,19 +91,17 @@
 .scroller[data-tool="area"] .textLayer { pointer-events: none; }
 .searchHit { border-radius: 2px; background: rgb(255 140 0 / 30%); box-shadow: 0 0 0 1px rgb(255 140 0 / 55%); }
 
-.selectionPopover { position: absolute; z-index: 20; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 18%); transform: translateX(-50%); }
+.selectionPopover { position: fixed; z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); max-width: calc(100vw - 32px); padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow); }
 .popoverColors, .popoverActions { display: flex; align-items: center; gap: 6px; }
-.popoverDivider { width: 1px; height: 20px; background: var(--line); }
-.popoverAction { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 8px; border: 0; border-radius: 999px; color: var(--ink); background: transparent; font: inherit; font-size: var(--font-size-body); font-weight: 800; cursor: pointer; }
+.popoverAction { display: inline-flex; align-items: center; gap: 5px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: var(--surface); font: inherit; font-size: var(--font-size-body); font-weight: 800; cursor: pointer; }
 .popoverAction:hover { background: var(--color-surface-subtle); }
 .popoverAction svg { width: 14px; height: 14px; }
-/* Touch / narrow screens: the selection actions become a sheet above the bottom edge, clear of the system handles. */
-.selectionPopover[data-compact] { position: fixed; inset: auto 8px calc(8px + env(safe-area-inset-bottom)); z-index: 40; display: grid; gap: 10px; padding: 12px; border-radius: var(--surface-card-radius); box-shadow: 0 -6px 28px rgb(0 0 0 / 20%); transform: none; }
-.selectionPopover[data-compact] .popoverDivider { display: none; }
-.selectionPopover[data-compact] .popoverColors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.selectionPopover[data-compact] .popoverActions { display: grid; grid-template-columns: 1fr 1fr; }
-.selectionPopover[data-compact] .popoverAction { justify-content: center; height: 44px; border: 1px solid var(--line); border-radius: var(--radius-control); }
-.popoverExcerpt { display: -webkit-box; margin: 0; overflow: hidden; color: var(--muted); font-size: var(--font-size-small); line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.popoverAction:disabled { opacity: .5; cursor: wait; }
+.selectionPopover[data-annotating] { width: 320px; }
+.selectionNote { display: grid; flex-basis: 100%; gap: var(--space-2); min-width: 0; }
+.selectionNote label { display: grid; gap: var(--space-1); color: var(--ink); font-size: var(--font-size-small); font-weight: 750; }
+.selectionNote .noteInput { width: 100%; }
+.selectionError { flex-basis: 100%; max-width: 320px; margin: 0; color: var(--color-danger-text); font-size: var(--font-size-small); }
 .colorChoice { display: inline-flex; min-width: 0; height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius-control); color: var(--ink); background: color-mix(in srgb, var(--hl) 14%, var(--surface)); font: inherit; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
 .colorChoice .dot { width: 12px; height: 12px; flex: none; }
 .colorChoice:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
@@ -185,6 +183,7 @@
 }
 /* Finger-sized targets (WCAG 2.5.8) on touch screens. */
 @media (pointer: coarse) {
+  .popoverAction { min-height: 44px; }
   .resizeHandle { width: 44px; min-height: 44px; }
   .iconButton { width: 44px; height: 44px; }
   /* Labelled tools keep their text: only the minimum size grows (touch laptops included). */
