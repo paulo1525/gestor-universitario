@@ -11,6 +11,7 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
 import { pdfJsAssetOptions } from "@/lib/pdfjs-assets.mjs";
+import { movePdfRangeEdge, pdfRangeFromRects, pdfRangeGeometry, pdfTextPoint, resizePdfArea, stepPdfRangeEdge, type HighlightEdge } from "@/lib/pdf-highlight-selection";
 
 type HighlightColor = "gold" | "blue" | "green" | "rose";
 type Rect = { x: number; y: number; width: number; height: number };
@@ -157,6 +158,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const scrollerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const highlightListRef = useRef<HTMLDivElement>(null);
+  const resizingRef = useRef(false);
+  const onResizeState = useCallback((active: boolean) => { resizingRef.current = active; }, []);
   const onCloseRef = useRef(onClose);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const textCache = useRef(new Map<number, string>());
@@ -363,7 +366,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     }
   }, [endpoint]);
 
-  const updateHighlight = useCallback(async (highlight: Highlight, changes: { color?: HighlightColor; note?: string; selectedText?: string }): Promise<boolean> => {
+  const updateHighlight = useCallback(async (highlight: Highlight, changes: { color?: HighlightColor; note?: string; selectedText?: string; rects?: Rect[] }): Promise<boolean> => {
     setError("");
     try {
       const response = await fetch(endpoint, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: highlight.id, ...changes }) });
@@ -400,7 +403,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   // Once active, the selected colour is applied immediately; the temporary mark
   // keeps the feedback instant while the annotation is persisted.
   const captureSelection = useCallback(() => {
-    if (tool !== "text") return;
+    if (tool !== "text" || resizingRef.current) return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.rangeCount) return;
     const range = selection.getRangeAt(0);
@@ -513,6 +516,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       const typing = Boolean(target?.closest("input, textarea, [contenteditable='true']"));
       if (event.key === "Escape") {
         setTool("none");
+        setActiveId(null);
         window.getSelection()?.removeAllRanges();
         return;
       }
@@ -711,7 +715,10 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
                     searchTerm={searchState.query}
                     pendingRects={pending?.page === page ? pending.rects : null}
                     pendingColor={pending?.page === page ? pending.color : null}
-                    onSelectHighlight={(highlight) => { setColorFilter("all"); setSidebarOpen(true); selectHighlight(highlight, false); }}
+                    onSelectHighlight={(highlight) => { setTool("none"); setColorFilter("all"); if (compact) setSidebarOpen(false); selectHighlight(highlight, false); }}
+                    onDeselectHighlight={() => setActiveId(null)}
+                    onResizeState={onResizeState}
+                    onResizeHighlight={(highlight, changes) => updateHighlight(highlight, changes)}
                     onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); }}
                   />;
                 })}
@@ -743,7 +750,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
               : !listed.length ? <div className={styles.emptyList}><Highlighter aria-hidden="true" /><strong>{highlights.length ? "Sem realces nesta cor" : "Ainda sem realces"}</strong><span>{highlights.length ? "" : "Ativa uma cor de realce e seleciona texto no PDF."}</span></div>
                 : listedGroups.map(([page, items]) => <section key={page} className={styles.pageGroup}>
                   <button type="button" className={styles.pageGroupTitle} onClick={() => scrollToPage(page)}>Página {page}<span>{items.length}</span></button>
-                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onSave={(changes) => updateHighlight(highlight, changes)} onRemove={() => setRemoveTarget(highlight)} />)}
+                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { setTool("none"); selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onSave={(changes) => updateHighlight(highlight, changes)} onRemove={() => setRemoveTarget(highlight)} />)}
                 </section>)}
           </div>
         </aside>
@@ -753,9 +760,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   </div>;
 }
 
-function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highlight: Highlight; active: boolean; onJump: () => void; onSave: (changes: { color: HighlightColor; note: string; selectedText: string }) => Promise<boolean>; onRemove: () => void }) {
+function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highlight: Highlight; active: boolean; onJump: () => void; onSave: (changes: { color: HighlightColor; note: string }) => Promise<boolean>; onRemove: () => void }) {
   const [note, setNote] = useState(highlight.note ?? "");
-  const [excerpt, setExcerpt] = useState(highlight.selectedText ?? "");
   const [draftColor, setDraftColor] = useState(highlight.color);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -764,7 +770,6 @@ function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highli
   useEffect(() => { if (editing) noteRef.current?.focus({ preventScroll: true }); }, [editing]);
   const edit = () => {
     setNote(highlight.note ?? "");
-    setExcerpt(highlight.selectedText ?? "");
     setDraftColor(highlight.color);
     setSaveError(false);
     setEditing(true);
@@ -772,7 +777,7 @@ function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highli
   const save = async () => {
     if (busy) return;
     setBusy(true);
-    const ok = await onSave({ note: note.trim(), selectedText: excerpt.trim(), color: draftColor });
+    const ok = await onSave({ note: note.trim(), color: draftColor });
     setBusy(false);
     setSaveError(!ok);
     if (ok) setEditing(false);
@@ -785,7 +790,6 @@ function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highli
       if (event.key === "Escape") { event.stopPropagation(); if (!busy) setEditing(false); }
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void save(); }
     }}>
-      <label>Texto do realce<textarea className={styles.noteInput} value={excerpt} maxLength={2000} disabled={busy} onChange={(event) => setExcerpt(event.target.value)} aria-label="Texto do realce" /></label>
       <label>Nota<textarea ref={noteRef} className={styles.noteInput} value={note} maxLength={800} disabled={busy} onChange={(event) => setNote(event.target.value)} placeholder="Escreve uma nota…" aria-label="Nota do realce" /></label>
       <div className={styles.itemSwatches} role="radiogroup" aria-label="Cor do realce">
         {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatchSmall} data-color={entry.value} aria-checked={draftColor === entry.value} aria-label={entry.label} disabled={busy} onClick={() => setDraftColor(entry.value)} />)}
@@ -798,7 +802,7 @@ function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highli
     </form> : highlight.note ? <button type="button" className={styles.note} onClick={edit} title="Editar nota">{highlight.note}</button>
       : <button type="button" className={styles.addNote} onClick={edit}>Adicionar nota</button>}
     <footer className={styles.itemFooter}>
-      {!editing && <button className="button button--ghost button--compact" type="button" onClick={edit}>Editar realce</button>}
+      {!editing && <><button className="button button--ghost button--compact" type="button" onClick={onJump}>Ajustar seleção</button><button className="button button--ghost button--compact" type="button" onClick={edit}>Nota e cor</button></>}
       <button type="button" className={styles.removeButton} disabled={busy} onClick={onRemove} aria-label="Remover realce" title="Remover realce"><Trash2 /></button>
     </footer>
   </article>;
@@ -821,11 +825,14 @@ type PdfPageProps = {
   pendingRects: Rect[] | null;
   pendingColor: HighlightColor | null;
   onSelectHighlight: (highlight: Highlight) => void;
+  onDeselectHighlight: () => void;
+  onResizeState: (active: boolean) => void;
+  onResizeHighlight: (highlight: Highlight, changes: { rects: Rect[]; selectedText?: string }) => Promise<boolean>;
   onDrawArea: (rect: Rect) => void;
 };
 
 /** One page: canvas + selectable text layer + highlights. Renders only near the viewport. */
-const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimatedSize, onSize, registerRef, scrollRoot, highlights, activeId, tool, color, searchTerm, pendingRects, pendingColor, onSelectHighlight, onDrawArea }: PdfPageProps) {
+const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimatedSize, onSize, registerRef, scrollRoot, highlights, activeId, tool, color, searchTerm, pendingRects, pendingColor, onSelectHighlight, onDeselectHighlight, onResizeState, onResizeHighlight, onDrawArea }: PdfPageProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -833,8 +840,105 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
   const [rendered, setRendered] = useState(false);
   const [textReady, setTextReady] = useState(0);
   const [draft, setDraft] = useState<{ start: { x: number; y: number }; rect: Rect } | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ id: string; rects: Rect[]; selectedText?: string } | null>(null);
+  const [resizeBusy, setResizeBusy] = useState(false);
+  const [resizeFailed, setResizeFailed] = useState(false);
+  const resizeRef = useRef<{ highlight: Highlight; edge: HighlightEdge; range: Range | null; changes: { rects: Rect[]; selectedText?: string }; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+  const selected = highlights.find((highlight) => highlight.id === activeId);
+  // Keep the page's text nodes while its highlight is being adjusted, even
+  // when scrolling or resizing briefly moves the page outside the viewport.
+  const shouldRender = near || Boolean(selected);
+  const selectedRects = selected ? resizePreview?.id === selected.id ? resizePreview.rects : highlightRects(selected) : [];
   const width = Math.floor(estimatedSize.width * scale);
   const height = Math.floor(estimatedSize.height * scale);
+  const lastSelectedRect = selectedRects.at(-1);
+  const resizeStatusStyle = lastSelectedRect ? {
+    top: Math.min(height - 64, (lastSelectedRect.y + lastSelectedRect.height) * height + 36),
+    left: Math.max(8, Math.min(width - 320, lastSelectedRect.x * width)),
+  } : undefined;
+
+  useEffect(() => {
+    setResizePreview(null);
+    setResizeFailed(false);
+    resizeRef.current = null;
+    onResizeState(false);
+  }, [activeId, scale, onResizeState]); // A zoom change replaces the PDF text nodes.
+
+  const persistResize = async (highlight: Highlight, changes: { rects: Rect[]; selectedText?: string }) => {
+    setResizeBusy(true);
+    setResizeFailed(false);
+    const ok = await onResizeHighlight(highlight, changes);
+    setResizeBusy(false);
+    setResizeFailed(!ok);
+    if (ok) setResizePreview(null);
+  };
+
+  const beginResize = (event: ReactPointerEvent<HTMLButtonElement>, edge: HighlightEdge) => {
+    if (!selected || resizeBusy || event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const layer = textRef.current, wrapper = wrapperRef.current;
+    if (!layer || !wrapper) return;
+    const range = selected.selectedText ? pdfRangeFromRects(layer, wrapper, selectedRects) : null;
+    if (selected.selectedText && !range) return;
+    resizeRef.current = { highlight: selected, edge, range, changes: { rects: selectedRects, selectedText: selected.selectedText ?? undefined }, moved: false };
+    suppressClickRef.current = true;
+    onResizeState(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const resizing = resizeRef.current, wrapper = wrapperRef.current, layer = textRef.current;
+    if (!resizing || !wrapper || !layer) return;
+    event.preventDefault(); event.stopPropagation();
+    const scroller = scrollRoot.current;
+    if (scroller) {
+      const viewport = scroller.getBoundingClientRect();
+      if (event.clientY < viewport.top + 28) scroller.scrollBy({ top: -12 });
+      else if (event.clientY > viewport.bottom - 28) scroller.scrollBy({ top: 12 });
+    }
+    let changes: { rects: Rect[]; selectedText?: string } | null;
+    if (resizing.range) {
+      const point = pdfTextPoint(layer, event.clientX, event.clientY);
+      const range = point && movePdfRangeEdge(layer, resizing.range, resizing.edge, point);
+      changes = range ? pdfRangeGeometry(range, wrapper) : null;
+    } else {
+      const bounds = wrapper.getBoundingClientRect();
+      const rect = resizePdfArea(boundingBox(highlightRects(resizing.highlight)), resizing.edge, { x: (event.clientX - bounds.left) / bounds.width, y: (event.clientY - bounds.top) / bounds.height });
+      changes = { rects: [rect] };
+    }
+    if (!changes) return;
+    resizing.changes = changes; resizing.moved = true;
+    setResizePreview({ id: resizing.highlight.id, ...changes });
+  };
+
+  const endResize = (event: ReactPointerEvent<HTMLButtonElement>, cancel = false) => {
+    event.preventDefault(); event.stopPropagation();
+    const resizing = resizeRef.current;
+    resizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    window.getSelection()?.removeAllRanges();
+    onResizeState(false);
+    if (!resizing || cancel || !resizing.moved) { setResizePreview(null); return; }
+    void persistResize(resizing.highlight, resizing.changes);
+  };
+
+  const stepResize = (edge: HighlightEdge, direction: number) => {
+    if (!selected || resizeBusy || !wrapperRef.current || !textRef.current) return;
+    if (!selected.selectedText) {
+      const rect = boundingBox(selectedRects);
+      const x = (edge === "start" ? rect.x : rect.x + rect.width) + direction / wrapperRef.current.clientWidth;
+      const y = edge === "start" ? rect.y : rect.y + rect.height;
+      const changes = { rects: [resizePdfArea(rect, edge, { x, y })] };
+      setResizePreview({ id: selected.id, ...changes });
+      void persistResize(selected, changes);
+      return;
+    }
+    const original = pdfRangeFromRects(textRef.current, wrapperRef.current, selectedRects);
+    const next = original && stepPdfRangeEdge(textRef.current, original, edge, direction);
+    const changes = next && pdfRangeGeometry(next, wrapperRef.current);
+    if (changes) { setResizePreview({ id: selected.id, ...changes }); void persistResize(selected, changes); }
+  };
 
   useEffect(() => {
     const element = wrapperRef.current;
@@ -845,7 +949,7 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
   }, [scrollRoot]);
 
   useEffect(() => {
-    if (!near) { setRendered(false); const canvas = canvasRef.current; if (canvas) { canvas.width = 0; canvas.height = 0; } if (textRef.current) textRef.current.replaceChildren(); return; }
+    if (!shouldRender) { setRendered(false); const canvas = canvasRef.current; if (canvas) { canvas.width = 0; canvas.height = 0; } if (textRef.current) textRef.current.replaceChildren(); return; }
     let active = true;
     let renderTask: RenderTask | undefined;
     let textLayer: InstanceType<PdfJs["TextLayer"]> | undefined;
@@ -879,7 +983,7 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
       if (reason?.name !== "RenderingCancelledException" && active) setRendered(true);
     });
     return () => { active = false; renderTask?.cancel(); textLayer?.cancel(); };
-  }, [near, onSize, page, pdfDocument, pdfjs, scale]);
+  }, [shouldRender, onSize, page, pdfDocument, pdfjs, scale]);
 
   // Search hits are marked on the text layer spans of rendered pages.
   useEffect(() => {
@@ -903,20 +1007,34 @@ const PdfPage = memo(function PdfPage({ page, pdfDocument, pdfjs, scale, estimat
     data-rendered={rendered || undefined}
     style={{ width, height, "--total-scale-factor": scale, "--scale-round-x": "1px", "--scale-round-y": "1px" } as CSSProperties}
     onClick={(event) => {
+      if (suppressClickRef.current) { suppressClickRef.current = false; return; }
       // Highlights never block text selection; a plain click on one selects it.
-      if (tool === "area" || !window.getSelection()?.isCollapsed) return;
+      if (!window.getSelection()?.isCollapsed) return;
       const bounds = event.currentTarget.getBoundingClientRect();
       const x = (event.clientX - bounds.left) / bounds.width, y = (event.clientY - bounds.top) / bounds.height;
       const hit = [...highlights].reverse().find((highlight) => highlightRects(highlight).some((rect) => x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height));
       if (hit) onSelectHighlight(hit);
+      else onDeselectHighlight();
     }}
   >
     <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
     <div ref={textRef} className={`textLayer ${styles.textLayer}`} aria-label={`Texto da página ${page}`} onPointerDown={(event) => event.currentTarget.classList.add("selecting")} />
     <div className={styles.highlightLayer} aria-hidden="true">
-      {highlights.flatMap((highlight) => highlightRects(highlight).map((rect, index) => <span key={`${highlight.id}-${index}`} className={styles.mark} data-color={highlight.color} data-active={activeId === highlight.id || undefined} style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />))}
+      {highlights.flatMap((highlight) => (resizePreview?.id === highlight.id ? resizePreview.rects : highlightRects(highlight)).map((rect, index) => <span key={`${highlight.id}-${index}`} className={styles.mark} data-color={highlight.color} data-active={activeId === highlight.id || undefined} style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />))}
       {pendingRects?.map((rect, index) => <span key={`pending-${index}`} className={styles.mark} data-color={pendingColor ?? color} data-pending style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%` }} />)}
     </div>
+    {selected && tool === "none" && selectedRects.length > 0 && <div className={styles.resizeControls} data-highlight-id={selected.id} onClick={(event) => event.stopPropagation()}>
+      {(["start", "end"] as const).map((edge) => {
+        const rect = edge === "start" ? selectedRects[0] : selectedRects[selectedRects.length - 1];
+        return <button key={edge} type="button" className={styles.resizeHandle} aria-label={edge === "start" ? "Ajustar início do realce" : "Ajustar fim do realce"} disabled={resizeBusy}
+          style={{ left: `${(rect.x + (edge === "end" ? rect.width : 0)) * 100}%`, top: `${rect.y * 100}%`, height: Math.max(32, rect.height * height) }}
+          onPointerDown={(event) => beginResize(event, edge)} onPointerMove={moveResize} onPointerUp={(event) => endResize(event)} onPointerCancel={(event) => endResize(event, true)}
+          onClick={(event) => { event.stopPropagation(); suppressClickRef.current = false; }}
+          onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); event.stopPropagation(); stepResize(edge, (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 5 : 1)); } }} />;
+      })}
+      {resizeBusy && <span className={styles.resizeStatus} style={resizeStatusStyle} role="status">A guardar…</span>}
+      {resizeFailed && resizePreview && <div className={styles.resizeStatus} style={resizeStatusStyle} role="alert">Não foi possível guardar.<button type="button" className="button button--compact" onClick={() => void persistResize(selected, resizePreview)}>Tentar novamente</button><button type="button" className="button button--compact" onClick={() => { setResizePreview(null); setResizeFailed(false); }}>Cancelar</button></div>}
+    </div>}
     {tool === "area" && <div
       className={styles.drawLayer}
       aria-label="Camada de realces"
