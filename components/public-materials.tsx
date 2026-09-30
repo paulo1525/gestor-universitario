@@ -167,7 +167,7 @@ export function PublicMaterials() {
   const signInHref = `/login/?next=${encodeURIComponent(PUBLIC_MATERIALS_PATH)}`;
   const hasLocked = state.units.some((item) => item.entries.some((entry) => entry.locked));
   // Signed-in users read PDFs in the annotator; visitors open the public file directly.
-  const openHref = (entry: Entry) => state.authenticated && entry.type === "catalog" && entry.id && entry.href?.endsWith("/view") ? materialReaderHref(entry.id) : entry.href ?? "#";
+  const openHref = (entry: Entry) => state.authenticated && entry.type === "catalog" && entry.section !== "compendiums" && entry.id && entry.href?.endsWith("/view") ? materialReaderHref(entry.id) : entry.href ?? "#";
   const recordOpening = async (entry: Entry, reader = false) => {
     if (reader || !entry.id || !entry.type) return;
     const views = await trackMaterialView(entry.id, entry.type);

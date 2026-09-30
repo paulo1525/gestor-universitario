@@ -145,7 +145,6 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [removing, setRemoving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [browserFullscreen, setBrowserFullscreen] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [colorFilter, setColorFilter] = useState<HighlightColor | "all">("all");
   // Narrow windows use the compact sidebar and larger touch targets.
@@ -157,6 +156,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const dialogRef = useRef<HTMLElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const highlightListRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const textCache = useRef(new Map<number, string>());
@@ -168,26 +168,17 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   useEffect(() => {
     const syncFullscreen = () => {
       setFullscreen(document.fullscreenElement === dialogRef.current);
-      const browserChromeHidden =
-        !document.fullscreenElement &&
-        window.outerWidth > 0 &&
-        window.outerHeight > 0 &&
-        window.innerWidth >= window.outerWidth - 16 &&
-        window.innerHeight >= window.outerHeight - 16;
-      setBrowserFullscreen(browserChromeHidden);
     };
     document.addEventListener("fullscreenchange", syncFullscreen);
-    window.addEventListener("resize", syncFullscreen);
     syncFullscreen();
     return () => {
       document.removeEventListener("fullscreenchange", syncFullscreen);
-      window.removeEventListener("resize", syncFullscreen);
     };
   }, []);
   useEffect(() => {
-    if (fullscreen || browserFullscreen) setChromeVisible(false);
+    if (fullscreen) setChromeVisible(false);
     else setChromeVisible(true);
-  }, [browserFullscreen, fullscreen]);
+  }, [fullscreen]);
 
   const setSidebarPreference = useCallback((open: boolean) => {
     setSidebarOpen(open);
@@ -212,12 +203,12 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     setLoadProgress(null);
     setPreparing(false);
     // The file comes from this device's cache when unchanged (304), otherwise it downloads with progress.
-    const bytes = loadPdfBytes(viewUrl, (progress) => { if (active) setLoadProgress(progress); }, controller.signal);
-    loadPdfJs().then(async (library) => {
+    Promise.all([
+      loadPdfJs(),
+      loadPdfBytes(viewUrl, (progress) => { if (active) setLoadProgress(progress); }, controller.signal),
+    ]).then(async ([library, data]) => {
       if (!active) return;
       setPdfjs(library);
-      const data = await bytes;
-      if (!active) return;
       setLoadProgress((current) => current && { ...current, phase: current.phase === "cached" ? "cached" : "downloading", loaded: current.total ?? current.loaded });
       setPreparing(true);
       loadingTask = library.getDocument({ data, ...pdfJsAssetOptions(library.version, window.location.origin) });
@@ -372,16 +363,18 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     }
   }, [endpoint]);
 
-  const updateHighlight = useCallback(async (highlight: Highlight, changes: { color?: HighlightColor; note?: string }) => {
-    const previous = highlight;
-    setHighlights((current) => current.map((item) => item.id === highlight.id ? { ...item, ...changes } : item));
+  const updateHighlight = useCallback(async (highlight: Highlight, changes: { color?: HighlightColor; note?: string; selectedText?: string }): Promise<boolean> => {
+    setError("");
     try {
       const response = await fetch(endpoint, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: highlight.id, ...changes }) });
-      const data = await response.json() as { error?: string };
+      const data = await response.json() as { highlight?: Highlight; error?: string };
       if (!response.ok) throw new Error(data.error || "Não foi possível atualizar o realce.");
+      setHighlights((current) => current.map((item) => item.id === highlight.id ? data.highlight ?? { ...item, ...changes } : item));
+      setAnnouncement("Realce atualizado.");
+      return true;
     } catch (reason) {
-      setHighlights((current) => current.map((item) => item.id === previous.id ? previous : item));
       setError(reason instanceof Error ? reason.message : "Não foi possível atualizar o realce.");
+      return false;
     }
   }, [endpoint]);
 
@@ -462,8 +455,18 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       const element = pageRefs.current.get(highlight.page);
       scrollToPage(highlight.page, "smooth", element ? Math.max(0, highlight.y * element.offsetHeight - 80) : 0);
     }
-    window.requestAnimationFrame(() => document.getElementById(`pdf-highlight-${highlight.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   }, [scrollToPage]);
+
+  // Scroll only the notes list: scrollIntoView also moved the reader and toolbar.
+  useEffect(() => {
+    if (!sidebarOpen || !activeId) return;
+    const list = highlightListRef.current;
+    const item = document.getElementById(`pdf-highlight-${activeId}`);
+    if (!list || !item) return;
+    const bounds = list.getBoundingClientRect(), target = item.getBoundingClientRect();
+    if (target.top < bounds.top) list.scrollTop += target.top - bounds.top;
+    else if (target.bottom > bounds.bottom) list.scrollTop += target.bottom - bounds.bottom;
+  }, [activeId, sidebarOpen]);
 
   // ---- Search -------------------------------------------------------------
   const pageText = useCallback(async (page: number) => {
@@ -621,7 +624,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
 
   const zoomLabel = zoom === "width" ? "Largura" : zoom === "page" ? "Página" : `${Math.round(zoom * 100)}%`;
   const zoomValue = typeof zoom === "number" ? String(zoom) : zoom;
-  const immersiveFullscreen = fullscreen || browserFullscreen;
+  const immersiveFullscreen = fullscreen;
 
   return <div className={styles.pageRoot}>
     <main ref={dialogRef} className={styles.reader} aria-labelledby="material-pdf-title" data-sidebar={sidebarOpen ? "open" : "closed"} data-fullscreen={immersiveFullscreen || undefined} data-chrome-visible={immersiveFullscreen && chromeVisible ? "true" : undefined}>
@@ -669,6 +672,9 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
           <div className={styles.swatches} role="radiogroup" aria-label="Cor do realce">
             {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatch} data-color={entry.value} aria-checked={tool !== "none" && color === entry.value} aria-label={entry.label} title={entry.label} onClick={() => { setColor(entry.value); if (tool === "none") setTool("text"); setAnnouncement(`Realce ${entry.label.toLowerCase()} ativo.`); }} />)}
           </div>
+          {compact && <select className={styles.colorSelect} aria-label="Cor dos novos realces" value={color} onChange={(event) => setColor(event.target.value as HighlightColor)}>
+            {COLORS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+          </select>}
         </div>
         </div>
         <form className={styles.search} role="search" onSubmit={(event) => { event.preventDefault(); stepSearch(1); }}>
@@ -705,7 +711,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
                     searchTerm={searchState.query}
                     pendingRects={pending?.page === page ? pending.rects : null}
                     pendingColor={pending?.page === page ? pending.color : null}
-                    onSelectHighlight={(highlight) => selectHighlight(highlight, false)}
+                    onSelectHighlight={(highlight) => { setColorFilter("all"); setSidebarOpen(true); selectHighlight(highlight, false); }}
                     onDrawArea={(rect) => { void createHighlight(page, [rect], "", color); }}
                   />;
                 })}
@@ -732,12 +738,12 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
             {COLORS.map((entry) => <button key={entry.value} type="button" aria-pressed={colorFilter === entry.value} onClick={() => setColorFilter(entry.value)} disabled={!colorCounts[entry.value]}><span className={styles.dot} data-color={entry.value} aria-hidden="true" />{entry.label}<b>{colorCounts[entry.value]}</b></button>)}
           </div>
           {error && <p className={styles.error} role="alert">{error}<button type="button" onClick={() => setError("")} aria-label="Fechar aviso"><X /></button></p>}
-          <div className={styles.highlightList}>
+          <div ref={highlightListRef} className={styles.highlightList}>
             {highlightsLoading ? <div className={styles.listSkeleton} aria-busy="true"><span /><span /><span /></div>
               : !listed.length ? <div className={styles.emptyList}><Highlighter aria-hidden="true" /><strong>{highlights.length ? "Sem realces nesta cor" : "Ainda sem realces"}</strong><span>{highlights.length ? "" : "Ativa uma cor de realce e seleciona texto no PDF."}</span></div>
                 : listedGroups.map(([page, items]) => <section key={page} className={styles.pageGroup}>
                   <button type="button" className={styles.pageGroupTitle} onClick={() => scrollToPage(page)}>Página {page}<span>{items.length}</span></button>
-                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onColor={(value) => void updateHighlight(highlight, { color: value })} onNote={(value) => void updateHighlight(highlight, { note: value })} onRemove={() => setRemoveTarget(highlight)} />)}
+                  {items.map((highlight) => <HighlightItem key={highlight.id} highlight={highlight} active={activeId === highlight.id} onJump={() => { selectHighlight(highlight); if (compact) setSidebarOpen(false); }} onSave={(changes) => updateHighlight(highlight, changes)} onRemove={() => setRemoveTarget(highlight)} />)}
                 </section>)}
           </div>
         </aside>
@@ -747,28 +753,53 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   </div>;
 }
 
-function HighlightItem({ highlight, active, onJump, onColor, onNote, onRemove }: { highlight: Highlight; active: boolean; onJump: () => void; onColor: (color: HighlightColor) => void; onNote: (note: string) => void; onRemove: () => void }) {
+function HighlightItem({ highlight, active, onJump, onSave, onRemove }: { highlight: Highlight; active: boolean; onJump: () => void; onSave: (changes: { color: HighlightColor; note: string; selectedText: string }) => Promise<boolean>; onRemove: () => void }) {
   const [note, setNote] = useState(highlight.note ?? "");
+  const [excerpt, setExcerpt] = useState(highlight.selectedText ?? "");
+  const [draftColor, setDraftColor] = useState(highlight.color);
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [editing, setEditing] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => { if (!editing) setNote(highlight.note ?? ""); }, [editing, highlight.note]);
-  useEffect(() => { if (editing) noteRef.current?.focus(); }, [editing]);
-  const save = () => {
-    setEditing(false);
-    if (note.trim() !== (highlight.note ?? "").trim()) onNote(note.trim());
+  useEffect(() => { if (editing) noteRef.current?.focus({ preventScroll: true }); }, [editing]);
+  const edit = () => {
+    setNote(highlight.note ?? "");
+    setExcerpt(highlight.selectedText ?? "");
+    setDraftColor(highlight.color);
+    setSaveError(false);
+    setEditing(true);
+  };
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await onSave({ note: note.trim(), selectedText: excerpt.trim(), color: draftColor });
+    setBusy(false);
+    setSaveError(!ok);
+    if (ok) setEditing(false);
   };
   return <article id={`pdf-highlight-${highlight.id}`} className={styles.highlightItem} data-color={highlight.color} data-active={active || undefined}>
     <button type="button" className={styles.quote} onClick={onJump} title="Ir para o realce">
       {highlight.selectedText ? <q>{highlight.selectedText}</q> : <em>Zona realçada</em>}
     </button>
-    {editing ? <textarea ref={noteRef} className={styles.noteInput} value={note} maxLength={800} onChange={(event) => setNote(event.target.value)} onBlur={save} onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) save(); if (event.key === "Escape") { event.stopPropagation(); setNote(highlight.note ?? ""); setEditing(false); } }} placeholder="Escreve uma nota…" aria-label="Nota do realce" />
-      : highlight.note ? <button type="button" className={styles.note} onClick={() => setEditing(true)} title="Editar nota">{highlight.note}</button>
-        : <button type="button" className={styles.addNote} onClick={() => setEditing(true)}>Adicionar nota</button>}
-    <footer className={styles.itemFooter}>
-      <div className={styles.itemSwatches} role="radiogroup" aria-label="Cor">
-        {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatchSmall} data-color={entry.value} aria-checked={highlight.color === entry.value} aria-label={entry.label} onClick={() => onColor(entry.value)} />)}
+    {editing ? <form className={styles.highlightEditor} onSubmit={(event) => { event.preventDefault(); void save(); }} onKeyDown={(event) => {
+      if (event.key === "Escape") { event.stopPropagation(); if (!busy) setEditing(false); }
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void save(); }
+    }}>
+      <label>Texto do realce<textarea className={styles.noteInput} value={excerpt} maxLength={2000} disabled={busy} onChange={(event) => setExcerpt(event.target.value)} aria-label="Texto do realce" /></label>
+      <label>Nota<textarea ref={noteRef} className={styles.noteInput} value={note} maxLength={800} disabled={busy} onChange={(event) => setNote(event.target.value)} placeholder="Escreve uma nota…" aria-label="Nota do realce" /></label>
+      <div className={styles.itemSwatches} role="radiogroup" aria-label="Cor do realce">
+        {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatchSmall} data-color={entry.value} aria-checked={draftColor === entry.value} aria-label={entry.label} disabled={busy} onClick={() => setDraftColor(entry.value)} />)}
       </div>
-      <button type="button" className={styles.removeButton} onClick={onRemove} aria-label="Remover realce" title="Remover realce"><Trash2 /></button>
+      {saveError && <p role="alert">Não foi possível guardar. As alterações continuam aqui; tenta novamente.</p>}
+      <div className={styles.editActions}>
+        <button className="button button--primary button--compact" type="submit" disabled={busy}>{busy ? "A guardar…" : "Guardar"}</button>
+        <button className="button button--secondary button--compact" type="button" disabled={busy} onClick={() => setEditing(false)}>Cancelar</button>
+      </div>
+    </form> : highlight.note ? <button type="button" className={styles.note} onClick={edit} title="Editar nota">{highlight.note}</button>
+      : <button type="button" className={styles.addNote} onClick={edit}>Adicionar nota</button>}
+    <footer className={styles.itemFooter}>
+      {!editing && <button className="button button--ghost button--compact" type="button" onClick={edit}>Editar realce</button>}
+      <button type="button" className={styles.removeButton} disabled={busy} onClick={onRemove} aria-label="Remover realce" title="Remover realce"><Trash2 /></button>
     </footer>
   </article>;
 }

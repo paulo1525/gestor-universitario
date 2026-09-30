@@ -15,6 +15,7 @@ import {
 import { AdminMetric, AdminMetricGrid, AdminNavigationItem, AdminNavigationList, AdminPage, AdminPageHeader, AdminSection, AdminSectionGrid } from "@/components/admin-ui";
 import { AppShell } from "@/components/app-shell";
 import { useI18n } from "@/components/i18n-context";
+import { useModuleEnabled } from "@/components/use-module-enabled";
 
 type AdminSnapshot = {
   users: number;
@@ -24,6 +25,7 @@ type AdminSnapshot = {
 
 export function AdminConsoleHome() {
   const { locale, t } = useI18n();
+  const quizzesEnabled = useModuleEnabled("quizzes.management");
   const [snapshot, setSnapshot] = useState<AdminSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -107,12 +109,11 @@ export function AdminConsoleHome() {
               title={t("admin.home.curricularUnits")}
              
             />
-            <AdminNavigationItem
+            {quizzesEnabled && <AdminNavigationItem
               href="/admin/testes"
               icon={<ClipboardCheck />}
               title={t("admin.home.quizzes")}
-             
-            />
+            />}
           </AdminNavigationList>
         </AdminSection>
 

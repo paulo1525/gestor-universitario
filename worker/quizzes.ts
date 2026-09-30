@@ -1067,6 +1067,8 @@ export function isQuizPath(pathname: string): boolean {
 }
 
 export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!await enabled("quizzes")) return disabled();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   if (path === "/api/admin/quizzes" && request.method === "GET") return adminCatalog(request, env, url, user, enabled);
   if (path === "/api/admin/quizzes" && request.method === "POST") return adminCreate(request, env, user, enabled);

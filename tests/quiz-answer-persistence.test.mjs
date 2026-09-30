@@ -18,6 +18,19 @@ const { handleQuizRoute } = await compile('../worker/quizzes.ts', (path) => {
 });
 const SQL = await initSqlJs();
 const user = { id: 'student-test', email: 'student@example.test', fullName: 'Estudante fictício', role: 'student' };
+const { moduleEffectiveEnabled } = await compile('../lib/app-modules.ts');
+test('módulo arquivado bloqueia todas as APIs antes de consultar D1 mesmo com configurações antigas ativas', async () => {
+  const env = { DB: { prepare() { throw new Error('Archived module must not query D1'); } } };
+  const keys = ['quizzes', 'quizzes.practice', 'quizzes.progress', 'quizzes.learning', 'quizzes.management'];
+  const states = Object.fromEntries(keys.map((key) => [key, true]));
+  for (const key of keys) assert.equal(moduleEffectiveEnabled(key, states), false);
+  for (const path of ['/api/question-bank', '/api/quizzes', '/api/quiz-attempts/attempt-test/answers', '/api/admin/quiz-questions']) {
+    const url = new URL(path, 'https://example.test');
+    const response = await handleQuizRoute(new Request(url), env, url, user, async (key) => moduleEffectiveEnabled(key, states));
+    assert.equal(response.status, 404);
+    assert.equal((await response.json()).code, 'MODULE_DISABLED');
+  }
+});
 function fixture(mode = 'quick') {
   const db = new SQL.Database();
   db.run(`CREATE TABLE quiz_attempts (id TEXT PRIMARY KEY,user_id TEXT,mode TEXT,status TEXT,expires_at INTEGER,duration_seconds INTEGER DEFAULT 300,answered_count INTEGER DEFAULT 0,correct_count INTEGER DEFAULT 0,updated_at INTEGER,completed_at INTEGER,config_json TEXT);

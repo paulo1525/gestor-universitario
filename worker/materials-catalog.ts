@@ -245,6 +245,8 @@ async function catalogItem(request: Request, env: MaterialsCatalogEnv, id: strin
 async function anki(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
   if (!await enabled("materials.anki")) return disabled();
   if (!user) return unauthenticated();
+  // The custom builder reads the archived question bank; ready-made Anki files remain available.
+  if (!await enabled("quizzes.practice")) return disabled();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const variant = text(url.searchParams.get("variant"), 20) || "reviewed";
   if (variant !== "reviewed") return json({ error: "Pacote Anki legado indisponível; use a versão revista.", code: "LEGACY_ANKI_RETIRED" }, 410);
@@ -470,15 +472,16 @@ async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: str
   }
   const now = Date.now();
   if (request.method === "PATCH") {
-    // Only the colour and the note change; the geometry stays as highlighted.
+    // Edit the excerpt, colour and note while preserving the marked geometry.
     if (!highlightId) return json({ error: "Realce inválido." }, 400);
     const current = await env.DB.prepare("SELECT * FROM material_pdf_highlights WHERE id=? AND user_id=? AND material_id=?").bind(highlightId, user.id, id).first<Record<string, unknown>>();
     if (!current) return json({ error: "Realce não encontrado." }, 404);
     const color = body.color === undefined ? String(current.color) : text(body.color, 12);
     const note = body.note === undefined ? (current.note as string | null) : (text(body.note, 800) || null);
+    const selectedText = body.selectedText === undefined ? (current.selected_text as string | null) : (text(body.selectedText, 2000) || null);
     if (!highlightColors.includes(color)) return json({ error: "Cor inválida." }, 400);
-    await env.DB.prepare("UPDATE material_pdf_highlights SET color=?,note=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?").bind(color, note, now, highlightId, user.id, id).run();
-    return json({ highlight: mapHighlight({ ...current, color, note, updated_at: now }) });
+    await env.DB.prepare("UPDATE material_pdf_highlights SET color=?,note=?,selected_text=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?").bind(color, note, selectedText, now, highlightId, user.id, id).run();
+    return json({ highlight: mapHighlight({ ...current, color, note, selected_text: selectedText, updated_at: now }) });
   }
   if (request.method !== "POST" && request.method !== "PUT") return json({ error: "Operação não suportada." }, 405);
   const page = Number(body.page), x = finiteCoordinate(body.x), y = finiteCoordinate(body.y), width = finiteCoordinate(body.width), height = finiteCoordinate(body.height);
