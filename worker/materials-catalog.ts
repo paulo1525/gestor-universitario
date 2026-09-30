@@ -209,32 +209,24 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
   const conditions = ["m.publication_status='published'", "(?='' OR m.curricular_unit_id=?)", "(?='' OR m.material_kind=?)", "(?='' OR lower(m.title || ' ' || m.description) LIKE lower(?))"];
   const bindings: unknown[] = [unitId, unitId, kind && catalogKinds.has(kind) ? kind : "", kind && catalogKinds.has(kind) ? kind : "", queryPattern, queryPattern];
   if (lessonCode) { conditions.push("(EXISTS (SELECT 1 FROM material_catalog_lessons ml_filter JOIN material_lessons fl ON fl.id=ml_filter.lesson_id WHERE ml_filter.material_id=m.id AND fl.code=?) OR ml.code=?)"); bindings.push(lessonCode, lessonCode); }
+  const favoritesEnabled = await enabled("materials.favorites");
+  const favoriteJoin = favoritesEnabled ? "LEFT JOIN material_catalog_favorites favorite ON favorite.material_id=m.id AND favorite.user_id=?" : "";
+  const favoriteColumn = favoritesEnabled ? "favorite.material_id IS NOT NULL" : "0";
+  // Indexed lesson/favourite lookups share the catalogue query. Neither the
+  // parameter count nor the number of D1 requests grows with the material list.
   const [itemsResult, lessonsResult, sourcesResult, deckResult, deckLessonsResult] = await Promise.all([
-    env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id WHERE ${conditions.join(" AND ")} ORDER BY CASE m.material_kind WHEN 'summary' THEN 1 WHEN 'bibliography' THEN 2 WHEN 'anki' THEN 3 ELSE 4 END,m.is_recommended DESC,m.updated_at DESC LIMIT 500`).bind(...bindings).all(),
+    env.DB.prepare(`SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author,${favoriteColumn} AS is_favorite,(SELECT json_group_array(code) FROM (SELECT l.code FROM material_catalog_lessons association JOIN material_lessons l ON l.id=association.lesson_id WHERE association.material_id=m.id ORDER BY l.sort_order,l.code)) AS lesson_codes FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id ${favoriteJoin} WHERE ${conditions.join(" AND ")} ORDER BY CASE m.material_kind WHEN 'summary' THEN 1 WHEN 'bibliography' THEN 2 WHEN 'anki' THEN 3 ELSE 4 END,m.is_recommended DESC,m.updated_at DESC LIMIT 500`).bind(...(favoritesEnabled ? [user.id, ...bindings] : bindings)).all(),
     env.DB.prepare("SELECT id,curricular_unit_id,code,title,lesson_type,sort_order FROM material_lessons WHERE (?='' OR curricular_unit_id=?) ORDER BY sort_order,code").bind(unitId, unitId).all(),
     env.DB.prepare("SELECT id,title,author,edition,citation FROM material_sources ORDER BY title,edition").all(),
     env.DB.prepare("SELECT * FROM material_anki_decks WHERE publication_status='published' AND (?='' OR curricular_unit_id=?) ORDER BY CASE variant WHEN 'essential' THEN 1 WHEN 'complete' THEN 2 ELSE 3 END,title").bind(unitId, unitId).all(),
-    env.DB.prepare("SELECT dl.deck_id,dl.lesson_id,dl.card_count,l.code,l.title FROM material_anki_deck_lessons dl JOIN material_lessons l ON l.id=dl.lesson_id ORDER BY l.sort_order,l.code").all(),
+    env.DB.prepare("SELECT dl.deck_id,dl.lesson_id,dl.card_count,l.code,l.title FROM material_anki_deck_lessons dl JOIN material_anki_decks d ON d.id=dl.deck_id JOIN material_lessons l ON l.id=dl.lesson_id WHERE d.publication_status='published' AND (?='' OR d.curricular_unit_id=?) ORDER BY l.sort_order,l.code").bind(unitId, unitId).all(),
   ]);
   const lessons = lessonsResult.results.map(row);
   const materialIds = itemsResult.results.map((item) => String(row(item).id));
-  const associationRows = materialIds.length
-    ? (await env.DB.prepare(`SELECT ml.material_id,l.code FROM material_catalog_lessons ml JOIN material_lessons l ON l.id=ml.lesson_id WHERE ml.material_id IN (${materialIds.map(() => "?").join(",")}) ORDER BY l.sort_order,l.code`).bind(...materialIds).all()).results.map(row)
-    : [];
-  const lessonCodesByMaterial = new Map<string, string[]>();
-  for (const association of associationRows) {
-    const materialId = String(association.material_id);
-    const values = lessonCodesByMaterial.get(materialId) || [];
-    values.push(String(association.code));
-    lessonCodesByMaterial.set(materialId, values);
-  }
-  // Stars are personal: only the signed-in user's favourites, and only while the favourites module is on.
-  const favoritesEnabled = await enabled("materials.favorites");
-  const favoriteIds = favoritesEnabled ? new Set((await env.DB.prepare("SELECT material_id FROM material_catalog_favorites WHERE user_id=?").bind(user.id).all()).results.map((item) => String(row(item).material_id))) : new Set<string>();
-  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog"), materialViewCounts(env, "anki")]);
+  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog", materialIds), materialViewCounts(env, "anki", deckResult.results.map((item) => String(row(item).id)))]);
   const catalogItems = itemsResult.results.map((item) => {
     const material = row(item);
-    return { ...mapCatalogItem(material, lessonCodesByMaterial.get(String(material.id)) || []), favorite: favoriteIds.has(String(material.id)), views: catalogViews ? catalogViews.get(String(material.id)) || 0 : null };
+    return { ...mapCatalogItem(material, JSON.parse(String(material.lesson_codes || "[]"))), favorite: Number(material.is_favorite) === 1, views: catalogViews ? catalogViews.get(String(material.id)) || 0 : null };
   });
   const decks = deckResult.results.map((item) => ({ ...mapDeck(row(item), deckLessonsResult.results.map(row)), views: deckViews ? deckViews.get(String(row(item).id)) || 0 : null }));
   return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { favorites: favoritesEnabled, manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
@@ -246,7 +238,7 @@ async function catalogItem(request: Request, env: MaterialsCatalogEnv, id: strin
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const item = await env.DB.prepare("SELECT m.*,cu.code AS unit_code,cu.name AS unit_name,ml.code AS lesson_code,src.title AS source_title,src.edition AS source_edition,src.author AS source_author FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id LEFT JOIN material_lessons ml ON ml.id=m.lesson_id LEFT JOIN material_sources src ON src.id=m.source_id WHERE m.id=? AND m.publication_status='published'").bind(id).first<Record<string, unknown>>();
   if (!item) return json({ error: "Material não encontrado." }, 404);
-  const views = await materialViewCounts(env, "catalog");
+  const views = await materialViewCounts(env, "catalog", [id]);
   return json({ item: { ...mapCatalogItem(item), views: views ? views.get(id) || 0 : null } });
 }
 
@@ -580,7 +572,8 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     env.DB.prepare("SELECT m.*,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
     ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
   ]);
-  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog"), materialViewCounts(env, "anki")]);
+  const visibleIds = (items: unknown[]) => items.map(row).filter((item) => user || Number(item.public_access) === 1).map((item) => String(item.id));
+  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog", visibleIds(catalogRows.results)), materialViewCounts(env, "anki", visibleIds(deckRows.results))]);
   type Entry = { views?: number | null; section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
   type Unit = { key: string; code: string; name: string; year: number | null; semester: number | null; entries: Entry[] };
   const units = new Map<string, Unit>();
