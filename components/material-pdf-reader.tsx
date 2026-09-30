@@ -4,14 +4,15 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { trackMaterialView } from "@/lib/material-views";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Maximize2, Minimize2, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, ExternalLink, Highlighter, ListTree, Maximize2, Minimize2, Minus, MousePointer2, PanelRightClose, PanelRightOpen, Plus, RectangleVertical, Rows3, Search, SquareDashed, StickyNote, Trash2, X } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import styles from "@/components/material-pdf-reader.module.css";
 import { loadPdfBytes, type PdfLoadProgress } from "@/lib/pdf-cache";
 import { pdfJsAssetOptions } from "@/lib/pdfjs-assets.mjs";
 import { movePdfRangeEdge, pdfRangeFromRects, pdfRangeGeometry, pdfTextPoint, resizePdfArea, stepPdfRangeEdge, type HighlightEdge } from "@/lib/pdf-highlight-selection";
+import { pdfSelectionToolbarPosition } from "@/lib/pdf-selection-toolbar";
 
 type HighlightColor = "gold" | "blue" | "green" | "rose";
 type Rect = { x: number; y: number; width: number; height: number };
@@ -71,19 +72,6 @@ function boundingBox(rects: Rect[]): Rect {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** Joins the per-span rectangles of a selection into one rectangle per line. */
-function mergeLineRects(rects: Rect[]): Rect[] {
-  const sorted = [...rects].sort((a, b) => a.y - b.y || a.x - b.x);
-  const lines: Rect[] = [];
-  for (const rect of sorted) {
-    const line = lines.find((candidate) => Math.abs(candidate.y + candidate.height / 2 - (rect.y + rect.height / 2)) < Math.max(candidate.height, rect.height) * 0.5);
-    if (!line) { lines.push({ ...rect }); continue; }
-    const merged = boundingBox([line, rect]);
-    Object.assign(line, merged);
-  }
-  return lines.map((rect) => ({ x: clamp01(rect.x), y: clamp01(rect.y), width: Math.min(rect.width, 1 - clamp01(rect.x)), height: Math.min(rect.height, 1 - clamp01(rect.y)) })).filter((rect) => rect.width > 0.002 && rect.height > 0.002);
-}
-
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
@@ -141,6 +129,9 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [pending, setPending] = useState<PendingSelection | null>(null);
+  const [selectionMenu, setSelectionMenu] = useState<PendingSelection | null>(null);
+  const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const selectionSavingRef = useRef(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<Highlight | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -342,7 +333,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
   }, []);
 
   // ---- Highlights -------------------------------------------------------
-  const createHighlight = useCallback(async (page: number, rects: Rect[], selectedText: string, highlightColor: HighlightColor) => {
+  const createHighlight = useCallback(async (page: number, rects: Rect[], selectedText: string, highlightColor: HighlightColor, note = "") => {
     if (!rects.length) return;
     const box = boundingBox(rects);
     setSaving(true);
@@ -350,7 +341,6 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     try {
       const shape = { ...box, rects };
       const color = highlightColor;
-      const note = "";
       const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ page, ...shape, color, note, selectedText }) });
       const data = await response.json() as { highlight?: Highlight; error?: string };
       if (!response.ok || !data.highlight) throw new Error(data.error || "Não foi possível guardar o realce.");
@@ -399,29 +389,30 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     }
   };
 
-  // Text selection is only highlighted after the user activates a highlight mode.
-  // Once active, the selected colour is applied immediately; the temporary mark
-  // keeps the feedback instant while the annotation is persisted.
+  // Normal selection offers one-time actions; the explicit text mode stays continuous.
   const captureSelection = useCallback(() => {
-    if (tool !== "text" || resizingRef.current) return;
+    if (resizingRef.current || selectionSavingRef.current || selectionMenuRef.current?.contains(document.activeElement)) return;
+    if (tool === "area") { setSelectionMenu(null); return; }
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+    if (!selection || selection.isCollapsed || !selection.rangeCount) { setSelectionMenu(null); return; }
     const range = selection.getRangeAt(0);
     const startElement = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
     const endElement = range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
     const pageElement = startElement?.closest<HTMLElement>("[data-pdf-page]");
     const scroller = scrollerRef.current;
     // Only selections that start and end on the same PDF page become highlights.
-    if (!pageElement || !scroller || !scroller.contains(pageElement) || endElement?.closest("[data-pdf-page]") !== pageElement) return;
+    if (!pageElement || !scroller || !scroller.contains(pageElement) || endElement?.closest("[data-pdf-page]") !== pageElement) { setSelectionMenu(null); return; }
     const page = Number(pageElement.dataset.pdfPage);
-    const bounds = pageElement.getBoundingClientRect();
-    const rects = mergeLineRects(Array.from(range.getClientRects())
-      // Line boxes only: the page-sized helper element used while selecting is dropped.
-      .filter((rect) => rect.width > 1 && rect.height > 1 && rect.height < bounds.height * 0.1 && rect.bottom > bounds.top && rect.top < bounds.bottom)
-      .map((rect) => ({ x: (rect.left - bounds.left) / bounds.width, y: (rect.top - bounds.top) / bounds.height, width: rect.width / bounds.width, height: rect.height / bounds.height })));
-    const text = selection.toString().replace(/\s+/g, " ").trim();
-    if (!rects.length || !text) return;
+    const geometry = pdfRangeGeometry(range, pageElement);
+    if (!geometry) return;
+    const { rects, selectedText: text } = geometry;
     const next: PendingSelection = { page, rects, text: text.slice(0, 2000), color };
+    if (tool === "none") {
+      setSelectionMenu((current) => current?.page === next.page && current.text === next.text && JSON.stringify(current.rects) === JSON.stringify(next.rects) ? current : next);
+      setActiveId(null);
+      return;
+    }
+    setSelectionMenu(null);
     setPending(next);
     selection.removeAllRanges();
     setAnnouncement(`A guardar realce na página ${page}.`);
@@ -429,6 +420,21 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       setPending((current) => current === next ? null : current);
     });
   }, [color, createHighlight, tool]);
+
+  const dismissSelection = () => { if (!selectionSavingRef.current) { setSelectionMenu(null); window.getSelection()?.removeAllRanges(); } };
+  const saveSelection = async (note: string) => {
+    const draft = selectionMenu;
+    if (!draft || selectionSavingRef.current) return;
+    selectionSavingRef.current = true;
+    setPending(draft);
+    try {
+      const created = await createHighlight(draft.page, draft.rects, draft.text, draft.color, note.trim());
+      if (created) { setSelectionMenu(null); setTool("none"); window.getSelection()?.removeAllRanges(); }
+    } finally {
+      selectionSavingRef.current = false;
+      setPending((current) => current === draft ? null : current);
+    }
+  };
 
   // Touch selections are adjusted with the system handles, which fire no pointerup on the page:
   // once the selection settles it becomes a highlight too. Mouse drags still wait for pointerup.
@@ -439,9 +445,8 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
     const onChange = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        const selection = window.getSelection();
-        if (pointerDown || !selection || selection.isCollapsed || !selection.rangeCount) return;
-        if (scrollerRef.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) captureSelection();
+        if (pointerDown) return;
+        captureSelection();
       }, 400);
     };
     document.addEventListener("selectionchange", onChange);
@@ -515,6 +520,7 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
       const target = event.target as HTMLElement | null;
       const typing = Boolean(target?.closest("input, textarea, [contenteditable='true']"));
       if (event.key === "Escape") {
+        if (!selectionSavingRef.current) setSelectionMenu(null);
         setTool("none");
         setActiveId(null);
         window.getSelection()?.removeAllRanges();
@@ -755,8 +761,69 @@ export function MaterialPdfReader({ materialId, title, viewUrl, downloadUrl, fil
           </div>
         </aside>
       </div>
+      {selectionMenu && <PdfSelectionToolbar draft={selectionMenu} toolbarRef={selectionMenuRef} readerRef={dialogRef} scrollRoot={scrollerRef} layoutKey={`${scale}:${sidebarOpen}:${compact}`} busy={saving} error={error} onColor={(value) => { setColor(value); setSelectionMenu({ ...selectionMenu, color: value }); setError(""); }} onSave={saveSelection} onClose={dismissSelection} />}
       <ConfirmationDialog open={Boolean(removeTarget)} eyebrow="" title="Remover este realce?" description="" subject={removeTarget?.selectedText || removeTarget?.note || undefined} subjectLabel={removeTarget?.selectedText ? "Texto" : "Nota"} confirmLabel={removing ? "A remover…" : "Remover"} busy={removing} onClose={() => setRemoveTarget(null)} onConfirm={() => { if (removeTarget) void remove(removeTarget); }} />
     </main>
+  </div>;
+}
+
+function PdfSelectionToolbar({ draft, toolbarRef, readerRef, scrollRoot, layoutKey, busy, error, onColor, onSave, onClose }: {
+  draft: PendingSelection;
+  toolbarRef: React.RefObject<HTMLDivElement | null>;
+  readerRef: React.RefObject<HTMLElement | null>;
+  scrollRoot: React.RefObject<HTMLDivElement | null>;
+  layoutKey: string;
+  busy: boolean;
+  error: string;
+  onColor: (color: HighlightColor) => void;
+  onSave: (note: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [annotating, setAnnotating] = useState(false);
+  const [note, setNote] = useState("");
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { setAnnotating(false); setNote(""); }, [draft.page, draft.text]);
+  useEffect(() => { if (annotating) noteRef.current?.focus({ preventScroll: true }); }, [annotating]);
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current, scroller = scrollRoot.current;
+    const page = readerRef.current?.querySelector<HTMLElement>(`[data-pdf-page="${draft.page}"]`);
+    if (!toolbar || !scroller || !page) return;
+    const update = () => {
+      const bounds = page.getBoundingClientRect(), root = scroller.getBoundingClientRect();
+      const visual = window.visualViewport;
+      const viewport = { left: Math.max(root.left, visual?.offsetLeft ?? 0), right: Math.min(root.right, (visual?.offsetLeft ?? 0) + (visual?.width ?? window.innerWidth)), top: Math.max(root.top, visual?.offsetTop ?? 0), bottom: Math.min(root.bottom, (visual?.offsetTop ?? 0) + (visual?.height ?? window.innerHeight)) };
+      const anchors = draft.rects.map((rect) => ({ left: bounds.left + rect.x * bounds.width, right: bounds.left + (rect.x + rect.width) * bounds.width, top: bounds.top + rect.y * bounds.height, bottom: bounds.top + (rect.y + rect.height) * bounds.height }));
+      const anchor = anchors.filter((rect) => rect.bottom > viewport.top && rect.top < viewport.bottom && rect.right > viewport.left && rect.left < viewport.right).at(-1);
+      const next = anchor ? pdfSelectionToolbarPosition(anchor, viewport, toolbar.getBoundingClientRect()) : annotating ? { left: viewport.left + 8, top: viewport.top + 8 } : null;
+      setPosition((previous) => previous?.left === next?.left && previous?.top === next?.top ? previous : next);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(toolbar); observer.observe(scroller); observer.observe(page);
+    scroller.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => { observer.disconnect(); scroller.removeEventListener("scroll", update); window.removeEventListener("resize", update); window.visualViewport?.removeEventListener("resize", update); window.visualViewport?.removeEventListener("scroll", update); };
+  }, [draft.page, draft.rects, annotating, layoutKey, readerRef, scrollRoot, toolbarRef]);
+  return <div ref={toolbarRef} className={styles.selectionPopover} data-annotating={annotating || undefined} role="region" aria-label="Ações da seleção" style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? "visible" : "hidden" }}
+    onPointerDown={(event) => { event.stopPropagation(); if (!(event.target as HTMLElement).closest("textarea, input")) event.preventDefault(); }}
+    onClick={(event) => event.stopPropagation()}
+    onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Escape" && !busy) { event.preventDefault(); onClose(); } if (annotating && event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); if (note.trim()) void onSave(note); } }}>
+    <div className={styles.popoverColors} role="radiogroup" aria-label="Cor da seleção">
+      {COLORS.map((entry) => <button key={entry.value} type="button" role="radio" className={styles.swatch} data-color={entry.value} aria-checked={draft.color === entry.value} aria-label={entry.label} disabled={busy} onClick={() => onColor(entry.value)} />)}
+    </div>
+    {!annotating && <div className={styles.popoverActions}>
+      <button type="button" className={styles.popoverAction} disabled={busy} onClick={() => void onSave("")}><Highlighter aria-hidden="true" />Realçar</button>
+      <button type="button" className={styles.popoverAction} disabled={busy} onClick={() => setAnnotating(true)}><StickyNote aria-hidden="true" />Anotar</button>
+      <button type="button" className={styles.iconButton} disabled={busy} aria-label="Fechar ações da seleção" onClick={onClose}><X aria-hidden="true" /></button>
+    </div>}
+    {annotating && <form className={styles.selectionNote} onSubmit={(event) => { event.preventDefault(); if (note.trim()) void onSave(note); }}>
+      <label>Nota<textarea ref={noteRef} className={styles.noteInput} value={note} maxLength={800} rows={3} disabled={busy} onChange={(event) => setNote(event.target.value)} aria-label="Nota da seleção" /></label>
+      <div className={styles.editActions}><button type="button" className="button button--secondary button--compact" disabled={busy} onClick={onClose}>Cancelar</button><button type="submit" className="button button--primary button--compact" disabled={busy || !note.trim()}>{busy ? "A guardar…" : "Guardar nota"}</button></div>
+    </form>}
+    {error && <p className={styles.selectionError} role="alert">{error}</p>}
   </div>;
 }
 
