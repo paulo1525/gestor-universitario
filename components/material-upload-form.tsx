@@ -208,7 +208,7 @@ export function MaterialUploadForm({ units, onClose, onSubmitted }: { units: Uni
                     : row.kind === "zip"
                       ? <span className={styles.kind}>{t("community.materials.category.other")}</span>
                       : <SearchableSelect value={row.category} disabled={locked} onChange={(event) => update(row.id, { category: event.target.value as MaterialCategory })} aria-label={t("community.materials.field.type")}>
-                        {(["summary", "notes", "other"] as const).map((category) => <option key={category} value={category}>{t(`community.materials.category.${category}`)}</option>)}
+                        {(["summary", "notes", "compendium", "other"] as const).map((category) => <option key={category} value={category}>{t(`community.materials.category.${category}`)}</option>)}
                       </SearchableSelect>}
                 <SearchableSelect value={row.unitId} disabled={locked} onChange={(event) => update(row.id, { unitId: event.target.value })} aria-label={t("community.materials.field.unit")}>
                   <option value="" disabled>{t("community.materials.field.unit")}</option>

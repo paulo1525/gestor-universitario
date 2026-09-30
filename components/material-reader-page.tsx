@@ -7,7 +7,7 @@ import { MaterialPdfReader } from "@/components/material-pdf-reader";
 import { QuietLoading } from "@/components/quiet-loading";
 import styles from "@/components/material-pdf-reader.module.css";
 
-type ReaderItem = { id: string; title: string; unitCode?: string | null; viewUrl?: string | null; downloadUrl?: string | null; fileName?: string };
+type ReaderItem = { id: string; title: string; unitCode?: string | null; otherFormat?: string | null; viewUrl?: string | null; downloadUrl?: string | null; fileName?: string };
 type State = { status: "loading" } | { status: "error"; message: string; item?: ReaderItem } | { status: "ready"; item: ReaderItem };
 
 /** Standalone annotator: opened in its own tab from the materials list and the dashboard. */
@@ -26,6 +26,10 @@ function Reader() {
       .then(async (response) => {
         const data = await response.json() as { item?: ReaderItem; error?: string };
         if (!response.ok || !data.item) throw new Error(data.error || "Não foi possível abrir este material.");
+        if (data.item.otherFormat === "compendium" && data.item.viewUrl) {
+          window.location.replace(data.item.viewUrl);
+          return;
+        }
         setState(data.item.viewUrl ? { status: "ready", item: data.item } : { status: "error", message: "Este material não tem um PDF para anotar.", item: data.item });
       })
       .catch((reason) => { if (!controller.signal.aborted) setState({ status: "error", message: reason instanceof Error ? reason.message : "Não foi possível abrir este material." }); });

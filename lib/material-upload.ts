@@ -117,7 +117,7 @@ export function zipEntryNames(directory: Uint8Array): string[] {
   return names;
 }
 
-export type MaterialCategory = "summary" | "notes" | "exam" | "anki" | "other";
+export type MaterialCategory = "summary" | "notes" | "compendium" | "exam" | "anki" | "other";
 
 /** Category suggested from the file; the student can change it except for exams and Anki decks. */
 export function suggestedCategory(kind: MaterialFileKind): MaterialCategory {

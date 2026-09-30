@@ -10,7 +10,6 @@ import {
   CalendarDays,
   CalendarClock,
   ChevronLeft,
-  ClipboardCheck,
   FileText,
   FolderOpen,
   GraduationCap,
@@ -31,7 +30,6 @@ import { clampPage, Pagination } from "@/components/pagination";
 import { AppToast } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
-import { QuestionBankSection } from "@/components/question-bank-section";
 import { RichTextContent } from "@/components/rich-text-editor";
 import { useI18n } from "@/components/i18n-context";
 import { UnitThumb } from "@/components/unit-thumb";
@@ -446,11 +444,9 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                     </dl>
                     <div className={styles.summaryActions}>
                       <Link className="button button--primary button--compact" href={`/materiais/?uc=${encodeURIComponent(data.unit.code.toLocaleUpperCase("pt-PT"))}`}><FolderOpen aria-hidden="true" />{t("community.units.studyMaterials")}</Link>
-                      {data.unit.code === "NEURO" && <Link className="button button--secondary button--compact" href="/testes/"><ClipboardCheck aria-hidden="true" />{t("community.units.practiceTests")}</Link>}
                     </div>
                   </section>
                   {data.academicContent.profile && <AcademicContentPanel content={data.academicContent} locale={locale} />}
-                  {data.unit.code === "NEURO" && <QuestionBankSection unitId={data.unit.id} unitCode={data.unit.code} />}
                   <div className={styles.columns}>
                     <div className={styles.page}>
                       <DetailSection

@@ -57,7 +57,7 @@ const statusTone: Record<string, string | undefined> = { pending: "accent", appr
 
 type Status = "pending" | "approved" | "rejected" | "archived";
 const LIBRARY_PAGE_SIZE = 10;
-type Category = "exam" | "summary" | "notes" | "other";
+type Category = "exam" | "summary" | "notes" | "compendium" | "other";
 
 function MaterialThumbnail({ fileType, src, title }: { fileType: string; src: string; title: string }) {
   const [failed, setFailed] = useState(false);
@@ -186,6 +186,7 @@ const categoryLabelKeys = {
   exam: "community.materials.category.exam",
   summary: "community.materials.category.summary",
   notes: "community.materials.category.notes",
+  compendium: "community.materials.category.compendium",
   other: "community.materials.category.other",
 } as const;
 const statusLabelKeys = {
