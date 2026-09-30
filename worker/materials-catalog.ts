@@ -2,6 +2,7 @@
 
 import { materialViewCounts, recordMaterialView } from "./material-views";
 import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
+import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory, type MaterialResourceCategory } from "@/lib/material-categories";
 import { driveConfigured, driveDownload, driveSyncStatus, isDriveKey, runDriveSync } from "@/worker/google-drive";
 
 export type MaterialsCatalogUser = {
@@ -78,6 +79,7 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     lessonCode: item.lesson_code,
     lessonCodes,
     kind: item.material_kind,
+    resourceCategory: materialResourceCategory(item.resource_category),
     bibliographyFormat: item.material_kind === "bibliography" ? bibliographyFormat(item) : null,
     summaryFormat: item.material_kind === "summary" ? (item.summary_format === "notes" ? "notes" : "lecture") : null,
     otherFormat: item.material_kind === "other" && (item.other_format === "slides" || item.other_format === "compendium") ? item.other_format : null,
@@ -538,10 +540,12 @@ async function anonymousDenied(request: Request, env: MaterialsCatalogEnv, user:
   return null;
 }
 
-type PublicSection = "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
-const PUBLIC_SECTION_ORDER: PublicSection[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
+type PublicSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
+const PUBLIC_SECTION_ORDER: PublicSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
 
 function publicSection(item: Record<string, unknown>): PublicSection {
+  const category = materialResourceCategory(item.resource_category);
+  if (category) return category;
   if (item.material_kind === "summary") return item.summary_format === "notes" ? "notes" : "summaries";
   if (item.material_kind === "bibliography") return "bibliography";
   if (item.material_kind === "anki") return "anki";
@@ -573,7 +577,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
   const ankiEnabled = await enabled("materials.anki");
   const [catalogRows, deckRows] = await Promise.all([
-    env.DB.prepare("SELECT m.id,m.material_kind,m.summary_format,m.bibliography_format,m.other_format,m.title,m.mime_type,m.file_name,m.storage_backend,m.storage_state,m.external_url,m.public_access,m.byte_size,m.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
+    env.DB.prepare("SELECT m.*,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
     ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
   ]);
   const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog"), materialViewCounts(env, "anki")]);

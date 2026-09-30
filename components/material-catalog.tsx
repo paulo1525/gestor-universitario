@@ -10,6 +10,7 @@ import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/
 import { MaterialViews } from "@/components/material-views";
 import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views";
 import { materialReaderHref } from "@/lib/material-reader";
+import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory, type MaterialResourceCategory } from "@/lib/material-categories";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
 import { RecordSkeleton, useHashRecord } from "@/components/record-list";
@@ -19,20 +20,21 @@ import { clampPage, Pagination } from "@/components/pagination";
 const RESOURCE_PAGE_SIZE = 10;
 const UNIT_PAGE_SIZE = 12;
 
-export type MaterialCatalogTab = "overview" | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "exams";
+export type MaterialCatalogTab = MaterialResourceCategory | "overview" | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "exams" | "other";
 /** List sections backed by catalogue items; every item belongs to exactly one. */
-type CatalogSection = "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "other";
+type CatalogSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "other";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
-type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind: string; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
+type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: Exclude<MaterialCatalogTab, "overview">[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams"];
-const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck };
-const listSections: Exclude<CatalogSection, "other">[] = ["summaries", "notes", "slides", "compendiums", "bibliography"];
-const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
+const tabs: Exclude<MaterialCatalogTab, "overview">[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams", "other"];
+const RESOURCE_ICON: Record<MaterialResourceCategory, LucideIcon> = { information: FileText, theory: Presentation, tutorials: Presentation, practical: Presentation, support: BookOpen, seminars: GraduationCap, assessment: ClipboardCheck };
+const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck, other: FileText };
+const listSections: CatalogSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "other"];
+const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
 export const GENERAL_MATERIAL_UNIT = "__general";
 
@@ -42,6 +44,8 @@ export function normalizeMaterialUnitCode(value: string | null | undefined) {
 
 /** PowerPoints and compendiums come from other_format (migration 0076); loose .pptx files and titled compendiums are recognised too. */
 function catalogSection(item: CatalogItem): CatalogSection {
+  const category = materialResourceCategory(item.resourceCategory);
+  if (category) return category;
   if (item.otherFormat === "compendium") return "compendiums";
   if (item.otherFormat === "slides" || /\.pptx?$/i.test(item.fileName || "") || /presentation|powerpoint/i.test(item.mimeType || "")) return "slides";
   if (item.kind === "bibliography") return "bibliography";
@@ -241,7 +245,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   /** "Gray’s Anatomy · pp. 227–236": the book and the pages of the excerpt. */
   const excerptLabel = (excerpt: CatalogItem) => [(excerpt.source?.title || excerpt.title).split(/[:—]/)[0].trim(), /pp?\.\s*[^—·]+$/.exec(excerpt.title)?.[0].trim()].filter(Boolean).join(" · ");
   const stats = useMemo(() => {
-    const counts: Record<CatalogSection, number> = { summaries: 0, notes: 0, slides: 0, compendiums: 0, bibliography: 0, other: 0 };
+    const counts = Object.fromEntries(listSections.map((section) => [section, 0])) as Record<CatalogSection, number>;
     for (const item of unitItems) counts[catalogSection(item)] += 1;
     return { ...counts, anki: unitDecks.length };
   }, [unitDecks.length, unitItems]);
@@ -328,7 +332,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
         <div className={styles.head}>
           <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
           <nav className={styles.tabs} aria-label={t("community.materials.title")}>
-            {tabs.map((tab) => {
+            {tabs.filter((tab) => !(MATERIAL_RESOURCE_CATEGORIES as readonly string[]).includes(tab) && tab !== "other" || stats[tab as CatalogSection] > 0).map((tab) => {
               const Icon = TAB_ICON[tab];
               const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
               return <button id={`material-tab-${tab}`} key={tab} type="button" className={styles.tab} onClick={() => onTabChange(tab)}>
