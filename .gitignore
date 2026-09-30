@@ -13,6 +13,7 @@
 /.open-next/
 /.wrangler/
 /temporary-resources/neuroanatomia/generated/
+/tmp/moodle-materials/
 
 # cloudflare local secrets
 .dev.vars*

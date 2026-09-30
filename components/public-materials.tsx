@@ -10,13 +10,14 @@ import { clampPage, Pagination } from "@/components/pagination";
 import { MaterialViews } from "@/components/material-views";
 import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views";
 import { materialReaderHref } from "@/lib/material-reader";
+import { MATERIAL_RESOURCE_CATEGORIES, type MaterialResourceCategory } from "@/lib/material-categories";
 import styles from "@/components/public-materials.module.css";
 
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
 const FILES_PAGE_SIZE = 10;
 
-type Section = "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
-const SECTIONS: Section[] = ["summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
+type Section = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
+const SECTIONS: Section[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
 // Folders shown in every subject, even when empty; the others only appear when they have files.
 const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
@@ -67,7 +68,7 @@ function fileDate(value?: number | null) {
 
 function FileIcon({ entry }: { entry: Entry }) {
   if (entry.section === "anki" || entry.mime === "application/apkg") return <Package aria-hidden="true" />;
-  if (entry.section === "slides") return <Presentation aria-hidden="true" />;
+  if (["slides", "theory", "tutorials", "practical", "seminars"].includes(entry.section)) return <Presentation aria-hidden="true" />;
   if (entry.mime?.startsWith("image/")) return <FileImage aria-hidden="true" />;
   if (entry.mime === "application/pdf") return <FileText aria-hidden="true" />;
   return <File aria-hidden="true" />;
