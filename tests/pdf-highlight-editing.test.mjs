@@ -15,7 +15,7 @@ test("compêndios abrem diretamente no PDF e outros documentos mantêm o anotado
   assert.equal(materialReaderHref("s", { otherFormat: "slides", viewUrl: "/api/material-catalog/s/view" }), "/materiais/ler/?id=s");
 });
 
-test("editar texto, nota e cor preserva geometria e protege realces de outra conta", async () => {
+test("ajustar seleção guarda a geometria no mesmo realce, preserva nota/cor e protege outra conta", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("CREATE TABLE users(id TEXT PRIMARY KEY); INSERT INTO users VALUES('owner'),('other');");
   db.exec("CREATE TABLE material_catalog(id TEXT PRIMARY KEY,mime_type TEXT,publication_status TEXT); INSERT INTO material_catalog VALUES('pdf','application/pdf','published');");
@@ -40,5 +40,22 @@ test("editar texto, nota e cor preserva geometria e protege realces de outra con
     assert.equal(updated.rects.length, 1);
     assert.equal((await request("owner", { color:"invalid" })).status, 400);
     assert.equal(db.prepare("SELECT color FROM material_pdf_highlights").get().color, "blue");
+    const rects = [{ x:.05,y:.2,width:.4,height:.04 }, { x:.1,y:.26,width:.2,height:.04 }];
+    assert.equal((await request("other", { rects, selectedText:"texto alargado" })).status, 404);
+    const resized = await request("owner", { rects, selectedText:"texto alargado" });
+    assert.equal(resized.status, 200);
+    const shape = (await resized.json()).highlight;
+    assert.deepEqual(shape.rects, rects);
+    assert.deepEqual([shape.page,shape.x,shape.y,shape.width], [2,.05,.2,.4]);
+    assert.ok(Math.abs(shape.height - .1) < 1e-9);
+    assert.equal(shape.note, "nova nota");
+    assert.equal(shape.color, "blue");
+    assert.equal(shape.selectedText, "texto alargado");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM material_pdf_highlights").get().n, 1);
+    assert.deepEqual(JSON.parse(db.prepare("SELECT rects FROM material_pdf_highlights").get().rects), rects);
+    for (const invalid of [null, "rects", [], Array(81).fill(rects[0]), [{x:-.1,y:.2,width:.3,height:.03}],[{x:.9,y:.2,width:.3,height:.03}], [...rects,{x:0,y:0,width:0,height:0}]]) {
+      assert.equal((await request("owner", { rects:invalid })).status, 400);
+    }
+    assert.deepEqual(JSON.parse(db.prepare("SELECT rects FROM material_pdf_highlights").get().rects), rects);
   } finally { db.close(); }
 });

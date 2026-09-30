@@ -472,7 +472,7 @@ async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: str
   }
   const now = Date.now();
   if (request.method === "PATCH") {
-    // Edit the excerpt, colour and note while preserving the marked geometry.
+    // Resize the same owned annotation; colour/note-only edits retain its geometry.
     if (!highlightId) return json({ error: "Realce inválido." }, 400);
     const current = await env.DB.prepare("SELECT * FROM material_pdf_highlights WHERE id=? AND user_id=? AND material_id=?").bind(highlightId, user.id, id).first<Record<string, unknown>>();
     if (!current) return json({ error: "Realce não encontrado." }, 404);
@@ -480,6 +480,16 @@ async function pdfHighlights(request: Request, env: MaterialsCatalogEnv, id: str
     const note = body.note === undefined ? (current.note as string | null) : (text(body.note, 800) || null);
     const selectedText = body.selectedText === undefined ? (current.selected_text as string | null) : (text(body.selectedText, 2000) || null);
     if (!highlightColors.includes(color)) return json({ error: "Cor inválida." }, 400);
+    if (body.rects !== undefined) {
+      const rects = highlightRects(body.rects);
+      if (!Array.isArray(body.rects) || !rects.length || rects.length !== body.rects.length) return json({ error: "Coordenadas do realce inválidas." }, 400);
+      const x = Math.min(...rects.map((rect) => rect.x)), y = Math.min(...rects.map((rect) => rect.y));
+      const width = Math.max(...rects.map((rect) => rect.x + rect.width)) - x;
+      const height = Math.max(...rects.map((rect) => rect.y + rect.height)) - y;
+      await env.DB.prepare("UPDATE material_pdf_highlights SET x=?,y=?,width=?,height=?,rects=?,color=?,note=?,selected_text=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?")
+        .bind(x, y, width, height, JSON.stringify(rects), color, note, selectedText, now, highlightId, user.id, id).run();
+      return json({ highlight: mapHighlight({ ...current, x, y, width, height, rects: JSON.stringify(rects), color, note, selected_text: selectedText, updated_at: now }) });
+    }
     await env.DB.prepare("UPDATE material_pdf_highlights SET color=?,note=?,selected_text=?,updated_at=? WHERE id=? AND user_id=? AND material_id=?").bind(color, note, selectedText, now, highlightId, user.id, id).run();
     return json({ highlight: mapHighlight({ ...current, color, note, selected_text: selectedText, updated_at: now }) });
   }
