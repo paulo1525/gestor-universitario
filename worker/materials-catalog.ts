@@ -105,6 +105,13 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     updatedAt: item.updated_at,
   };
 }
+function externalDeckUrl(item: Record<string, unknown>): string | null {
+  if (item.storage_backend !== "external" || typeof item.storage_key !== "string") return null;
+  try {
+    const url = new URL(item.storage_key);
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
 function mapDeck(item: Record<string, unknown>, lessonRows: Array<Record<string, unknown>>) {
   return {
     id: item.id,
@@ -116,7 +123,7 @@ function mapDeck(item: Record<string, unknown>, lessonRows: Array<Record<string,
     cardCount: Number(item.card_count || 0),
     mediaCount: Number(item.media_count || 0),
     storage: { backend: item.storage_backend, state: item.storage_state, ready: item.storage_state === "ready", size: item.byte_size, checksum: item.checksum_sha256 },
-    downloadUrl: item.storage_state === "ready" ? `/api/material-anki/${encodeURIComponent(String(item.id))}/download` : null,
+    downloadUrl: item.storage_state === "ready" ? externalDeckUrl(item) || `/api/material-anki/${encodeURIComponent(String(item.id))}/download` : null,
     publicAccess: Number(item.public_access) === 1,
     status: item.publication_status,
     sourceFileName: item.source_file_name,
@@ -529,6 +536,8 @@ async function ankiDownload(request: Request, env: MaterialsCatalogEnv, id: stri
   const denied = await anonymousDenied(request, env, user, item);
   if (denied) return denied;
   if (!item) return json({ error: "Baralho Anki não encontrado." }, 404);
+  const externalUrl = externalDeckUrl(item);
+  if (item.storage_state === "ready" && externalUrl) return Response.redirect(externalUrl, 302);
   if (item.storage_backend !== "r2" || item.storage_state !== "ready" || !item.storage_key) return json({ error: "Este baralho está catalogado, mas ainda aguarda disponibilização no armazenamento.", code: "STORAGE_NOT_READY" }, 409);
   return objectDownload(request, env, String(item.storage_key), String(item.file_name || "baralho.apkg"), String(item.mime_type || "application/apkg"));
 }
@@ -583,7 +592,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   const ankiEnabled = await enabled("materials.anki");
   const [catalogRows, deckRows] = await Promise.all([
     env.DB.prepare("SELECT m.*,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_catalog m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.publication_status='published' AND m.storage_state='ready' AND m.storage_backend IN ('r2','external') ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE,m.title COLLATE NOCASE LIMIT 800").all(),
-    ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
+    ankiEnabled ? env.DB.prepare("SELECT d.id,d.title,d.file_name,d.storage_backend,d.storage_key,d.storage_state,d.public_access,d.byte_size,d.updated_at,cu.id AS unit_id,cu.code AS unit_code,cu.name AS unit_name,cu.study_year,cu.semester FROM material_anki_decks d JOIN curricular_units cu ON cu.id=d.curricular_unit_id WHERE d.publication_status='published' AND d.storage_state='ready' ORDER BY d.title COLLATE NOCASE").all() : Promise.resolve({ results: [] as unknown[] }),
   ]);
   const visibleIds = (items: unknown[]) => items.map(row).filter((item) => user || Number(item.public_access) === 1).map((item) => String(item.id));
   const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog", visibleIds(catalogRows.results)), materialViewCounts(env, "anki", visibleIds(deckRows.results))]);
@@ -610,7 +619,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
     add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download`, mime: String(item.mime_type || ""), size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
   for (const raw of deckRows.results) {
-    const item = row(raw), id = String(item.id), download = `/api/material-anki/${encodeURIComponent(id)}/download`;
+    const item = row(raw), id = String(item.id), download = externalDeckUrl(item) || `/api/material-anki/${encodeURIComponent(id)}/download`;
     add(item, { section: "anki", id, type: "anki", title: String(item.title), href: download, download, mime: "application/apkg", size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
   const ordered = [...units.values()].map((unit) => ({ ...unit, entries: unit.entries.sort((a, b) => PUBLIC_SECTION_ORDER.indexOf(a.section) - PUBLIC_SECTION_ORDER.indexOf(b.section) || Number(a.locked) - Number(b.locked) || String(a.title || "").localeCompare(String(b.title || ""), "pt-PT", { numeric: true, sensitivity: "base" })) }));

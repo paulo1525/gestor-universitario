@@ -36,5 +36,14 @@ test('Neuro pack replaces the two editions without removing records or other uni
     const counts=db.prepare('SELECT COUNT(*) n,SUM(card_count) cards FROM material_anki_deck_lessons WHERE deck_id=?').get(pack.id);
     assert.equal(counts.n,34); assert.equal(counts.cards,3079);
     assert.equal(db.prepare('SELECT COUNT(*) n FROM admin_audit_log').get().n,1);
+    const externalMigration=readFileSync(new URL('../migrations/0110_neuro_anki_onedrive_download.sql',import.meta.url),'utf8');
+    db.exec(externalMigration); db.exec(externalMigration);
+    const external=db.prepare('SELECT * FROM material_anki_decks WHERE id=?').get(pack.id);
+    assert.equal(external.storage_backend,'external');
+    assert.match(external.storage_key,/^https:\/\/1drv\.ms\/.+&download=1$/);
+    assert.equal(external.card_count,pack.card_count);
+    assert.equal(external.checksum_sha256,pack.checksum_sha256);
+    assert.equal(external.public_access,0);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM admin_audit_log').get().n,2);
   } finally { db.close(); }
 });
