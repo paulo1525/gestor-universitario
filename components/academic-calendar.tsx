@@ -8,7 +8,6 @@ import {
   BookOpen,
   CalendarDays,
   CalendarClock,
-  CircleHelp,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -55,6 +54,7 @@ type CalendarEvent = {
   type: string;
   startsAt: DateInput;
   endsAt: DateInput | null;
+  allDay: boolean;
   location: string;
   unitId: string;
   unitName: string;
@@ -66,14 +66,14 @@ type CalendarEvent = {
 type Unit = { id: string; name: string; code: string };
 type Notice = { kind: ToastKind; message: string } | null;
 type CalendarView = "month" | "agenda";
-type EventForm = { title: string; description: string; type: string; startsAt: string; endsAt: string; location: string; unitId: string; organizer: string; scope: "personal" | "commission" };
+type EventForm = { title: string; description: string; type: string; startsAt: string; endsAt: string; allDay: boolean; location: string; unitId: string; organizer: string; scope: "personal" | "commission" };
 
-const emptyEventForm: EventForm = { title: "", description: "", type: "study", startsAt: "", endsAt: "", location: "", unitId: "", organizer: "", scope: "personal" };
+const emptyEventForm: EventForm = { title: "", description: "", type: "study", startsAt: "", endsAt: "", allDay: false, location: "", unitId: "", organizer: "", scope: "personal" };
 
 const sharedEventLabelKeys = { assessment: "community.calendar.type.assessment", exam: "community.calendar.type.exam", deadline: "community.calendar.type.deadline", academic: "community.calendar.type.academic", meeting: "community.calendar.type.meeting", event: "community.calendar.type.event", evaluation: "community.calendar.type.evaluation" } as const;
 const privateEventLabelKeys = { study: "community.calendar.type.study", personal: "community.calendar.type.personal", social: "community.calendar.type.social", academic_group: "community.calendar.type.academic_group", meeting: "community.calendar.type.meeting" } as const;
 const eventLabelKeys = { ...sharedEventLabelKeys, ...privateEventLabelKeys };
-const academicGroups = ["TUFMED — Tuna Feminina de Medicina do Porto", "TMP — Tuna de Medicina do Porto", "GATU", "Comissão de Praxe", "Comissão Organizadora de Noites Académicas"];
+const academicGroups = ["TUFMED (Tuna Feminina de Medicina do Porto)", "TMP (Tuna de Medicina do Porto)", "GATU", "Comissão de Praxe", "Comissão Organizadora de Noites Académicas"];
 
 const weekDayKeys = ["community.calendar.week.mon", "community.calendar.week.tue", "community.calendar.week.wed", "community.calendar.week.thu", "community.calendar.week.fri", "community.calendar.week.sat", "community.calendar.week.sun"] as const;
 
@@ -95,6 +95,7 @@ function normaliseEvent(raw: Record<string, unknown>, fallbackTitle: string): Ca
     type: String(value(raw, "type", "eventType", "event_type") || "academic"),
     startsAt: dateInput(value(raw, "startsAt", "starts_at", "date")),
     endsAt: value(raw, "endsAt", "ends_at") ? dateInput(value(raw, "endsAt", "ends_at")) : null,
+    allDay: value(raw, "allDay", "all_day") === true || value(raw, "allDay", "all_day") === 1,
     location: String(value(raw, "location") || ""),
     unitId: String(value(raw, "unitId", "unit_id") ?? value(unit, "id") ?? ""),
     unitName: String(value(raw, "unitName", "unit_name") ?? value(unit, "name") ?? ""),
@@ -135,12 +136,15 @@ function formForDay(date: Date): EventForm {
 }
 
 function formForEvent(item: CalendarEvent): EventForm {
+  const first = validDate(item.startsAt), last = lastDay(item);
+  const days = item.allDay && first && last;
   return {
     title: item.title,
     description: item.description,
     type: item.type,
-    startsAt: dateTimeLocal(item.startsAt),
-    endsAt: item.endsAt ? dateTimeLocal(item.endsAt) : "",
+    startsAt: days ? dateKey(first) : dateTimeLocal(item.startsAt),
+    endsAt: days ? (dateKey(first) === dateKey(last) ? "" : dateKey(last)) : item.endsAt ? dateTimeLocal(item.endsAt) : "",
+    allDay: item.allDay,
     location: item.location,
     unitId: item.unitId,
     organizer: item.organizer,
@@ -173,6 +177,43 @@ function sameDay(start: DateInput, end: DateInput) {
   return Boolean(a && b && dateKey(a) === dateKey(b));
 }
 
+/** Last calendar day an event occupies: an end at exactly 00:00 belongs to the previous day. */
+function lastDay(item: CalendarEvent) {
+  const start = validDate(item.startsAt);
+  if (!start) return null;
+  const end = item.endsAt ? validDate(item.endsAt) : null;
+  if (!end || end <= start) return startOfDay(start);
+  const atMidnight = end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0 && end.getMilliseconds() === 0;
+  return startOfDay(atMidnight && !item.allDay ? new Date(end.getTime() - 1) : end);
+}
+
+function eventDayKeys(item: CalendarEvent) {
+  const start = validDate(item.startsAt), last = lastDay(item);
+  if (!start || !last) return [];
+  const keys: string[] = [];
+  for (let day = startOfDay(start); day <= last && keys.length < 62; day = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1)) keys.push(dateKey(day));
+  return keys;
+}
+
+function formatEventRange(item: CalendarEvent, locale: string, fallback: string, allDayLabel: string) {
+  const start = validDate(item.startsAt), last = lastDay(item);
+  if (!start || !last) return fallback;
+  if (item.allDay) {
+    const day = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    return dateKey(start) === dateKey(last) ? `${day.format(start)} · ${allDayLabel}` : `${day.format(start)} – ${day.format(last)}`;
+  }
+  const end = item.endsAt ? validDate(item.endsAt) : null;
+  const from = formatDate(item.startsAt, true, locale, fallback);
+  return end && end > start ? `${from}–${formatDate(item.endsAt!, !sameDay(item.startsAt, item.endsAt!), locale, "")}` : from;
+}
+
+/** Local start of the form's first day, whatever input type it uses. */
+function formStartDate(form: EventForm) {
+  if (!form.allDay) return new Date(form.startsAt);
+  const [year, month, day] = form.startsAt.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function monthDays(month: Date) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
   const mondayOffset = (first.getDay() + 6) % 7;
@@ -188,6 +229,13 @@ function monthDays(month: Date) {
 function moveEventToDate(item: CalendarEvent, target: Date): CalendarEvent | null {
   const starts = validDate(item.startsAt);
   if (!starts) return null;
+  if (item.allDay) {
+    const last = lastDay(item) ?? startOfDay(starts);
+    const span = Math.round((last.getTime() - startOfDay(starts).getTime()) / 86400000);
+    const nextStart = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+    const nextEnd = new Date(target.getFullYear(), target.getMonth(), target.getDate() + span, 23, 59, 59, 999);
+    return { ...item, startsAt: nextStart.toISOString(), endsAt: nextEnd.toISOString() };
+  }
   const ends = item.endsAt ? validDate(item.endsAt) : null;
   const duration = ends ? Math.max(0, ends.getTime() - starts.getTime()) : 0;
   const nextStart = new Date(target.getFullYear(), target.getMonth(), target.getDate(), starts.getHours(), starts.getMinutes(), starts.getSeconds(), starts.getMilliseconds());
@@ -196,13 +244,16 @@ function moveEventToDate(item: CalendarEvent, target: Date): CalendarEvent | nul
 }
 
 function eventPayload(form: EventForm, current?: CalendarEvent) {
-  return {
+  const base = {
     ...(current ? { id: current.id, visibility: current.visibility, status: current.status } : {}),
     ...form,
-    startsAt: new Date(form.startsAt).toISOString(),
-    endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null,
     unitId: form.unitId || null,
   };
+  if (form.allDay) {
+    const [endYear, endMonth, endDay] = (form.endsAt || form.startsAt).split("-").map(Number);
+    return { ...base, startsAt: formStartDate(form).toISOString(), endsAt: new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999).toISOString() };
+  }
+  return { ...base, startsAt: new Date(form.startsAt).toISOString(), endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null };
 }
 
 export function AcademicCalendar() {
@@ -289,10 +340,7 @@ export function AcademicCalendar() {
   const eventsByDay = useMemo(() => {
     const result = new Map<string, CalendarEvent[]>();
     for (const item of filtered) {
-      const date = validDate(item.startsAt);
-      if (!date) continue;
-      const key = dateKey(date);
-      result.set(key, [...(result.get(key) || []), item]);
+      for (const key of eventDayKeys(item)) result.set(key, [...(result.get(key) || []), item]);
     }
     return result;
   }, [filtered]);
@@ -308,6 +356,7 @@ export function AcademicCalendar() {
     return date && date >= today;
   }).slice(0, 5), [filtered, today]);
   const descriptionLength = richTextPlainText(form.description).length;
+  const scopeNote = t(form.scope === "personal" ? "community.calendar.privateNotice" : "community.calendar.sharedNotice");
 
   const selectDay = (date: Date) => {
     setSelectedDate(dateKey(date));
@@ -412,7 +461,7 @@ export function AcademicCalendar() {
       });
       const data = await response.json() as { error?: string; conflicts?: { title?: string }[] };
       if (!response.ok) throw new Error(data.error || t("community.calendar.createError"));
-      const eventDate = new Date(form.startsAt);
+      const eventDate = formStartDate(form);
       setForm(emptyEventForm);
       setEditor(false);
       setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
@@ -440,7 +489,7 @@ export function AcademicCalendar() {
       });
       const data = await response.json() as { error?: string; conflicts?: { title?: string }[] };
       if (!response.ok) throw new Error(data.error || t("community.calendar.updateError"));
-      const eventDate = new Date(form.startsAt);
+      const eventDate = formStartDate(form);
       setVisibleMonth(new Date(eventDate.getFullYear(), eventDate.getMonth(), 1));
       setSelectedDate(dateKey(eventDate));
       setEditingEvent(false);
@@ -471,19 +520,33 @@ export function AcademicCalendar() {
     } finally { setDeleting(false); setDeleteTarget(null); }
   };
 
+  const toggleAllDay = (allDay: boolean) => setForm(current => {
+    const startDay = current.startsAt.slice(0, 10), endDay = current.endsAt.slice(0, 10);
+    if (allDay) return { ...current, allDay, startsAt: startDay, endsAt: endDay && endDay !== startDay ? endDay : "" };
+    return { ...current, allDay, startsAt: startDay ? `${startDay}T09:00` : "", endsAt: startDay ? `${endDay || startDay}T10:00` : "" };
+  });
+
   const renderEventFields = (mode: "create" | "edit") => <div className={styles.formGrid}>
-    <fieldset className={`${styles.full} ${styles.scopeField}`} aria-label={t("community.calendar.scope")}>
-      <legend className={styles.scopeLegend}>{t("community.calendar.scope")} <span className={`preference-help-wrap ${styles.scopeHelp}`}><button type="button" className="preference-help-button" aria-label={t("community.calendar.scopeHelp")} aria-describedby="calendar-scope-help"><CircleHelp aria-hidden="true" /></button><span className="preference-help-tooltip" id="calendar-scope-help" role="tooltip">{t(form.scope === "personal" ? "community.calendar.privateNotice" : "community.calendar.sharedNotice")}</span></span></legend>
-      {mode === "create" && canManage ? <div className={styles.scopeOptions}>
+    {mode === "create" && canManage && <fieldset className={`${styles.full} ${styles.scopeField}`}>
+      <legend className={styles.scopeLegend}>{t("community.calendar.scope")}</legend>
+      <div className={styles.scopeOptions}>
         {(["personal", "commission"] as const).map(scope => <label key={scope} className={`${styles.scopeChoice} ${form.scope === scope ? styles.scopeChoiceActive : ""}`}><input type="radio" name="calendar-scope" value={scope} checked={form.scope === scope} onChange={() => setForm(current => ({ ...current, scope, type: scope === "personal" ? "study" : "academic", unitId: "", organizer: "" }))} />{scope === "personal" ? <LockKeyhole aria-hidden="true" /> : <UsersRound aria-hidden="true" />}<span>{scopeLabel(scope)}</span></label>)}
-      </div> : <span className={styles.scopeValue}>{scopeLabel(form.scope)}</span>}
-    </fieldset>
+      </div>
+    </fieldset>}
     <label className={styles.full}><FormLabel icon={PencilLine}>{t("community.calendar.title")}</FormLabel><input ref={mode === "create" ? editorTitleRef : undefined} required maxLength={160} value={form.title} onChange={event => setForm(current => ({ ...current, title: event.target.value }))} placeholder={t(form.scope === "personal" ? "community.calendar.personalTitlePlaceholder" : "community.calendar.titlePlaceholder")} /></label>
     <label><FormLabel icon={Shapes}>{t("community.calendar.type")}</FormLabel><SearchableSelect value={form.type} onChange={event => setForm(current => ({ ...current, type: event.target.value, organizer: event.target.value === "academic" || event.target.value === "academic_group" ? current.organizer : "" }))}>{Object.entries(form.scope === "personal" ? privateEventLabelKeys : sharedEventLabelKeys).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}</SearchableSelect></label>
     <label><FormLabel icon={BookOpen}>{t("community.calendar.unit")}</FormLabel><SearchableSelect value={form.unitId} onChange={event => setForm(current => ({ ...current, unitId: event.target.value }))}><option value="">{t("community.calendar.general")}</option>{units.map(unit => <option value={unit.id} key={unit.id}>{unit.code} · {unit.name}</option>)}</SearchableSelect></label>
     {(form.type === "academic" || form.type === "academic_group") && <label className={styles.full}><FormLabel icon={Shapes} optional>{t("community.calendar.organizer")}</FormLabel><SearchableSelect allowCustomValue maxLength={120} value={form.organizer} onChange={event => setForm(current => ({ ...current, organizer: event.target.value }))} placeholder={t("community.calendar.organizerPlaceholder")}>{academicGroups.map(group => <option key={group} value={group}>{group}</option>)}</SearchableSelect></label>}
-    <label><FormLabel icon={Clock3}>{t("community.calendar.start")}</FormLabel><input required type="datetime-local" value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
-    <label><FormLabel icon={CalendarClock} optional>{t("community.calendar.end")}</FormLabel><input type="datetime-local" min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
+    <div className={`${styles.full} ${styles.whenBox}`}>
+      <div className={styles.whenHead}>
+        <span>{t("community.calendar.when")}</span>
+        <label className={styles.allDayToggle}><input type="checkbox" checked={form.allDay} onChange={event => toggleAllDay(event.target.checked)} /><span>{t("community.calendar.allDay")}</span></label>
+      </div>
+      <div className={styles.whenFields}>
+        <label><FormLabel icon={Clock3}>{t(form.allDay ? "community.calendar.startDate" : "community.calendar.start")}</FormLabel><input required type={form.allDay ? "date" : "datetime-local"} value={form.startsAt} onChange={event => setForm(current => ({ ...current, startsAt: event.target.value }))} /></label>
+        <label><FormLabel icon={CalendarClock} optional>{t(form.allDay ? "community.calendar.endDate" : "community.calendar.end")}</FormLabel><input type={form.allDay ? "date" : "datetime-local"} min={form.startsAt} value={form.endsAt} onChange={event => setForm(current => ({ ...current, endsAt: event.target.value }))} /></label>
+      </div>
+    </div>
     <label className={styles.full}><FormLabel icon={MapPin} optional>{t("community.calendar.locationOptional")}</FormLabel><input maxLength={200} value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} /></label>
     <div className={`${styles.full} ${styles.richTextField}`}><FormLabel icon={FileText} optional>{t("community.calendar.descriptionLabel")}</FormLabel><RichTextEditor value={form.description} onChange={description => setForm(current => ({ ...current, description }))} ariaLabel={t("community.calendar.descriptionLabel")} maxLength={2000} minHeight="compact" onInvalidLink={() => setNotice({ kind: "warning", message: "Indica uma ligação válida iniciada por http://, https:// ou mailto:." })} /></div>
   </div>;
@@ -545,13 +608,13 @@ export function AcademicCalendar() {
                 onDrop={event => { event.preventDefault(); dropEvent(date); }}>
                 <button type="button" className={styles.daySelect} onClick={() => openCreateForDate(date)} aria-label={`${t("community.calendar.daySummary", { date: date.toLocaleDateString(locale), count: dayEvents.length })}. ${t("community.calendar.addOnDay")}`} aria-pressed={isSelected}><span className={`${styles.dayNumber} ${isToday ? styles.today : ""}`}>{date.getDate()}</span></button>
                 <span className={styles.dayEvents}>
-                  {dayEvents.slice(0, 3).map(item => <button type="button" key={item.id} className={`${styles.eventPill} ${draggingEventId === item.id ? styles.draggingEvent : ""}`} data-event-type={item.type} data-event-scope={item.scope} draggable={canManage || item.scope === "personal" ? movingEventId !== item.id : false}
+                  {dayEvents.slice(0, 3).map(item => { const firstDay = dateKey(validDate(item.startsAt) || date) === key; return <button type="button" key={item.id} className={`${styles.eventPill} ${draggingEventId === item.id ? styles.draggingEvent : ""} ${firstDay ? "" : styles.eventContinued}`} data-event-type={item.type} data-event-scope={item.scope} draggable={firstDay && canEdit(item) ? movingEventId !== item.id : false}
                     onDragStart={event => { if (!canEdit(item)) return; event.stopPropagation(); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDraggingEventId(item.id); }}
                     onDragEnd={() => { setDraggingEventId(null); setDropTargetDate(null); }}
                     onClick={event => { event.stopPropagation(); selectEvent(item); }}
                     aria-label={`${scopeLabel(item.scope)}: ${t("community.calendar.eventAria", { title: item.title, date: formatEventDate(item.startsAt) })}${canEdit(item) ? `. ${t("community.calendar.dragHint")}` : ""}`}>
-                    <span className={styles.eventDot} />{movingEventId === item.id ? t("community.calendar.moving") : <>{formatEventDate(item.startsAt, false)} <strong>{item.title}</strong></>}
-                  </button>)}
+                    <span className={styles.eventDot} />{movingEventId === item.id ? t("community.calendar.moving") : <>{!item.allDay && firstDay && <>{formatEventDate(item.startsAt, false)} </>}<strong>{item.title}</strong></>}
+                  </button>; })}
                   {dayEvents.length > 3 && <span className={styles.moreEvents}>{t("community.calendar.moreEvents", { count: dayEvents.length - 3 })}</span>}
                 </span>
               </div>;
@@ -565,7 +628,7 @@ export function AcademicCalendar() {
             <strong>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long" }).format(new Date(`${selectedDate}T12:00:00`))}</strong>
           </div>
           {selectedEvents.length === 0 ? <div className={styles.emptyDay}><CalendarDays /><strong>{t("community.calendar.freeDay")}</strong><span>{t("community.calendar.noEvents")}</span></div> : <div className={styles.dayEventList}>{selectedEvents.map(item => <button type="button" key={item.id} className={styles.dayEventCard} onClick={() => selectEvent(item)} data-event-type={item.type} data-event-scope={item.scope}>
-            <span className={styles.eventTime}>{formatEventDate(item.startsAt, false)}</span><span><strong>{item.title}</strong><small>{scopeLabel(item.scope)} · {item.organizer || item.unitName || eventLabels[item.type] || item.type}</small></span><ChevronRight />
+            <span className={styles.eventTime}>{item.allDay || dateKey(validDate(item.startsAt) || today) !== selectedDate ? t("community.calendar.allDay") : formatEventDate(item.startsAt, false)}</span><span><strong>{item.title}</strong><small>{scopeLabel(item.scope)} · {item.organizer || item.unitName || eventLabels[item.type] || item.type}</small></span><ChevronRight />
           </button>)}</div>}
           {selectedEvents.length === 0 && upcoming.length > 0 && <div className={styles.upcoming}><span>{t("community.calendar.next")}</span>{upcoming.slice(0, 3).map(item => <button type="button" key={item.id} onClick={() => selectEvent(item)}><time>{formatEventDate(item.startsAt)}</time><strong>{item.title}</strong></button>)}</div>}
         </aside>
@@ -574,7 +637,7 @@ export function AcademicCalendar() {
           <span className={list.statusDot} aria-hidden="true" />
           <div className={list.rowMain}>
             <h3><a className={`link-quiet ${list.titleLink}`} href={recordHref("evento", item.id)} onClick={event => { event.preventDefault(); selectEvent(item); }}>{item.title}</a></h3>
-            <p className={list.rowMeta}>{scopeLabel(item.scope)} · {formatEventDate(item.startsAt)}{item.endsAt && `–${formatEventDate(item.endsAt, false)}`}{item.location && <> · {item.scope === "personal" || isExternalLocation(item.location) ? item.location : <Link className={styles.rowLink} href={campusSearchHref(item.location)} aria-label={t("community.calendar.openCampus", { location: item.location })}>{item.location}</Link>}</>}{item.organizer && <> · {item.organizer}</>}{item.unitName && <> · {item.unitId ? <Link className={styles.rowLink} href={unitHref(item.unitId)}>{item.unitName}</Link> : item.unitName}</>}</p>
+            <p className={list.rowMeta}>{scopeLabel(item.scope)} · {formatEventRange(item, locale, t("community.calendar.dateUnknown"), t("community.calendar.allDay"))}{item.location && <> · {item.scope === "personal" || isExternalLocation(item.location) ? item.location : <Link className={styles.rowLink} href={campusSearchHref(item.location)} aria-label={t("community.calendar.openCampus", { location: item.location })}>{item.location}</Link>}</>}{item.organizer && <> · {item.organizer}</>}{item.unitName && <> · {item.unitId ? <Link className={styles.rowLink} href={unitHref(item.unitId)}>{item.unitName}</Link> : item.unitName}</>}</p>
           </div>
           <span className={`${list.statusPill} ${styles.typePill}`} data-event-type={item.type}>{eventLabels[item.type] || item.type}</span>
         </li>)}
@@ -584,7 +647,7 @@ export function AcademicCalendar() {
     {editor && <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving) closeEditor(); }}>
       <form className={styles.eventForm} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-create-title" onSubmit={save}>
         <header className="app-modal-header" data-app-modal-header>
-          <h2 id="calendar-create-title">{t(form.scope === "personal" ? "community.calendar.createPersonal" : "community.calendar.createCommission")}</h2>
+          <div><h2 id="calendar-create-title">{t(form.scope === "personal" ? "community.calendar.createPersonal" : "community.calendar.createCommission")}</h2><p>{scopeNote}</p></div>
           <FormCloseButton onClick={closeEditor} label="Fechar" disabled={saving} />
         </header>
         <div data-app-modal-body>{renderEventFields("create")}</div>
@@ -598,7 +661,7 @@ export function AcademicCalendar() {
     {selectedEvent && <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !saving && movingEventId !== selectedEvent.id) { setEditingEvent(false); setSelectedEventId(null); } }}>
       {editingEvent && canEdit(selectedEvent) ? <form className={styles.eventForm} data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title" onSubmit={update}>
         <header className="app-modal-header" data-app-modal-header>
-          <h2 id="calendar-event-title">Editar evento</h2>
+          <div><h2 id="calendar-event-title">Editar evento</h2><p>{scopeLabel(form.scope)} · {scopeNote}</p></div>
           <FormCloseButton onClick={() => { setEditingEvent(false); setForm(emptyEventForm); }} label="Fechar" disabled={saving} />
         </header>
         <div data-app-modal-body>{renderEventFields("edit")}</div>
@@ -608,23 +671,22 @@ export function AcademicCalendar() {
         </footer>
       </form> : <article ref={readingRef} tabIndex={-1} className={styles.eventReading} data-app-modal="modal" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title">
         <header className="app-modal-header" data-app-modal-header>
-          <span className={styles.typeCaption} data-event-type={selectedEvent.type}>{scopeLabel(selectedEvent.scope)} · {eventLabels[selectedEvent.type] || selectedEvent.type}</span>
+          <span className={styles.chips}><span className={styles.typeCaption} data-event-type={selectedEvent.type}>{eventLabels[selectedEvent.type] || selectedEvent.type}</span><span className={styles.scopeCaption}>{selectedEvent.scope === "personal" ? <LockKeyhole aria-hidden="true" /> : <UsersRound aria-hidden="true" />}{scopeLabel(selectedEvent.scope)}</span></span>
           <FormCloseButton onClick={() => setSelectedEventId(null)} label="Fechar detalhe" disabled={movingEventId === selectedEvent.id} />
         </header>
         <div className={styles.readingInner} data-app-modal-body>
           <h2 id="calendar-event-title" className={styles.readingTitle}>{selectedEvent.title}</h2>
-          <p className={styles.readingMeta}>
-            <span><CalendarDays aria-hidden="true" />{formatDate(selectedEvent.startsAt, true, locale, t("community.calendar.dateUnknown"))}{selectedEvent.endsAt && `–${formatDate(selectedEvent.endsAt, !sameDay(selectedEvent.startsAt, selectedEvent.endsAt), locale, "")}`}</span>
-            {selectedEvent.location && <span><MapPin aria-hidden="true" />{selectedEvent.location}</span>}
-            {selectedEvent.organizer && <span><Shapes aria-hidden="true" />{selectedEvent.organizer}</span>}
-            {selectedEvent.unitName && <span><BookOpen aria-hidden="true" />{selectedEvent.unitId ? <Link className={styles.quietLink} href={unitHref(selectedEvent.unitId)}>{selectedEvent.unitName}</Link> : selectedEvent.unitName}</span>}
-          </p>
-          <span className={styles.readingRule} aria-hidden="true" />
+          <ul className={styles.facts}>
+            <li><span className={styles.factIcon} aria-hidden="true"><CalendarDays /></span><span>{formatEventRange(selectedEvent, locale, t("community.calendar.dateUnknown"), t("community.calendar.allDay"))}</span></li>
+            {selectedEvent.location && <li><span className={styles.factIcon} aria-hidden="true"><MapPin /></span><span>{selectedEvent.location}</span></li>}
+            {selectedEvent.organizer && <li><span className={styles.factIcon} aria-hidden="true"><Shapes /></span><span>{selectedEvent.organizer}</span></li>}
+            {selectedEvent.unitName && <li><span className={styles.factIcon} aria-hidden="true"><BookOpen /></span><span>{selectedEvent.unitId ? <Link className={styles.quietLink} href={unitHref(selectedEvent.unitId)}>{selectedEvent.unitName}</Link> : selectedEvent.unitName}</span></li>}
+          </ul>
           {selectedEvent.description && <RichTextContent value={selectedEvent.description} className={styles.readingBody} />}
         </div>
         {canEdit(selectedEvent) && <footer data-app-modal-footer>
-          <button type="button" className="button button--danger" data-app-modal-action="danger" disabled={movingEventId === selectedEvent.id} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 aria-hidden="true" />Eliminar</button>
-          <button type="button" className="button button--secondary" data-app-modal-action="secondary" onClick={() => beginEdit(selectedEvent)}><PencilLine aria-hidden="true" />Editar</button>
+          <button type="button" className={`button button--secondary ${styles.deleteAction}`} data-app-modal-action="secondary" disabled={movingEventId === selectedEvent.id} onClick={() => setDeleteTarget(selectedEvent)}><Trash2 aria-hidden="true" />Eliminar</button>
+          <button type="button" className="button button--primary" data-app-modal-action="primary" onClick={() => beginEdit(selectedEvent)}><PencilLine aria-hidden="true" />Editar</button>
         </footer>}
       </article>}
     </div>}

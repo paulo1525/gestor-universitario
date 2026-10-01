@@ -2,6 +2,7 @@
 
 import {
   Apple,
+  CalendarCheck,
   CalendarPlus,
   Check,
   Clipboard,
@@ -161,7 +162,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
     </button>
 
     {open && <div className="app-modal-backdrop" data-app-modal-backdrop role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) setOpen(false); }}>
-      <section id="calendar-subscription-panel" data-app-modal="modal" data-app-modal-size="compact" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
+      <section id="calendar-subscription-panel" data-app-modal="modal" data-app-modal-size="wide" role="dialog" aria-modal="true" aria-labelledby="calendar-subscription-title">
         <header className="app-modal-header" data-app-modal-header>
           <h2 id="calendar-subscription-title">{t("calendar.subscription.title")}</h2>
           <FormCloseButton onClick={() => setOpen(false)} label={t("calendar.subscription.close")} />
@@ -175,7 +176,15 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
                 <input maxLength={80} value={label} onChange={event => setLabel(event.target.value)} placeholder={t("calendar.subscription.labelPlaceholder")} />
               </label>
               {units.length > 0 && <fieldset className={styles.field}>
-                <legend>{t("calendar.subscription.units")}</legend>
+                <legend className={styles.legend}>
+                  <span className={styles.legendTitle}>
+                    <span>{t("calendar.subscription.units")}</span>
+                    {unitIds.length > 0 && <b>{unitIds.length}</b>}
+                  </span>
+                  <button type="button" className={styles.selectAll} onClick={() => setUnitIds(unitIds.length === units.length ? [] : units.map(unit => unit.id))}>
+                    {t(unitIds.length === units.length ? "calendar.subscription.clearAll" : "calendar.subscription.selectAll")}
+                  </button>
+                </legend>
                 <div className={styles.unitList}>{units.map(unit => <label key={unit.id}>
                   <input
                     type="checkbox"
@@ -184,8 +193,10 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
                       ? [...current, unit.id]
                       : current.filter(id => id !== unit.id))}
                   />
-                  <span>{unit.code ? <b>{unit.code}</b> : null}{unit.name}</span>
+                  {unit.code ? <b>{unit.code}</b> : null}
+                  <span>{unit.name}</span>
                 </label>)}</div>
+                <p className={styles.note}>{t("calendar.subscription.unitsHelp")}</p>
               </fieldset>}
             </form> : <div className={styles.created}>
               <p className={styles.success}><Check />{t("calendar.subscription.createdTitle")}</p>
@@ -208,6 +219,7 @@ export function CalendarSubscription({ units }: { units: Unit[] }) {
             <h3 id="calendar-subscription-active">{t("calendar.subscription.active")}{items.length > 0 && <b>{items.length}</b>}</h3>
             <div className={styles.list}>
               {loading ? <RecordSkeleton label={t("calendar.subscription.active")} rows={2} /> : items.length ? items.map(item => <article key={item.id}>
+                <span className={styles.itemIcon} aria-hidden="true"><CalendarCheck /></span>
                 <div>
                   <strong>{item.label}</strong>
                   <small>{item.lastUsedAt
