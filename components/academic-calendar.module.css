@@ -6,16 +6,21 @@
 .full { grid-column:1/-1; }
 .scopeField { min-width:0; margin:0; padding:0; border:0; }
 .scopeLegend { margin-bottom:6px; padding:0; color:var(--color-text); font-size:var(--font-size-body); font-weight:800; }
-.scopeHelp { margin-left:5px; vertical-align:middle; }
-.scopeHelp :global(.preference-help-tooltip) { top:-13px; right:auto; left:calc(100% + 10px); }
-.scopeHelp :global(.preference-help-tooltip)::before { top:10px; right:100%; bottom:auto; left:auto; border-bottom-color:transparent; border-right-color:#292925; }
 .scopeOptions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
 .formGrid .scopeChoice { position:relative; display:flex; align-items:center; justify-content:center; gap:8px; min-height:var(--control-height); padding:8px 12px; border:1px solid var(--color-border); border-radius:var(--radius-control); color:var(--color-text-muted); background:var(--color-surface); font-size:var(--font-size-body); font-weight:750; cursor:pointer; }
 .scopeChoice input { position:absolute; width:1px; height:1px; opacity:0; }
 .scopeChoice svg { width:16px; height:16px; flex:none; }
 .formGrid .scopeChoiceActive { border-color:var(--gold); color:var(--color-text); background:var(--gold-soft); }
 .formGrid .scopeChoice:focus-within { outline:2px solid var(--gold); outline-offset:2px; box-shadow:var(--focus-ring-accent); }
-.scopeValue { display:inline-flex; align-items:center; min-height:var(--control-height); padding:0 12px; border:1px solid var(--color-border); border-radius:var(--radius-control); color:var(--color-text-soft); background:var(--color-surface-subtle); font-size:var(--font-size-body); font-weight:750; }
+
+/* "When" block: the all-day switch and the date fields read as one group. */
+.whenBox { display:grid; gap:var(--space-3); padding:var(--space-3) var(--space-4) var(--space-4); border:1px solid var(--color-border); border-radius:var(--radius-control); background:var(--color-surface-subtle); }
+.whenHead { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); color:var(--color-text); font-size:var(--font-size-body); font-weight:700; }
+.formGrid .allDayToggle { display:inline-flex; align-items:center; gap:8px; padding:4px 10px; border:1px solid var(--color-border); border-radius:999px; color:var(--color-text-soft); background:var(--color-surface); font-weight:700; cursor:pointer; }
+.formGrid .allDayToggle:has(input:checked) { border-color:var(--gold); color:var(--color-accent-text); background:var(--gold-soft); }
+.formGrid .allDayToggle:has(input:focus-visible) { outline:3px solid var(--color-focus); outline-offset:2px; }
+.whenFields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3) var(--space-4); }
+@media (max-width:560px) { .whenFields { grid-template-columns:1fr; } }
 
 .calendarShell { overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
 .toolbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 1.15rem; border-bottom:1px solid #e7e8e2; }
@@ -56,6 +61,7 @@
 .eventPill[draggable="true"]:active { cursor:grabbing; }
 .eventPill:focus-visible { outline:2px solid #4d5fe8; outline-offset:1px; }
 .draggingEvent { opacity:.42; }
+.eventContinued { border-top-left-radius:0; border-bottom-left-radius:0; }
 .eventPill strong { font-weight:800; }
 .eventPill[data-event-type="assessment"] { color:#733b13; background:#fff0e3; border-color:#e27927; }
 .eventPill[data-event-type="exam"] { color:var(--color-danger-text); background:#ffebee; border-color:#d64e64; }
@@ -127,8 +133,6 @@
 
   .formGrid { grid-template-columns:1fr; }
   .full { grid-column:1; }
-  .scopeHelp :global(.preference-help-tooltip) { top:calc(100% + 9px); left:0; }
-  .scopeHelp :global(.preference-help-tooltip)::before { top:auto; right:auto; bottom:100%; left:9px; border-right-color:transparent; border-bottom-color:#292925; }
   .toolbar { align-items:stretch; flex-direction:column; }
   .toolbarActions { width:100%; justify-content:space-between; margin-left:0; }
   .monthNavigation { display:grid; grid-template-columns:auto auto auto 1fr; }
@@ -231,27 +235,31 @@
 
 /* Event view: one light reading card inside the shared modal chrome (like an open announcement). */
 .eventReading:focus { outline: 0; }
-.readingInner { display: grid; justify-items: start; }
-
-.typeCaption { padding: 2px 8px; border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .02em; }
+.readingInner { display: grid; gap: var(--space-4); justify-items: stretch; }
+.chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.typeCaption, .scopeCaption { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .02em; }
+.scopeCaption svg { width: 11px; height: 11px; }
 .typeCaption[data-event-type="assessment"] { color: #8a4a17; background: #fbf1e8; }
 .typeCaption[data-event-type="exam"] { color: #8f3445; background: #fbeef0; }
 .typeCaption[data-event-type="deadline"] { color: var(--color-accent-text); background: #fbf6e2; }
 .typeCaption[data-event-type="meeting"] { color: #34489a; background: #f0f2fc; }
 /* Doubled class beats the global dialog h2 rules. */
-.readingInner .readingTitle.readingTitle { margin: var(--space-2) 0 0; color: var(--color-text); font-size: 20px; font-weight: 800; line-height: 1.25; letter-spacing: -.015em; }
-.readingMeta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
-.readingMeta span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
-.readingMeta svg { width: 12px; height: 12px; flex: none; color: var(--color-text-subtle, var(--color-text-muted)); }
+.readingInner .readingTitle.readingTitle { margin: 0; color: var(--color-text); font-size: 20px; font-weight: 800; line-height: 1.25; letter-spacing: -.015em; }
+.facts { display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); list-style: none; }
+.facts li { display: flex; align-items: center; gap: var(--space-3); min-height: 46px; padding: 6px var(--space-3); border-bottom: 1px solid var(--color-border); color: var(--color-text); font-size: var(--font-size-body); font-weight: 600; }
+.facts li:last-child { border-bottom: 0; }
+.facts li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.factIcon { display: grid; width: 30px; height: 30px; flex: none; place-items: center; border-radius: var(--radius-control); color: var(--color-accent-text); background: var(--gold-soft); }
+.factIcon svg { width: 15px; height: 15px; }
 .quietLink { color: inherit; text-decoration: none; }
 .quietLink:hover { color: var(--color-text); text-decoration: underline; text-underline-offset: 2px; }
-.readingRule { width: 32px; height: 3px; margin: var(--space-3) 0; border-radius: 2px; background: var(--color-accent); }
-.readingBody { max-width: 110ch; color: var(--color-text); font-size: 13px; line-height: 1.65; }
+.readingBody { max-width: 110ch; color: var(--color-text); font-size: var(--font-size-body-emphasis); line-height: 1.65; }
+/* Delete stays quiet next to the primary Edit action. */
+:global(body) .deleteAction[data-app-modal-action] { margin-right: auto; color: var(--color-danger-text) !important; }
+:global(body) .deleteAction[data-app-modal-action]:hover { background: var(--color-danger-soft) !important; }
 
-:global(html[data-theme="forum"]) .readingRule { background: #2679aa; }
 @media (max-width: 640px) {
   .readingInner .readingTitle.readingTitle { font-size: 18px; }
-
 }
 /* Reading width between the shared compact (420px) and default (680px) dialog sizes. */
-:global(body) .eventReading[data-app-modal="modal"][role="dialog"] { width: min(560px, calc(100vw - 32px)) !important; }
+:global(body) .eventReading[data-app-modal="modal"][role="dialog"] { width: min(620px, calc(100vw - 32px)) !important; }

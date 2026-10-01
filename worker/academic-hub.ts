@@ -87,7 +87,7 @@ async function unitChoices(env: HubEnv): Promise<Array<Record<string, unknown>>>
 }
 
 function eventDto(row: Record<string, unknown>) {
-  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, location: row.location, organizer: row.organizer, scope: "commission", visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
+  return { id: row.id, title: row.title, description: sanitizeRichTextHtml(String(row.description ?? "")), type: row.event_type, kind: row.event_type, unitId: row.curricular_unit_id, unitCode: row.unit_code, unitName: row.unit_name, startsAt: row.starts_at, endsAt: row.ends_at, allDay: Number(row.all_day) === 1, location: row.location, organizer: row.organizer, scope: "commission", visibility: row.visibility, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at };
 }
 
 async function personalCalendar(request: Request, env: HubEnv, url: URL, user: HubUser | null, enabled: ModuleChecker): Promise<Response> {
@@ -116,19 +116,19 @@ async function personalCalendar(request: Request, env: HubEnv, url: URL, user: H
   if (!["POST", "PUT"].includes(request.method)) return json({ error: "Operação não suportada." }, 405);
   const title = text(body.title, 160), description = sanitizeRichTextHtml(longText(body.description, 12000));
   const type = text(body.type, 30), unitId = text(body.unitId, 80);
-  const startsAt = timestamp(body.startsAt), endsAt = body.endsAt == null ? startsAt : timestamp(body.endsAt);
+  const startsAt = timestamp(body.startsAt), endsAt = body.endsAt == null ? startsAt : timestamp(body.endsAt), allDay = body.allDay === true ? 1 : 0;
   const location = text(body.location, 200), organizer = text(body.organizer, 120);
   if (title.length < 3 || richTextPlainText(description).length > 2000 || !["study", "personal", "social", "academic_group", "meeting"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
   const now = Date.now();
   if (request.method === "POST") {
     const newId = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO personal_calendar_events (id,owner_id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,organizer,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(newId, user.id, title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, now, now).run();
+    await env.DB.prepare("INSERT INTO personal_calendar_events (id,owner_id,title,description,event_type,curricular_unit_id,starts_at,ends_at,all_day,location,organizer,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(newId, user.id, title, description, type, unitId || null, startsAt, endsAt, allDay, location || null, organizer || null, now, now).run();
     return json({ ok: true, id: newId }, 201);
   }
   if (!id) return json({ error: "Evento não encontrado." }, 404);
-  const result = await env.DB.prepare("UPDATE personal_calendar_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,location=?,organizer=?,updated_at=? WHERE id=? AND owner_id=?")
-    .bind(title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, now, id, user.id).run();
+  const result = await env.DB.prepare("UPDATE personal_calendar_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,all_day=?,location=?,organizer=?,updated_at=? WHERE id=? AND owner_id=?")
+    .bind(title, description, type, unitId || null, startsAt, endsAt, allDay, location || null, organizer || null, now, id, user.id).run();
   return result.meta.changes ? json({ ok: true, id }) : json({ error: "Evento não encontrado." }, 404);
 }
 
@@ -172,17 +172,17 @@ async function calendar(request: Request, env: HubEnv, url: URL, user: HubUser |
   const title = text(body.title, 160), description = sanitizeRichTextHtml(longText(body.description, 12000));
   const type = text(body.type ?? body.eventType, 30) || "event";
   const unitId = text(body.unitId ?? body.curricularUnitId, 80);
-  const startsAt = timestamp(body.startsAt), endsAt = timestamp(body.endsAt) ?? startsAt;
+  const startsAt = timestamp(body.startsAt), endsAt = timestamp(body.endsAt) ?? startsAt, allDay = body.allDay === true ? 1 : 0;
   const location = text(body.location, 200), visibility = text(body.visibility, 20) || "students", organizer = text(body.organizer, 120);
   const status = text(body.status, 20) || "scheduled";
   if (title.length < 3 || richTextPlainText(description).length > 2000 || !["assessment", "exam", "deadline", "academic", "meeting", "event", "evaluation"].includes(type) || startsAt === null || endsAt === null || endsAt < startsAt || !["public", "students", "cc"].includes(visibility) || !["scheduled", "cancelled"].includes(status) || !await existingUnit(env, unitId)) return json({ error: "Dados do evento inválidos." }, 400);
   const now = Date.now();
   if (request.method === "POST") {
-    await env.DB.prepare("INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,location,organizer,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(id, title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, visibility, status, actor(user), actor(user), now, now).run();
+    await env.DB.prepare("INSERT INTO academic_events (id,title,description,event_type,curricular_unit_id,starts_at,ends_at,all_day,location,organizer,visibility,status,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, title, description, type, unitId || null, startsAt, endsAt, allDay, location || null, organizer || null, visibility, status, actor(user), actor(user), now, now).run();
   } else {
-    const result = await env.DB.prepare("UPDATE academic_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,location=?,organizer=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?")
-      .bind(title, description, type, unitId || null, startsAt, endsAt, location || null, organizer || null, visibility, status, actor(user), now, id).run();
+    const result = await env.DB.prepare("UPDATE academic_events SET title=?,description=?,event_type=?,curricular_unit_id=?,starts_at=?,ends_at=?,all_day=?,location=?,organizer=?,visibility=?,status=?,updated_by=?,updated_at=? WHERE id=?")
+      .bind(title, description, type, unitId || null, startsAt, endsAt, allDay, location || null, organizer || null, visibility, status, actor(user), now, id).run();
     if (!result.meta.changes) return json({ error: "Evento não encontrado." }, 404);
   }
   const conflicts = ["assessment", "exam", "evaluation"].includes(type) ? await env.DB.prepare("SELECT id,title,starts_at,ends_at FROM academic_events WHERE id!=? AND event_type IN ('assessment','exam','evaluation') AND status='scheduled' AND starts_at<? AND ends_at>? ORDER BY starts_at LIMIT 20").bind(id, endsAt, startsAt).all() : { results: [] };
@@ -1098,6 +1098,14 @@ function icsText(value: unknown): string {
   return String(value ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
 }
 
+const lisbonDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Lisbon", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** All-day events use DATE values; DTEND is exclusive, so it is the day after the last day. */
+function icsDay(value: unknown, extraDays = 0): string {
+  const [year, month, day] = lisbonDay.format(Number(value)).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + extraDays)).toISOString().slice(0, 10).replace(/-/g, "");
+}
+
 function icsDate(value: unknown): string {
   return new Date(Number(value)).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
@@ -1115,7 +1123,7 @@ async function calendarFeed(env: HubEnv, url: URL, enabled: ModuleChecker): Prom
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Gestor Universitario//Calendario Academico//PT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Gestor Universitario"];
   for (const item of events.results) {
     const row = rowObject(item), description = [richTextPlainText(String(row.description ?? "")), row.unit_code ? `${row.unit_code} - ${row.unit_name}` : ""].filter(Boolean).join("\\n");
-    lines.push("BEGIN:VEVENT", `UID:${icsText(row.id)}@gestoruniversitario.cc`, `DTSTAMP:${icsDate(row.updated_at)}`, `DTSTART:${icsDate(row.starts_at)}`, `DTEND:${icsDate(row.ends_at)}`, `SUMMARY:${icsText(row.title)}`, `DESCRIPTION:${icsText(description)}`);
+    lines.push("BEGIN:VEVENT", `UID:${icsText(row.id)}@gestoruniversitario.cc`, `DTSTAMP:${icsDate(row.updated_at)}`, ...(Number(row.all_day) === 1 ? [`DTSTART;VALUE=DATE:${icsDay(row.starts_at)}`, `DTEND;VALUE=DATE:${icsDay(row.ends_at, 1)}`] : [`DTSTART:${icsDate(row.starts_at)}`, `DTEND:${icsDate(row.ends_at)}`]), `SUMMARY:${icsText(row.title)}`, `DESCRIPTION:${icsText(description)}`);
     if (row.location) lines.push(`LOCATION:${icsText(row.location)}`);
     lines.push("END:VEVENT");
   }
