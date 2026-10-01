@@ -28,7 +28,7 @@ export type MaterialUnitOption = { id: string; code: string; name: string; year?
 type BibliographyFormat = "complete" | "excerpt" | "translation";
 type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
-type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; variant: "essential" | "complete" | "custom"; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
+type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
 const tabs: Exclude<MaterialCatalogTab, "overview">[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams", "other"];
 const RESOURCE_ICON: Record<MaterialResourceCategory, LucideIcon> = { information: FileText, theory: Presentation, tutorials: Presentation, practical: Presentation, support: BookOpen, seminars: GraduationCap, assessment: ClipboardCheck };
@@ -100,7 +100,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const [legacyResourceId] = useHashRecord("recurso", { scroll: false });
   const [legacyReadId] = useHashRecord("ler", { scroll: false });
   const router = useRouter();
-  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "favorites" | "recommended" | "original" | "verified" | "pending">("all"), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [ankiVariant, setAnkiVariant] = useState<"essential" | "complete">("essential"), [favoritesEnabled, setFavoritesEnabled] = useState(false);
+  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "favorites" | "recommended" | "original" | "verified" | "pending">("all"), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [favoritesEnabled, setFavoritesEnabled] = useState(false);
   const [sortOrder, setSortOrder] = useState("lesson");
   const loadCatalog = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
@@ -150,7 +150,6 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const compendiumUnit = resolveMaterialCompendiumUnit(unitCode) || (selectedUnit ? resolveMaterialCompendiumUnit(selectedUnit.id) || resolveMaterialCompendiumUnit(selectedUnit.name) : undefined);
   const selectedUnitId = selectedUnit?.id || compendiumUnit?.id;
   const unitDecks = useMemo(() => decks.filter((deck) => deck.unitId && (deck.unitId === selectedUnitId || deck.unitId === compendiumUnit?.id)), [compendiumUnit?.id, decks, selectedUnitId]);
-  const selectedDeck = unitDecks.find((deck) => deck.variant === ankiVariant);
   const countFor = useCallback((unit: MaterialUnitOption) => {
     const code = normalizeMaterialUnitCode(unit.code);
     const catalogCount = items.filter((item) => normalizeMaterialUnitCode(item.unitCode) === code || item.unitId === unit.id).length;
@@ -397,20 +396,17 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
           </div>
         </>}
         {activeTab === "anki" && <>
-          <FilterBar label={t("community.materials.catalog.packageBase")}>
-            <FilterSegmented label={t("community.materials.catalog.packageBase")} value={ankiVariant} onChange={setAnkiVariant} options={[{ value: "essential", label: t("community.materials.catalog.essential") }, { value: "complete", label: t("community.materials.catalog.complete") }]} />
-          </FilterBar>
-          {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} rows={1} /> : <ul className={list.rows}>
-            <li className={list.row} data-tone={selectedDeck?.downloadUrl ? "success" : undefined}>
+          {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} rows={1} /> : unitDecks.length ? <ul className={list.rows}>
+            {unitDecks.map((deck) => <li key={deck.id} className={list.row} data-tone={deck.downloadUrl ? "success" : undefined}>
               <span className={list.rowIcon} aria-hidden="true"><Package /></span>
               <div className={list.rowMain}>
-                <h3>{compendiumUnit?.shortTitle || selectedUnit.name} · {ankiVariant === "essential" ? t("community.materials.catalog.essential") : t("community.materials.catalog.complete")}</h3>
-                <p className={list.rowMeta}>{selectedDeck ? `${selectedDeck.cardCount} ${t("community.materials.catalog.cards")}` : t("community.materials.catalog.ankiUnitPending")}</p>
-                <MaterialViews count={selectedDeck?.views} />
+                <h3>{deck.title}</h3>
+                <p className={list.rowMeta}>{deck.cardCount} {t("community.materials.catalog.cards")}</p>
+                <MaterialViews count={deck.views} />
               </div>
-              {selectedDeck?.downloadUrl ? <a className="button button--secondary button--compact" href={selectedDeck.downloadUrl} onClick={() => void recordDeckOpening(selectedDeck)} download><Download aria-hidden="true" />Descarregar pacote</a> : selectedDeck && <span className={styles.pending}>{t("community.materials.catalog.ankiStoragePending")}</span>}
-            </li>
-          </ul>}
+              {deck.downloadUrl ? <a className="button button--secondary button--compact" href={deck.downloadUrl} onClick={() => void recordDeckOpening(deck)} download><Download aria-hidden="true" />Descarregar pacote</a> : <span className={styles.pending}>{t("community.materials.catalog.ankiStoragePending")}</span>}
+            </li>)}
+          </ul> : <div className={list.empty}><Package aria-hidden="true" /><strong>{t("community.materials.catalog.ankiUnitPending")}</strong></div>}
         </>}
         {activeTab === "exams" && examsPanel}
       </div>
