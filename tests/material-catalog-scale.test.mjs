@@ -23,7 +23,7 @@ vm.runInNewContext(compiled, {
   Request, Response, URL, crypto, TextEncoder, TextDecoder,
 });
 
-function fixture(size) {
+function fixture(size, externalDeckUrl = null) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`
     CREATE TABLE users(id TEXT PRIMARY KEY);
@@ -36,6 +36,10 @@ function fixture(size) {
   sqlite.exec(migration.split("-- Aulas da Neuroanatomia")[0]);
   sqlite.exec(readFileSync(new URL("../migrations/0081_material_catalog_favorites.sql", import.meta.url), "utf8"));
   sqlite.exec(readFileSync(new URL("../migrations/0091_material_views.sql", import.meta.url), "utf8"));
+  if (externalDeckUrl) {
+    sqlite.exec("ALTER TABLE material_anki_decks ADD COLUMN public_access INTEGER NOT NULL DEFAULT 0");
+    sqlite.prepare("INSERT INTO material_anki_decks(id,curricular_unit_id,title,variant,storage_backend,storage_key,storage_state,publication_status,created_at,updated_at) VALUES('neuro-external','fis','Anki','custom','external',?,'ready','published',0,0)").run(externalDeckUrl);
+  }
   sqlite.exec(`
     INSERT INTO material_lessons(id,curricular_unit_id,code,title,lesson_type,sort_order,created_at,updated_at)
     VALUES ('at1','fis','AT1','Teórica','theory',1,0,0),('ap1','fis','AP1','Prática','practical',2,0,0);
@@ -62,6 +66,7 @@ function fixture(size) {
         return this;
       },
       async all() { return { results: statement.all(...parameters) }; },
+      async first() { return statement.get(...parameters) || null; },
     };
   } };
   return { database, queries, close: () => sqlite.close() };
@@ -104,3 +109,19 @@ for (const size of [143, 500]) {
     } finally { close(); }
   });
 }
+
+test('external Anki downloads link to OneDrive and retain access checks without R2', async () => {
+  const link = 'https://1drv.ms/u/c/ed0b5401b9a1a159/IQDIjKZw5p_SSbXYhdGsW3RHATU6a_Enm74KN1p6nVvMdn0?e=Yov0wb&download=1';
+  const { database, close } = fixture(2, link);
+  try {
+    const data = await catalog(database);
+    assert.equal(data.decks[0].downloadUrl, link);
+    const url = new URL('https://example.test/api/material-anki/neuro-external/download');
+    const env = { DB: database, MATERIALS_BUCKET: new Proxy({}, { get() { throw Error('External downloads must not read R2'); } }) };
+    const response = await exported.handleMaterialsCatalogRoute(new Request(url), env, url, { id: 'student', role: 'student' }, async () => true);
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('location'), link);
+    const anonymous = await exported.handleMaterialsCatalogRoute(new Request(url), env, url, null, async () => true);
+    assert.equal(anonymous.status, 401);
+  } finally { close(); }
+});
