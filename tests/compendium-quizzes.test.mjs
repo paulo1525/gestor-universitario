@@ -76,5 +76,9 @@ test('migrations e API integram perguntas abertas, cinco opções e imagens sem 
     runScript(db,await readFile(new URL('../migrations/0114_import_fisio_neuro_radiology_compendiums.sql',import.meta.url),'utf8'));
     assert.equal(db.exec("SELECT COUNT(*) FROM question_bank_items WHERE source_id LIKE 'compendium-source-%'")[0].values[0][0],2584);
     assert.equal(db.exec("SELECT COUNT(*) FROM quiz_attempts WHERE id='prior'")[0].values[0][0],1);
+    db.run(await readFile(new URL('../migrations/0116_archive_fisio_short_answers.sql',import.meta.url),'utf8'));
+    assert.equal(db.exec("SELECT COUNT(*) FROM quiz_questions q JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE cu.code='FIS1' AND q.status='published' AND q.response_type<>'multiple_choice'")[0].values[0][0],0);
+    assert.equal(db.exec("SELECT COUNT(*) FROM quiz_questions q JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE cu.code='FIS1' AND q.status='published' AND q.response_type='multiple_choice'")[0].values[0][0],1106);
+    assert.equal(db.exec("SELECT published_count FROM question_bank_sources WHERE id='compendium-source-fis1'")[0].values[0][0],1106);
   } finally {db.close();}
 });

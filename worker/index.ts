@@ -11,7 +11,6 @@ import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
 import { handleCampusRoute, isCampusPath } from "./campus";
 import { announcementAudienceWhere, unreadAnnouncementCount, recordAnnouncementRead } from "./communication-counts";
 import { handleQuizRoute, isQuizPath } from "./quizzes";
-import { handleLearningRoute, isLearningPath } from "./learning";
 import { handleStudyAnnotations } from "./study-annotations";
 import { neuroParagraphs } from "@/lib/neuroanatomia-study";
 
@@ -1689,10 +1688,6 @@ async function routeApi(request: Request, env: Env, url: URL, ctx?: ExecutionCon
   if (isQuizPath(pathname)) {
     const user = await currentUser(request, env);
     return handleQuizRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
-  }
-  if (isLearningPath(pathname)) {
-    const user = await currentUser(request, env);
-    return handleLearningRoute(request, env, url, user, (key) => isModuleEnabled(env, key));
   }
   if (pathname === "/api/study/neuro-ap1/annotations") {
     const user = await currentUser(request, env);

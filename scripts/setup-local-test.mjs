@@ -151,7 +151,7 @@ const statements = [
   "DELETE FROM announcements",
   "DELETE FROM curricular_unit_representatives",
   "DELETE FROM curricular_units",
-  "UPDATE app_module_settings SET enabled=CASE WHEN module_key LIKE 'classes%' THEN 0 ELSE 1 END,updated_by=NULL,updated_at=" + now,
+  "UPDATE app_module_settings SET enabled=CASE WHEN module_key LIKE 'classes%' OR module_key='quizzes.learning' THEN 0 ELSE 1 END,updated_by=NULL,updated_at=" + now,
   "DELETE FROM student_destinations",
   "DELETE FROM distribution_manual_overrides",
   "DELETE FROM distribution_result_reviews",
