@@ -1,0 +1,40 @@
+{
+  "academicYear": "2026/2027",
+  "files": [
+    {
+      "id": "material-fis1-compendium-solutions",
+      "table": "material_catalog",
+      "unitCode": "FIS1",
+      "title": "Fisiologia I — Compêndio por aulas com soluções",
+      "fileName": "Fisiologia_I_FMUP_Compendio_por_Aulas_2026-10-04_com_solucoes.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 42148241,
+      "sha256": "4a5f36feede65de1f085718c2e1f6b64563baf48a414783fc8b87245c88c3682",
+      "storageKey": "materials/fisiologia-i/compendios/4a5f36feede65de1f085718c2e1f6b64563baf48a414783fc8b87245c88c3682.pdf"
+    },
+    {
+      "id": "material-fis1-compendium-no-solutions",
+      "table": "material_catalog",
+      "unitCode": "FIS1",
+      "title": "Fisiologia I — Compêndio por aulas sem soluções",
+      "fileName": "Fisiologia_I_FMUP_Compendio_por_Aulas_2026-10-04_sem_solucoes.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 41666357,
+      "sha256": "c2f0398ee6bb6f7e37757e37573c019ce41fdd56904cc66c31ee35fc0cd43267",
+      "storageKey": "materials/fisiologia-i/compendios/c2f0398ee6bb6f7e37757e37573c019ce41fdd56904cc66c31ee35fc0cd43267.pdf"
+    },
+    {
+      "id": "anki-fis1-compendium-mc",
+      "table": "material_anki_decks",
+      "unitCode": "FIS1",
+      "title": "Fisiologia - Compêndio",
+      "fileName": "Fisiologia_Compendio_MC_2026-10-04_33d0262a.apkg",
+      "mimeType": "application/apkg",
+      "byteSize": 32853742,
+      "sha256": "7586ddbc94e5c2300a5350a6c2dc8d4159d2bd123ec3c00a30b7f6961635dc6a",
+      "storageKey": "materials/fisiologia-i/anki/7586ddbc94e5c2300a5350a6c2dc8d4159d2bd123ec3c00a30b7f6961635dc6a.apkg",
+      "cardCount": 1111,
+      "mediaCount": 202
+    }
+  ]
+}

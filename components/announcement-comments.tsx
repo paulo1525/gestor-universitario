@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { EyeOff, LoaderCircle, Send, Trash2 } from "lucide-react";
+import { EyeOff, LoaderCircle, Send, Trash2, Pin, PinOff } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { useI18n } from "@/components/i18n-context";
 import { PersonName } from "@/components/person-name";
@@ -18,6 +18,8 @@ type Comment = {
   commission?: boolean;
   own: boolean;
   canDelete: boolean;
+  pinned?: boolean;
+  canPin?: boolean;
 };
 
 const DEFAULT_MAX_LENGTH = 1000;
@@ -39,6 +41,7 @@ export function AnnouncementComments({ announcementId, revealIdentifiers, onCoun
   const [sending, setSending] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
+  const [pinningId, setPinningId] = useState<string | null>(null);
   const [canWrite, setCanWrite] = useState(true);
   const countChange = useRef(onCountChange);
   useEffect(() => { countChange.current = onCountChange; });
@@ -96,6 +99,17 @@ export function AnnouncementComments({ announcementId, revealIdentifiers, onCoun
     }
   };
 
+  const pin = async (comment: Comment) => {
+    setPinningId(comment.id);
+    try {
+      const response = await fetch(endpoint,{method:"PATCH",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({id:comment.id,pinned:!comment.pinned})});
+      const data = await response.json() as {error?:string};
+      if (!response.ok) throw new Error(data.error || t("announcements.comments.sendError"));
+      await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : t("announcements.comments.sendError")); }
+    finally { setPinningId(null); }
+  };
+
   const when = (value: number) => {
     const date = new Date(value);
     const sameDay = date.toDateString() === new Date().toDateString();
@@ -111,10 +125,11 @@ export function AnnouncementComments({ announcementId, revealIdentifiers, onCoun
             <li key={comment.id} className={styles.comment}>
               <span className={`${styles.avatar} ${comment.own ? styles.avatarOwn : ""} ${comment.commission ? styles.avatarCommission : ""}`} aria-hidden="true">{comment.author.anonymous ? <EyeOff /> : initials(comment.author.fullName)}</span>
               <div className={styles.content}>
-                <p className={styles.meta}><strong>{comment.author.anonymous ? comment.author.fullName : <PersonName person={personDisplay(comment.author, { revealIdentifier: revealIdentifiers, locale })} />}</strong>{comment.commission && <span className={styles.commissionTag}>{t("comments.commission")}</span>}<time dateTime={new Date(comment.createdAt).toISOString()}>{when(comment.createdAt)}</time></p>
+                <p className={styles.meta}><strong>{comment.author.anonymous ? comment.author.fullName : <PersonName person={personDisplay(comment.author, { revealIdentifier: revealIdentifiers, locale })} />}</strong>{comment.commission && <span className={styles.commissionTag}>{t("comments.commission")}</span>}{comment.pinned && <span className={styles.pinnedLabel}><Pin aria-hidden="true" />Afixado</span>}<time dateTime={new Date(comment.createdAt).toISOString()}>{when(comment.createdAt)}</time></p>
                 <RichTextContent className={styles.body} value={comment.body} />
               </div>
-              {comment.canDelete && !readOnly && canWrite && <button className={styles.delete} type="button" onClick={() => setDeleteTarget(comment)} disabled={deletingId === comment.id} aria-label={t("announcements.comments.delete")} title={t("announcements.comments.delete")}><Trash2 aria-hidden="true" /></button>}
+              <div className={styles.actions}>{comment.canPin && !readOnly && <button className={styles.action} type="button" aria-label={comment.pinned ? "Desafixar comentário" : "Afixar comentário"} title={comment.pinned ? "Desafixar comentário" : "Afixar comentário"} disabled={pinningId===comment.id} onClick={() => void pin(comment)}>{comment.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}</button>}
+              {comment.canDelete && !readOnly && canWrite && <button className={styles.delete} type="button" onClick={() => setDeleteTarget(comment)} disabled={deletingId === comment.id} aria-label={t("announcements.comments.delete")} title={t("announcements.comments.delete")}><Trash2 aria-hidden="true" /></button>}</div>
             </li>
           ))}
         </ol>

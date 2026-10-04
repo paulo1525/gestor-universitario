@@ -1,0 +1,1 @@
+export function quizReadiness(summary: { uniqueQuestionCount: number; latestCorrectCount: number; completedCount: number; recentAccuracy: number | null }, totalQuestions: number): { score: number | null; coverage: number; mastery: number | null; recent: number | null };

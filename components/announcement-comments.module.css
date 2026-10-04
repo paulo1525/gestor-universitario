@@ -36,3 +36,10 @@
 :global(html[data-theme="forum"]) .avatarCommission { color: #fff; background: #1d3b57; }
 .avatar svg { width: 14px; height: 14px; }
 .commissionTag { padding: 1px 7px; border-radius: 999px; color: var(--color-accent-text); background: var(--color-accent-soft); font-size: var(--font-size-caption); font-weight: 800; }
+
+.actions { display: flex; align-items: center; gap: var(--space-1); }
+.action { display: grid; width: 30px; height: 30px; padding: 0; place-items: center; border: 0; border-radius: var(--radius-control); color: var(--color-text-muted); background: transparent; cursor: pointer; }
+.action svg, .pinnedLabel svg { width: 14px; height: 14px; }
+.action:hover { color: var(--color-accent-text); background: var(--color-accent-soft); }
+.action:disabled { cursor: wait; opacity: .5; }
+.pinnedLabel { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--color-accent-text); font-size: var(--font-size-caption); }
