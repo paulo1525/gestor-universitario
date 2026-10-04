@@ -198,6 +198,19 @@ function normaliseAcademicContent(value: unknown): AcademicContent {
 }
 
 const UNIT_PAGE_SIZE = 12;
+const calendarEventLabelKeys = {
+  assessment: "community.calendar.type.assessment",
+  exam: "community.calendar.type.exam",
+  deadline: "community.calendar.type.deadline",
+  academic: "community.calendar.type.academic",
+  meeting: "community.calendar.type.meeting",
+  study: "community.calendar.type.study",
+  personal: "community.calendar.type.personal",
+  social: "community.calendar.type.social",
+  academic_group: "community.calendar.type.academic_group",
+  event: "community.calendar.type.event",
+  evaluation: "community.calendar.type.evaluation",
+} as const;
 
 export function CurricularUnitCatalog() {
   const { locale, t } = useI18n();
@@ -305,6 +318,11 @@ export function CurricularUnitCatalog() {
 
 export function CurricularUnitDetail({ id }: { id: string }) {
   const { locale, t } = useI18n();
+  const eventKindLabel = (value: string) => {
+    const normalized = value.trim().toLocaleLowerCase("en");
+    const key = calendarEventLabelKeys[normalized as keyof typeof calendarEventLabelKeys];
+    return key ? t(key) : value;
+  };
   const [data, setData] = useState<Detail | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState("");
@@ -464,7 +482,7 @@ export function CurricularUnitDetail({ id }: { id: string }) {
                               <strong>{item.title}</strong>
                               <small>
                                 {date(item.startsAt, locale)}
-                                {item.kind ? ` · ${item.kind}` : ""}
+                                {item.kind ? ` · ${eventKindLabel(item.kind)}` : ""}
                               </small>
                             </span>
                           </div>
