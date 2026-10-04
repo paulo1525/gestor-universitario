@@ -1652,7 +1652,7 @@ tbody tr:hover, tbody tr.is-selected { background: #fffcf0; }
   }
 
   .sidebar.sidebar--collapsed .brand {
-    padding-bottom: 46px;
+    padding-bottom: calc(46px + var(--space-3));
   }
 
   .sidebar__collapse::before {
