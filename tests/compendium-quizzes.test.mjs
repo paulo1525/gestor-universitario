@@ -72,9 +72,14 @@ test('migrations e API integram perguntas abertas, cinco opções e imagens sem 
     assert.equal(short.status,201);const open=(await short.json()).attempt;
     assert.equal(open.answerFormat,'short_answer');assert.equal(open.questions.length,5);
     assert.ok(open.questions.every(q=>q.options[0].text && !q.solutionImageUrls));
+    // The imported bank also contains questions with fewer options. Restrict
+    // this case to five-option questions instead of relying on a random sample.
+    const mixedQuestionIds=(db.exec("SELECT id FROM quiz_questions WHERE curricular_unit_id='fis' AND status='published' AND (SELECT COUNT(*) FROM quiz_question_options o WHERE o.question_id=quiz_questions.id)<>5")[0]?.values ?? []).map(([id])=>id);
+    db.run("UPDATE quiz_questions SET status='archived' WHERE curricular_unit_id='fis' AND status='published' AND (SELECT COUNT(*) FROM quiz_question_options o WHERE o.question_id=quiz_questions.id)<>5;");
     const mc=await request('/api/quiz-attempts',{mode:'exam',unitId:'fis',questionCount:5,timed:false});
     assert.equal(mc.status,201);const exam=(await mc.json()).attempt;
     assert.ok(exam.questions.every(q=>q.options.length===5));assert.ok(exam.questions.every(q=>q.correctOptionId===undefined && q.solutionImageUrls===undefined));
+    for(const id of mixedQuestionIds) db.run("UPDATE quiz_questions SET status='published' WHERE id=?",[id]);
     const source=db.exec("SELECT question_images_json,solution_images_json FROM quiz_questions WHERE solution_images_json<>'[]' AND curricular_unit_id='ar' LIMIT 1")[0];
     assert.ok(source);assert.ok(JSON.parse(source.values[0][1]).length>0);
     // Repeatable imports retain existing attempts and stable source IDs.
