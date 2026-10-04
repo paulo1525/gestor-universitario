@@ -254,6 +254,8 @@ const ptPT = {
   "cookies.keepSignedInDescription": "Recomendado neste dispositivo pessoal: mantém o acesso durante 7 dias.",
   "cookies.policy": "Política de Cookies",
   "cookies.save": "Guardar preferências",
+  "cookies.saving": "A guardar…",
+  "cookies.saveError": "Não foi possível guardar a preferência de sessão. Tente novamente.",
 } as const;
 
 export type MessageKey = keyof typeof ptPT;
@@ -508,6 +510,8 @@ const en: Record<MessageKey, string> = {
   "cookies.keepSignedInDescription": "Recommended on this personal device: keeps access active for 7 days.",
   "cookies.policy": "Cookie Policy",
   "cookies.save": "Save preferences",
+  "cookies.saving": "Saving…",
+  "cookies.saveError": "Could not save the session preference. Please try again.",
   "community.materials.examSitting": "Sitting",
   "community.materials.examSittingUnknown": "To be confirmed",
   "community.materials.examSittingNormal": "Regular",

@@ -12,7 +12,8 @@ async function compile(relative, require = () => { throw new Error('Unexpected i
   return compiled.exports;
 }
 const richText = await compile('../lib/announcement-content.ts');
-const { handleQuizRoute, balancedLessonQuestions } = await compile('../worker/quizzes.ts', () => richText);
+const contentStore = await compile('../worker/quiz-content-store.ts', () => ({revision: 'unused'}));
+const { handleQuizRoute, balancedLessonQuestions } = await compile('../worker/quizzes.ts', (path) => path === './quiz-content-store' ? contentStore : richText);
 const SQL = await initSqlJs();
 
 // Keep each SQLite preparation bounded, like D1's migration runner.

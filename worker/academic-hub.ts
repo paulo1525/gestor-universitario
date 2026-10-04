@@ -1038,11 +1038,11 @@ function notificationDto(item: unknown) {
   return { id: `${String(row.source_type)}:${String(row.source_id)}`, notificationId: `${String(row.source_type)}:${String(row.source_id)}`, sourceType: row.source_type, sourceId: row.source_id, type: row.source_type, category: row.source_type, title: row.title, body: row.description, description: row.description, priority: row.priority, href: row.href, unitId: row.unit_id, unitCode: row.unit_code, unitName: row.unit_name ?? row.unit_code, occurredAt: row.occurred_at, createdAt: row.occurred_at, read: row.read_at !== null, readAt: row.read_at, archived: row.archived_at !== null, archivedAt: row.archived_at };
 }
 
-async function loadNotifications(env: HubEnv, user: HubUser, preferences: NotificationPreferences, limit: number, unreadOnly: boolean, includeArchived: boolean) {
+function notificationFeedQuery(user: HubUser, preferences: NotificationPreferences, unreadOnly: boolean, includeArchived: boolean) {
   const sources: string[] = [];
   const bindings: unknown[] = [];
   if (preferences.announcements) {
-    sources.push("SELECT a.id AS source_id,'announcement' AS source_type,a.title,substr(a.body,1,300) AS description,a.priority,'/avisos' AS href,NULL AS unit_id,NULL AS unit_code,a.published_at AS occurred_at FROM announcements a WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?)");
+    sources.push("SELECT a.id AS source_id,'announcement' AS source_type,a.title,a.body AS description,a.priority,'/avisos' AS href,NULL AS unit_id,NULL AS unit_code,a.published_at AS occurred_at FROM announcements a WHERE a.status='published' AND (a.expires_at IS NULL OR a.expires_at>?)");
     bindings.push(Date.now());
   }
   if (preferences.calendar) sources.push("SELECT e.id AS source_id,'event' AS source_type,e.title,substr(e.description,1,300) AS description,CASE WHEN e.event_type IN ('exam','assessment','evaluation') THEN 'important' ELSE 'normal' END AS priority,'/calendario' AS href,e.curricular_unit_id AS unit_id,cu.code AS unit_code,e.starts_at AS occurred_at FROM academic_events e LEFT JOIN curricular_units cu ON cu.id=e.curricular_unit_id WHERE e.status='scheduled' AND e.visibility!='cc' AND e.starts_at>=unixepoch()*1000-86400000");
@@ -1052,10 +1052,16 @@ async function loadNotifications(env: HubEnv, user: HubUser, preferences: Notifi
     bindings.push(user.id);
   }
   if (preferences.materials) sources.push("SELECT m.id AS source_id,'material' AS source_type,m.title,substr(m.description,1,300) AS description,'normal' AS priority,'/materiais' AS href,m.curricular_unit_id AS unit_id,cu.code AS unit_code,m.updated_at AS occurred_at FROM material_submissions m LEFT JOIN curricular_units cu ON cu.id=m.curricular_unit_id WHERE m.status='published' AND m.material_type!='exam_photo'");
-  if (!sources.length) return [];
+  if (!sources.length) return null;
   const unitClause = preferences.unitIds.length ? `AND (feed.unit_id IS NULL OR feed.unit_id IN (${preferences.unitIds.map(() => "?").join(",")}))` : "";
-  bindings.push(user.id, includeArchived ? 1 : 0, unreadOnly ? 1 : 0, preferences.urgentOnly ? 1 : 0, ...preferences.unitIds, limit);
-  const result = await env.DB.prepare(`WITH feed AS (${sources.join(" UNION ALL ")}) SELECT feed.*,state.read_at,state.archived_at FROM feed LEFT JOIN notification_states state ON state.user_id=? AND state.source_type=feed.source_type AND state.source_id=feed.source_id WHERE (?=1 OR state.archived_at IS NULL) AND (?=0 OR state.read_at IS NULL) AND (?=0 OR feed.priority='urgent') ${unitClause} ORDER BY feed.occurred_at DESC LIMIT ?`).bind(...bindings).all();
+  bindings.push(user.id, includeArchived ? 1 : 0, unreadOnly ? 1 : 0, preferences.urgentOnly ? 1 : 0, ...preferences.unitIds);
+  return { sql: `WITH feed AS (${sources.join(" UNION ALL ")}) SELECT feed.*,state.read_at,state.archived_at FROM feed LEFT JOIN notification_states state ON state.user_id=? AND state.source_type=feed.source_type AND state.source_id=feed.source_id WHERE (?=1 OR state.archived_at IS NULL) AND (?=0 OR state.read_at IS NULL) AND (?=0 OR feed.priority='urgent') ${unitClause}`, bindings };
+}
+
+async function loadNotifications(env: HubEnv, user: HubUser, preferences: NotificationPreferences, limit: number, unreadOnly: boolean, includeArchived: boolean) {
+  const query = notificationFeedQuery(user, preferences, unreadOnly, includeArchived);
+  if (!query) return [];
+  const result = await env.DB.prepare(query.sql + " ORDER BY feed.occurred_at DESC LIMIT ?").bind(...query.bindings, limit).all();
   return result.results.map(notificationDto);
 }
 
@@ -1148,11 +1154,16 @@ async function notifications(request: Request, env: HubEnv, url: URL, user: HubU
   if (request.method !== "PATCH") return json({ error: "Operacao nao suportada." }, 405);
   const body = await bodyJson(request);
   if (!body) return json({ error: "Pedido JSON invalido." }, 400);
-  let rawItems = Array.isArray(body.items) ? body.items : [body];
+  const rawItems = Array.isArray(body.items) ? body.items : [body];
   if (body.all === true || body.action === "mark_all_read") {
     const preferences = await loadNotificationPreferences(env, user.id);
-    rawItems = (await loadNotifications(env, user, preferences, 100, false, false)).map((item) => ({ sourceType: item.sourceType, sourceId: item.sourceId, read: true }));
-    if (!rawItems.length) return json({ ok: true, updated: 0 });
+    const query = notificationFeedQuery(user, preferences, true, false);
+    if (!query) return json({ ok: true, updated: 0 });
+    const now = Date.now();
+    // One atomic statement covers the complete eligible feed, including older rows.
+    // Account, categories, urgency, units and archived state use the same read filters.
+    const result = await env.DB.prepare(`INSERT INTO notification_states(user_id,source_type,source_id,read_at,archived_at,updated_at) SELECT ?,eligible.source_type,eligible.source_id,?,NULL,? FROM (${query.sql}) eligible WHERE 1 ON CONFLICT(user_id,source_type,source_id) DO UPDATE SET read_at=excluded.read_at,updated_at=excluded.updated_at`).bind(user.id, now, now, ...query.bindings).run();
+    return json({ ok: true, updated: result.meta.changes });
   }
   if (!rawItems.length || rawItems.length > 100) return json({ error: "Indique entre uma e cem notificacoes." }, 400);
   const now = Date.now(), statements: D1PreparedStatement[] = [];

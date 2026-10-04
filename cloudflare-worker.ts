@@ -30,6 +30,11 @@ function isDirectApiRoute(method: string, pathname: string): boolean {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const pathname = new URL(request.url).pathname;
+    // Question files are fetched internally through ASSETS after API authentication.
+    // Direct URLs never expose a file, including to signed-in users.
+    if (pathname === "/__private_quiz" || pathname.startsWith("/__private_quiz/")) {
+      return new Response("Not found", { status: 404, headers: { "cache-control": "private, no-store" } });
+    }
     if (isFileRoute(request.method, pathname) || isDirectApiRoute(request.method, pathname)) {
       return apiWorker.fetch(request, env, ctx);
     }

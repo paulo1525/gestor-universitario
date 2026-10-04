@@ -15,24 +15,33 @@ export function CookiePreferences() {
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [persistent, setPersistent] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   useEscapeKey(open, () => setOpen(false));
 
   useEffect(() => {
-    const show = () => setOpen(true);
+    const show = () => { setError(""); try { setPersistent(localStorage.getItem(PERSISTENCE_KEY) !== "false"); } catch { /* Keep the current choice if storage is unavailable. */ } setOpen(true); };
     window.addEventListener(OPEN_COOKIE_PREFERENCES, show);
     return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES, show);
   }, []);
 
   useEffect(() => {
     queueMicrotask(() => {
-      setPersistent(localStorage.getItem(PERSISTENCE_KEY) !== "false");
+      try { setPersistent(localStorage.getItem(PERSISTENCE_KEY) !== "false"); } catch { /* Storage can be unavailable in private browsing. */ }
     });
   }, []);
 
   async function save() {
-    localStorage.setItem(PERSISTENCE_KEY, String(persistent));
-    await fetch("/api/auth/session-preference", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ persistent }) }).catch(() => undefined);
-    setOpen(false);
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/session-preference", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ persistent }) });
+      if (!response.ok) throw new Error(t("cookies.saveError"));
+      try { localStorage.setItem(PERSISTENCE_KEY, String(persistent)); } catch { /* The server preference was saved even if local storage is unavailable. */ }
+      setOpen(false);
+    } catch { setError(t("cookies.saveError")); }
+    finally { setSaving(false); }
   }
 
   function close() { setOpen(false); }
@@ -48,11 +57,12 @@ export function CookiePreferences() {
         <div className="cookie-options" data-app-modal-body>
           <p className="cookie-options__intro">{t("cookies.description")}</p>
           <div className="cookie-option"><strong>{t("cookies.essential")}</strong><span className="cookie-required">{t("cookies.alwaysActive")}</span></div>
-          <label className="cookie-option"><span><strong>{t("cookies.keepSignedIn")}</strong><small>{t("cookies.keepSignedInDescription")}</small></span><input className="toggle" type="checkbox" checked={persistent} onChange={(event) => setPersistent(event.target.checked)} /></label>
+          <label className="cookie-option"><span><strong>{t("cookies.keepSignedIn")}</strong><small>{t("cookies.keepSignedInDescription")}</small></span><input className="toggle" type="checkbox" checked={persistent} disabled={saving} onChange={(event) => setPersistent(event.target.checked)} /></label>
+          {error && <p className="cookie-options__error" role="alert">{error}</p>}
         </div>
         <footer data-app-modal-footer>
           <Link className="cookie-policy-link" href="/cookies/" onClick={close}>{t("cookies.policy")}</Link>
-          <button className="button button--primary" data-app-modal-action="primary" type="button" onClick={() => void save()}>{t("cookies.save")}</button>
+          <button className="button button--primary" data-app-modal-action="primary" type="button" disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{t(saving ? "cookies.saving" : "cookies.save")}</button>
         </footer>
       </section>
     </div>
