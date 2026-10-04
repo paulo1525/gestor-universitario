@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, Download, File, FileImage, FileText, Folder, Globe, House, Lock, LogIn, Package, Presentation, RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BookOpen, ChevronRight, Download, File, FileImage, FileText, Folder, Globe, GraduationCap, House, Library, Lock, LogIn, NotebookPen, Package, Presentation, RefreshCw, Search, Video } from "lucide-react";
 import { AppToast, type ToastKind } from "@/components/app-toast";
 import { useI18n } from "@/components/i18n-context";
 import { clampPage, Pagination } from "@/components/pagination";
@@ -11,15 +11,14 @@ import { MaterialViews } from "@/components/material-views";
 import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views";
 import { materialReaderHref } from "@/lib/material-reader";
 import { MATERIAL_RESOURCE_CATEGORIES, type MaterialResourceCategory } from "@/lib/material-categories";
+import { MATERIAL_FOLDER_GROUPS, materialFolderCount, VIDEO_FOLDERS, type VideoFolder } from "@/lib/material-folders";
 import styles from "@/components/public-materials.module.css";
 
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
 const FILES_PAGE_SIZE = 10;
 
-type Section = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
-const SECTIONS: Section[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
-// Folders shown in every subject, even when empty; the others only appear when they have files.
-const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
+type Section = VideoFolder | "videos" | MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
+const SECTIONS: Section[] = ["videos", ...VIDEO_FOLDERS, ...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
 type Entry = { views?: number | null; section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; description?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
 type Unit = { key: string; code: string; name: string; year?: number | null; semester?: number | null; entries: Entry[] };
@@ -48,7 +47,8 @@ function normalize(value: string) {
 /** The open folder lives in the address (?pasta=NEURO/notes) so it can be shared and survives a reload. */
 function placeFromUrl(): Place {
   if (typeof window === "undefined") return { unit: "", section: "" };
-  const [unit = "", section = ""] = (new URLSearchParams(window.location.search).get("pasta") ?? "").split("/");
+  const [unit = "", parent = "", child = ""] = (new URLSearchParams(window.location.search).get("pasta") ?? "").split("/");
+  const section = parent === "videos" && child ? `video-${child}` : parent;
   return { unit, section: (SECTIONS as string[]).includes(section) ? section as Section : "" };
 }
 
@@ -67,8 +67,9 @@ function fileDate(value?: number | null) {
 }
 
 function FileIcon({ entry }: { entry: Entry }) {
+  if (entry.section.startsWith("video-") || entry.mime?.startsWith("video/")) return <Video aria-hidden="true" />;
   if (entry.section === "anki" || entry.mime === "application/apkg") return <Package aria-hidden="true" />;
-  if (["slides", "theory", "tutorials", "practical", "seminars"].includes(entry.section)) return <Presentation aria-hidden="true" />;
+  if (entry.section === "slides") return <Presentation aria-hidden="true" />;
   if (entry.mime?.startsWith("image/")) return <FileImage aria-hidden="true" />;
   if (entry.mime === "application/pdf") return <FileText aria-hidden="true" />;
   return <File aria-hidden="true" />;
@@ -113,7 +114,7 @@ export function PublicMaterials() {
     setPage(1);
     setQuery("");
     const url = new URL(window.location.href);
-    const value = [next.unit, next.section].filter(Boolean).join("/");
+    const value = [next.unit, ...(next.section.startsWith("video-") ? ["videos", next.section.slice(6)] : [next.section])].filter(Boolean).join("/");
     if (value) url.searchParams.set("pasta", value); else url.searchParams.delete("pasta");
     window.history.pushState(null, "", url);
     window.scrollTo({ top: 0 });
@@ -153,14 +154,17 @@ export function PublicMaterials() {
   const sectionLabel = (section: Section) => t(`publicMaterials.section.${section}` as "publicMaterials.section.summaries");
   const unit = state.units.find((item) => unitKey(item) === place.unit) ?? null;
   const section = unit && place.section ? place.section : "";
+  const videoChild = section.startsWith("video-");
+  const folderCounts = Object.fromEntries(SECTIONS.map((key) => [key, unit?.entries.filter((entry) => entry.section === key).length || 0]));
+  const folderIcon = (key: Section) => key === "videos" || key.startsWith("video-") ? Video : key === "sebentas" || key === "notes" ? NotebookPen : key === "compendiums" ? Library : key === "bibliography" ? BookOpen : key === "anki" ? Package : key === "slides" ? Presentation : ["theory", "practical", "tutorials", "seminars"].includes(key) ? GraduationCap : Folder;
   const term = normalize(query.trim());
 
   // What the current view lists: search results across every folder, or the files of the open type folder.
-  const files = useMemo(() => {
+  const files = (() => {
     if (term) return state.units.flatMap((item) => item.entries.filter((entry) => !entry.locked && normalize(`${entry.title ?? ""} ${item.code} ${item.name}`).includes(term)).map((entry) => ({ entry, unit: item })));
     if (unit && section) return unit.entries.filter((entry) => entry.section === section).map((entry) => ({ entry, unit }));
     return [];
-  }, [section, state.units, term, unit]);
+  })();
   const currentPage = clampPage(page, files.length, FILES_PAGE_SIZE);
   const pageFiles = files.slice((currentPage - 1) * FILES_PAGE_SIZE, currentPage * FILES_PAGE_SIZE);
 
@@ -209,6 +213,7 @@ export function PublicMaterials() {
           {term ? <span aria-current="page">{t("publicMaterials.results", { count: files.length })}</span> : <>
             <button type="button" onClick={() => open({ unit: "", section: "" })} aria-current={!unit ? "page" : undefined}>{t("publicMaterials.title")}</button>
             {unit && <><ChevronRight aria-hidden="true" /><button type="button" onClick={() => open({ unit: unitKey(unit), section: "" })} aria-current={!section ? "page" : undefined}>{unit.code ? `${unit.code} · ${unit.name}` : unit.name || t("publicMaterials.general")}</button></>}
+            {unit && videoChild && <><ChevronRight aria-hidden="true" /><button type="button" onClick={() => open({ unit: unitKey(unit), section: "videos" })}>{sectionLabel("videos")}</button></>}
             {unit && section && <><ChevronRight aria-hidden="true" /><span aria-current="page">{sectionLabel(section)}</span></>}
           </>}
         </nav>
@@ -233,15 +238,25 @@ export function PublicMaterials() {
             </section>)}
           </div>
         ) : !term && unit && !section ? (
-          <ul className={styles.folders}>
-            {SECTIONS.filter((key) => FIXED_SECTIONS.includes(key) || unit.entries.some((entry) => entry.section === key)).map((key) => {
-              const entries = unit.entries.filter((entry) => entry.section === key);
-              return <li key={key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(unit), section: key })}>
-                <Folder aria-hidden="true" />
-                <span><strong>{sectionLabel(key)}</strong><small>{count(entries)}</small></span>
-              </button></li>;
+          <div className={styles.semesters}>
+            {MATERIAL_FOLDER_GROUPS.map((group) => {
+              const folders = group.sections.filter((key) => materialFolderCount(key, folderCounts) > 0);
+              return folders.length ? <section key={group.key} aria-label={t(`publicMaterials.group.${group.key}`)}>
+                <h3 className={styles.semesterTitle}>{t(`publicMaterials.group.${group.key}`)}</h3>
+                <ul className={styles.folders}>{folders.map((key) => {
+                  const Icon = folderIcon(key as Section);
+                  const total = materialFolderCount(key, folderCounts);
+                  return <li key={key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(unit), section: key as Section })}>
+                    <Icon aria-hidden="true" /><span><strong>{sectionLabel(key as Section)}</strong><small>{t(total === 1 ? "publicMaterials.fileOne" : "publicMaterials.files", { count: total })}</small></span>
+                  </button></li>;
+                })}</ul>
+              </section> : null;
             })}
-          </ul>
+          </div>
+        ) : !term && unit && section === "videos" ? (
+          <ul className={styles.folders}>{VIDEO_FOLDERS.filter((key) => folderCounts[key] > 0).map((key) => <li key={key}><button className={styles.folder} type="button" onClick={() => open({ unit: unitKey(unit), section: key })}>
+            <Video aria-hidden="true" /><span><strong>{sectionLabel(key)}</strong><small>{count(unit.entries.filter((entry) => entry.section === key))}</small></span>
+          </button></li>)}</ul>
         ) : files.length === 0 ? (
           <p className={styles.message} role="status">{t(term ? "publicMaterials.noResults" : "publicMaterials.emptyFolder")}</p>
         ) : (

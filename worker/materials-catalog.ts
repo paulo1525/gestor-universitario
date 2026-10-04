@@ -3,6 +3,7 @@
 import { materialViewCounts, recordMaterialView } from "./material-views";
 import { reserveR2ReadOperations } from "@/worker/r2-read-budget";
 import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory, type MaterialResourceCategory } from "@/lib/material-categories";
+import { materialVideoFolder, VIDEO_FOLDERS, type VideoFolder } from "@/lib/material-folders";
 import { driveConfigured, driveDownload, driveSyncStatus, isDriveKey, runDriveSync } from "@/worker/google-drive";
 
 export type MaterialsCatalogUser = {
@@ -555,10 +556,12 @@ async function anonymousDenied(request: Request, env: MaterialsCatalogEnv, user:
   return null;
 }
 
-type PublicSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
-const PUBLIC_SECTION_ORDER: PublicSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
+type PublicSection = VideoFolder | MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
+const PUBLIC_SECTION_ORDER: PublicSection[] = [...VIDEO_FOLDERS, ...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
 
 function publicSection(item: Record<string, unknown>): PublicSection {
+  const video = materialVideoFolder({ mimeType: String(item.mime_type || ''), fileName: String(item.file_name || ''), title: String(item.title || ''), resourceCategory: String(item.resource_category || '') });
+  if (video) return video;
   if (item.study_category === "sebenta") return "sebentas";
   const category = materialResourceCategory(item.resource_category);
   if (category) return category;

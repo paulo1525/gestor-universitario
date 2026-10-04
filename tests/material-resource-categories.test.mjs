@@ -1,3 +1,4 @@
+import * as materialFolders from '../lib/material-folders.ts';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -11,6 +12,7 @@ const exported = {};
 vm.runInNewContext(compiled, {
   exports: exported,
   require(specifier) {
+    if (specifier === "@/lib/material-folders") return materialFolders;
     if (specifier === "@/lib/material-categories") return { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory };
     if (specifier === "./material-views") return { materialViewCounts: async () => null };
     if (specifier === "@/worker/google-drive") return { driveConfigured: () => false, driveSyncStatus: async () => ({ configured: false }) };

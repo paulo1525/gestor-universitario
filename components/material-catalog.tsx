@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, type LucideIcon } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, Video, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -11,6 +11,7 @@ import { MaterialViews } from "@/components/material-views";
 import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views";
 import { materialReaderHref } from "@/lib/material-reader";
 import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory, type MaterialResourceCategory } from "@/lib/material-categories";
+import { MATERIAL_FOLDER_GROUPS, materialFolderCount, materialVideoFolder, VIDEO_FOLDERS, type VideoFolder } from "@/lib/material-folders";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
 import { RecordSkeleton, useHashRecord } from "@/components/record-list";
@@ -20,9 +21,9 @@ import { clampPage, Pagination } from "@/components/pagination";
 const RESOURCE_PAGE_SIZE = 10;
 const UNIT_PAGE_SIZE = 12;
 
-export type MaterialCatalogTab = MaterialResourceCategory | "overview" | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "exams" | "other";
+export type MaterialCatalogTab = VideoFolder | "videos" | MaterialResourceCategory | "overview" | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "exams" | "other";
 /** List sections backed by catalogue items; every item belongs to exactly one. */
-type CatalogSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "other";
+type CatalogSection = VideoFolder | MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "other";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
@@ -30,11 +31,11 @@ type CatalogItem = { studyCategory?: "sebenta" | null; views?: number | null; up
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: Exclude<MaterialCatalogTab, "overview">[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "exams", "other"];
-const RESOURCE_ICON: Record<MaterialResourceCategory, LucideIcon> = { information: FileText, theory: Presentation, tutorials: Presentation, practical: Presentation, support: BookOpen, seminars: GraduationCap, assessment: ClipboardCheck };
-const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck, other: FileText };
-const listSections: CatalogSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "other"];
-const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
+const RESOURCE_ICON: Record<MaterialResourceCategory, LucideIcon> = { information: FileText, theory: GraduationCap, tutorials: GraduationCap, practical: GraduationCap, support: BookOpen, seminars: GraduationCap, assessment: ClipboardCheck };
+const VIDEO_ICON = { videos: Video, "video-theory": Video, "video-practical": Video, "video-other": Video };
+const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { ...VIDEO_ICON, ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck, other: FileText };
+const listSections: CatalogSection[] = [...VIDEO_FOLDERS, ...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "other"];
+const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { ...VIDEO_ICON, ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
 export const GENERAL_MATERIAL_UNIT = "__general";
 
@@ -44,6 +45,8 @@ export function normalizeMaterialUnitCode(value: string | null | undefined) {
 
 /** PowerPoints and compendiums come from other_format (migration 0076); loose .pptx files and titled compendiums are recognised too. */
 function catalogSection(item: CatalogItem): CatalogSection {
+  const video = materialVideoFolder(item);
+  if (video) return video;
   if (item.studyCategory === "sebenta") return "sebentas";
   const category = materialResourceCategory(item.resourceCategory);
   if (category) return category;
@@ -96,7 +99,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   examsPanel?: ReactNode;
 }) {
   const { t } = useI18n();
-  const tabLabel = (tab: MaterialCatalogTab) => tab === "overview" ? t("community.materials.catalog.allFiles") : t(`community.materials.catalog.tab.${tab}` as "community.materials.catalog.tab.overview");
+  const tabLabel = (tab: MaterialCatalogTab) => tab === "videos" || tab.startsWith("video-") ? t(`publicMaterials.section.${tab}` as "publicMaterials.section.videos") : tab === "overview" ? t("community.materials.catalog.allFiles") : t(`community.materials.catalog.tab.${tab}` as "community.materials.catalog.tab.overview");
   // Older links (#recurso-<id>, #ler-<id>) now open the annotator page.
   const [legacyResourceId] = useHashRecord("recurso", { scroll: false });
   const [legacyReadId] = useHashRecord("ler", { scroll: false });
@@ -176,6 +179,16 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   // Translation-only view is organized by lesson so the sequence is visibly chronological.
   // Other bibliography views stay grouped by book.
   const groups = useMemo(() => {
+    if (activeTab.startsWith("video-")) {
+      const videoGroups = new Map<string, { key: string; title: string; items: CatalogItem[] }>();
+      for (const item of visible) {
+        const code = primaryLessonCode(item);
+        const key = code || "complements";
+        if (!videoGroups.has(key)) videoGroups.set(key, { key, title: code || "Complementos", items: [] });
+        videoGroups.get(key)!.items.push(item);
+      }
+      return [...videoGroups.values()];
+    }
     if (activeTab !== "bibliography" || sortOrder !== "lesson") return [{ key: "all", title: "", items: visible }];
 
     if (formatFilter === "translation") {
@@ -247,10 +260,9 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const stats = useMemo(() => {
     const counts = Object.fromEntries(listSections.map((section) => [section, 0])) as Record<CatalogSection, number>;
     for (const item of unitItems) counts[catalogSection(item)] += 1;
-    return { ...counts, anki: unitDecks.length };
-  }, [unitDecks.length, unitItems]);
+    return { ...counts, anki: unitDecks.length, exams: submissionCounts[unitCode] || 0 };
+  }, [unitDecks.length, unitItems, submissionCounts, unitCode]);
   const label = (item: CatalogItem) => { const section = catalogSection(item); return section === "other" ? t("community.materials.catalog.tab.overview") : tabLabel(section); };
-  const verificationLabel = (value?: CatalogItem["verification"]) => value === "verified" ? t("community.materials.catalog.verified") : value === "original" ? t("community.materials.catalog.original") : t("community.materials.catalog.pending");
   const formatLabel = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}` as "community.materials.catalog.format.complete");
   const formatBadge = (format: BibliographyFormat) => t(`community.materials.catalog.format.${format}Badge` as "community.materials.catalog.format.completeBadge");
   // Optimistic star: flips at once and reverts if the server refuses.
@@ -325,23 +337,27 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
 
   // Step 2: choose a material type. Files stay hidden until a type is opened.
   const unitTitle = selectedUnit.code === GENERAL_MATERIAL_UNIT ? selectedUnit.name : `${selectedUnit.code} · ${selectedUnit.name}`;
-  if (activeTab === "overview") {
+  const folderButton = (tab: Exclude<MaterialCatalogTab, "overview">) => {
+    const Icon = TAB_ICON[tab];
+    return <button id={`material-tab-${tab}`} key={tab} type="button" className={styles.tab} onClick={() => { setSearch(""); setLessonFilter(""); onTabChange(tab); }}>
+      <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
+      <span className={styles.tabLabel}>{tabLabel(tab)}</span>
+      <span className={styles.tabCount}>{materialFolderCount(tab, stats)}</span>
+      <ChevronRight className={styles.tabChevron} aria-hidden="true" />
+    </button>;
+  };
+  if (activeTab === "overview" || activeTab === "videos") {
     return <>
-      <button className={list.back} type="button" onClick={() => onUnitChange("")}><ChevronLeft aria-hidden="true" />{t("community.materials.catalog.unit.change")}</button>
+      <button className={list.back} type="button" onClick={() => activeTab === "videos" ? onTabChange("overview") : onUnitChange("")}><ChevronLeft aria-hidden="true" />{activeTab === "videos" ? selectedUnit.name : t("community.materials.catalog.unit.change")}</button>
       <section className={styles.catalog} aria-label={unitTitle}>
         <div className={styles.head}>
-          <h2 className={styles.unitTitle}><UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} /><span>{selectedUnit.name}</span></h2>
+          <h2 className={styles.unitTitle}>{activeTab === "videos" ? <Video aria-hidden="true" /> : <UnitThumb id={selectedUnit.id} code={selectedUnit.code} name={selectedUnit.name} />}<span>{activeTab === "videos" ? `${selectedUnit.name} · ${tabLabel("videos")}` : selectedUnit.name}</span></h2>
           <nav className={styles.tabs} aria-label={t("community.materials.title")}>
-            {tabs.filter((tab) => !(MATERIAL_RESOURCE_CATEGORIES as readonly string[]).includes(tab) && tab !== "other" || stats[tab as CatalogSection] > 0).map((tab) => {
-              const Icon = TAB_ICON[tab];
-              const count = tab === "exams" ? submissionCounts[unitCode] || 0 : stats[tab];
-              return <button id={`material-tab-${tab}`} key={tab} type="button" className={styles.tab} onClick={() => onTabChange(tab)}>
-                <span className={styles.tabIcon} aria-hidden="true"><Icon /></span>
-                <span className={styles.tabLabel}>{tabLabel(tab)}</span>
-                <span className={styles.tabCount}>{count}</span>
-                <ChevronRight className={styles.tabChevron} aria-hidden="true" />
-              </button>;
+            {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : activeTab === "videos" ? VIDEO_FOLDERS.filter((tab) => stats[tab] > 0).map(folderButton) : MATERIAL_FOLDER_GROUPS.map((group) => {
+              const folders = group.sections.filter((tab) => materialFolderCount(tab, stats) > 0);
+              return folders.length ? <div key={group.key}><h3 className={list.groupTitle}>{t(`publicMaterials.group.${group.key}`)}</h3>{folders.map(folderButton)}</div> : null;
             })}
+            {!loading && !error && unitItems.length + unitDecks.length + stats.exams === 0 && <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div>}
           </nav>
         </div>
         {error && <div className={`${styles.notice} ${styles.noticeError}`} role="alert"><div><strong>{t("community.materials.catalog.loadError")}</strong><span>{error}</span></div><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
@@ -351,7 +367,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
 
   const ActiveIcon = TAB_ICON[activeTab as Exclude<MaterialCatalogTab, "overview">];
   return <>
-    <button className={list.back} type="button" onClick={() => onTabChange("overview")}><ChevronLeft aria-hidden="true" />Tipos de documento</button>
+    <button className={list.back} type="button" onClick={() => onTabChange(activeTab.startsWith("video-") ? "videos" : "overview")}><ChevronLeft aria-hidden="true" />{activeTab.startsWith("video-") ? tabLabel("videos") : "Materiais de estudo"}</button>
     <section className={styles.catalog} aria-label={`${unitTitle} · ${tabLabel(activeTab)}`}>
       <div className={styles.detailHead}>
         <span className={styles.tabIcon} aria-hidden="true"><ActiveIcon /></span>
@@ -365,9 +381,9 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
         {listTab && <>
           <FilterBar label={t("community.materials.catalog.search")} className={`${styles.catalogFilters} ${activeTab === "bibliography" ? styles.bibliographyFilters : ""}`}>
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
-            {activeTab === "bibliography" && <FilterSegmented label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={setFormatFilter} options={[{ value: "all", label: t("community.materials.catalog.format.all") }, ...formats.map((format) => ({ value: format, label: formatLabel(format), count: formatCounts[format] }))]} />}
+            {activeTab === "bibliography" && <FilterSegmented label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={setFormatFilter} options={[{ value: "all", label: t("community.materials.catalog.format.all") }, ...formats.filter((format) => formatCounts[format] > 0).map((format) => ({ value: format, label: formatLabel(format), count: formatCounts[format] }))]} />}
             {unitLessons.length > 0 && <FilterSelect label={t("community.materials.catalog.lesson")} value={lessonFilter} onChange={setLessonFilter} defaultValue="" options={[{ value: "", label: t("community.materials.catalog.allLessons") }, ...unitLessons.map((lesson) => ({ value: lesson.code, label: `${lesson.code} · ${lesson.title}` }))]} />}
-            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), { value: "recommended", label: t("community.materials.catalog.recommendedOnly") }, { value: "verified", label: t("community.materials.catalog.verified") }, { value: "original", label: t("community.materials.catalog.original") }, { value: "pending", label: t("community.materials.catalog.pending") }]} />
+            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), { value: "recommended", label: t("community.materials.catalog.recommendedOnly") }]} />
             <FilterSelect label={t("community.materials.catalog.sort")} value={sortOrder} onChange={setSortOrder} defaultValue="lesson" options={[{ value: "lesson", label: t("community.materials.catalog.sort.lesson") }, { value: "views", label: t("community.materials.catalog.sort.views") }, { value: "recent", label: t("community.materials.catalog.sort.recent") }]} />
           </FilterBar>
           <div className={styles.resourceList}>
@@ -387,9 +403,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
                   {item.downloadUrl && <span className={list.rowActions}>
                     <a className={list.rowAction} data-icon-only="true" href={item.downloadUrl} onClick={() => void recordOpening(item)} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /></a>
                   </span>}
-                  {item.verification === "verified"
-                    ? <span className={list.statusIcon} data-tone="success" role="img" aria-label={verificationLabel(item.verification)} title={verificationLabel(item.verification)}><CheckCircle2 aria-hidden="true" /></span>
-                    : <span className={list.statusPill} data-tone={item.verification === "pending" ? "accent" : undefined}>{verificationLabel(item.verification)}</span>}
+                  {item.verification === "pending" && <span className={list.statusPill} data-tone="accent">{t("community.materials.catalog.pending")}</span>}
                 </span>
               </li>)}</ul>
             </div>) : <div className={list.empty}><FileText /><strong>{t("community.materials.catalog.empty")}</strong></div>}
