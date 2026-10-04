@@ -34,7 +34,7 @@ export function UrgentAnnouncementBanner({ enabled }: { enabled: boolean }) {
   const summary = announcementPlainText(announcement.body);
   const dismiss = () => {
     window.sessionStorage.setItem(`dismissed-urgent-announcement-v2:${announcement.id}`, "1");
-    void fetch("/api/announcements", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "acknowledge", id: announcement.id }) });
+    void fetch("/api/announcements", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "acknowledge", id: announcement.id }) }).then(response => { if(response.ok) window.dispatchEvent(new Event("communication:changed")); }).catch(() => {});
     setAnnouncement(null);
   };
 

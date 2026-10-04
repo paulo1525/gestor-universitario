@@ -29,6 +29,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
   const [theme, setTheme] = useState<SiteTheme>(() => typeof document !== "undefined" && document.documentElement.dataset.theme === "forum" ? "forum" : "cc");
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [communicationCounts, setCommunicationCounts] = useState({ userId: "", announcements: 0, polls: 0 });
   const { access: moduleAccess } = useModules();
   const { user, logout, setFontScale } = useAuth();
   const { breadcrumb: translateBreadcrumb, locale, setLocale, t } = useI18n();
@@ -92,6 +93,40 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
       return next;
     });
   };
+  useEffect(() => {
+    if (!user?.email) return;
+    let mounted = true;
+    let version = 0;
+    const loadCounts = async () => {
+      const requestVersion = ++version;
+      const count = async (url: string, field: string, enabled: boolean) => {
+        if (!enabled) return 0;
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) return null;
+          const data = await response.json() as Record<string, unknown>;
+          const value = Number(data[field]);
+          return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+        } catch { return null; }
+      };
+      const [announcements, polls] = await Promise.all([
+        count("/api/announcements?countOnly=true", "unreadCount", moduleAccess["announcements.feed"]),
+        count("/api/polls?countOnly=true", "unansweredCount", moduleAccess["polls.voting"]),
+      ]);
+      if (mounted && requestVersion === version) setCommunicationCounts(previous => ({ userId:user.email, announcements:announcements ?? (previous.userId===user.email ? previous.announcements : 0), polls:polls ?? (previous.userId===user.email ? previous.polls : 0) }));
+    };
+    const refresh = () => { void loadCounts(); };
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    refresh();
+    window.addEventListener("communication:changed", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { mounted=false; window.removeEventListener("communication:changed",refresh); window.removeEventListener("focus",refresh); document.removeEventListener("visibilitychange",onVisible); };
+  }, [user?.email, moduleAccess]);
+  const unreadAnnouncements = communicationCounts.userId === user?.email && moduleAccess["announcements.feed"] ? communicationCounts.announcements : 0;
+  const unansweredPolls = communicationCounts.userId === user?.email && moduleAccess["polls.voting"] ? communicationCounts.polls : 0;
+
+
   const stopPreview = async () => {
     await fetch("/api/admin/preview-user", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: null }) });
     window.location.href = "/admin";
@@ -110,9 +145,9 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
             {hasCommunication&&<section className={adminNavigationStyles.group}>
               <button className={`${adminNavigationStyles.groupButton} ${["announcements","requests","polls","notifications"].includes(active) ? adminNavigationStyles.currentGroup : ""}`} type="button" aria-expanded={openSiteGroup === "communication"} aria-controls="site-navigation-communication" onClick={() => setOpenSiteGroup((current) => current === "communication" ? null : "communication")}><Megaphone/><span>{t("nav.communication")}</span><ChevronDown className={openSiteGroup === "communication" ? adminNavigationStyles.chevronOpen : ""}/></button>
               <div id="site-navigation-communication" className={`${adminNavigationStyles.groupItems} ${openSiteGroup !== "communication" ? adminNavigationStyles.groupItemsClosed : ""}`}>
-                {moduleAccess["announcements.feed"]&&<Link prefetch={false} className={`${adminNavigationStyles.item} ${active === "announcements" ? adminNavigationStyles.active : ""}`} href="/avisos" onClick={() => setOpen(false)}><Megaphone/><span>{t("nav.announcements.title")}</span></Link>}
+                {moduleAccess["announcements.feed"]&&<Link prefetch={false} className={`${adminNavigationStyles.item} ${active === "announcements" ? adminNavigationStyles.active : ""}`} href="/avisos" onClick={() => setOpen(false)}><Megaphone/><span>{t("nav.announcements.title")}</span>{unreadAnnouncements > 0 && <span className={adminNavigationStyles.countBadge} aria-label={`${unreadAnnouncements} ${locale === "en" ? "unread announcements" : "avisos por ler"}`}>{unreadAnnouncements > 99 ? "99+" : unreadAnnouncements}</span>}</Link>}
                 {moduleAccess["requests.submission"]&&<Link prefetch={false} className={`${adminNavigationStyles.item} ${active === "requests" ? adminNavigationStyles.active : ""}`} href="/pedidos" onClick={() => setOpen(false)}><Inbox/><span>{t("nav.requests.title")}</span></Link>}
-                {moduleAccess["polls.voting"]&&<Link prefetch={false} className={`${adminNavigationStyles.item} ${active === "polls" ? adminNavigationStyles.active : ""}`} href="/inqueritos" onClick={() => setOpen(false)}><Vote/><span>{t("nav.polls.title")}</span></Link>}
+                {moduleAccess["polls.voting"]&&<Link prefetch={false} className={`${adminNavigationStyles.item} ${active === "polls" ? adminNavigationStyles.active : ""}`} href="/inqueritos" onClick={() => setOpen(false)}><Vote/><span>{t("nav.polls.title")}</span>{unansweredPolls > 0 && <span className={adminNavigationStyles.countBadge} aria-label={`${unansweredPolls} ${locale === "en" ? "unanswered polls" : "inquéritos por responder"}`}>{unansweredPolls > 99 ? "99+" : unansweredPolls}</span>}</Link>}
               </div>
             </section>}
             {hasAcademicLife&&<section className={adminNavigationStyles.group}>

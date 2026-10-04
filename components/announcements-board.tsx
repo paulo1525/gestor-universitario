@@ -4,6 +4,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Bold, ChevronLeft, Italic, Link2, List, ListOrdered, Megaphone, MessageCircle, Pencil, RotateCcw, Search, Underline } from "lucide-react";
+import { useAuth } from "@/components/auth-context";
 import { AppShell } from "@/components/app-shell";
 import { AnnouncementComments, initials } from "@/components/announcement-comments";
 import { AppToast, ToastKind } from "@/components/app-toast";
@@ -130,6 +131,7 @@ function formatDate(value: string | number, locale: string) {
 
 
 export function AnnouncementsBoard() {
+  const { user } = useAuth();
   const { locale, t } = useI18n();
   const dateLocale = locale === "en" ? "en-GB" : "pt-PT";
   const priorityLabels = useMemo<Record<Priority, string>>(() => ({
@@ -169,6 +171,7 @@ export function AnnouncementsBoard() {
   // Read on first render: the app shell rewrites the URL while the session loads.
   const [openId, setOpenId] = useState<string | null>(() => typeof window === "undefined" ? null : announcementIdFromHash());
   const editorRef = useRef<HTMLDivElement>(null);
+  const recordedReads = useRef(new Set<string>());
   const [minimumExpiry] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
 
   const load = useCallback(async () => {
@@ -266,6 +269,7 @@ export function AnnouncementsBoard() {
       if (!response.ok) throw new Error(data.error || t("announcements.publishError"));
       setNotice({ kind: "success", message: t(editingId ? "announcements.updateSuccess" : "announcements.publishSuccess") });
       closeEditor();
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("announcements.publishError") });
@@ -287,6 +291,7 @@ export function AnnouncementsBoard() {
       if (!response.ok) throw new Error(data.error || t("announcements.archiveError"));
       setNotice({ kind: "success", message: t(status === "archived" ? "announcements.archiveSuccess" : "announcements.restoreSuccess") });
       if (announcementIdFromHash() === id) openAnnouncement(null);
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("announcements.archiveError") });
@@ -336,6 +341,16 @@ export function AnnouncementsBoard() {
     return groups;
   };
   const openItem = openId ? announcements.find(item => item.id === openId) ?? null : null;
+  useEffect(() => {
+    if (!openItem || openItem.status === "archived") return;
+    const readKey = `${user?.email}:${openItem.id}:${openItem.publishedAt}`;
+    if (recordedReads.current.has(readKey)) return;
+    recordedReads.current.add(readKey);
+    void fetch("/api/announcements", { method:"PATCH", headers:{"content-type":"application/json"}, body:JSON.stringify({action:"read",id:openItem.id}) }).then(response => {
+      if (response.ok) window.dispatchEvent(new Event("communication:changed"));
+      else recordedReads.current.delete(readKey);
+    }).catch(() => { recordedReads.current.delete(readKey); });
+  }, [openItem, user?.email]);
   const authorOf = (item: Announcement) => personDisplay({ fullName: item.authorName, id: item.authorId, email: item.authorEmail, studentNumber: item.authorStudentNumber }, { revealIdentifier: false, locale });
   // On an open announcement its own actions live in the floating menu.
   const archiveIcon = useMemo(() => <Archive />, []);

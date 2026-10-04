@@ -415,3 +415,6 @@
 @media (prefers-reduced-motion: reduce) {
   .chevron { transition: none; }
 }
+
+.figure { margin: 0; }
+.figure img { display: block; max-width: 100%; height: auto; }
