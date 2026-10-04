@@ -98,11 +98,11 @@
 .summaryArrow { width: 16px; color: #aaa79e; transition: color .16s ease, transform .16s ease; }
 .summaryCard:hover .summaryArrow { color: var(--color-accent-text); transform: translateX(2px); }
 
-/* Panels keep their natural height so shorter lists do not leave empty space. */
+/* Panels in the same row keep equal height; their rows share the available space. */
 .contentGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: 16px;
 }
 /* Panels hidden by disabled modules: an odd last panel takes the full row. */
@@ -177,7 +177,11 @@
 .panelHeader.panelHeader { grid-template-columns: minmax(0, 1fr) auto; }
 .panelHeader.panelHeader :global(.surface-header__aside) { grid-column: auto; justify-content: flex-end; }
 .panelHeader.panelHeader :global(.surface-header__aside) > a { flex: 0 0 auto; }
-.list { display: grid; }
+.list {
+  display: grid;
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(min-content, 1fr);
+}
 
 .item {
   min-width: 0;

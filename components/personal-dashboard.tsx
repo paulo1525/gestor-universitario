@@ -20,6 +20,7 @@ type LearningModule = { id: string; title: string; unitCode: string; stepCount: 
 const object = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const array = (root: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) if (Array.isArray(root[key])) return root[key] as unknown[]; return []; };
 const text = (item: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) if (typeof item[key] === "string" && item[key]) return String(item[key]); return ""; };
+const plainText = (value: string) => value.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
 const number = (item: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) { const value = Number(item[key]); if (item[key] !== null && item[key] !== undefined && Number.isFinite(value)) return value; } return null; };
 const boolean = (item: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) if (typeof item[key] === "boolean") return item[key] as boolean; return false; };
 
@@ -34,7 +35,7 @@ function dateValue(item: Record<string, unknown>, ...keys: string[]) {
 }
 function entries(items: unknown[], kind: "event" | "announcement" | "poll" | "request" | "material"): Entry[] {
   return items.map((raw, index) => { const item = object(raw), id = text(item, "id", "notificationId") || String(index); const fallback = kind === "event" ? "/calendario" : kind === "announcement" ? "/avisos" : kind === "poll" ? "/inqueritos" : kind === "request" ? "/pedidos" : "/materiais"; return {
-    id, title: text(item, "title", "subject", "name", "label"), description: text(item, "description", "excerpt", "content", "summary", "unitName", "curricularUnitName"), date: dateValue(item, "startsAt", "startAt", "publishedAt", "createdAt", "updatedAt", "endsAt", "deadline"),
+    id, title: text(item, "title", "subject", "name", "label"), description: plainText(text(item, "description", "excerpt", "content", "summary", "unitName", "curricularUnitName")), date: dateValue(item, "startsAt", "startAt", "publishedAt", "createdAt", "updatedAt", "endsAt", "deadline"),
     href: text(item, "href", "url") || (kind === "material" && id ? `/materiais?material=${encodeURIComponent(id)}` : fallback), label: text(item, "unitCode", "unitName", "type", "priority", "category"), status: text(item, "status", "state"), read: boolean(item, "read", "isRead") || Boolean(item.readAt),
   }; });
 }
@@ -74,7 +75,7 @@ export function PersonalDashboard() {
         const { day, month } = formatDateParts(item.date, locale);
         return <Link prefetch={false} href={item.href} key={`${kind}-${item.id}`} className={`${styles.item} ${kind === "event" ? "" : styles.plainItem} ${kind === "announcement" && !item.read ? styles.unread : ""}`}>
           {kind === "event" && <time className={styles.dateBox} dateTime={item.date || undefined}><strong>{day}</strong><small>{month}</small></time>}
-          <span className={styles.itemCopy}><strong>{item.title || t("personalDashboard.untitled")}</strong>{item.description && <p>{item.description}</p>}{kind === "event" ? item.label && <small>{priorityLabel(item.label)}</small> : date && <small>{date}</small>}</span>
+          <span className={styles.itemCopy}><strong>{item.title || t("personalDashboard.untitled")}</strong>{item.description && <p>{item.description}</p>}{kind !== "event" && date && <small>{date}</small>}</span>
           <span className={styles.itemMeta}>{item.label && <span className={styles.badge} data-tone={kind === "request" ? "blue" : kind === "poll" ? "green" : undefined}>{priorityLabel(item.label)}</span>}<ChevronRight aria-hidden="true" /></span>
         </Link>;
       })}</div> : <div className={styles.empty} role="status">
