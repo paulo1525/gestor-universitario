@@ -1,3 +1,4 @@
+import * as materialFolders from '../lib/material-folders.ts';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
@@ -8,7 +9,7 @@ import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory } from "../lib/m
 
 const compiled = ts.transpileModule(readFileSync(new URL("../worker/materials-catalog.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const catalogWorker = { exports: {} };
-new Function("module", "exports", "require", compiled)(catalogWorker, catalogWorker.exports, (specifier) => specifier === "@/lib/material-categories" ? { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory } : {});
+new Function("module", "exports", "require", compiled)(catalogWorker, catalogWorker.exports, (specifier) => specifier === "@/lib/material-folders" ? materialFolders : specifier === "@/lib/material-categories" ? { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory } : {});
 
 test("compêndios abrem diretamente no PDF e outros documentos mantêm o anotador", () => {
   assert.equal(materialReaderHref("c", { otherFormat: "compendium", viewUrl: "/api/material-catalog/c/view" }), "/api/material-catalog/c/view");

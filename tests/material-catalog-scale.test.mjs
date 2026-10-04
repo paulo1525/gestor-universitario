@@ -1,3 +1,4 @@
+import * as materialFolders from '../lib/material-folders.ts';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
@@ -15,6 +16,7 @@ vm.runInNewContext(typescript.transpileModule(viewSource, { compilerOptions: { m
 vm.runInNewContext(compiled, {
   exports: exported,
   require(specifier) {
+    if (specifier === "@/lib/material-folders") return materialFolders;
     if (specifier === "@/lib/material-categories") return { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory };
     if (specifier === "./material-views") return viewExports;
     if (specifier === "@/worker/google-drive") return { driveConfigured: () => false };
