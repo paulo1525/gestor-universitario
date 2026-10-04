@@ -16,12 +16,12 @@ import styles from "@/components/public-materials.module.css";
 export const PUBLIC_MATERIALS_PATH = "/materiais-do-ano/";
 const FILES_PAGE_SIZE = 10;
 
-type Section = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
-const SECTIONS: Section[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
+type Section = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
+const SECTIONS: Section[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
 // Folders shown in every subject, even when empty; the others only appear when they have files.
 const FIXED_SECTIONS: Section[] = ["summaries", "notes", "bibliography", "anki"];
 // A locked entry carries only its section: the server never sends its title, id or link to visitors.
-type Entry = { views?: number | null; section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
+type Entry = { views?: number | null; section: Section; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; description?: string; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
 type Unit = { key: string; code: string; name: string; year?: number | null; semester?: number | null; entries: Entry[] };
 
 /** Subjects grouped by year and semester (in order), each group sorted by number of files, then by code. */
@@ -260,7 +260,7 @@ export function PublicMaterials() {
                 <li className={styles.file} key={`${entry.type}-${entry.id}`}>
                   <a className={styles.fileName} href={openHref(entry)} onClick={() => void recordOpening(entry, openHref(entry).startsWith("/materiais/ler"))} target="_blank" rel="noopener">
                     <FileIcon entry={entry} />
-                    <span><strong>{entry.title}</strong><MaterialViews count={entry.views} />{term && <small>{owner.code || owner.name} › {sectionLabel(entry.section)}</small>}</span>
+                    <span><strong>{entry.title}</strong>{entry.description && <small>{entry.description}</small>}<MaterialViews count={entry.views} />{term && <small>{owner.code || owner.name} › {sectionLabel(entry.section)}</small>}</span>
                     <span className="sr-only"> ({t("links.opensInNewTab")})</span>
                   </a>
                   <span className={styles.fileMeta}>{fileSize(entry.size)}</span>

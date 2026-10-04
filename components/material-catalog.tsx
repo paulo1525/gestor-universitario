@@ -20,21 +20,21 @@ import { clampPage, Pagination } from "@/components/pagination";
 const RESOURCE_PAGE_SIZE = 10;
 const UNIT_PAGE_SIZE = 12;
 
-export type MaterialCatalogTab = MaterialResourceCategory | "overview" | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "exams" | "other";
+export type MaterialCatalogTab = MaterialResourceCategory | "overview" | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "exams" | "other";
 /** List sections backed by catalogue items; every item belongs to exactly one. */
-type CatalogSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "other";
+type CatalogSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "other";
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
-type CatalogItem = { views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
+type CatalogItem = { studyCategory?: "sebenta" | null; views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
-const tabs: Exclude<MaterialCatalogTab, "overview">[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "exams", "other"];
+const tabs: Exclude<MaterialCatalogTab, "overview">[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "exams", "other"];
 const RESOURCE_ICON: Record<MaterialResourceCategory, LucideIcon> = { information: FileText, theory: Presentation, tutorials: Presentation, practical: Presentation, support: BookOpen, seminars: GraduationCap, assessment: ClipboardCheck };
-const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck, other: FileText };
-const listSections: CatalogSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "other"];
-const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
+const TAB_ICON: Record<Exclude<MaterialCatalogTab, "overview">, LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, exams: ClipboardCheck, other: FileText };
+const listSections: CatalogSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "other"];
+const SECTION_ICON: Record<CatalogSection | "anki", LucideIcon> = { ...RESOURCE_ICON, summaries: ScrollText, notes: NotebookPen, slides: Presentation, sebentas: NotebookPen, compendiums: Library, bibliography: BookOpen, anki: Package, other: FileText };
 const formats: BibliographyFormat[] = ["complete", "excerpt", "translation"];
 export const GENERAL_MATERIAL_UNIT = "__general";
 
@@ -44,6 +44,7 @@ export function normalizeMaterialUnitCode(value: string | null | undefined) {
 
 /** PowerPoints and compendiums come from other_format (migration 0076); loose .pptx files and titled compendiums are recognised too. */
 function catalogSection(item: CatalogItem): CatalogSection {
+  if (item.studyCategory === "sebenta") return "sebentas";
   const category = materialResourceCategory(item.resourceCategory);
   if (category) return category;
   if (item.otherFormat === "compendium") return "compendiums";
@@ -277,7 +278,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     const lessonsOf = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
     const availability = item.viewUrl || item.downloadUrl ? "" : item.kind === "bibliography" && item.storage?.backend === "inline" ? "Referência bibliográfica apenas" : item.storage?.state !== "ready" ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable");
     const printed = item.pages?.printedStart && !/\bpp?\./.test(item.title) ? `pp. ${item.pages.printedStart}–${item.pages.printedEnd || item.pages.printedStart}` : "";
-    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), printed, item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · "), availability].filter(Boolean).join(" · ");
+    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), printed, item.studyCategory === "sebenta" ? item.description : "", item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · "), availability].filter(Boolean).join(" · ");
   };
   // Full reference (formerly the detail card) as the row's tooltip.
   const resourceFacts = (item: CatalogItem) => [

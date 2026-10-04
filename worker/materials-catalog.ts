@@ -82,6 +82,7 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     resourceCategory: materialResourceCategory(item.resource_category),
     bibliographyFormat: item.material_kind === "bibliography" ? bibliographyFormat(item) : null,
     summaryFormat: item.material_kind === "summary" ? (item.summary_format === "notes" ? "notes" : "lecture") : null,
+    studyCategory: item.study_category === "sebenta" ? "sebenta" : null,
     otherFormat: item.material_kind === "other" && (item.other_format === "slides" || item.other_format === "compendium") ? item.other_format : null,
     publicAccess: Number(item.public_access) === 1,
     title: item.title,
@@ -554,10 +555,11 @@ async function anonymousDenied(request: Request, env: MaterialsCatalogEnv, user:
   return null;
 }
 
-type PublicSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "compendiums" | "bibliography" | "anki" | "other";
-const PUBLIC_SECTION_ORDER: PublicSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "compendiums", "bibliography", "anki", "other"];
+type PublicSection = MaterialResourceCategory | "summaries" | "notes" | "slides" | "sebentas" | "compendiums" | "bibliography" | "anki" | "other";
+const PUBLIC_SECTION_ORDER: PublicSection[] = [...MATERIAL_RESOURCE_CATEGORIES, "summaries", "notes", "slides", "sebentas", "compendiums", "bibliography", "anki", "other"];
 
 function publicSection(item: Record<string, unknown>): PublicSection {
+  if (item.study_category === "sebenta") return "sebentas";
   const category = materialResourceCategory(item.resource_category);
   if (category) return category;
   if (item.material_kind === "summary") return item.summary_format === "notes" ? "notes" : "summaries";
@@ -596,7 +598,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   ]);
   const visibleIds = (items: unknown[]) => items.map(row).filter((item) => user || Number(item.public_access) === 1).map((item) => String(item.id));
   const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog", visibleIds(catalogRows.results)), materialViewCounts(env, "anki", visibleIds(deckRows.results))]);
-  type Entry = { views?: number | null; section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
+  type Entry = { views?: number | null; section: PublicSection; locked: boolean; id?: string; type?: "catalog" | "anki"; title?: string; description?: string; format?: string | null; href?: string; download?: string; isPublic?: boolean; mime?: string; size?: number | null; updatedAt?: number | null };
   type Unit = { key: string; code: string; name: string; year: number | null; semester: number | null; entries: Entry[] };
   const units = new Map<string, Unit>();
   const unitFor = (item: Record<string, unknown>) => {
@@ -616,7 +618,7 @@ async function publicMaterials(request: Request, env: MaterialsCatalogEnv, user:
   for (const raw of catalogRows.results) {
     const item = row(raw), id = String(item.id), external = typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url) ? item.external_url : null;
     const href = external || `/api/material-catalog/${encodeURIComponent(id)}/${item.mime_type === "application/pdf" ? "view" : "download"}`;
-    add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download`, mime: String(item.mime_type || ""), size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
+    add(item, { section: publicSection(item), id, type: "catalog", title: String(item.title), description: item.study_category === "sebenta" ? String(item.description || "") : undefined, format: item.material_kind === "bibliography" ? bibliographyFormat(item) : null, href, download: external ? undefined : `/api/material-catalog/${encodeURIComponent(id)}/download`, mime: String(item.mime_type || ""), size: item.byte_size == null ? null : Number(item.byte_size), updatedAt: item.updated_at == null ? null : Number(item.updated_at) });
   }
   for (const raw of deckRows.results) {
     const item = row(raw), id = String(item.id), download = externalDeckUrl(item) || `/api/material-anki/${encodeURIComponent(id)}/download`;
