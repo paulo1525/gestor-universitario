@@ -21,8 +21,9 @@ const user = { id: 'student-test', email: 'student@example.test', fullName: 'Est
 const { moduleEffectiveEnabled } = await compile('../lib/app-modules.ts');
 test('módulo reativado respeita o interruptor administrativo e bloqueia APIs quando desativado', async () => {
   const env = { DB: { prepare() { throw new Error('Archived module must not query D1'); } } };
-  const keys = ['quizzes', 'quizzes.practice', 'quizzes.progress', 'quizzes.learning', 'quizzes.management'];
+  const keys = ['quizzes', 'quizzes.practice', 'quizzes.progress', 'quizzes.management'];
   for (const key of keys) assert.equal(moduleEffectiveEnabled(key, {}), true);
+  assert.equal(moduleEffectiveEnabled('quizzes.learning', {}), false);
   const states = Object.fromEntries(keys.map((key) => [key, false]));
   for (const key of keys) assert.equal(moduleEffectiveEnabled(key, states), false);
   for (const path of ['/api/question-bank', '/api/quizzes', '/api/quiz-attempts/attempt-test/answers', '/api/admin/quiz-questions']) {

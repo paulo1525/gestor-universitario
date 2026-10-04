@@ -1,4 +1,4 @@
-import { LearningHub } from "@/components/learning-hub";
+import { LearningHub } from "@/archive/learning/learning-hub";
 
 export default function LearningPage() {
   return <LearningHub />;

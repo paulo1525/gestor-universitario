@@ -28,7 +28,7 @@ import { AppToast, type ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
 import { ModuleGuard } from "@/components/module-guard";
 import { RichTextContent } from "@/components/rich-text-editor";
-import styles from "@/components/learning-hub.module.css";
+import styles from "@/archive/learning/learning-hub.module.css";
 
 type Progress = {
   attemptId: string;

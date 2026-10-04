@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 
 const RANDOM_MODE_DESCRIPTION = "Mistura perguntas para consolidar o que já estudaste.";
-const LEARNING_SECTION_ENABLED = false;
 const NEURO_UNIT_CODE = "NEURO";
 const NEURO_DEFAULT_QUESTION_COUNT = "30";
 
@@ -98,9 +97,6 @@ export function QuizUiAdjustments() {
         const ariaLabel = `Aleatório. ${RANDOM_MODE_DESCRIPTION}`;
         if (button.getAttribute("aria-label") !== ariaLabel) button.setAttribute("aria-label", ariaLabel);
       });
-
-      const learningLink = document.querySelector<HTMLElement>('a[href="/testes/aprender"]');
-      if (learningLink) learningLink.style.display = LEARNING_SECTION_ENABLED ? "" : "none";
 
       const unitCode = selectedUnitCode();
       const isNeuro = unitCode === NEURO_UNIT_CODE;

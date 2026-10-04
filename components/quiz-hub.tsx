@@ -20,7 +20,6 @@ import {
   Eye,
   EyeOff,
   Flag,
-  GraduationCap,
   Lightbulb,
   Keyboard,
   MessageCircle,
@@ -342,6 +341,7 @@ function apiError(data: Record<string, unknown>, fallback: string) {
 export function QuizHub() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState(() => readQuizPreferences().unitId ?? "");
+  const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
   const [selectedMode, setSelectedMode] = useState<Mode>(() => readQuizPreferences().mode ?? "quick");
   const [finishConfirmation, setFinishConfirmation] = useState(false);
@@ -908,6 +908,7 @@ export function QuizHub() {
             error={error}
             units={units}
             selectedUnitId={selectedUnitId}
+            expandedUnitId={expandedUnitId}
             selectedUnit={selectedUnit}
             selectedMode={selectedMode}
             selectedTopicIds={selectedTopicIds}
@@ -921,7 +922,7 @@ export function QuizHub() {
             loadingAttempt={loadingAttempt || restoringAttempt || Boolean(restoreError)}
             resumeAttempt={attempt?.status === "active" ? attempt : null}
             availability={availability}
-            onUnit={(unitId) => { setAvailability(null); setSelectedUnitId(unitId); }}
+            onUnit={(unitId) => { setAvailability(null); setSelectedUnitId(unitId); setExpandedUnitId((current) => current === unitId ? null : unitId); }}
             onMode={(mode) => { setAvailability(null); setSelectedMode(mode); }}
             onTopics={(topicIds) => { setAvailability(null); setSelectedTopicIds(topicIds); }}
             onQuestionCount={(count) => { if (QUIZ_QUESTION_COUNTS.includes(count)) { setAvailability(null); setQuestionCount(count); } }}
@@ -986,11 +987,11 @@ export function QuizHub() {
 }
 
 function TestsTabs({ active, onPractice, onStatistics }: { active: "practice" | "statistics"; onPractice?: () => void; onStatistics?: () => void }) {
-  return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "learn", label: "Aprender matéria", icon: <GraduationCap />, href: "/testes/aprender" }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }]} />;
+  return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }]} />;
 }
 
-function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
-  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
+function Catalogue({ loading, error, units, selectedUnitId, expandedUnitId, selectedUnit, selectedMode, selectedTopicIds, topics, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, exportingAnki, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onExportAnki }: {
+  loading: boolean; error: string; units: Unit[]; selectedUnitId: string; expandedUnitId: string | null; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
   exportingAnki: boolean;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
@@ -1017,7 +1018,7 @@ function Catalogue({ loading, error, units, selectedUnitId, selectedUnit, select
         {units.length > 1 && <FilterBar label="Filtrar disciplinas"><FilterSearch label="Pesquisar disciplinas" value={unitQuery} onChange={setUnitQuery} placeholder="Pesquisar disciplinas" /></FilterBar>}
         <div className={styles.unitGrid}>
           {visibleUnits.map((unit) => {
-            const selected = unit.id === selectedUnitId;
+            const selected = unit.id === expandedUnitId;
             return <article key={unit.id} className={`${styles.unitCard} ${selected ? styles.unitCardSelected : ""}`}>
               <button type="button" className={styles.unitCardHeader} onClick={() => onUnit(unit.id)} aria-expanded={selected}>
                 <span className={styles.unitCode}>{unit.code}</span>
