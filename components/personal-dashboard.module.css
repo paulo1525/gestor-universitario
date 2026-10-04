@@ -98,11 +98,11 @@
 .summaryArrow { width: 16px; color: #aaa79e; transition: color .16s ease, transform .16s ease; }
 .summaryCard:hover .summaryArrow { color: var(--color-accent-text); transform: translateX(2px); }
 
-/* Blocks in pairs: each row shares one height, so nothing is left hanging. */
+/* Panels keep their natural height so shorter lists do not leave empty space. */
 .contentGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: 16px;
 }
 /* Panels hidden by disabled modules: an odd last panel takes the full row. */
