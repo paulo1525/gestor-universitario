@@ -12,7 +12,9 @@ async function compile(path, require = () => { throw new Error('Unexpected depen
   return compiled.exports;
 }
 const richText = await compile('../lib/announcement-content.ts');
+const contentStore = await compile('../worker/quiz-content-store.ts', () => ({revision: 'unused'}));
 const { handleQuizRoute } = await compile('../worker/quizzes.ts', (path) => {
+  if(path === './quiz-content-store')return contentStore;
   assert.equal(path, '../lib/announcement-content');
   return richText;
 });

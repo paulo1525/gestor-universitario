@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "../lib/announcement-content";
+import { QuizContentStore, QuizContentError, type QuizContentEnv } from "./quiz-content-store";
 
 export type QuizUser = {
   id: string;
@@ -10,7 +11,7 @@ export type QuizUser = {
   actorId?: string;
 };
 
-type QuizEnv = { DB: D1Database };
+type QuizEnv = QuizContentEnv & { content?: QuizContentStore | null };
 type ModuleChecker = (key: string) => Promise<boolean>;
 type Row = Record<string, unknown>;
 type QuizMode = "quick" | "exam" | "topic" | "unseen" | "mistakes";
@@ -210,6 +211,7 @@ async function activeUnit(env: QuizEnv, unitId: string): Promise<Row | null> {
 }
 
 async function activeTopic(env: QuizEnv, topicId: string): Promise<Row | null> {
+  if (env.content) return env.content.topic(topicId);
   return env.DB.prepare("SELECT id,curricular_unit_id,title,description,status,sort_order,deleted_at FROM quiz_topics WHERE id=? AND deleted_at IS NULL").bind(topicId).first<Row>();
 }
 
@@ -277,6 +279,7 @@ function commentThreads(comments: PublicQuizComment[]): PublicQuizCommentThread[
 }
 
 async function optionsForQuestions(env: QuizEnv, questionIds: string[]): Promise<Map<string, ParsedOption[]>> {
+  if (env.content) return env.content.options(questionIds);
   const output = new Map<string, ParsedOption[]>();
   if (!questionIds.length) return output;
   const placeholders = questionIds.map(() => "?").join(",");
@@ -294,6 +297,7 @@ async function catalog(request: Request, env: QuizEnv, user: QuizUser | null, en
   if (!user) return unauthenticated();
   if (!await enabled("quizzes.practice")) return disabled();
   if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+  if (env.content) return contentCatalog(env, user, enabled);
   const [unitsResult, topicsResult, recommendation, platformResult] = await Promise.all([
     env.DB.prepare("SELECT cu.id,cu.code,cu.name,cu.ects,cu.study_year,cu.semester,COUNT(q.id) AS question_count,SUM(CASE WHEN q.response_type='multiple_choice' THEN 1 ELSE 0 END) AS multiple_choice_count,SUM(CASE WHEN q.response_type<>'multiple_choice' THEN 1 ELSE 0 END) AS short_answer_count FROM curricular_units cu JOIN quiz_questions q ON q.curricular_unit_id=cu.id AND q.status='published' AND q.deleted_at IS NULL JOIN quiz_topics t ON t.id=q.topic_id AND t.status='published' AND t.deleted_at IS NULL WHERE cu.active=1 GROUP BY cu.id ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE").all(),
     env.DB.prepare("SELECT t.*,cu.code AS unit_code,cu.name AS unit_name,COUNT(q.id) AS question_count,SUM(CASE WHEN q.response_type='multiple_choice' THEN 1 ELSE 0 END) AS multiple_choice_count,SUM(CASE WHEN q.response_type<>'multiple_choice' THEN 1 ELSE 0 END) AS short_answer_count FROM quiz_topics t JOIN curricular_units cu ON cu.id=t.curricular_unit_id JOIN quiz_questions q ON q.topic_id=t.id AND q.status='published' AND q.deleted_at IS NULL WHERE cu.active=1 AND t.status='published' AND t.deleted_at IS NULL GROUP BY t.id ORDER BY cu.study_year,cu.semester,t.sort_order,t.title COLLATE NOCASE").all(),
@@ -358,12 +362,17 @@ async function questionBankCatalog(request: Request, env: QuizEnv, url: URL, use
   const whereSql = ` WHERE ${where.join(" AND ")}`;
   const fromSql = " FROM question_bank_items q JOIN question_bank_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id";
   try {
-    const count = await env.DB.prepare(`SELECT COUNT(*) AS total${fromSql}${whereSql}`).bind(...bindings).first<Row>();
+    const contentRows = env.content ? contentBankResults(await env.content.shard(unitId), {sourceId,topicId,subtopic,academicYear,assessment,session,pageFilter,responseType,imageFilter,solutionFilter,query}) : null;
+    const count = contentRows ? {total: contentRows.selected.length} : await env.DB.prepare(`SELECT COUNT(*) AS total${fromSql}${whereSql}`).bind(...bindings).first<Row>();
     const total = Number(count?.total || 0);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const effectivePage = Math.min(page, totalPages);
     const offset = (effectivePage - 1) * pageSize;
-    const [topicsResult, questionsResult, sourceRows, facetRows] = await Promise.all([
+    const bankSelected = contentRows ? await env.content!.bankQuestions(unitId,contentRows.selected.slice(offset,offset+pageSize)) : null;
+    const bankTopics=contentRows?new Map(contentRows.topics.map(t=>[t.id,t])):null;
+    const [topicsResult, questionsResult, sourceRows, facetRows] = contentRows ? [
+      {results:contentRows.topics}, {results:bankSelected!.map(q=>({...q,topic_title:bankTopics!.get(q.topic_id)?.title,chapter_number:bankTopics!.get(q.topic_id)?.chapter_number}))}, {results:contentRows.sources}, {results:contentRows.all},
+    ] : await Promise.all([
       env.DB.prepare(`SELECT t.id,t.title,t.chapter_number,COUNT(q.id) AS question_count FROM question_bank_topics t LEFT JOIN question_bank_items q ON q.topic_id=t.id AND ${publishedPredicate} WHERE t.curricular_unit_id=? GROUP BY t.id ORDER BY t.sort_order,t.title COLLATE NOCASE`).bind(unitId).all(),
       env.DB.prepare(`SELECT q.id,q.external_key,q.prompt,q.options_text,q.answer_indicated,q.answer_text,q.response_type,q.image_url,q.question_images_json,q.solution_images_json,q.source_subtopic,q.source_academic_year,q.source_page,q.source_question,q.source_assessment,q.source_session,q.source_original,q.anatomical_justification,q.validation_state,q.review_note,q.confidence,t.id AS topic_id,t.title AS topic_title,t.chapter_number${fromSql}${whereSql} ORDER BY q.sort_order,q.id LIMIT ? OFFSET ?`).bind(...bindings, pageSize, offset).all(),
       env.DB.prepare("SELECT id,label,source_kind,revision_label,source_row_count,imported_count,published_count,review_count,coverage_json,verification_status FROM question_bank_sources WHERE curricular_unit_id=? ORDER BY updated_at DESC").bind(unitId).all(),
@@ -473,7 +482,7 @@ async function exportQuiz(env: QuizEnv, url: URL, user: QuizUser | null, enabled
       ? " AND (SELECT COUNT(*) FROM quiz_attempt_questions mistaken JOIN quiz_attempts mistaken_attempt ON mistaken_attempt.id=mistaken.attempt_id WHERE mistaken_attempt.user_id=? AND mistaken.question_id=q.id AND mistaken.is_correct=0) > (SELECT COUNT(*) FROM quiz_attempt_questions corrected JOIN quiz_attempts corrected_attempt ON corrected_attempt.id=corrected.attempt_id WHERE corrected_attempt.user_id=? AND corrected.question_id=q.id AND corrected.is_correct=1)"
       : "";
   const selectionBinds: unknown[] = mode === "unseen" ? [user.id] : mode === "mistakes" ? [user.id, user.id] : [];
-  const candidates = await env.DB.prepare("SELECT q.*,t.title AS topic_title,cu.code AS unit_code,cu.name AS unit_name" + baseSql + selectionSql + " ORDER BY RANDOM() LIMIT ?")
+  const candidates = env.content ? await contentCandidates(env,user,unitId,topicIds,difficulty,"multiple_choice",mode,requestedCount) : await env.DB.prepare("SELECT q.*,t.title AS topic_title,cu.code AS unit_code,cu.name AS unit_name" + baseSql + selectionSql + " ORDER BY RANDOM() LIMIT ?")
     .bind(...baseBinds, ...selectionBinds, requestedCount).all();
   if (candidates.results.length < requestedCount) return json({ error: "Não existem perguntas suficientes para criar este ficheiro Anki.", code: "not_enough_questions", available: candidates.results.length, required: requestedCount }, 409);
   const optionMap = await optionsForQuestions(env, candidates.results.map((item) => String(item.id)));
@@ -506,6 +515,12 @@ async function exportQuiz(env: QuizEnv, url: URL, user: QuizUser | null, enabled
 async function publicQuestion(env: QuizEnv, user: QuizUser | null, id: string, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("quizzes.practice")) return disabled();
+  if (env.content) {
+    const found = await env.content.question(id);
+    if (!found || !publishedContent(env).some(q=>q.id===id) || !await activeUnit(env,String(found.curricular_unit_id))) return json({error:"Pergunta não encontrada."},404);
+    const options=await optionsForQuestions(env,[id]);
+    return json({question:questionDto(found,(options.get(id)||[]).map(o=>({id:o.id,text:o.text,position:o.position})))});
+  }
   const question = await env.DB.prepare("SELECT q.*,NULL AS correct_option_id FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE q.id=? AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL AND cu.active=1").bind(id).first<Row>();
   if (!question) return json({ error: "Pergunta não encontrada." }, 404);
   const options = await optionsForQuestions(env, [id]);
@@ -620,7 +635,7 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const unit = unitId ? await activeUnit(env, unitId) : null;
   if (frequency) {
     if (unit?.code !== "FIS1") return json({ error: "A simulação de frequência está disponível apenas para Fisiologia I." }, 400);
-    const lessons = await env.DB.prepare("SELECT id FROM quiz_topics WHERE curricular_unit_id=? AND status='published' AND deleted_at IS NULL AND json_valid(description) AND json_extract(description,'$.assessmentPart')=? ORDER BY sort_order,id").bind(unitId, assessmentPart).all();
+    const lessons = env.content ? {results:env.content.manifest.topics.filter(t=>t.curricular_unit_id===unitId&&t.status==='published'&&t.deleted_at==null).filter(t=>{try{return JSON.parse(String(t.description)).assessmentPart===assessmentPart;}catch{return false;}}).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||String(a.id).localeCompare(String(b.id)))} : await env.DB.prepare("SELECT id FROM quiz_topics WHERE curricular_unit_id=? AND status='published' AND deleted_at IS NULL AND json_valid(description) AND json_extract(description,'$.assessmentPart')=? ORDER BY sort_order,id").bind(unitId, assessmentPart).all();
     topicIds = lessons.results.map((lesson) => String(lesson.id));
     if (!topicIds.length) return json({ error: "As aulas desta frequência ainda não estão disponíveis." }, 409);
   }
@@ -647,13 +662,13 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const selectionBinds: unknown[] = mode === "unseen" ? [user.id] : mode === "mistakes" ? [user.id, user.id] : [];
   const platformClause = platformMistakes ? ` AND q.id IN (SELECT question_id FROM (${PLATFORM_STATS_SQL}))` : "";
   const order = platformMistakes ? ` ORDER BY (SELECT 1.0*ps.wrong_count/ps.participants FROM (${PLATFORM_STATS_SQL}) ps WHERE ps.question_id=q.id) DESC,q.id` : frequency ? " ORDER BY t.sort_order,q.topic_id,RANDOM()" : " ORDER BY RANDOM()";
-  const candidates = await env.DB.prepare("SELECT q.*" + baseSql + selectionSql + platformClause + order + " LIMIT ?")
+  const candidates = env.content ? await contentCandidates(env,user,unitId,topicIds,difficulty,answerFormat,mode,frequency?2000:requestedCount,frequency,platformMistakes) : await env.DB.prepare("SELECT q.*" + baseSql + selectionSql + platformClause + order + " LIMIT ?")
     .bind(...baseBinds, ...selectionBinds, frequency ? 2000 : requestedCount).all();
   if (frequency) candidates.results = balancedLessonQuestions(candidates.results.map(row), requestedCount);
   if (platformMistakes && candidates.results.length < requestedCount) return json({ error: "Ainda não há perguntas com respostas suficientes de estudantes distintos para esta seleção.", code: "not_enough_questions", available: candidates.results.length, required: requestedCount }, 409);
   if (mode === "mistakes" && candidates.results.length < requestedCount) return json({ error: "Não há perguntas erradas pessoais suficientes para este teste.", code: "not_enough_mistakes", available: candidates.results.length, required: requestedCount }, 409);
   if (mode === "unseen" && !candidates.results.length) {
-    const total = await env.DB.prepare("SELECT COUNT(*) AS total" + baseSql).bind(...baseBinds).first<Row>();
+    const total = env.content ? {total:(await contentCandidateMetadata(env,unitId,topicIds,difficulty,answerFormat)).eligible.length} : await env.DB.prepare("SELECT COUNT(*) AS total" + baseSql).bind(...baseBinds).first<Row>();
     if (Number(total?.total || 0) > 0) return json({ error: "Já respondeu a todas as perguntas elegíveis.", code: "all_questions_seen", available: 0, total: total?.total || 0 }, 409);
   }
   if (!candidates.results.length) return json({ error: "Não existem perguntas publicadas para esta seleção." }, 404);
@@ -673,6 +688,17 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const shortAnswerMode = body.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check";
   const configJson = JSON.stringify({ topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, objective: frequency ? "frequency" : platformMistakes ? "platform_mistakes" : null, assessmentPart: frequency ? assessmentPart : null, timerPaused: false, pausedTotalMs: 0 });
   const statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO quiz_attempts (id,user_id,mode,curricular_unit_id,topic_id,difficulty_filter,status,question_count,started_at,created_at,updated_at,config_json,duration_seconds,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(attemptId, user.id, mode, unitId || null, topicId, difficulty, "active", snapshots.length, now, now, now, configJson, durationSeconds, expiresAt)];
+  if(env.content) {
+    // Preserve historical foreign keys for IDs added in future GitHub releases.
+    // These registry rows contain no question text, solutions or answer options.
+    const topicSet=new Set(snapshots.map(item=>item.question.topic_id));
+    const topics=env.content.manifest.topics.filter(topic=>topicSet.has(topic.id)).map(topic=>({id:topic.id,unitId:topic.curricular_unit_id,title:topic.title}));
+    const identities=snapshots.map(({question})=>({id:question.id,unitId:question.curricular_unit_id,topicId:question.topic_id,difficulty:question.difficulty}));
+    statements.unshift(
+      env.DB.prepare("INSERT OR IGNORE INTO quiz_topics(id,curricular_unit_id,title,status,created_by,updated_by,created_at,updated_at) SELECT json_extract(value,'$.id'),json_extract(value,'$.unitId'),json_extract(value,'$.title'),'published',?,?,?,? FROM json_each(?)").bind(user.id,user.id,now,now,JSON.stringify(topics)),
+      env.DB.prepare("INSERT OR IGNORE INTO quiz_questions(id,curricular_unit_id,topic_id,prompt,explanation,difficulty,status,created_by,updated_by,created_at,updated_at) SELECT json_extract(value,'$.id'),json_extract(value,'$.unitId'),json_extract(value,'$.topicId'),'','',json_extract(value,'$.difficulty'),'published',?,?,?,? FROM json_each(?)").bind(user.id,user.id,now,now,JSON.stringify(identities)),
+    );
+  }
   snapshots.forEach(({ question, options }, index) => {
     const correct = options.find((option) => option.isCorrect)!;
     statements.push(env.DB.prepare("INSERT INTO quiz_attempt_questions (attempt_id,question_id,curricular_unit_id,topic_id,position,prompt,image_url,explanation,difficulty,options_json,correct_option_id,question_images_json,solution_images_json,seen_before) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,EXISTS(SELECT 1 FROM quiz_attempt_questions seen JOIN quiz_attempts a ON a.id=seen.attempt_id WHERE a.user_id=? AND seen.question_id=? AND seen.selected_option_id IS NOT NULL))")
@@ -776,6 +802,7 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
   if (!await enabled("quizzes.progress")) return disabled();
   const unitId = text(url.searchParams.get("unitId"), 100) || null;
   if (unitId && !await activeUnit(env, unitId)) return json({ error: "Disciplina inválida." }, 400);
+  const contentIds=env.content?JSON.stringify(publishedContent(env).filter(q=>!unitId||q.curricular_unit_id===unitId).map(q=>q.id)):null;
   const [summary, topics, mistakes, recentAttemptsResult, masteryResult] = await Promise.all([
     env.DB.prepare(`SELECT
       COUNT(*) AS attempt_count,
@@ -792,7 +819,7 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
       FROM quiz_attempts
       WHERE user_id=? AND (? IS NULL OR curricular_unit_id=?)`).bind(user.id, unitId, unitId, user.id, unitId, unitId).first<Row>(),
     env.DB.prepare("SELECT aq.topic_id,t.title,aq.curricular_unit_id,cu.code AS unit_code,COUNT(aq.question_id) AS answered_count,SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id LEFT JOIN quiz_topics t ON t.id=aq.topic_id LEFT JOIN curricular_units cu ON cu.id=aq.curricular_unit_id WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND a.status='completed' AND aq.is_correct IS NOT NULL GROUP BY aq.topic_id ORDER BY (1.0 * SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) / COUNT(aq.question_id)) ASC, answered_count DESC").bind(user.id, unitId, unitId).all(),
-    env.DB.prepare("SELECT q.id,q.prompt,q.image_url,q.difficulty,t.id AS topic_id,t.title AS topic_title,cu.id AS unit_id,cu.code AS unit_code,MAX(aq.answered_at) AS last_answered_at FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id JOIN quiz_questions q ON q.id=aq.question_id JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND aq.is_correct=0 AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL GROUP BY q.id ORDER BY last_answered_at DESC LIMIT 50").bind(user.id, unitId, unitId).all(),
+    contentIds ? env.DB.prepare("SELECT aq.question_id AS id,aq.prompt,aq.image_url,aq.difficulty,aq.topic_id,t.title AS topic_title,aq.curricular_unit_id AS unit_id,cu.code AS unit_code,MAX(aq.answered_at) AS last_answered_at FROM quiz_attempts a JOIN quiz_attempt_questions aq ON aq.attempt_id=a.id LEFT JOIN quiz_topics t ON t.id=aq.topic_id LEFT JOIN curricular_units cu ON cu.id=aq.curricular_unit_id WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND aq.is_correct=0 AND aq.question_id IN(SELECT value FROM json_each(?)) GROUP BY aq.question_id ORDER BY last_answered_at DESC LIMIT 50").bind(user.id,unitId,unitId,contentIds).all() : env.DB.prepare("SELECT q.id,q.prompt,q.image_url,q.difficulty,t.id AS topic_id,t.title AS topic_title,cu.id AS unit_id,cu.code AS unit_code,MAX(aq.answered_at) AS last_answered_at FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id JOIN quiz_questions q ON q.id=aq.question_id JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND aq.is_correct=0 AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL GROUP BY q.id ORDER BY last_answered_at DESC LIMIT 50").bind(user.id, unitId, unitId).all(),
     env.DB.prepare(`SELECT
       a.id,
       a.curricular_unit_id AS unit_id,
@@ -809,7 +836,7 @@ async function progress(env: QuizEnv, user: QuizUser | null, enabled: ModuleChec
       WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND a.status='completed'
       ORDER BY a.completed_at DESC,a.started_at DESC
       LIMIT 10`).bind(user.id, unitId, unitId).all(),
-    env.DB.prepare(`SELECT COUNT(*) AS seen_count,SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM (
+    contentIds ? env.DB.prepare("SELECT COUNT(*) AS seen_count,SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM (SELECT aq.question_id,aq.is_correct,ROW_NUMBER() OVER(PARTITION BY aq.question_id ORDER BY aq.answered_at DESC,a.started_at DESC,a.id DESC) AS latest FROM quiz_attempts a JOIN quiz_attempt_questions aq ON aq.attempt_id=a.id WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND a.status='completed' AND aq.selected_option_id IS NOT NULL AND aq.is_correct IS NOT NULL AND aq.question_id IN(SELECT value FROM json_each(?))) WHERE latest=1").bind(user.id,unitId,unitId,contentIds).first<Row>() : env.DB.prepare(`SELECT COUNT(*) AS seen_count,SUM(CASE WHEN is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM (
       SELECT aq.question_id,aq.is_correct,ROW_NUMBER() OVER (PARTITION BY aq.question_id ORDER BY aq.answered_at DESC,a.started_at DESC,a.id DESC) AS latest
       FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id JOIN quiz_questions q ON q.id=aq.question_id
       WHERE a.user_id=? AND (? IS NULL OR a.curricular_unit_id=?) AND a.status='completed' AND aq.selected_option_id IS NOT NULL AND aq.is_correct IS NOT NULL AND q.status='published' AND q.deleted_at IS NULL
@@ -873,7 +900,7 @@ async function publicComments(request: Request, env: QuizEnv, url: URL, user: Qu
   const messageLength = richTextPlainText(message).length;
   const parentCommentId = text(body?.parentCommentId ?? body?.parentId ?? body?.replyToCommentId, 100);
   if (!questionId || messageLength < 2 || messageLength > 1200) return json({ error: "O comentário deve ter entre 2 e 1200 caracteres." }, 400);
-  const question = await env.DB.prepare("SELECT q.id FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id WHERE q.id=? AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL").bind(questionId).first();
+  const question = env.content ? publishedContent(env).find(q=>q.id===questionId) : await env.DB.prepare("SELECT q.id FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id WHERE q.id=? AND q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL").bind(questionId).first();
   if (!question) return json({ error: "A pergunta não está disponível para comentários." }, 404);
   const parent = parentCommentId ? await env.DB.prepare("SELECT c.id,u.full_name AS author_name,u.role AS author_role FROM quiz_comments c JOIN users u ON u.id=c.author_user_id WHERE c.id=? AND c.question_id=? AND c.status='published' AND c.deleted_at IS NULL").bind(parentCommentId, questionId).first<Row>() : null;
   if (parentCommentId && !parent) return json({ error: "A resposta tem de referir um comentário publicado desta pergunta." }, 400);
@@ -973,7 +1000,7 @@ async function importQuestions(env: QuizEnv, user: QuizUser, rowsValue: unknown,
   if (!Array.isArray(rowsValue) || !rowsValue.length || rowsValue.length > MAX_IMPORT_ROWS) return json({ error: `A importação deve conter entre 1 e ${MAX_IMPORT_ROWS} perguntas.` }, 400);
   const [unitRows, topicRows] = await Promise.all([
     env.DB.prepare("SELECT id,code FROM curricular_units WHERE active=1").all(),
-    env.DB.prepare("SELECT id,curricular_unit_id,title,status FROM quiz_topics WHERE deleted_at IS NULL").all(),
+    env.content ? {results:env.content.manifest.topics.filter(t=>t.deleted_at==null)} : env.DB.prepare("SELECT id,curricular_unit_id,title,status FROM quiz_topics WHERE deleted_at IS NULL").all(),
   ]);
   const unitsById = new Map(unitRows.results.map((item) => [String(item.id), item]));
   const unitsByCode = new Map(unitRows.results.map((item) => [String(item.code).toLocaleUpperCase("pt-PT"), item]));
@@ -1061,8 +1088,8 @@ async function updateTopic(env: QuizEnv, user: QuizUser, source: Row): Promise<R
 
 async function updateQuestion(env: QuizEnv, user: QuizUser, source: Row): Promise<Response> {
   const id = text(source.id ?? source.questionId, 100);
-  const current = id ? await env.DB.prepare("SELECT * FROM quiz_questions WHERE id=? AND deleted_at IS NULL").bind(id).first<Row>() : null;
-  if (!current) return json({ error: "Pergunta não encontrada." }, 404);
+  const current = id ? env.content ? await env.content.question(id) : await env.DB.prepare("SELECT * FROM quiz_questions WHERE id=? AND deleted_at IS NULL").bind(id).first<Row>() : null;
+  if (!current || current.deleted_at != null) return json({ error: "Pergunta não encontrada." }, 404);
   const input = questionInput(source);
   const hasOptions = has(source, "options") || has(source, "answers");
   const imageProvided = has(source, "imageUrl") || has(source, "image") || has(source, "imageDataUrl");
@@ -1152,7 +1179,7 @@ export function isQuizPath(pathname: string): boolean {
   return path === "/api/quizzes" || path === "/api/question-bank" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
-export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
+async function dispatchQuizRoute(request: Request, env: QuizEnv, url: URL, user: QuizUser | null, enabled: ModuleChecker): Promise<Response> {
   if (!user) return unauthenticated();
   if (!await enabled("quizzes")) return disabled();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
@@ -1199,4 +1226,413 @@ export async function handleQuizRoute(request: Request, env: QuizEnv, url: URL, 
   const questionId = path.match(/^\/api\/quizzes\/([^/]+)$/);
   if (questionId) return request.method === "GET" ? publicQuestion(env, user, questionId[1], enabled) : json({ error: "Operação não suportada." }, 405);
   return json({ error: "Endpoint não encontrado." }, 404);
+}
+
+export async function handleQuizRoute(
+  request: Request,
+  env: QuizEnv,
+  url: URL,
+  user: QuizUser | null,
+  enabled: ModuleChecker,
+): Promise<Response> {
+  if (!user) return unauthenticated();
+  if (!(await enabled("quizzes"))) return disabled();
+  const path = url.pathname.replace(/\/+$/, "");
+  if (path.startsWith("/api/admin/") && !isAdmin(user)) return forbidden();
+  if (env.QUIZ_CONTENT_STORAGE === "files" && path.startsWith("/api/admin/")) {
+    return json(
+      {
+        error:
+          "As perguntas são atualizadas nos ficheiros da aplicação e publicadas pelo GitHub.",
+        code: "QUIZ_CONTENT_READ_ONLY",
+      },
+      405,
+    );
+  }
+  const needsContent =
+    path === "/api/question-bank" ||
+    path === "/api/quizzes" ||
+    path === "/api/quizzes/export" ||
+    (path === "/api/quiz-attempts" && request.method === "POST") ||
+    path === "/api/quizzes/progress" ||
+    path === "/api/quiz-progress" ||
+    (path.startsWith("/api/admin/quizzes") && !path.endsWith("/comments")) ||
+    /^\/api\/quizzes\/[^/]+$/.test(path) ||
+    ((path === "/api/quiz-comments" || path.endsWith("/comments")) &&
+      request.method === "POST");
+  const moduleKey = path.startsWith("/api/admin/")
+    ? "quizzes.management"
+    : path.endsWith("progress") || path === "/api/quiz-progress"
+      ? "quizzes.progress"
+      : "quizzes.practice";
+  if (!(await enabled(moduleKey))) return disabled();
+  try {
+    const content = needsContent ? await QuizContentStore.open(env) : null;
+    return await dispatchQuizRoute(
+      request,
+      { ...env, content },
+      url,
+      user,
+      enabled,
+    );
+  } catch (error) {
+    if (error instanceof QuizContentError)
+      return json({ error: error.message, code: error.code }, error.status);
+    throw error;
+  }
+}
+
+function publishedContent(env: QuizEnv, units?: Set<string>): Row[] {
+  const topics = new Set(
+    env
+      .content!.manifest.topics.filter(
+        (t) => t.status === "published" && t.deleted_at == null,
+      )
+      .map((t) => t.id),
+  );
+  return env.content!.manifest.questions.filter(
+    (q) =>
+      q.status === "published" &&
+      q.deleted_at == null &&
+      topics.has(q.topic_id) &&
+      (!units || units.has(String(q.curricular_unit_id))),
+  );
+}
+
+function contentTopicRows(
+  env: QuizEnv,
+  units: Row[],
+  includeDeleted = false,
+  published = false,
+): Row[] {
+  const unitMap = new Map(units.map((u) => [u.id, u]));
+  const counts = new Map<
+    unknown,
+    {
+      question_count: number;
+      multiple_choice_count: number;
+      short_answer_count: number;
+    }
+  >();
+  for (const q of env.content!.manifest.questions) {
+    if (q.deleted_at != null || (published && q.status !== "published"))
+      continue;
+    const c = counts.get(q.topic_id) || {
+      question_count: 0,
+      multiple_choice_count: 0,
+      short_answer_count: 0,
+    };
+    c.question_count++;
+    if (q.response_type === "multiple_choice") c.multiple_choice_count++;
+    else c.short_answer_count++;
+    counts.set(q.topic_id, c);
+  }
+  return env
+    .content!.manifest.topics.filter(
+      (t) =>
+        unitMap.has(t.curricular_unit_id) &&
+        (includeDeleted || t.deleted_at == null) &&
+        (!published || (t.status === "published" && counts.has(t.id))),
+    )
+    .map<Row>((t) => ({
+      ...t,
+      unit_code: unitMap.get(t.curricular_unit_id)!.code,
+      unit_name: unitMap.get(t.curricular_unit_id)!.name,
+      ...(counts.get(t.id) || {
+        question_count: 0,
+        multiple_choice_count: 0,
+        short_answer_count: 0,
+      }),
+    }))
+    .sort(
+      (a, b) =>
+        Number(unitMap.get(a.curricular_unit_id)!.study_year) -
+          Number(unitMap.get(b.curricular_unit_id)!.study_year) ||
+        Number(unitMap.get(a.curricular_unit_id)!.semester) -
+          Number(unitMap.get(b.curricular_unit_id)!.semester) ||
+        Number(a.sort_order) - Number(b.sort_order) ||
+        String(a.title).localeCompare(String(b.title), "pt-PT"),
+    );
+}
+
+async function contentCatalog(
+  env: QuizEnv,
+  user: QuizUser,
+  enabled: ModuleChecker,
+): Promise<Response> {
+  const [unitsResult, stats, recommendation] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id,code,name,ects,study_year,semester FROM curricular_units WHERE active=1 ORDER BY study_year,semester,name COLLATE NOCASE",
+    ).all<Row>(),
+    env.DB.prepare(PLATFORM_STATS_SQL).all<Row>(),
+    enabled("quizzes.progress").then((on) =>
+      on
+        ? env.DB.prepare(
+            "SELECT aq.topic_id,COUNT(*) AS attempted_count,SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id WHERE a.user_id=? AND a.status='completed' AND aq.is_correct IS NOT NULL GROUP BY aq.topic_id ORDER BY 1.0*SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END)/COUNT(*) ASC,COUNT(*) DESC",
+          )
+            .bind(user.id)
+            .all<Row>()
+        : { results: [] as Row[] },
+    ),
+  ]);
+  const unitRows = unitsResult.results;
+  const questions = publishedContent(
+    env,
+    new Set(unitRows.map((u) => String(u.id))),
+  );
+  const platformIds = new Set(stats.results.map((s) => s.question_id));
+  const totals = new Map<
+    unknown,
+    { count: number; mc: number; short: number; platform: number }
+  >();
+  for (const q of questions) {
+    const c = totals.get(q.curricular_unit_id) || {
+      count: 0,
+      mc: 0,
+      short: 0,
+      platform: 0,
+    };
+    c.count++;
+    if (q.response_type === "multiple_choice") c.mc++;
+    else c.short++;
+    if (platformIds.has(q.id)) c.platform++;
+    totals.set(q.curricular_unit_id, c);
+  }
+  const units = unitRows
+    .filter((u) => totals.has(u.id))
+    .map((u) => {
+      const c = totals.get(u.id)!;
+      return {
+        id: u.id,
+        code: u.code,
+        name: u.name,
+        ects: u.ects,
+        year: u.study_year,
+        semester: u.semester,
+        questionCount: c.count,
+        multipleChoiceCount: c.mc,
+        shortAnswerCount: c.short,
+        platformMistakeCount: c.platform,
+      };
+    });
+  const topics = contentTopicRows(env, unitRows, false, true).map((t) => ({
+    ...topicDto(t),
+    unitCode: t.unit_code,
+    unitName: t.unit_name,
+  }));
+  const recommended = recommendation.results.find((r) =>
+    topics.some((t) => t.id === r.topic_id),
+  );
+  const topic =
+    recommended && topics.find((t) => t.id === recommended.topic_id);
+  return json({
+    units,
+    topics,
+    themes: topics,
+    recommendedTopic:
+      topic && recommended
+        ? {
+            id: topic.id,
+            title: topic.title,
+            unitId: topic.unitId,
+            unitCode: topic.unitCode,
+            unitName: topic.unitName,
+            attemptedCount: recommended.attempted_count,
+            correctCount: recommended.correct_count,
+          }
+        : null,
+  });
+}
+
+async function contentCandidateMetadata(
+  env: QuizEnv,
+  unitId: string,
+  topicIds: string[],
+  difficulty: Difficulty | null,
+  responseType: string,
+) {
+  const units = await env.DB.prepare(
+    "SELECT id,code,name FROM curricular_units WHERE active=1",
+  ).all<Row>();
+  const eligible = publishedContent(
+    env,
+    new Set(units.results.map((u) => String(u.id))),
+  ).filter(
+    (q) =>
+      (!unitId || q.curricular_unit_id === unitId) &&
+      (!topicIds.length || topicIds.includes(String(q.topic_id))) &&
+      (!difficulty || q.difficulty === difficulty) &&
+      (responseType === "multiple_choice"
+        ? q.response_type === "multiple_choice"
+        : q.response_type !== "multiple_choice"),
+  );
+  return { units, eligible };
+}
+
+async function contentCandidates(
+  env: QuizEnv,
+  user: QuizUser,
+  unitId: string,
+  topicIds: string[],
+  difficulty: Difficulty | null,
+  responseType: string,
+  mode: QuizMode,
+  count: number,
+  frequency = false,
+  platform = false,
+): Promise<{ results: Row[] }> {
+  const candidates = await contentCandidateMetadata(
+      env,
+      unitId,
+      topicIds,
+      difficulty,
+      responseType,
+    ),
+    units = candidates.units;
+  let eligible = candidates.eligible;
+  if (mode === "unseen" || mode === "mistakes") {
+    const history = await env.DB.prepare(
+      "SELECT aq.question_id,COUNT(aq.selected_option_id) AS seen_count,SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) AS correct_count,SUM(CASE WHEN aq.is_correct=0 THEN 1 ELSE 0 END) AS wrong_count FROM quiz_attempts a JOIN quiz_attempt_questions aq ON aq.attempt_id=a.id WHERE a.user_id=? GROUP BY aq.question_id",
+    )
+      .bind(user.id)
+      .all<Row>();
+    const byId = new Map(history.results.map((r) => [r.question_id, r]));
+    eligible = eligible.filter((q) => {
+      const h = byId.get(q.id);
+      return mode === "unseen"
+        ? !Number(h?.seen_count)
+        : Number(h?.wrong_count) > Number(h?.correct_count);
+    });
+  }
+  let platformStats = new Map<unknown, Row>();
+  if (platform) {
+    const result = await env.DB.prepare(PLATFORM_STATS_SQL).all<Row>();
+    platformStats = new Map(result.results.map((r) => [r.question_id, r]));
+    eligible = eligible.filter((q) => platformStats.has(q.id));
+  }
+  // Fisher-Yates selects from the eligible IDs; SQL no longer scans and sorts all questions.
+  eligible = [...eligible];
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  if (platform)
+    eligible.sort(
+      (a, b) =>
+        Number(platformStats.get(b.id)!.wrong_count) /
+          Number(platformStats.get(b.id)!.participants) -
+          Number(platformStats.get(a.id)!.wrong_count) /
+            Number(platformStats.get(a.id)!.participants) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+  const topics = new Map(env.content!.manifest.topics.map((t) => [t.id, t]));
+  if (frequency)
+    eligible.sort(
+      (a, b) =>
+        Number(topics.get(a.topic_id)?.sort_order) -
+          Number(topics.get(b.topic_id)?.sort_order) ||
+        String(a.topic_id).localeCompare(String(b.topic_id)),
+    );
+  const picked = eligible.slice(0, count);
+  const rows = await env.content!.questionsByIds(
+    picked.map((q) => String(q.id)),
+  );
+  const byId = new Map(rows.map((q) => [q.id, q]));
+  const unitById = new Map(units.results.map((u) => [u.id, u]));
+  return {
+    results: picked.map((q) => ({
+      ...byId.get(q.id)!,
+      topic_title: topics.get(q.topic_id)?.title,
+      unit_code: unitById.get(q.curricular_unit_id)?.code,
+      unit_name: unitById.get(q.curricular_unit_id)?.name,
+    })),
+  };
+}
+
+function contentBankResults(
+  shard: Awaited<ReturnType<QuizContentStore["shard"]>>,
+  filters: Record<string, string>,
+): { all: Row[]; selected: Row[]; topics: Row[]; sources: Row[] } {
+  const byTopic = new Map(shard.bankTopics.map((t) => [t.id, t]));
+  const all = shard.bankQuestions
+    .filter(
+      (q) =>
+        (q.eligible === true ||
+          (q.eligible == null &&
+            q.status === "published" &&
+            q.validation_state === "VALIDADO" &&
+            q.confidence === "ALTO" &&
+            !String(q.review_note || "").trim() &&
+            (q.response_type !== "multiple_choice" ||
+              (String(q.options_text).toLowerCase().includes("a)") &&
+                String(q.options_text).toLowerCase().includes("b)"))))) &&
+        byTopic.has(q.topic_id),
+    )
+    .map<Row>((q) => ({
+      ...q,
+      topic_title: byTopic.get(q.topic_id)!.title,
+      chapter_number: byTopic.get(q.topic_id)!.chapter_number,
+    }));
+  const selected = all
+    .filter(
+      (q) =>
+        Object.entries({
+          sourceId: "source_id",
+          topicId: "topic_id",
+          subtopic: "source_subtopic",
+          academicYear: "source_academic_year",
+          assessment: "source_assessment",
+          session: "source_session",
+          pageFilter: "source_page",
+          responseType: "response_type",
+        }).every(
+          ([filter, field]) => !filters[filter] || q[field] === filters[filter],
+        ) &&
+        (!filters.imageFilter ||
+          filters.imageFilter === "all" ||
+          Boolean(String(q.image_url || "")) ===
+            (filters.imageFilter === "with")) &&
+        (filters.solutionFilter === "all" ||
+          Boolean(
+            String(q.answer_text || "").trim() &&
+              String(q.answer_text).trim().toLowerCase() !==
+                "resolução validada fmup.",
+          ) ===
+            (filters.solutionFilter === "with")) &&
+        (!filters.query ||
+          [
+            "prompt",
+            "topic_title",
+            "source_subtopic",
+            "source_question",
+            "source_assessment",
+            "source_session",
+          ].some((field) =>
+            String(q[field] || "")
+              .toLocaleLowerCase("pt-PT")
+              .includes(filters.query.toLocaleLowerCase("pt-PT")),
+          )),
+    )
+    .sort(
+      (a, b) =>
+        Number(a.sort_order) - Number(b.sort_order) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+  const counts = new Map<unknown, number>();
+  for (const q of all)
+    counts.set(q.topic_id, (counts.get(q.topic_id) || 0) + 1);
+  return {
+    all,
+    selected,
+    topics: shard.bankTopics
+      .map<Row>((t) => ({ ...t, question_count: counts.get(t.id) || 0 }))
+      .sort(
+        (a, b) =>
+          Number(a.sort_order) - Number(b.sort_order) ||
+          String(a.title).localeCompare(String(b.title), "pt-PT"),
+      ),
+    sources: [...shard.bankSources].sort(
+      (a, b) => Number(b.updated_at) - Number(a.updated_at),
+    ),
+  };
 }

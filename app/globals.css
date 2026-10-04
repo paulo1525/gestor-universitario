@@ -939,6 +939,7 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
    removable chips. Labels stay in the DOM for assistive technology; the
    placeholder and "all" option name each control visually. */
 .filter-bar {
+  --filter-control-height: var(--control-height);
   display: grid;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -1007,7 +1008,8 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 .filter-field__control :is(input, select) {
   width: 100%;
   min-width: 0;
-  height: var(--control-height-sm);
+  height: var(--filter-control-height, var(--control-height));
+  min-height: var(--filter-control-height, var(--control-height));
   margin: 0;
   padding: 0 10px;
   border: 1px solid var(--color-border-strong);
@@ -1020,7 +1022,7 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
   transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
 
-.filter-field__control input {
+.filter-field--search .filter-field__control input {
   padding-left: 32px;
   padding-right: 32px;
 }
@@ -1089,7 +1091,7 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 
 .filter-check {
   display: flex;
-  min-height: var(--control-height-sm);
+  min-height: var(--filter-control-height, var(--control-height));
   align-items: center;
   gap: 8px;
   padding: 0 10px;
@@ -1154,13 +1156,14 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
   flex-wrap: wrap;
   gap: 2px;
   padding: 3px;
+  min-height: var(--filter-control-height, var(--control-height));
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
 }
 
 .filter-segmented button {
   display: inline-flex;
-  min-height: 28px;
+  min-height: calc(var(--filter-control-height, var(--control-height)) - 6px);
   align-items: center;
   gap: 6px;
   padding: 0 10px;
@@ -1198,6 +1201,10 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 
 .filter-bar__toggle {
   display: none;
+}
+
+.filter-bar .filter-bar__controls > .button {
+  min-height: var(--filter-control-height);
 }
 
 .filter-bar__active {
@@ -1261,7 +1268,7 @@ h2 { margin-bottom: 5px; font-size: var(--font-size-heading-2); line-height: 1.2
 
   .filter-bar__toggle {
     display: inline-flex;
-    height: var(--control-height-sm);
+    height: var(--filter-control-height);
     align-items: center;
     gap: 6px;
     padding: 0 10px;
@@ -6658,6 +6665,7 @@ body [data-app-modal="modal"] [data-app-modal-body] .form-label > svg { display:
 /* Cookie preferences inside the shared modal. */
 .cookie-options { display: grid; gap: 0; }
 .cookie-options__intro { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); line-height: 1.5; }
+.cookie-options__error { margin: var(--space-2) 0 0; color: var(--color-danger-text); font-size: var(--font-size-small); line-height: 1.5; }
 .cookie-options .cookie-option { display: flex; min-height: 0; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 0; border-top: 1px solid var(--color-border); cursor: default; }
 .cookie-options label.cookie-option { cursor: pointer; }
 .cookie-options .cookie-option > span { display: grid; gap: 2px; }

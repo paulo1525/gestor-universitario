@@ -25,12 +25,12 @@
 
 .search { position: relative; display: block; width: 100%; }
 .search svg { position: absolute; top: 50%; left: 12px; width: 16px; height: 16px; color: var(--color-text-subtle); transform: translateY(-50%); pointer-events: none; }
-.search input { width: 100%; min-height: 40px; padding: 0 12px 0 38px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface-subtle); font: inherit; font-size: var(--font-size-body); }
+.search input { width: 100%; min-height: var(--control-height); padding: 0 12px 0 38px; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface-subtle); font: inherit; font-size: var(--font-size-body); }
 .search input:focus { border-color: var(--color-focus); outline: none; background: var(--color-surface); box-shadow: var(--focus-ring); }
 
 .topActions { display: flex; justify-content: flex-end; gap: var(--space-2); }
-.iconButton, .textButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--control-height-sm); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 750; text-decoration: none; cursor: pointer; }
-.iconButton { width: var(--control-height-sm); color: var(--color-text-muted); }
+.iconButton, .textButton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--control-height); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; font-size: var(--font-size-small); font-weight: 750; text-decoration: none; cursor: pointer; }
+.iconButton { width: var(--control-height); color: var(--color-text-muted); }
 .textButton { padding: 0 var(--space-3); white-space: nowrap; }
 .iconButton svg, .textButton svg { width: 15px; height: 15px; flex: none; }
 .iconButton:hover, .textButton:hover { border-color: var(--color-border-hover); }

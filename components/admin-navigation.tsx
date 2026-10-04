@@ -7,7 +7,6 @@ import {
   BarChart3,
   BookOpen,
   Boxes,
-  BrainCircuit,
   ChevronDown,
   ClipboardCheck,
   History,
@@ -118,7 +117,6 @@ export function AdminNavigation({ active, collapsed, onNavigate }: { active: App
       label: copy.content,
       icon: BookOpen,
       items: [
-        { active: "quizzes_management", href: "/admin/testes", icon: BrainCircuit, label: copy.quizzes, visible: Boolean(access["quizzes.management"]) },
         { active: "curricular_units_management", href: "/admin/unidades-curriculares", icon: BookOpen, label: copy.units, visible: canManageUnits },
       ],
     },

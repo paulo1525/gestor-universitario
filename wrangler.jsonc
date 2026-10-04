@@ -17,7 +17,8 @@
   ],
   "assets": {
     "directory": ".open-next/assets",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": ["/__private_quiz", "/__private_quiz/*"]
   },
   "r2_buckets": [
     {
@@ -45,6 +46,7 @@
   ],
   "vars": {
     "APP_ORIGIN": "https://gestoruniversitario.cc",
+    "QUIZ_CONTENT_STORAGE": "files",
     "EMAIL_FROM": "Gestor Universitário <no-reply@gestoruniversitario.cc>",
     "TURNSTILE_SITE_KEY": "0x4AAAAAADzawlPGODPKIZld",
     "MAINTENANCE_MODE": "true"

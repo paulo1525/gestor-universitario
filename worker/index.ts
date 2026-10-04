@@ -16,6 +16,9 @@ import { neuroParagraphs } from "@/lib/neuroanatomia-study";
 
 export interface Env {
   DB: D1Database;
+  QUIZ_CONTENT_STORAGE?: string;
+  QUIZ_CONTENT_KEY?: string;
+  moduleStatesPromise?: Promise<Record<string, boolean>>;
   // The binding is optional for local/preview databases so catalog endpoints
   // can expose metadata while returning STORAGE_NOT_READY until R2 is ready.
   MATERIALS_BUCKET?: R2Bucket;
@@ -538,9 +541,14 @@ async function requireAdmin(request: Request, env: Env) {
 }
 
 async function moduleStates(env: Env): Promise<Record<string, boolean>> {
-  const result = await env.DB.prepare("SELECT module_key,enabled FROM app_module_settings").all<{ module_key: string; enabled: number }>();
-  const stored = Object.fromEntries(result.results.map((row) => [row.module_key, row.enabled === 1]));
-  return Object.fromEntries(APP_MODULES.map((module) => [module.key, stored[module.key] ?? module.defaultEnabled]));
+  // Reuse one snapshot within the request, including parallel module checks.
+  // The next request still observes administrative changes immediately.
+  env.moduleStatesPromise ??= (async () => {
+    const result = await env.DB.prepare("SELECT module_key,enabled FROM app_module_settings").all<{ module_key: string; enabled: number }>();
+    const stored = Object.fromEntries(result.results.map((row) => [row.module_key, row.enabled === 1]));
+    return Object.fromEntries(APP_MODULES.map((module) => [module.key, stored[module.key] ?? module.defaultEnabled]));
+  })();
+  return env.moduleStatesPromise;
 }
 
 async function isModuleEnabled(env: Env, key: string): Promise<boolean> {
@@ -606,6 +614,7 @@ async function handleAdminModules(request: Request, env: Env, user: CurrentUser)
   ];
   if (homepageCleared) writes.push(env.DB.prepare("DELETE FROM app_settings WHERE key='home_module_key'"));
   await env.DB.batch(writes);
+  delete env.moduleStatesPromise;
   return json({ ok: true, ...await moduleResponse(env, user) });
 }
 

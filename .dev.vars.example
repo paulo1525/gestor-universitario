@@ -8,3 +8,8 @@ TURNSTILE_SECRET_KEY=segredo-turnstile-de-exemplo
 # GOOGLE_DRIVE_FOLDER_ID=id-da-pasta-raiz
 # Só local: entra automaticamente com esta conta em 127.0.0.1/localhost (ignorado noutros domínios).
 # LOCAL_AUTO_LOGIN_EMAIL=up202500000@up.pt
+# Chave dos ficheiros JSON cifrados: copiar pelo canal privado da configuração.
+# Nunca guardar a chave no Git. O empacotamento gera-a em .dev.vars se necessário.
+# QUIZ_CONTENT_KEY=chave-base64-de-32-bytes
+# Só para os dados fictícios gerados por test:local:setup, enquanto não empacotados:
+# QUIZ_CONTENT_STORAGE=d1
