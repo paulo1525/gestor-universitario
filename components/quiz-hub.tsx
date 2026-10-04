@@ -20,6 +20,9 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleHelp,
+  Cookie,
+  SlidersHorizontal,
+  ZoomIn,
   Clock3,
   Eye,
   EyeOff,
@@ -42,6 +45,8 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { OPEN_COOKIE_PREFERENCES } from "@/components/floating-actions";
+import { useEscapeKey } from "@/components/use-escape-key";
 import { AppShell } from "@/components/app-shell";
 import { PageTabs } from "@/components/page-tabs";
 import { SurfaceHeader } from "@/components/surface-header";
@@ -158,7 +163,7 @@ const QUIZ_PROGRESS_COOKIE = "gu-quiz-progress";
 const EMPTY_TOPICS: Topic[] = [];
 
 const modeCards: Array<{ id: Mode; title: string; description: string; icon: typeof Play }> = [
-  { id: "quick", title: "Sessão guiada", description: "Mistura perguntas para consolidar o que já estudaste.", icon: BrainCircuit },
+  { id: "quick", title: "Aleatório", description: "Mistura perguntas para consolidar o que já estudaste.", icon: BrainCircuit },
   { id: "unseen", title: "Matéria nova", description: "Descobre conceitos através de perguntas que ainda não viste.", icon: EyeOff },
   { id: "mistakes", title: "Só erros", description: "Recupera perguntas falhadas e corrige confusões recentes.", icon: RotateCcw },
   { id: "topic", title: "Por tópico", description: "Concentra a sessão num ou mais temas da unidade curricular.", icon: BookOpen },
@@ -167,7 +172,7 @@ const modeCards: Array<{ id: Mode; title: string; description: string; icon: typ
 ];
 
 function modeTitle(mode: Mode) {
-  return mode === "frequency" ? "Simulação de frequência" : mode === "platform_mistakes" ? "Mais erradas na plataforma" : mode === "topic" ? "Por tópico" : mode === "unseen" ? "Matéria nova" : mode === "mistakes" ? "Só erros" : mode === "exam" ? "Simulado" : "Sessão guiada";
+  return mode === "frequency" ? "Simulação de frequência" : mode === "platform_mistakes" ? "Mais erradas na plataforma" : mode === "topic" ? "Por tópico" : mode === "unseen" ? "Matéria nova" : mode === "mistakes" ? "Só erros" : mode === "exam" ? "Simulado" : "Aleatório";
 }
 
 function questionLabel(count: number) {
@@ -909,7 +914,7 @@ export function QuizHub() {
   return <AuthGuard>
     <ModuleGuard moduleKey="quizzes.practice">
       <AppShell active="quizzes" breadcrumb="Testes" focusMode={screen === "attempt"}>
-        <div className={styles.page}>
+        <div className={`${styles.page} ${screen === "attempt" ? styles.attemptPage : ""}`}>
           {notice && <AppToast kind={notice.kind} message={notice.message} onDismiss={() => setNotice(null)} />}
           {screen === "catalogue" && restoringAttempt && <p className="sr-only" role="status">A recuperar a sessão…</p>}
           {screen === "catalogue" && restoreError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{restoreError}</p><button type="button" onClick={() => setRestoreVersion((version) => version + 1)}>Tentar novamente</button></div>}
@@ -962,7 +967,7 @@ export function QuizHub() {
             return unit ? <>
               <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title={`Estatísticas · ${unit.name}`} />
               <TestsTabs active="statistics" onPractice={() => { setSelectedUnitId(unit.id); setExpandedUnitId(unit.id); setScreen("catalogue"); }} />
-              <button className={listStyles.back} type="button" onClick={() => { setStatisticsUnitId(""); setStatistics(null); }}><ChevronLeft aria-hidden="true" />Disciplinas</button>
+              <button className={`${listStyles.back} ${styles.backLink}`} type="button" onClick={() => { setStatisticsUnitId(""); setStatistics(null); }}><ChevronLeft aria-hidden="true" />Disciplinas</button>
               <StatisticsView statistics={statistics} loading={statisticsLoading || !statistics && !statisticsError} error={statisticsError} totalAvailableQuestions={unit.questionCount} clearing={clearingStatistics} onRetry={() => void loadStatistics()} onClear={() => setClearStatisticsConfirmation(true)} />
             </> : <>
               <SurfaceHeader standalone headingLevel="h1" icon={<BarChart3 />} eyebrow="Testes" title="Estatísticas por disciplina" /><TestsTabs active="statistics" onPractice={() => setScreen("catalogue")} />
@@ -1046,7 +1051,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
     {resumeAttempt && <section className={styles.resumeCard} aria-labelledby="continuar-teste"><span><Play /></span><div><h2 id="continuar-teste">Retomar sessão</h2><p>{resumeUnit ? `${resumeUnit.code} · ${resumeUnit.name} · ` : ""}{modeTitle(resumeAttempt.mode)} · {resumeAttempt.answers.length}/{resumeAttempt.questions.length}</p></div><button className={styles.primaryButton} type="button" onClick={onResume}><Play />Continuar</button></section>}
     {loading ? <section className={styles.unitCatalogue} aria-busy="true"><RecordSkeleton label="A preparar a tua sessão" /></section> : error ? <State icon={<TriangleAlert />} title="Não foi possível carregar as sessões" text={error} action={<button type="button" onClick={onRetry}>Tentar novamente</button>} /> : !units.length ? <State icon={<CircleHelp />} title="Ainda não há sessões disponíveis" text="Ainda não existem perguntas publicadas." /> : <>
       {!selectedUnit ? <DisciplinePicker units={units} statistics={false} onSelect={onUnit} /> : <>
-        <button className={listStyles.back} type="button" onClick={() => onUnit(selectedUnit.id)}><ChevronLeft aria-hidden="true" />Disciplinas</button>
+        <button className={`${listStyles.back} ${styles.backLink}`} type="button" onClick={() => onUnit(selectedUnit.id)}><ChevronLeft aria-hidden="true" />Disciplinas</button>
         <section className={styles.unitCatalogue} aria-label="Configuração do teste">
         <div className={styles.unitGrid}>
           {visibleUnits.map((unit) => {
@@ -1065,7 +1070,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Sessão guiada</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes repetir uma sessão guiada ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Sessão guiada</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><button className="button button--primary" type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar sessão"}</button></footer>
+                <footer className={styles.unitActions}><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar sessão"}</button></footer>
               </div>}
             </article>;
           })}
@@ -1149,6 +1154,16 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
 }) {
   const [showAllQuestions, setShowAllQuestions] = useState(false);
   const visibleQuestionIndexes = attempt.questions.map((_, index) => index).filter((index) => showAllQuestions || attempt.questions.length <= 10 || index === 0 || index === attempt.questions.length - 1 || Math.abs(index - currentIndex) <= 2);
+  const questionPanelRef = useRef<HTMLElement>(null);
+  const previousQuestionId = useRef<string | null>(null);
+  useEffect(() => {
+    if (previousQuestionId.current === question.id) return;
+    const startingSession = previousQuestionId.current === null;
+    previousQuestionId.current = question.id;
+    questionPanelRef.current?.focus({ preventScroll: true });
+    if (startingSession) window.scrollTo({ top: 0, behavior: "instant" });
+    else questionPanelRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [question.id]);
   const isExam = (attempt.mode === "exam" || attempt.mode === "frequency");
   const durationLabel = attempt.timed ? humanDuration(normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT)) : "Sem limite";
   const answered = Boolean(currentAnswer?.selectedOptionId);
@@ -1170,26 +1185,25 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   };
   return <>
     <section className={styles.sessionBar} aria-label="Progresso do teste">
-      <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {questionLabel(attempt.questions.length)}{attempt.timed ? ` · ${durationLabel}` : " · sem limite"}</small></span></div>
-      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null && <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT) * .2) ? styles.lowTime : ""}`} role="timer" aria-live="polite" aria-atomic="true" data-timer-state={attempt.timerPaused ? "paused" : remaining <= 60 ? "low" : "running"} aria-label={`Tempo restante: ${formatClock(remaining)}. Limite: ${durationLabel}`}><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>{formatClock(remaining)}</strong><small>{attempt.timerPaused ? "Em pausa" : `de ${durationLabel}`}</small></span></span>}{!attempt.timed && <span className={styles.timer} data-timer-state="untimed"><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>Sem limite</strong><small>sem cronómetro</small></span></span>}</div>
-      <div className={styles.sessionActions}><button type="button" className={styles.backButton} onClick={onPause} disabled={finishing || savingCount > 0 || timerBusy}><ArrowLeft /> Guardar e sair</button><button type="button" className={styles.quitButton} onClick={onQuit} disabled={finishing || savingCount > 0 || timerBusy}>Desistir</button></div>
+      <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)}</small></span></div>
+      <div className={styles.sessionStats}><span className={styles.sessionPosition} aria-label={`Pergunta ${currentIndex + 1} de ${attempt.questions.length}`}><b>{currentIndex + 1}</b><small>/ {attempt.questions.length}</small></span>{remaining !== null ? <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT) * .2) ? styles.lowTime : ""}`} role="timer" aria-live="off" data-timer-state={attempt.timerPaused ? "paused" : remaining <= 60 ? "low" : "running"} aria-label={`Tempo restante: ${formatClock(remaining)}. Limite: ${durationLabel}`}><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>{formatClock(remaining)}</strong><small>{attempt.timerPaused ? "Em pausa" : durationLabel}</small></span></span> : <span className={styles.timer} data-timer-state="untimed"><Clock3 aria-hidden="true" /><strong>Sem limite</strong></span>}{attempt.timed && <button type="button" className={`${styles.secondaryButton} ${styles.timerToggle}`} aria-label={timerBusy ? "A sincronizar cronómetro" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} title={attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}</button>}</div>
       <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Perguntas respondidas"><span style={{ width: `${progress}%` }} /></div>
     </section>
-    <div className={styles.sessionSummary}><span role="status">{savingCount ? <>A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><small>{attempt.timed ? "O tempo pausa ao sair deste separador." : "Responde ao teu ritmo, sem cronómetro."}</small>{attempt.timed && <button type="button" className={styles.secondaryButton} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}{timerBusy ? "A sincronizar…" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"}</button>}<button type="button" className={styles.textButton} disabled={finishing || savingCount > 0} onClick={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }}>{attempt.answers.length < attempt.questions.length ? "Ir para uma pergunta por responder" : "Tudo respondido"}</button><button type="button" className={styles.secondaryButton} disabled={finishing || savingCount > 0} onClick={onFinish}>{finishing ? "A concluir…" : "Concluir sessão"}</button></div>
+    <div className={styles.sessionSummary}><span role="status">{savingCount ? <>A guardar {savingCount === 1 ? "resposta" : "respostas"}…</> : <><Check aria-hidden="true" /> {attempt.answers.length}/{attempt.questions.length} respostas guardadas</>}</span><SessionTools busy={finishing || savingCount > 0 || timerBusy} timed={attempt.timed} onPause={onPause} onQuit={onQuit} onFinish={onFinish} unanswered={attempt.answers.length < attempt.questions.length} onUnanswered={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }} /></div>
     {timerError && <div className={styles.availability} role="alert"><TriangleAlert /><p>{timerError}</p><button type="button" disabled={timerBusy} onClick={onTimer}>Sincronizar cronómetro</button></div>}
     {attempt.timerPaused && <p className={styles.saving} role="status"><Pause />Cronómetro em pausa. Retoma para continuar a responder.</p>}
     <div className={styles.attemptLayout}>
-      <aside className={styles.navigator} aria-label="Navegação pelas perguntas"><header><strong>Perguntas</strong><small>{progress}%</small></header><div className={styles.questionGrid}>{visibleQuestionIndexes.map((index, position) => {
+      <aside className={styles.navigator} aria-label="Navegação pelas perguntas" data-expanded={showAllQuestions}><header><strong>Perguntas</strong></header><div id="quiz-question-map" className={styles.questionGrid}>{visibleQuestionIndexes.map((index, position) => {
         const item = attempt.questions[index];
         const answer = attempt.answers.find((entry) => entry.questionId === item.id);
         const state = !answer ? "não respondida" : isExam || answer.correct === null ? "respondida" : answer.correct ? "certa" : "errada";
         const gap = position > 0 && index > visibleQuestionIndexes[position-1]+1;
         return <span className={styles.questionJump} key={item.id}>{gap && <span className={styles.questionGap} aria-hidden="true">…</span>}<button type="button" className={`${styles.questionNumber} ${index === currentIndex ? styles.current : ""} ${statusClass(answer)}`} disabled={finishing || sendingComment} onClick={() => onQuestion(index)} aria-current={index === currentIndex ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${state}`}>{index + 1}</button></span>;
-      })}</div>{attempt.questions.length > 10 && <button className="button button--ghost button--compact" type="button" aria-expanded={showAllQuestions} onClick={() => setShowAllQuestions((current) => !current)}>{showAllQuestions ? "Ver menos" : "Ver todas"}</button>}</aside>
-      <section className={styles.questionPanel} aria-labelledby="question-title">
-        <header className={styles.questionHeader}><span className={styles.topicLabel}>{question.topic}</span><span className={`${styles.seenBadge} ${question.seenBefore ? styles.seenBadgeViewed : styles.seenBadgeNew}`}>{question.seenBefore ? "Já vista" : "Nova"}</span><small>{currentIndex + 1} / {attempt.questions.length}</small></header>
+      })}</div><button className={`button button--ghost ${styles.mapToggle}`} type="button" aria-expanded={showAllQuestions} aria-controls="quiz-question-map" onClick={() => setShowAllQuestions((current) => !current)}><span className={styles.mapDesktopLabel}>{showAllQuestions ? "Ver menos" : "Ver todas"}</span><span className={styles.mapMobileLabel}>{showAllQuestions ? "Fechar mapa" : "Ver perguntas"}</span><ChevronDown aria-hidden="true" /></button></aside>
+      <section ref={questionPanelRef} tabIndex={-1} className={styles.questionPanel} aria-labelledby="question-title">
+        <header className={styles.questionHeader}><span className={styles.topicLabel}>{question.topic}</span><span className={`${styles.seenBadge} ${question.seenBefore ? styles.seenBadgeViewed : styles.seenBadgeNew}`}>{question.seenBefore ? "Já vista" : "Nova"}</span></header>
         <div key={question.id} className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
-          {question.imageUrls.map((url, index) => <figure key={url} className={styles.questionImage}><img src={url} alt={`Figura ${index + 1} da pergunta`} /></figure>)}
+          {question.imageUrls.map((url, index) => <figure key={url} className={styles.questionImage}><a className={styles.imageOpen} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar figura ${index + 1} da pergunta, abre num novo separador`}><img src={url} alt={question.imageAlt || `Figura ${index + 1} da pergunta`} /><span><ZoomIn aria-hidden="true" />Ampliar</span></a></figure>)}
           <div className={styles.questionContent}>
             <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
             {answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
@@ -1209,11 +1223,36 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
             {showExplanation && question.explanation && !feedback && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
           </div>
         </div>
-        <footer className={styles.questionActions}><div><button type="button" className={styles.textButton} onClick={onExplain} aria-expanded={showExplanation} disabled={!question.explanation || (!answered && isExam)}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}</span><ArrowRight /></button></div></footer>
+        <footer className={styles.questionActions}><div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onExplain} aria-expanded={showExplanation} disabled={!question.explanation || (!answered && isExam)}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : "Seguinte"}</span><ArrowRight /></button></div></footer>
         {commentsOpen && <Comments onPin={onPinComment} pinning={pinningComment} comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
       </section>
     </div>
   </>;
+}
+
+function SessionTools({ busy, timed, unanswered, onPause, onQuit, onFinish, onUnanswered }: { busy: boolean; timed: boolean; unanswered: boolean; onPause: () => void; onQuit: () => void; onFinish: () => void; onUnanswered: () => void }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEscapeKey(open, () => { setOpen(false); trigger.current?.focus(); });
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
+  const run = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
+  return <div ref={root} className={styles.sessionTools}>
+    <button ref={trigger} type="button" className={styles.toolsTrigger} aria-expanded={open} aria-controls="quiz-session-tools" onClick={() => setOpen((current) => !current)}><SlidersHorizontal aria-hidden="true" /><span>Opções</span><ChevronDown aria-hidden="true" /></button>
+    {open && <div id="quiz-session-tools" className={styles.toolsPanel}>
+      <button type="button" disabled={busy} onClick={() => run(onPause)}><ArrowLeft aria-hidden="true" />Guardar e sair</button>
+      <button type="button" disabled={busy || !unanswered} onClick={() => run(onUnanswered)}><CircleHelp aria-hidden="true" />Ir para uma pergunta por responder</button>
+      <button type="button" disabled={busy} onClick={() => run(onFinish)}><CheckCircle2 aria-hidden="true" />Concluir sessão</button>
+      <button type="button" className={styles.toolsQuit} disabled={busy} onClick={() => run(onQuit)}><XCircle aria-hidden="true" />Desistir do teste</button>
+      <button type="button" onClick={() => run(() => window.dispatchEvent(new Event(OPEN_COOKIE_PREFERENCES)))}><Cookie aria-hidden="true" />Preferências de cookies</button>
+      {timed && <p>O tempo pausa ao sair deste separador.</p>}
+    </div>}
+  </div>;
 }
 
 function ResultsView({ attempt, correctCount, percent, recommendation, onRestart }: { attempt: Attempt; correctCount: number; percent: number; recommendation: string; onRestart: () => void }) {
