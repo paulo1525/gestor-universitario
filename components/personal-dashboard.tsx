@@ -23,6 +23,19 @@ const text = (item: Record<string, unknown>, ...keys: string[]) => { for (const 
 const plainText = (value: string) => value.replace(/<br\s*\/?\s*>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
 const number = (item: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) { const value = Number(item[key]); if (item[key] !== null && item[key] !== undefined && Number.isFinite(value)) return value; } return null; };
 const boolean = (item: Record<string, unknown>, ...keys: string[]) => { for (const key of keys) if (typeof item[key] === "boolean") return item[key] as boolean; return false; };
+const calendarLabelKeys = {
+  assessment: "community.calendar.type.assessment",
+  exam: "community.calendar.type.exam",
+  deadline: "community.calendar.type.deadline",
+  academic: "community.calendar.type.academic",
+  meeting: "community.calendar.type.meeting",
+  study: "community.calendar.type.study",
+  personal: "community.calendar.type.personal",
+  social: "community.calendar.type.social",
+  academic_group: "community.calendar.type.academic_group",
+  event: "community.calendar.type.event",
+  evaluation: "community.calendar.type.evaluation",
+} as const;
 
 // Dates arrive as ISO strings or as epoch milliseconds.
 function dateValue(item: Record<string, unknown>, ...keys: string[]) {
@@ -59,12 +72,13 @@ export function PersonalDashboard() {
   const summaries = [
     { module: "calendar.events", href: "/calendario", icon: CalendarDays, label: t("personalDashboard.summary.events"), value: data?.events.length || 0, help: t("personalDashboard.summary.eventsHelp"), tone: "gold" }, { module: "polls.voting", href: "/inqueritos", icon: ClipboardCheck, label: t("personalDashboard.summary.polls"), value: data?.polls.length || 0, help: t("personalDashboard.summary.pollsHelp"), tone: "gold" }, { module: "materials.library", href: "/materiais", icon: Highlighter, label: t("personalDashboard.summary.materials"), value: data?.highlightTotal || 0, help: t("personalDashboard.summary.materialsHelp"), tone: "gold" }, { module: "quizzes.practice", href: "/testes", icon: BrainCircuit, label: t("personalDashboard.summary.quizzes"), value: data?.completedQuizAttempts || 0, help: t("personalDashboard.summary.quizzesHelp"), tone: "gold" },
   ].filter((summary) => on(summary.module));
-  const priorityLabel = (value: string) => {
+  const badgeLabel = (value: string) => {
     const normalized = value.trim().toLocaleLowerCase("en");
     if (normalized === "urgent") return t("notifications.priority.urgent");
     if (normalized === "important") return t("notifications.priority.important");
     if (normalized === "normal") return t("notifications.priority.normal");
-    return value;
+    const calendarLabelKey = calendarLabelKeys[normalized as keyof typeof calendarLabelKeys];
+    return calendarLabelKey ? t(calendarLabelKey) : value;
   };
   const listPanel = (title: string, subtitle: string, href: string, Icon: typeof CalendarDays, items: Entry[], kind: "event" | "announcement" | "poll" | "request" | "material") => {
     const titleId = `dashboard-${kind}-title`;
@@ -76,7 +90,7 @@ export function PersonalDashboard() {
         return <Link prefetch={false} href={item.href} key={`${kind}-${item.id}`} className={`${styles.item} ${kind === "event" ? "" : styles.plainItem} ${kind === "announcement" && !item.read ? styles.unread : ""}`}>
           {kind === "event" && <time className={styles.dateBox} dateTime={item.date || undefined}><strong>{day}</strong><small>{month}</small></time>}
           <span className={styles.itemCopy}><strong>{item.title || t("personalDashboard.untitled")}</strong>{item.description && <p>{item.description}</p>}{kind !== "event" && date && <small>{date}</small>}</span>
-          <span className={styles.itemMeta}>{item.label && <span className={styles.badge} data-tone={kind === "request" ? "blue" : kind === "poll" ? "green" : undefined}>{priorityLabel(item.label)}</span>}<ChevronRight aria-hidden="true" /></span>
+          <span className={styles.itemMeta}>{item.label && <span className={styles.badge} data-tone={kind === "request" ? "blue" : kind === "poll" ? "green" : undefined}>{badgeLabel(item.label)}</span>}<ChevronRight aria-hidden="true" /></span>
         </Link>;
       })}</div> : <div className={styles.empty} role="status">
         <span className={styles.stateIcon} aria-hidden="true"><Icon /></span>
