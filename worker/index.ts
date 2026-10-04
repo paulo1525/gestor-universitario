@@ -1396,10 +1396,23 @@ async function handleAnnouncementComments(request: Request, env: Env, user: Curr
   if (request.method === "GET") {
     const announcementId = new URL(request.url).searchParams.get("announcementId")?.trim() || "";
     if (!announcementId || !await visible(announcementId, management)) return json({ error: "Aviso não encontrado." }, 404);
-    const rows = await env.DB.prepare("SELECT c.id,c.body,c.created_at,c.user_id,u.full_name,u.email FROM announcement_comments c JOIN users u ON u.id=c.user_id WHERE c.announcement_id=? AND c.deleted_at IS NULL ORDER BY c.created_at ASC LIMIT 300").bind(announcementId).all<{ id: string; body: string; created_at: number; user_id: string; full_name: string; email: string}>();
-    return json({ comments: rows.results.map(row => ({ id: row.id, body: row.body, createdAt: row.created_at, author: { fullName: row.full_name, ...(canViewIdentifiers ? { id: row.user_id, email: row.email } : {}) }, own: row.user_id === user.id, canDelete: row.user_id === user.id || isManagementCore(user) })) });
+    const rows = await env.DB.prepare("SELECT c.id,c.body,c.created_at,c.user_id,c.pinned_at,u.full_name,u.email FROM announcement_comments c JOIN users u ON u.id=c.user_id WHERE c.announcement_id=? AND c.deleted_at IS NULL ORDER BY c.pinned_at DESC,c.created_at ASC LIMIT 300").bind(announcementId).all<{ id: string; body: string; created_at: number; user_id: string; pinned_at: number | null; full_name: string; email: string}>();
+    return json({ comments: rows.results.map(row => ({ id: row.id, body: row.body, createdAt: row.created_at, pinned: row.pinned_at !== null, canPin: isManagementCore(user), author: { fullName: row.full_name, ...(canViewIdentifiers ? { id: row.user_id, email: row.email } : {}) }, own: row.user_id === user.id, canDelete: row.user_id === user.id || isManagementCore(user) })) });
   }
   const body = await parseJson(request);
+  if (request.method === "PATCH") {
+    if (!isManagementCore(user)) return json({error:"Sem permissão para afixar comentários."},403);
+    const id = String(body?.id || "").trim();
+    if (typeof body?.pinned !== "boolean") return json({error:"Indique se pretende afixar o comentário."},400);
+    const comment = await env.DB.prepare("SELECT id,announcement_id FROM announcement_comments WHERE id=? AND deleted_at IS NULL").bind(id).first<{id:string;announcement_id:string}>();
+    if (!comment || !await visible(comment.announcement_id,management)) return json({error:"Comentário não encontrado."},404);
+    const now = Date.now();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE announcement_comments SET pinned_at=? WHERE id=?").bind(body.pinned ? now : null,id),
+      env.DB.prepare("INSERT INTO admin_audit_log (actor_user_id,action,details,created_at) VALUES (?,'announcement_comment_pinned',?,?)").bind(user.actorId || user.id,JSON.stringify({id,announcementId:comment.announcement_id,pinned:body.pinned}),now),
+    ]);
+    return json({ok:true});
+  }
   if (request.method === "POST") {
     const announcementId = String(body?.announcementId || "").trim();
     const text = sanitizeAnnouncementHtml(String(body?.body || "").trim());
@@ -1673,7 +1686,7 @@ async function routeApi(request: Request, env: Env, url: URL, ctx?: ExecutionCon
     const user = await currentUser(request, env);
     return user ? handleAdminModules(request, env, user) : json({ error: "Sessão inválida." }, 401);
   }
-  if (pathname === "/api/announcements/comments" && ["GET", "POST", "DELETE"].includes(request.method)) {
+  if (pathname === "/api/announcements/comments" && ["GET", "POST", "PATCH", "DELETE"].includes(request.method)) {
     const user = await currentUser(request, env);
     return user ? handleAnnouncementComments(request, env, user) : json({ error: "Sessão inválida." }, 401);
   }

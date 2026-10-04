@@ -21,22 +21,29 @@ const icons = {
   info: Info,
 };
 
-export function AppToast({ message, kind = "success", title, duration = 3000, onDismiss }: Props) {
+export function AppToast(props: Props) {
+  return <ToastMessage key={`${props.kind}:${props.title}:${props.message}:${props.duration}`} {...props} />;
+}
+
+function ToastMessage({ message, kind = "success", title, duration = 3000, onDismiss }: Props) {
   const { t } = useI18n();
   const [leaving, setLeaving] = useState(false);
   const exitTimer = useRef<number | null>(null);
+  const onDismissRef = useRef(onDismiss);
+  const canDismiss = Boolean(onDismiss);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
   const Icon = icons[kind];
   const dismiss = useCallback(() => {
-    if (!onDismiss || leaving) return;
+    if (!onDismissRef.current || leaving) return;
     setLeaving(true);
-    exitTimer.current = window.setTimeout(onDismiss, 180);
-  }, [leaving, onDismiss]);
+    exitTimer.current = window.setTimeout(() => onDismissRef.current?.(), 180);
+  }, [leaving]);
 
   useEffect(() => {
-    if (!onDismiss || duration <= 0 || leaving) return;
+    if (!canDismiss || duration <= 0 || leaving) return;
     const timer = window.setTimeout(dismiss, duration);
     return () => window.clearTimeout(timer);
-  }, [dismiss, duration, leaving, onDismiss]);
+  }, [dismiss, duration, leaving, canDismiss]);
 
   useEffect(() => () => {
     if (exitTimer.current) window.clearTimeout(exitTimer.current);
