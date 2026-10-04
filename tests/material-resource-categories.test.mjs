@@ -22,6 +22,8 @@ vm.runInNewContext(compiled, {
 function database() {
   const catalog = MATERIAL_RESOURCE_CATEGORIES.map((category, index) => ({ id: `file-${index}`, title: `Original ${category}`, material_kind: "other", other_format: "slides", resource_category: category, mime_type: "application/pdf", storage_backend: "r2", storage_state: "ready", public_access: 0, unit_id: "unit-1", unit_code: "FIS1", unit_name: "Fisiologia I", study_year: 2, semester: 1 }));
   catalog.push({ ...catalog[0], id: "legacy", resource_category: null, title: "Legacy slides" });
+  catalog.push({ ...catalog[0], id: "sebenta", resource_category: null, other_format: null, study_category: "sebenta", title: "Sebenta de Fisiologia I" });
+  catalog.push({ ...catalog[0], id: "compendium", resource_category: null, other_format: "compendium", title: "Compêndio de Fisiologia I" });
   return { prepare(sql) { return { bind() { return this; }, async first() { return catalog[0]; }, async all() { return { results: sql.includes("FROM material_catalog m") ? catalog : [] }; } }; } };
 }
 
@@ -33,6 +35,8 @@ test("as novas categorias prevalecem sobre slides e as categorias antigas mantê
   const entries = units[0].entries;
   for (const category of MATERIAL_RESOURCE_CATEGORIES) assert.equal(entries.find((entry) => entry.title === `Original ${category}`).section, category);
   assert.equal(entries.find((entry) => entry.id === "legacy").section, "slides");
+  assert.equal(entries.find((entry) => entry.id === "sebenta").section, "sebentas");
+  assert.equal(entries.find((entry) => entry.id === "compendium").section, "compendiums");
 });
 
 test("os materiais docentes continuam protegidos para visitantes sem sessão", async () => {
