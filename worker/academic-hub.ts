@@ -4,6 +4,7 @@ import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-cont
 import { isExamWorkflowTransitionAllowed } from "@/lib/exam-workflow.mjs";
 import { handleMaterialsCatalogRoute, isMaterialsCatalogPath } from "./materials-catalog";
 import { deleteSubmissionFiles, handleMaterialUploadRoute, isMaterialUploadPath, markUploadsAttached, readyUploads } from "./material-uploads";
+import { unansweredPollCount } from "./communication-counts";
 import { MATERIAL_MAX_EXAM_PHOTOS } from "@/lib/material-upload";
 
 export type HubUser = {
@@ -633,6 +634,9 @@ async function polls(request: Request, env: HubEnv, url: URL, user: HubUser | nu
   if (!await enabled(management ? "polls.management" : "polls.voting")) return disabled();
   if (management && !isCommission(user)) return forbidden();
   if (request.method === "GET") {
+    if (url.searchParams.get("countOnly") === "true") {
+      return json({ unansweredCount: await unansweredPollCount(env.DB,id=>voterHash(env,user,id)) });
+    }
     const scope = isCommission(user) && url.searchParams.get("scope") === "management" ? "1=1" : "p.status IN ('published','closed') AND (p.starts_at IS NULL OR p.starts_at<=?)";
     const pollResult = scope === "1=1" ? await env.DB.prepare("SELECT p.*,(SELECT COUNT(*) FROM poll_participations pp WHERE pp.poll_id=p.id) AS total_votes FROM polls p ORDER BY p.created_at DESC").all() : await env.DB.prepare(`SELECT p.*,(SELECT COUNT(*) FROM poll_participations pp WHERE pp.poll_id=p.id) AS total_votes FROM polls p WHERE ${scope} ORDER BY p.created_at DESC`).bind(Date.now()).all();
     const ids = pollResult.results.map((item) => String(rowObject(item).id));

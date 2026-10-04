@@ -26,6 +26,8 @@ type QuestionBankQuestion = {
   hasOptions: boolean;
   hasImage: boolean;
   imageUrl: string | null;
+  imageUrls?: string[];
+  solutionImageUrls?: string[];
   responseType: string;
   topic: { id: string; title: string; chapterNumber: string };
   source: { subtopic: string; academicYear: string; page: string; question: string; assessment: string; session: string; original: string; indicatedAnswer: string | null; validatedAnswer: string | null; validationState: string; warning: string; justification: string; confidence: string };
@@ -260,8 +262,10 @@ export function QuestionBankSection({ unitId, unitCode }: { unitId: string; unit
                   <ChevronDown className={styles.chevron} aria-hidden="true" />
                 </summary>
                 <div className={styles.answer}>
+                  {(question.imageUrls ?? (question.imageUrl ? [question.imageUrl] : [])).map((url, figureIndex) => <figure key={url} className={styles.figure}><img src={url} alt={`Figura ${figureIndex + 1} da pergunta`} loading="lazy" /></figure>)}
                   <span className={styles.answerLabel}>{includeSolutions ? "Solução validada" : "Compêndio sem soluções"}</span>
                   {question.answer ? <p>{question.answer}</p> : <p>Resposta ocultada para este compêndio.</p>}
+                  {includeSolutions && question.solutionImageUrls?.map((url, figureIndex) => <figure key={url} className={styles.figure}><img src={url} alt={`Figura ${figureIndex + 1} da solução`} loading="lazy" /></figure>)}
                   {question.options?.length ? <div className={styles.options} aria-label="Opções de resposta">
                     {question.options.map((option) => <div className={option.isCorrect && includeSolutions ? styles.optionCorrect : styles.option} key={option.id}><span>{option.label})</span><span>{option.text}</span></div>)}
                   </div> : null}

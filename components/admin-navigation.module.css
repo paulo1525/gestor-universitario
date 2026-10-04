@@ -338,3 +338,7 @@
     transition: none;
   }
 }
+
+.navigation .item > span.countBadge { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-width: 22px; height: 22px; margin-left: auto; padding-inline: 4px; border-radius: 999px; color: var(--sidebar-active-text); background: var(--gold); font-size: var(--font-size-caption); font-weight: 800; }
+.navigation .item.active > span.countBadge { color: var(--sidebar-active-bg); background: var(--sidebar-active-text); }
+@media (min-width: 821px) { :global(.sidebar.sidebar--collapsed) .navigation .item > span.countBadge { position: absolute; inset: 0 0 auto auto; width: auto; height: 18px; min-width: 18px; padding-inline: 3px; clip-path: none; overflow: visible; } }

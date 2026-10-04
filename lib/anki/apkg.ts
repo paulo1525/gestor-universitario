@@ -23,6 +23,8 @@ export type AnkiMcqCard = {
   options: AnkiMcqOption[];
   explanationHtml: string;
   image?: AnkiMcqImage | null;
+  images?: AnkiMcqImage[];
+  solutionImages?: AnkiMcqImage[];
   sourceHtml?: string;
   tags?: string[];
 };
@@ -242,13 +244,13 @@ function validateInput(input: AnkiMcqDeckInput): void {
     if (!card.id.trim() || ids.has(card.id)) throw new Error(`A pergunta ${index + 1} tem um identificador vazio ou repetido.`);
     ids.add(card.id);
     if (!plainText(card.promptHtml)) throw new Error(`A pergunta ${index + 1} não tem enunciado.`);
-    if (card.options.length < 2 || card.options.length > 4 || card.options.some((option) => !plainText(option.html))) throw new Error(`A pergunta ${index + 1} tem de ter entre duas e quatro opções preenchidas.`);
+    if (card.options.length < 2 || card.options.length > 5 || card.options.some((option) => !plainText(option.html))) throw new Error(`A pergunta ${index + 1} tem de ter entre duas e cinco opções preenchidas.`);
     if (card.options.filter((option) => option.isCorrect).length !== 1) throw new Error(`A pergunta ${index + 1} tem de ter exatamente uma resposta correta.`);
     if (plainText(card.explanationHtml).length < 20) throw new Error(`A explicação da pergunta ${index + 1} deve ser desenvolvida (mínimo de 20 caracteres).`);
     for (const [label, html] of [["enunciado", card.promptHtml], ["explicação", card.explanationHtml], ["fonte", card.sourceHtml || ""]] as const) assertNoDataUri(html, `O campo ${label} da pergunta ${index + 1}`);
     card.options.forEach((option, optionIndex) => assertNoDataUri(option.html, `A opção ${optionIndex + 1} da pergunta ${index + 1}`));
-    if (card.image) {
-      const imageSize = asBytes(card.image.bytes).length;
+    for (const image of [...(card.images ?? (card.image ? [card.image] : [])), ...(card.solutionImages ?? [])]) {
+      const imageSize = asBytes(image.bytes).length;
       if (imageSize === 0) throw new Error(`A imagem da pergunta ${index + 1} está vazia.`);
       if (imageSize > MAX_ANKI_IMAGE_BYTES) throw new Error(`A imagem da pergunta ${index + 1} excede o limite de 1 MiB.`);
     }
@@ -275,18 +277,19 @@ export async function buildMcqApkg(input: AnkiMcqDeckInput): Promise<AnkiApkgRes
       input.cards.forEach((card, index) => {
         const noteId = generatedAt + (index * 2);
         const cardId = noteId + 1;
-        let imageField = "";
-        if (card.image) {
-          const bytes = asBytes(card.image.bytes);
-          const mediaName = `gu-${fnv1aBytes(bytes).toString(36)}-${safeMediaBaseName(card.image.fileName)}`;
+        const attachImage = (image: AnkiMcqImage) => {
+          const bytes = asBytes(image.bytes);
+          const mediaName = `gu-${fnv1aBytes(bytes).toString(36)}-${safeMediaBaseName(image.fileName)}`;
           const existing = mediaByName.get(mediaName);
           if (existing && !sameBytes(existing, bytes)) throw new Error(`Conflito no ficheiro de media ${mediaName}.`);
           mediaByName.set(mediaName, bytes);
-          imageField = `<img src="${escapeHtml(mediaName)}"${card.image.alt ? ` alt="${escapeHtml(card.image.alt)}"` : ""}>`;
-        }
+          return `<img src="${escapeHtml(mediaName)}"${image.alt ? ` alt="${escapeHtml(image.alt)}"` : ""}>`;
+        };
+        const imageField = (card.images ?? (card.image ? [card.image] : [])).map(attachImage).join("\n");
+        const solutionField = (card.solutionImages ?? []).map(attachImage).join("\n");
         const promptHtml = sanitizeRichTextHtml(card.promptHtml);
         const safeOptions = card.options.map((option) => ({ ...option, html: sanitizeRichTextHtml(option.html) }));
-        const fields = [promptHtml, optionsHtml(safeOptions), imageField, answerHtml(safeOptions), sanitizeRichTextHtml(card.explanationHtml), sanitizeRichTextHtml(card.sourceHtml || "")];
+        const fields = [promptHtml, optionsHtml(safeOptions), imageField, answerHtml(safeOptions), sanitizeRichTextHtml(card.explanationHtml) + solutionField, sanitizeRichTextHtml(card.sourceHtml || "")];
         if (fields.some((field) => DATA_URI.test(field))) throw new Error(`A pergunta ${index + 1} contém uma data URI.`);
         noteStatement.run([noteId, stableGuid(card.id), modelId, modifiedSeconds, -1, normalizeTags(card.tags), fields.join(FIELD_SEPARATOR), plainText(promptHtml), checksums[index], 0, ""]);
         cardStatement.run([cardId, noteId, deckId, 0, modifiedSeconds, -1, 0, 0, index + 1, 0, 0, 0, 0, 0, 0, 0, 0, ""]);

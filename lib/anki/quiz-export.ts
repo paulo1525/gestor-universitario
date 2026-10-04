@@ -12,6 +12,8 @@ export type QuizExportQuestion = {
   topicTitle: string;
   prompt: string;
   imageUrl: string | null;
+  imageUrls?: string[];
+  solutionImageUrls?: string[];
   explanation: string;
   difficulty: string;
   options: QuizExportOption[];
@@ -89,16 +91,18 @@ export async function quizExportToAnkiDeck(payload: QuizExportPayload, options: 
   const resolver = options.resolveImage || ((imageUrl, question) => defaultQuizImageResolver(imageUrl, question, options.fetcher));
   const cards = await Promise.all(payload.questions.map(async (question, index) => {
     const orderedOptions = [...question.options].sort((left, right) => left.position - right.position);
-    if (orderedOptions.length < 2 || orderedOptions.length > 4) throw new Error(`A pergunta ${index + 1} não tem entre duas e quatro opções.`);
+    if (orderedOptions.length < 2 || orderedOptions.length > 5) throw new Error(`A pergunta ${index + 1} não tem entre duas e cinco opções.`);
     if (!orderedOptions.some((option) => option.id === question.correctOptionId)) throw new Error(`A pergunta ${index + 1} não identifica uma opção correta válida.`);
-    const image = question.imageUrl ? await resolver(question.imageUrl, question) : null;
-    if (image && image.bytes.byteLength > MAX_ANKI_IMAGE_BYTES) throw new Error(`A imagem da pergunta ${question.id} excede o limite de 1 MiB.`);
+    const images = (await Promise.all((question.imageUrls ?? (question.imageUrl ? [question.imageUrl] : [])).map(url => resolver(url, question)))).filter((image): image is AnkiMcqImage => image !== null);
+    const solutionImages = (await Promise.all((question.solutionImageUrls ?? []).map(url => resolver(url, question)))).filter((image): image is AnkiMcqImage => image !== null);
+    for (const image of [...images, ...solutionImages]) if (image.bytes.byteLength > MAX_ANKI_IMAGE_BYTES) throw new Error(`A imagem da pergunta ${question.id} excede o limite de 1 MiB.`);
     return {
       id: question.id,
       promptHtml: question.prompt,
       options: orderedOptions.map((option) => ({ html: escapeHtml(option.text), isCorrect: option.id === question.correctOptionId })),
       explanationHtml: question.explanation,
-      image,
+      images,
+      solutionImages,
       sourceHtml: `${escapeHtml(payload.deck.unitCode)} · ${escapeHtml(question.topicTitle)}`,
       tags: [payload.deck.unitCode, question.topicTitle, question.difficulty, payload.deck.mode],
     };

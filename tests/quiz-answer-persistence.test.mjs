@@ -19,10 +19,11 @@ const { handleQuizRoute } = await compile('../worker/quizzes.ts', (path) => {
 const SQL = await initSqlJs();
 const user = { id: 'student-test', email: 'student@example.test', fullName: 'Estudante fictício', role: 'student' };
 const { moduleEffectiveEnabled } = await compile('../lib/app-modules.ts');
-test('módulo arquivado bloqueia todas as APIs antes de consultar D1 mesmo com configurações antigas ativas', async () => {
+test('módulo reativado respeita o interruptor administrativo e bloqueia APIs quando desativado', async () => {
   const env = { DB: { prepare() { throw new Error('Archived module must not query D1'); } } };
   const keys = ['quizzes', 'quizzes.practice', 'quizzes.progress', 'quizzes.learning', 'quizzes.management'];
-  const states = Object.fromEntries(keys.map((key) => [key, true]));
+  for (const key of keys) assert.equal(moduleEffectiveEnabled(key, {}), true);
+  const states = Object.fromEntries(keys.map((key) => [key, false]));
   for (const key of keys) assert.equal(moduleEffectiveEnabled(key, states), false);
   for (const path of ['/api/question-bank', '/api/quizzes', '/api/quiz-attempts/attempt-test/answers', '/api/admin/quiz-questions']) {
     const url = new URL(path, 'https://example.test');

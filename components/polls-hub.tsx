@@ -240,6 +240,7 @@ export function PollsHub() {
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error || t("polls.vote.error"));
       setNotice({ kind: "success", message: t("polls.vote.success") });
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.vote.error") });
@@ -284,6 +285,7 @@ export function PollsHub() {
       if (!response.ok) throw new Error(data.error || t(editing ? "polls.save.updateError" : "polls.save.createError"));
       closeEditor();
       setNotice({ kind: "success", message: t(editing ? "polls.save.updated" : "polls.save.published") });
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.save.error") });
@@ -300,6 +302,7 @@ export function PollsHub() {
       if (!response.ok) throw new Error(data.error || t("polls.save.updateError"));
       setCloseTarget(null);
       setNotice({ kind: "success", message: t(status === "closed" ? "polls.closedNotice" : "polls.reopenedNotice") });
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.save.updateError") });
@@ -319,6 +322,7 @@ export function PollsHub() {
       if (openId === deleteTarget.id) openPoll(null);
       setDeleteTarget(null);
       setNotice({ kind: "success", message: t("polls.delete.success") });
+      window.dispatchEvent(new Event("communication:changed"));
       await load();
     } catch (reason) {
       setNotice({ kind: "error", message: reason instanceof Error ? reason.message : t("polls.delete.error") });
