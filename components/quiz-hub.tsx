@@ -499,6 +499,8 @@ export function QuizHub() {
   useEffect(() => { if (screen === "statistics") void loadStatistics(); }, [loadStatistics, screen]);
   useEffect(() => {
     if (!selectedUnit) return;
+    if (selectedUnit.multipleChoiceCount === 0 && selectedUnit.shortAnswerCount > 0) setAnswerFormat("short_answer");
+    else if (selectedUnit.shortAnswerCount === 0 && selectedUnit.multipleChoiceCount > 0) setAnswerFormat("multiple_choice");
     setSelectedTopicIds((current) => {
       const valid = current.filter((id) => selectedUnit.topics.some((topic) => topic.id === id));
       return valid.length === current.length ? current : valid;

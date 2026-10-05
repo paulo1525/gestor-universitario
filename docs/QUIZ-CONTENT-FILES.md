@@ -64,6 +64,24 @@ revisão. Ficheiros cujo conteúdo não mudou conservam a sua versão cifrada.
 Nunca adicionar a pasta de JSON legíveis ao Git. Fazer commit e push apenas
 quando a publicação estiver explicitamente autorizada.
 
+### Neuroanatomia — edição final de 29/09/2026
+
+`scripts/update-neuro-compendium.mjs` atualiza exclusivamente os registos de
+Neuroanatomia no export privado antes do `pack --rebuild`. Recebe `--source`
+com a base `Compendio/Base/questoes.json`, `--content` com o diretório privado
+desempacotado e `--groups` com um JSON privado extraído de `estrutura_aulas.py`:
+uma lista na ordem de `GROUPS`, com `code`, `title`, `indices` e `count` (contagem
+das perguntas incluídas nesses índices). Conferir este ficheiro com o guia e
+os dois PDFs finais de `Entregas/` antes de executar a atualização.
+
+A edição tem 1.174 registos internos: 1.164 publicados, dez excluídos e 283
+soluções com ressalvas. Os 17 conjuntos AT/AP substituem os temas anteriores.
+Os IDs derivados dos identificadores persistentes `Q` são os mesmos da
+importação anterior; os 295 registos antigos de AP1 são arquivados sem remover
+as suas opções, preservando tentativas, respostas e comentários na D1.
+As conclusões, ressalvas, referências e proveniência da base ficam no conteúdo
+cifrado. Esta operação não lê Ankis nem exige migrations remotas.
+
 ## Histórico e recuperação
 
 Respostas, comentários, progresso e snapshots de tentativas permanecem na D1.
