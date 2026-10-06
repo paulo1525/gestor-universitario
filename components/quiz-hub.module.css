@@ -434,6 +434,10 @@
 .answerStyleGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
 .choiceHint { display: none; margin: 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); line-height: 1.5; }
 .sessionRecap { min-width: 0; margin: 0 auto 0 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); font-weight: 650; }
+/* Testes tabs (Praticar · Estatísticas · Ranking) span the whole content width. */
+.page :global(.page-tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.page :global(.page-tabs) > :is(a, button) { justify-content: center; min-height: 36px; }
+
 .countRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
 .countChoices {
@@ -2602,6 +2606,7 @@
   .unitActions { position: sticky; z-index: 3; bottom: 0; margin: 0 calc(var(--space-3) * -1) calc(var(--space-3) * -1); padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); background: var(--color-surface); }
   .page .unitActions .startSession { width: 100%; min-height: 52px; font-size: var(--font-size-heading-2); }
   .page :global(.page-tabs) > button, .page .backLink { min-height: 44px; font-size: var(--font-size-heading-3); }
+  .page :global(.page-tabs) > button { gap: var(--space-1); padding: 0 var(--space-1); white-space: nowrap; }
   .page :global(.filter-bar) { --filter-control-height: 44px; }
   .page :global(.filter-bar) :global(input[type="search"]) { font-size: var(--font-size-heading-2); }
   :global(body):has(.page) :global([role="listbox"] [role="option"]) { min-height: 44px; font-size: var(--font-size-heading-3); }
