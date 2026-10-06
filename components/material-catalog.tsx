@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, ClipboardCheck, Download, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, Video, type LucideIcon } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, Video, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -304,6 +304,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   // Step 1: choose the curricular unit.
   if (!selectedUnit) {
     const term = unitSearch.trim().toLocaleLowerCase("pt-PT");
+    const showOsmosis = !term || "videos osmosis google drive".includes(term.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
     const matching = unitOptions.filter((unit) => !term || `${unit.code} ${unit.name}`.toLocaleLowerCase("pt-PT").includes(term));
     const currentUnitPage = clampPage(unitPage, matching.length, UNIT_PAGE_SIZE);
     const unitGroups = new Map<string, MaterialUnitOption[]>();
@@ -315,6 +316,19 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       <FilterBar label={t("community.materials.catalog.unit.search")}>
         <FilterSearch label={t("community.materials.catalog.unit.search")} value={unitSearch} onChange={setUnitSearch} placeholder={t("community.materials.catalog.unit.searchPlaceholder")} />
       </FilterBar>
+      {showOsmosis && <div className={list.group}>
+        <h3 className={list.groupTitle}>Coleções de vídeos</h3>
+        <ul className={list.rows}>
+          <li className={list.row}>
+            <span className={list.rowIcon} aria-hidden="true"><Video /></span>
+            <div className={list.rowMain}>
+              <h3><a className={`link-quiet ${list.titleLink}`} href="https://drive.google.com/drive/folders/1FA-iBD8tIldAsPE3GYXacbYwvqw866AA?usp=sharing" target="_blank" rel="noopener noreferrer">Vídeos OSMOSIS</a></h3>
+              <p className={list.rowMeta}>Pasta partilhada na Google Drive · coleção parcial</p>
+            </div>
+            <ExternalLink className={list.rowArrow} aria-label="Abre numa nova janela" />
+          </li>
+        </ul>
+      </div>}
       {error && <div className={styles.notice} role="alert"><span>{error}</span><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div>}
       {loading && !units.length ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : matching.length ? [...unitGroups.entries()].map(([group, groupUnits]) => <div className={list.group} key={group || "all"}>
         {group && <h3 className={list.groupTitle}>{group}</h3>}
@@ -330,7 +344,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
             </li>;
           })}
         </ul>
-      </div>) : <div className={list.empty}><GraduationCap /><strong>{t("community.materials.catalog.unit.empty")}</strong></div>}
+      </div>) : !showOsmosis && <div className={list.empty}><GraduationCap /><strong>{t("community.materials.catalog.unit.empty")}</strong></div>}
       {!loading && <Pagination page={currentUnitPage} totalItems={matching.length} pageSize={UNIT_PAGE_SIZE} onChange={setUnitPage} />}
     </section>;
   }

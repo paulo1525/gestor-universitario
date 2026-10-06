@@ -15,7 +15,7 @@ import { adminDataLabel } from "@/lib/i18n-admin";
 import { setTestMode, TEST_MODE_AVAILABLE } from "@/lib/test-mode";
 import styles from "@/components/admin-control.module.css";
 import { FilterSearch, FilterSelect } from "@/components/filter-bar";
-import { AdminEmptyState, AdminMetric, AdminMetricGrid, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
+import { AdminEmptyState, AdminFormGrid, AdminMetric, AdminMetricGrid, AdminPage, AdminPageHeader, AdminSection, AdminToolbar } from "@/components/admin-ui";
 import { useFloatingAction } from "@/components/floating-actions";
 import { clampPage, Pagination } from "@/components/pagination";
 
@@ -57,6 +57,9 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
   const [savedUserId, setSavedUserId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [validationDeadline, setValidationDeadline] = useState("");
+  const [validationDeadlineEnabled, setValidationDeadlineEnabled] = useState(false);
+  const [savingValidation, setSavingValidation] = useState(false);
   const [page, setPage] = useState(1);
   const [savedStatuses, setSavedStatuses] = useState<Record<string, Status>>({});
   const [blockTarget, setBlockTarget] = useState<User | null>(null);
@@ -96,9 +99,14 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
       setDepartments(userData.departments);
     } else {
       const settingsResponse = await fetch("/api/admin/settings", { cache: "no-store" });
-      const settingsData = await settingsResponse.json() as { maintenanceMode: boolean; maintenanceMessage: string };
+      const settingsData = await settingsResponse.json() as { maintenanceMode: boolean; maintenanceMessage: string; emailValidationClosesAt?: string | null };
       setMaintenance(settingsData.maintenanceMode);
       setMessage(settingsData.maintenanceMessage);
+      setValidationDeadlineEnabled(Boolean(settingsData.emailValidationClosesAt));
+      if (settingsData.emailValidationClosesAt) {
+        const date = new Date(settingsData.emailValidationClosesAt);
+        setValidationDeadline(Number.isFinite(date.getTime()) ? new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0,16) : "");
+      } else setValidationDeadline("");
     }
     setLoading(false);
   }, [view]);
@@ -156,6 +164,17 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
     } finally { setSavingSettings(false); }
   };
 
+  const saveValidation = async () => {
+    setSavingValidation(true); setMaintenanceNotice("");
+    try {
+      const deadline = validationDeadlineEnabled ? new Date(validationDeadline).toISOString() : null;
+      const response = await fetch("/api/admin/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ section: "registration", emailValidationClosesAt: deadline }) });
+      const data = await response.json() as { error?: string };
+      setMaintenanceNoticeError(!response.ok);
+      setMaintenanceNotice(response.ok ? (locale === "en" ? "Account validation settings saved." : "Configuração de validação de contas guardada.") : data.error || t("admin.common.saveFailed"));
+    } catch { setMaintenanceNoticeError(true); setMaintenanceNotice(t("admin.common.saveFailed")); }
+    finally { setSavingValidation(false); }
+  };
   const openUserItem = view === "users" && openUserId ? users.find((user) => user.id === openUserId) ?? null : null;
   useFloatingAction(openUserItem ? { id: "preview-user", label: t("admin.control.usePermissions"), icon: FLOATING_PREVIEW_ICON, onClick: () => void previewUser(openUserItem.id) } : null);
 
@@ -203,6 +222,17 @@ export function AdminControl({ view }: { view: "settings" | "users" }) {
           <label className={styles.editorLabel}><span><strong>{t("admin.control.maintenanceNotice")}</strong><small>{messageLength}/500</small></span><RichTextEditor value={message} onChange={setMessage} ariaLabel={t("admin.control.maintenanceNotice")} placeholder={t("admin.control.maintenancePlaceholder")} maxLength={500} minHeight="compact" disabled={loading} onInvalidLink={() => { setMaintenanceNoticeError(true); setMaintenanceNotice(t("admin.control.invalidLink")); }} /></label>
         </div>
         <footer className={styles.sectionFooter}><button className="button button--primary button--compact" onClick={() => void saveSettings()} disabled={loading || savingSettings || messageLength === 0 || messageLength > 500}>{savingSettings ? <><LoaderCircle className="spin" />{t("admin.common.saving")}</> : settingsSaved ? <><Check />{t("admin.common.saved")}</> : <><Save />{t("admin.control.saveAvailability")}</>}</button></footer>
+      </AdminSection>
+      <AdminSection icon={<ShieldCheck />} eyebrow={locale === "en" ? "Accounts" : "Contas"} title={locale === "en" ? "Account validation" : "Validação de contas"}>
+        <div className={styles.editorBody}>
+          <AdminFormGrid>
+            <label className="switch"><input type="checkbox" checked={validationDeadlineEnabled} disabled={loading || savingValidation} onChange={event => setValidationDeadlineEnabled(event.target.checked)} /><span><strong>{locale === "en" ? "Set an email validation deadline" : "Definir prazo para validação por email"}</strong></span></label>
+            {validationDeadlineEnabled && <label className="field"><span>{locale === "en" ? "Require administrator approval from" : "Exigir aprovação de administrador a partir de"}</span><input type="datetime-local" value={validationDeadline} onChange={event => setValidationDeadline(event.target.value)} disabled={loading || savingValidation} required /></label>}
+          </AdminFormGrid>
+          <p className="surface-note">{locale === "en" ? "After this deadline, new accounts require approval in Users and permissions. Existing active accounts keep their access." : "Após o prazo, as novas contas ficam pendentes em Utilizadores e permissões. As contas já ativas mantêm o acesso."}</p>
+          {validationDeadlineEnabled && <p className="surface-note">{locale === "en" ? "Time zone" : "Fuso horário"}: {Intl.DateTimeFormat().resolvedOptions().timeZone}</p>}
+        </div>
+        <footer className={styles.sectionFooter}><button className="button button--primary button--compact" type="button" onClick={() => void saveValidation()} disabled={loading || savingValidation || (validationDeadlineEnabled && !validationDeadline)}><Save aria-hidden="true" />{savingValidation ? t("admin.common.saving") : locale === "en" ? "Save validation" : "Guardar validação"}</button></footer>
       </AdminSection>
     </div> : <>
       {!openUserId && <AdminMetricGrid label={t("admin.control.accounts")}>
