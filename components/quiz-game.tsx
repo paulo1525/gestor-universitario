@@ -2,11 +2,11 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Crown, Flame, Lock, LogOut, Medal, Pencil, Star, Target, Trophy, Users, X, Zap } from "lucide-react";
+import { Award, CheckCircle2, Crown, Flame, Lock, LogOut, Medal, Pencil, Star, Target, Trophy, Users, Volume2, VolumeX, X, XCircle, Zap } from "lucide-react";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { RecordSkeleton } from "@/components/record-list";
 import { SurfaceHeader } from "@/components/surface-header";
-import { attemptXp, isRankingPass, quizLevel, type QuizGameProfile, type RankingPeriod } from "@/lib/quiz-gamification.mjs";
+import { attemptXp, isRankingPass, quizLevel, XP_PER_CORRECT, type QuizGameProfile, type RankingPeriod } from "@/lib/quiz-gamification.mjs";
 import styles from "@/components/quiz-game.module.css";
 
 export type { QuizGameProfile };
@@ -23,6 +23,88 @@ export async function fetchQuizProfile(): Promise<QuizGameProfile | null> {
 /** Short haptic cue on phones; silently ignored elsewhere. */
 export function haptic(pattern: number | number[]) {
   try { if (typeof navigator !== "undefined" && "vibrate" in navigator && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) navigator.vibrate(pattern); } catch { /* unsupported */ }
+}
+
+const SOUND_STORAGE_KEY = "gestor-quiz-sound";
+type SoundKind = "correct" | "wrong" | "combo" | "win";
+let audioContext: AudioContext | null = null;
+
+function readSoundEnabled() {
+  try { return window.localStorage.getItem(SOUND_STORAGE_KEY) === "on"; } catch { return false; }
+}
+
+/** Short synthesised cues (no audio files). Off by default; the student turns them on. */
+export function playQuizSound(kind: SoundKind) {
+  if (typeof window === "undefined" || !readSoundEnabled()) return;
+  try {
+    const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
+    audioContext ??= new AudioCtor();
+    const context = audioContext;
+    if (context.state === "suspended") void context.resume();
+    const notes: Record<SoundKind, Array<[number, number, OscillatorType]>> = {
+      correct: [[660, 0, "sine"], [990, 0.09, "sine"]],
+      wrong: [[220, 0, "triangle"], [180, 0.12, "triangle"]],
+      combo: [[660, 0, "sine"], [880, 0.07, "sine"], [1320, 0.14, "sine"]],
+      win: [[523, 0, "sine"], [659, 0.12, "sine"], [784, 0.24, "sine"], [1047, 0.36, "sine"]],
+    };
+    for (const [frequency, delay, type] of notes[kind]) {
+      const oscillator = context.createOscillator(), gain = context.createGain();
+      const start = context.currentTime + delay;
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.25);
+    }
+  } catch { /* Audio is a nicety. */ }
+}
+
+export function SoundToggle({ className }: { className?: string }) {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => { setEnabled(readSoundEnabled()); }, []);
+  const toggle = () => {
+    const next = !enabled;
+    setEnabled(next);
+    try { window.localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+    if (next) playQuizSound("correct");
+  };
+  return <button type="button" className={className} aria-pressed={enabled} aria-label={enabled ? "Desligar sons" : "Ligar sons"} title={enabled ? "Desligar sons" : "Ligar sons"} onClick={toggle}>{enabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}</button>;
+}
+
+export type TrackState = "empty" | "answered" | "correct" | "wrong";
+
+/** One segment per question: the progress bar doubles as the question map. */
+export function QuestionTrack({ states, current, disabled, onSelect }: { states: TrackState[]; current: number; disabled: boolean; onSelect: (index: number) => void }) {
+  const labels: Record<TrackState, string> = { empty: "por responder", answered: "respondida", correct: "certa", wrong: "errada" };
+  return <div className={styles.track} role="group" aria-label="Perguntas" data-dense={states.length > 20 || undefined}>
+    {states.map((state, index) => <button key={index} type="button" className={styles.trackStep} data-state={state} aria-current={index === current ? "step" : undefined} aria-label={`Pergunta ${index + 1}, ${labels[state]}`} disabled={disabled} onClick={() => onSelect(index)}><span /></button>)}
+  </div>;
+}
+
+export function XpCounter({ xp, burst }: { xp: number; burst: number }) {
+  return <span className={styles.xp} aria-label={`${xp} XP nesta sessão`}>
+    <Zap aria-hidden="true" /><b key={xp}>{xp}</b><small>XP</small>
+    {burst > 0 && <span key={burst} className={styles.xpFloat} aria-hidden="true">+{XP_PER_CORRECT}</span>}
+  </span>;
+}
+
+/** Celebration chip when a streak reaches 3, 5, 10, 15… */
+export function StreakBanner({ combo }: { combo: number }) {
+  const milestone = combo === 3 || combo === 5 || combo >= 10 && combo % 5 === 0;
+  if (!milestone) return null;
+  return <div key={combo} className={styles.streakBanner} role="status"><Flame aria-hidden="true" /><strong>{combo} seguidas!</strong><span>{combo >= 10 ? "Lendário" : combo >= 5 ? "Imparável" : "Em chamas"}</span></div>;
+}
+
+/** Duolingo-style result strip shown in the answer footer once feedback arrives. */
+export function AnswerVerdict({ correct, message, correctAnswer }: { correct: boolean; message: string; correctAnswer?: string | null }) {
+  return <section className={styles.verdict} data-correct={correct || undefined} role="status">
+    <span className={styles.verdictIcon}>{correct ? <CheckCircle2 aria-hidden="true" /> : <XCircle aria-hidden="true" />}</span>
+    <div><strong>{message}</strong>{!correct && correctAnswer ? <small>Resposta certa: {correctAnswer}</small> : correct ? <small>+{XP_PER_CORRECT} XP</small> : null}</div>
+  </section>;
 }
 
 const PRAISE = ["Boa!", "Certíssimo!", "Isso mesmo!", "Excelente!", "Na mouche!"];
@@ -105,7 +187,7 @@ export function ResultsGame({ correct, total, bestCombo, before, after, onAgain,
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [percent]);
-  useEffect(() => { if (passed) haptic([30, 40, 60]); }, [passed]);
+  useEffect(() => { if (passed) { haptic([30, 40, 60]); playQuizSound("win"); } }, [passed]);
   const headline = perfect ? "Perfeito!" : percent >= 90 ? "Brutal!" : passed ? "Conta para o ranking!" : percent >= 50 ? "Quase lá!" : "Bora outra?";
   const sub = passed ? "Teste com 75% ou mais." : `Faltaram ${Math.max(0, Math.ceil(total * 0.75) - correct)} certas para os 75%.`;
   return <section className={styles.results} data-passed={passed || undefined} aria-labelledby="results-headline">

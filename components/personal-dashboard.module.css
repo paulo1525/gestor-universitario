@@ -24,10 +24,10 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid #e5cf6d;
+  border: 1px solid var(--color-accent-border);
   border-radius: 16px;
   color: var(--color-accent-text);
-  background: linear-gradient(145deg, #fffbea, var(--gold-soft));
+  background: linear-gradient(145deg, var(--color-surface-subtle), var(--gold-soft));
   box-shadow: 0 6px 18px rgba(94, 72, 0, .06);
 }
 
@@ -71,7 +71,7 @@
 }
 
 .summaryCard:hover {
-  border-color: #d7c879;
+  border-color: var(--color-accent-border);
   background: var(--color-surface-subtle);
 }
 
@@ -128,7 +128,7 @@
   gap: 16px;
   padding: 11px 16px;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 92%, #eef1f4);
+  background: color-mix(in srgb, var(--surface) 92%, var(--color-surface-muted));
 }
 
 .panelTitle {
@@ -207,10 +207,10 @@
   display: grid;
   place-items: center;
   align-content: center;
-  border: 1px solid #eddd9b;
+  border: 1px solid var(--color-accent-border);
   border-radius: 11px;
   color: var(--color-accent-text);
-  background: #fff9df;
+  background: var(--color-surface-subtle);
   text-align: center;
 }
 
@@ -224,7 +224,7 @@
   place-items: center;
   border-radius: 11px;
   color: var(--color-text-muted);
-  background: #eef5f1;
+  background: var(--color-surface-muted);
 }
 
 .itemIcon { color: var(--color-accent-text); background: var(--gold-soft); }
@@ -244,7 +244,7 @@
 }
 
 .itemMeta svg { width: 15px; }
-.badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; color: var(--color-accent-text); background: #fff0af; font-size: var(--font-size-caption); font-weight: 850; text-transform: uppercase; }
+.badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; color: var(--color-accent-text); background: var(--color-accent-soft); font-size: var(--font-size-caption); font-weight: 850; text-transform: uppercase; }
 .unread { box-shadow: inset 3px 0 #d5aa10; }
 
 .empty,
@@ -281,17 +281,17 @@
 
 .cohortBody { padding: 16px; }
 .classMain { display: flex; align-items: center; gap: 14px; }
-.classNumber { width: 52px; height: 52px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 15px; color: #fff; background: var(--ink); font: 800 19px/1 var(--font-display), sans-serif; box-shadow: 0 5px 14px rgba(25, 28, 35, .13); }
+.classNumber { width: 52px; height: 52px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 15px; color: var(--surface); background: var(--ink); font: 800 19px/1 var(--font-display), sans-serif; box-shadow: 0 5px 14px rgba(25, 28, 35, .13); }
 .classCopy { min-width: 0; }
 .classCopy strong { display: block; font-size: var(--font-size-body-emphasis); }
 .classCopy span { display: block; margin-top: 5px; color: var(--muted); font-size: var(--font-size-small); line-height: 1.4; }
 .classActions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
-.classActions a { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--color-text-soft); background: #fff; font-size: var(--font-size-small); font-weight: 850; }
-.classActions a:first-child { color: var(--color-accent-text); border-color: #dfca75; background: #fff9de; }
-.classActions a:hover { border-color: #cfb84f; background: var(--gold-soft); }
+.classActions a { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--color-text-soft); background: var(--color-surface); font-size: var(--font-size-small); font-weight: 850; }
+.classActions a:first-child { color: var(--color-accent-text); border-color: var(--color-accent-border); background: var(--color-surface-subtle); }
+.classActions a:hover { border-color: var(--color-accent-border); background: var(--gold-soft); }
 .classActions a:focus-visible { outline: 3px solid rgba(213, 170, 16, .25); outline-offset: 2px; }
 .classActions svg { width: 14px; }
-.retry { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--color-accent-text); background: #fff; font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
+.retry { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--color-accent-text); background: var(--color-surface); font-size: var(--font-size-small); font-weight: 800; cursor: pointer; }
 
 /* Study panel: PDFs with highlights and learning paths in progress. */
 .studyItem {

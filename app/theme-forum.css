@@ -108,7 +108,7 @@ html[data-theme="forum"] .brand__logo-frame {
   padding: 3px;
   border: 1px solid rgba(255,255,255,.16);
   border-radius: 7px;
-  background: rgba(255,255,255,.96);
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .brand__name {
@@ -199,7 +199,7 @@ html[data-theme="forum"] .text-size-setting button {
 
 html[data-theme="forum"] .text-size-setting button.is-active {
   border-color: var(--color-accent);
-  color: #432500;
+  color: var(--color-accent-text);
   background: var(--color-accent);
 }
 
@@ -241,19 +241,19 @@ html[data-theme="forum"] .profile-theme-option {
 
 html[data-theme="forum"] .profile-theme-option.is-active {
   border-color: #74a8c6;
-  background: #e8f4fa;
+  background: var(--color-info-soft);
 }
 
 html[data-theme="forum"] .profile-theme-option > svg,
 html[data-theme="forum"] .profile-menu__label > svg {
-  color: #1973a5;
+  color: var(--color-info-text);
 }
 
 /* Topbar and omnibox */
 html[data-theme="forum"] .topbar {
   height: 60px;
-  border-color: #b8c8d5;
-  background: rgba(255,255,255,.96);
+  border-color: var(--color-info-border);
+  background: var(--color-surface);
   box-shadow: 0 1px 3px rgba(29, 66, 94, .07);
   backdrop-filter: blur(10px);
 }
@@ -269,21 +269,21 @@ html[data-theme="forum"] .breadcrumbs a {
 }
 
 html[data-theme="forum"] .breadcrumbs strong {
-  color: #173c59;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] .topbar-global-search {
   height: 40px;
   min-height: 40px;
   padding: 0;
-  border-color: #b9cad7;
+  border-color: var(--color-info-border);
   border-radius: 5px;
-  background: #f2f6f9;
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .topbar-global-search:focus-within {
   border-color: #2c8fc0;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: var(--focus-ring);
 }
 
@@ -294,7 +294,7 @@ html[data-theme="forum"] .topbar-global-search > svg {
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: #557487;
+  color: var(--color-info-text);
   background: transparent;
   box-shadow: none;
 }
@@ -319,20 +319,20 @@ html[data-theme="forum"] .topbar-global-search > button[type="submit"] {
   padding: 0;
   border: 0;
   border-radius: 0 4px 4px 0;
-  color: #236e98;
+  color: var(--color-info-text);
   background: transparent;
   box-shadow: none;
 }
 
 html[data-theme="forum"] .topbar-global-search > button[type="submit"]:hover {
-  background: #e1eef5;
+  background: var(--color-info-soft);
 }
 
 html[data-theme="forum"] .topbar-global-search kbd {
-  border-color: #b7c7d4;
+  border-color: var(--color-info-border);
   border-radius: 3px;
-  color: #536d7f;
-  background: #fff;
+  color: var(--color-info-text);
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .topbar-search-popover {
@@ -342,8 +342,8 @@ html[data-theme="forum"] .topbar-search-popover {
 }
 
 html[data-theme="forum"] .topbar-search-group > h3 {
-  color: #397495;
-  background: #f2f7fa;
+  color: var(--color-info-text);
+  background: var(--color-surface-subtle);
 }
 
 html[data-theme="forum"] .topbar-global-search .topbar-search-option {
@@ -352,13 +352,13 @@ html[data-theme="forum"] .topbar-global-search .topbar-search-option {
 
 html[data-theme="forum"] .topbar-global-search .topbar-search-option:hover,
 html[data-theme="forum"] .topbar-global-search .topbar-search-option.is-active {
-  background: #e5f2f8;
+  background: var(--color-info-soft);
 }
 
 html[data-theme="forum"] .topbar-search-option__icon {
   border-radius: 4px;
-  color: #176f9f;
-  background: #dceef7;
+  color: var(--color-info-text);
+  background: var(--color-info-soft);
 }
 
 html[data-theme="forum"] .topbar-global-search .topbar-search-option .topbar-search-option__type {
@@ -366,15 +366,15 @@ html[data-theme="forum"] .topbar-global-search .topbar-search-option .topbar-sea
   min-width: 0;
   height: auto;
   min-height: 0;
-  border: 1px solid #bdcbd5;
+  border: 1px solid var(--color-info-border);
   border-radius: 4px;
-  color: #49677b;
-  background: #e8eef3;
+  color: var(--color-info-text);
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .topbar-global-search .topbar-search-all {
-  color: #176f9f;
-  background: #f1f6f9;
+  color: var(--color-info-text);
+  background: var(--color-surface-muted);
 }
 
 /* Page hierarchy */
@@ -385,21 +385,21 @@ html[data-theme="forum"] .main-content {
 /* Heading colours belong to light content surfaces only; dark surfaces such as
    the authentication aside keep their own inverse colour. */
 html[data-theme="forum"] :where(.workspace, .auth-card) h1 {
-  color: #173b58;
+  color: var(--color-info-text);
   letter-spacing: -.025em;
 }
 
 html[data-theme="forum"] :where(.workspace, .auth-card) h2 {
-  color: #204b69;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] :where(.workspace, .auth-card) :is(h3, h4) {
-  color: #294d66;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] .eyebrow,
 html[data-theme="forum"] [class*="eyebrow"] {
-  color: #207ca9;
+  color: var(--color-info-text);
   letter-spacing: .09em;
 }
 
@@ -413,8 +413,8 @@ html[data-theme="forum"] .page-heading__icon,
 html[data-theme="forum"] .admin-settings__icon,
 html[data-theme="forum"] [class*="heroIcon"],
 html[data-theme="forum"] [class*="editorIcon"] {
-  color: #176f9f;
-  background: #dceff8;
+  color: var(--color-info-text);
+  background: var(--color-info-soft);
   border-radius: 5px;
 }
 
@@ -494,7 +494,7 @@ html[data-theme="forum"] [class*="sectionHead"],
 html[data-theme="forum"] [class*="formHeading"],
 html[data-theme="forum"] [class*="editorHeader"] {
   border-color: var(--color-border-strong);
-  background: linear-gradient(180deg, #f6fafc, #eaf2f7);
+  background: linear-gradient(180deg, var(--color-surface-subtle), var(--color-surface-muted));
 }
 
 html[data-theme="forum"] [data-platform-surface-header]:not(.surface-header--standalone) {
@@ -552,7 +552,7 @@ html[data-theme="forum"] .admin-empty,
 html[data-theme="forum"] [class*="empty"],
 html[data-theme="forum"] [class*="loading"] {
   color: var(--color-text-muted);
-  background-color: #f5f8fa;
+  background-color: var(--color-surface-subtle);
 }
 
 /* Links and actions */
@@ -604,32 +604,32 @@ html[data-theme="forum"] .workspace [class*="createButton"] svg {
 html[data-theme="forum"] .button--secondary,
 html[data-theme="forum"] .button--ghost,
 html[data-theme="forum"] .workspace [class*="secondaryButton"] {
-  border-color: #aebfcb;
-  color: #245879;
-  background: #fff;
+  border-color: var(--color-info-border);
+  color: var(--color-info-text);
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .button--secondary:hover,
 html[data-theme="forum"] .button--ghost:hover,
 html[data-theme="forum"] .workspace [class*="secondaryButton"]:hover {
   border-color: #6e9bb8;
-  background: #eaf4f9;
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .row-action:hover,
 html[data-theme="forum"] [class*="iconButton"]:hover,
 html[data-theme="forum"] [class*="closeButton"]:hover {
-  background: #e3f0f7;
+  background: var(--color-info-soft);
 }
 
 /* Forms */
 html[data-theme="forum"] .workspace :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 html[data-theme="forum"] .modal :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 html[data-theme="forum"] [contenteditable="true"] {
-  border-color: #b7c7d3;
+  border-color: var(--color-info-border);
   border-radius: var(--radius-control);
   color: var(--color-text);
-  background-color: #fff;
+  background-color: var(--color-surface);
 }
 
 html[data-theme="forum"] .workspace :where(input, select, textarea):focus,
@@ -654,11 +654,11 @@ html[data-theme="forum"] [class*="community-suite-module"][class*="search"] inpu
 html[data-theme="forum"] .form-label,
 html[data-theme="forum"] .field,
 html[data-theme="forum"] [class*="field"] > label {
-  color: #39566a;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] .form-label > svg {
-  color: #2184b2;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] :where(input[type="checkbox"], input[type="radio"]) {
@@ -667,12 +667,12 @@ html[data-theme="forum"] :where(input[type="checkbox"], input[type="radio"]) {
 
 html[data-theme="forum"] :where(input, select, textarea):disabled {
   color: var(--color-text-disabled);
-  background: #e8edf1;
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] :where(input, select, textarea)[aria-invalid="true"] {
   border-color: var(--color-danger) !important;
-  background: #fff8f7;
+  background: var(--color-surface-subtle);
 }
 
 html[data-theme="forum"] fieldset {
@@ -680,55 +680,55 @@ html[data-theme="forum"] fieldset {
 }
 
 html[data-theme="forum"] legend {
-  color: #315a74;
+  color: var(--color-info-text);
 }
 
 /* Tables and dense lists */
 html[data-theme="forum"] table {
   color: var(--color-text-soft);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] th {
   height: 34px;
   padding-block: 8px;
-  border-color: #b9cad6;
-  color: #315e79;
-  background: linear-gradient(180deg, #edf5f9, #dfeaf1);
+  border-color: var(--color-info-border);
+  color: var(--color-info-text);
+  background: linear-gradient(180deg, var(--color-surface-muted), var(--color-info-soft));
   font-size: var(--font-size-caption);
 }
 
 html[data-theme="forum"] td {
   height: 52px;
-  border-color: #dbe3e9;
-  color: #304556;
-  background: #fff;
+  border-color: var(--color-border);
+  color: var(--color-info-text);
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] tbody tr:nth-child(even) td {
-  background: #fafcfd;
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] tbody tr:hover td,
 html[data-theme="forum"] tbody tr.is-selected td {
-  background: #eaf5fa;
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .student-row,
 html[data-theme="forum"] [class*="listItem"],
 html[data-theme="forum"] [class*="ListItem"] {
-  border-color: #d8e1e7;
+  border-color: var(--color-border);
 }
 
 /* Tabs, filters, badges and state communication */
 html[data-theme="forum"] [role="tablist"] {
-  border-color: #b9c9d5;
-  background: #e5edf3;
+  border-color: var(--color-info-border);
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] [role="tablist"] button {
   border-radius: 4px;
-  color: #4f687a;
+  color: var(--color-info-text);
 }
 
 html[data-theme="forum"] [role="tablist"] button[aria-selected="true"],
@@ -790,8 +790,8 @@ html[data-theme="forum"] [class*="status_archived"] {
 }
 
 html[data-theme="forum"] .admin-role {
-  color: #285f83;
-  background-color: #e6f1f7;
+  color: var(--color-info-text);
+  background-color: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .status--success,
@@ -826,8 +826,8 @@ html[data-theme="forum"] [class*="priority_important"] [class*="announcements-bo
 }
 
 html[data-theme="forum"] [class*="priority_normal"] [class*="announcements-board-module"][class*="priority"] {
-  color: #286b97;
-  background-color: #e4f2fa;
+  color: var(--color-info-text);
+  background-color: var(--color-info-soft);
 }
 
 html[data-theme="forum"] .status--neutral,
@@ -835,8 +835,8 @@ html[data-theme="forum"] [class*="statusArchived"],
 html[data-theme="forum"] [class*="status_closed"],
 html[data-theme="forum"] [class*="status_expired"],
 html[data-theme="forum"] [class*="status_archived"] {
-  color: #526575;
-  background-color: #e8eef3;
+  color: var(--color-info-text);
+  background-color: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .admin-notice,
@@ -846,7 +846,7 @@ html[data-theme="forum"] .app-toast {
 }
 
 html[data-theme="forum"] .progress {
-  background: #dce5eb;
+  background: var(--color-border);
 }
 
 html[data-theme="forum"] .progress span {
@@ -865,36 +865,36 @@ html[data-theme="forum"] .confirm-dialog,
 html[data-theme="forum"] .placement-drawer {
   border: 1px solid #91a9ba;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: 0 24px 70px rgba(9, 35, 54, .32);
 }
 
 html[data-theme="forum"] .modal__header,
 html[data-theme="forum"] .placement-drawer > header,
 html[data-theme="forum"] .confirm-dialog > header {
-  border-color: #b7c8d4;
-  background: linear-gradient(180deg, #f2f7fa, #e3edf3);
+  border-color: var(--color-info-border);
+  background: linear-gradient(180deg, var(--color-surface-subtle), var(--color-surface-muted));
 }
 
 /* Communication and feature-specific surfaces */
 html[data-theme="forum"] .announcement {
-  color: #68400a;
-  border-color: #e1b574;
-  background: #fff1dc;
+  color: var(--color-accent-text);
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
 }
 
 html[data-theme="forum"] .urgent-announcement {
-  color: #6f2b22;
-  border-color: #dfada5;
-  background: linear-gradient(100deg, #fdecea, #fff5e7);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-border);
+  background: linear-gradient(100deg, var(--color-danger-soft), var(--color-surface-subtle));
 }
 
 html[data-theme="forum"] .exchange-panel,
 html[data-theme="forum"] .placement-runbar,
 html[data-theme="forum"] .placement-preflight__simulation {
-  border-color: #a9c7d8;
-  color: #254f68;
-  background: #edf7fb;
+  border-color: var(--color-info-border);
+  color: var(--color-info-text);
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .placement-sheet > .placement-runbar {
@@ -906,7 +906,7 @@ html[data-theme="forum"] .preflight-check,
 html[data-theme="forum"] .preflight-group,
 html[data-theme="forum"] .ticket-admin-card {
   border-color: var(--color-border);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .placement-filter-grid,
@@ -915,7 +915,7 @@ html[data-theme="forum"] .ticket-filter-bar,
 html[data-theme="forum"] [class*="filterBar"],
 html[data-theme="forum"] [class*="toolbar"] {
   border-color: var(--color-border-strong);
-  background-color: #f1f6f9;
+  background-color: var(--color-surface-muted);
 }
 
 /* Compact academic calendar: typography is dense while controls and complete
@@ -968,7 +968,7 @@ html[data-theme="forum"] [class*="calendarShell"] [class*="clearFilters"] {
 html[data-theme="forum"] [class*="calendarShell"] [class*="weekHeader"] span {
   min-height: 34px;
   padding-inline: 7px;
-  color: #496b80;
+  color: var(--color-info-text);
   font-size: var(--font-size-caption);
   line-height: 1;
 }
@@ -1070,7 +1070,7 @@ html[data-theme="forum"] .auth-page {
 }
 
 html[data-theme="forum"] .auth-card {
-  background: #fff;
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .auth-information {
@@ -1089,9 +1089,9 @@ html[data-theme="forum"] .auth-information p {
 }
 
 html[data-theme="forum"] .auth-tabs {
-  border: 1px solid #c2d0da;
+  border: 1px solid var(--color-info-border);
   border-radius: 5px;
-  background: #e8eef3;
+  background: var(--color-surface-muted);
 }
 
 html[data-theme="forum"] .auth-tabs button {
@@ -1121,10 +1121,10 @@ html[data-theme="forum"] .auth-loading {
 /* Search fields read as one control, rather than a bordered wrapper plus a second input. */
 html[data-theme="forum"] .search-field {
   overflow: hidden;
-  border-color: #a9c5d7;
+  border-color: var(--color-info-border);
   border-radius: 5px;
-  color: #527087;
-  background: #fff;
+  color: var(--color-info-text);
+  background: var(--color-surface);
 }
 
 html[data-theme="forum"] .search-field input {

@@ -12,7 +12,7 @@
 .full { grid-column: 1 / -1; }
 
 .emptyAction { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 38px; margin-top: 4px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--color-text-muted); background: var(--surface); font: 800 var(--font-size-caption) inherit; cursor: pointer; }
-.emptyAction:hover { border-color: #d4bd59; color: var(--color-accent-text); background: var(--gold-soft); }
+.emptyAction:hover { border-color: var(--color-accent-border); color: var(--color-accent-text); background: var(--gold-soft); }
 .emptyAction svg { width: 13px; height: 13px; }
 
 .pillIcon { width: 11px; height: 11px; margin-right: 4px; vertical-align: -1px; }

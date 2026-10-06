@@ -121,7 +121,7 @@
 .removeButton {
   width: 36px;
   color: var(--color-danger-text);
-  background: #fff6f4;
+  background: var(--color-surface-subtle);
 }
 
 .chooseButton:hover {
@@ -130,8 +130,8 @@
 }
 
 .removeButton:hover {
-  border-color: #e1b0aa;
-  background: #ffeae6;
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
 }
 
 .chooseButton:focus-visible,

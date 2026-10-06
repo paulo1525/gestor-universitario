@@ -104,7 +104,7 @@
 }
 
 .statisticsDangerButton {
-  color: var(--color-danger, #a23a34);
+  color: var(--color-danger, var(--color-danger-text));
   border-color: color-mix(in srgb, var(--color-danger, #a23a34) 42%, var(--line));
   background: color-mix(in srgb, var(--color-danger, #a23a34) 6%, var(--surface));
 }
@@ -113,7 +113,7 @@
 .statisticsDangerButton:focus-visible {
   color: var(--color-danger-text);
   border-color: #bf5c55;
-  background: #fff3f1;
+  background: var(--color-surface-muted);
 }
 
 .statisticsButton:disabled {
@@ -456,7 +456,7 @@
 }
 
 .countChoices button:hover:not(:disabled) { color: var(--color-text); }
-.countChoices button[aria-checked="true"] { color: var(--color-text); background: var(--color-accent); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.countChoices button[aria-checked="true"] { color: var(--color-accent-contrast); background: var(--color-accent); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 .countChoices button:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
 .countChoices button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
 
@@ -1300,12 +1300,23 @@
   z-index: 12;
   top: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 15px;
+  gap: var(--space-3);
   margin-bottom: 10px;
-  padding: 11px 14px 15px;
+  padding: var(--space-3) var(--space-4);
 }
+
+.hudRow { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.hudTrack { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
+.hudIconButton { min-width: 44px; min-height: 40px; padding: 0; justify-content: center; }
+.hudIconButton svg { width: 18px; height: 18px; }
+.hudIconButton[aria-pressed="true"] { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); color: var(--color-accent-text); background: var(--color-accent-soft); }
+.examCount { flex: none; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); font-weight: 750; font-variant-numeric: tabular-nums; }
+.questionActions[data-verdict] { flex-wrap: wrap; transition: background .2s ease, border-color .2s ease; }
+.questionActions[data-verdict="correct"] { border-top-color: var(--color-success-border); background: var(--color-success-soft); }
+.questionActions[data-verdict="wrong"] { border-top-color: var(--color-danger-border); background: var(--color-danger-soft); }
+.questionActions[data-verdict="correct"] .primaryButton { color: var(--color-text-inverse); background: var(--color-success); }
+.questionActions[data-verdict="wrong"] .primaryButton { color: var(--color-text-inverse); background: var(--color-danger); }
+.questionActions[data-verdict] .primaryButton:hover:not(:disabled) { filter: brightness(1.06); }
 
 .sessionIdentity {
   min-width: 0;
@@ -1426,7 +1437,7 @@
 }
 
 .quitButton {
-  border-color: #e3c2bd;
+  border-color: var(--color-danger-border);
   color: var(--color-danger-text);
   background: var(--surface);
 }
@@ -1526,19 +1537,19 @@
 
 .questionNumber.answered {
   color: var(--color-link);
-  border-color: #b9d6e5;
+  border-color: var(--color-info-border);
   background: var(--blue-soft);
 }
 
 .questionNumber.correct {
   color: var(--green);
-  border-color: #b8dfc8;
+  border-color: var(--color-success-border);
   background: var(--green-soft);
 }
 
 .questionNumber.incorrect {
   color: var(--color-danger-text);
-  border-color: #e7c0ba;
+  border-color: var(--color-danger-border);
   background: var(--color-danger-soft);
 }
 
@@ -1638,7 +1649,7 @@
   max-height: 470px;
   display: block;
   object-fit: contain;
-  background: #f1f1ed;
+  background: var(--color-surface-muted);
 }
 
 .options {
@@ -1706,7 +1717,7 @@
 }
 
 .option.optionCorrect {
-  border-color: #a9d8bc;
+  border-color: var(--color-success-border);
   background: var(--green-soft);
 }
 
@@ -1714,7 +1725,7 @@
 .option.optionCorrect > svg { color: var(--color-success); }
 
 .option.optionWrong {
-  border-color: #e0aaa2;
+  border-color: var(--color-danger-border);
   background: var(--color-danger-soft);
   animation: optionShake .32s ease-in-out;
 }
@@ -1887,13 +1898,13 @@
 
 .selfAssessmentCorrect {
   color: var(--green) !important;
-  border-color: #b5dcc4 !important;
+  border-color: var(--color-success-border) !important;
   background: var(--green-soft) !important;
 }
 
 .selfAssessmentIncorrect {
   color: var(--color-danger-text) !important;
-  border-color: #e1b5ad !important;
+  border-color: var(--color-danger-border) !important;
   background: var(--color-danger-soft) !important;
 }
 
@@ -1957,13 +1968,13 @@
 }
 
 .feedbackGood {
-  border-color: #b5dcc4;
+  border-color: var(--color-success-border);
   color: var(--green);
   background: var(--green-soft);
 }
 
 .feedbackBad {
-  border-color: #e1b5ad;
+  border-color: var(--color-danger-border);
   color: var(--color-danger-text);
   background: var(--color-danger-soft);
 }
@@ -2506,10 +2517,6 @@
     grid-column: 1 / -1;
   }
 
-  .sessionBar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
   .sessionActions {
     grid-column: 1 / -1;
   }
@@ -2610,17 +2617,23 @@
 
   .sessionBar {
     position: sticky;
-    grid-template-columns: minmax(0, 1fr) auto;
     gap: var(--space-2);
-    padding: var(--space-3) var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-3) var(--space-3);
   }
+  .hudRow { gap: var(--space-2); }
+  .hudTrack { gap: var(--space-2); }
+  .sessionTools .toolsTrigger { min-width: 44px; min-height: 40px; padding: 0; justify-content: center; }
+  .sessionTools .toolsTrigger > span, .sessionTools .toolsTrigger > svg:last-child { display: none; }
+  .timerToggle, .hudIconButton { min-width: 40px; min-height: 40px; }
+  .questionActions[data-verdict] { grid-template-columns: auto minmax(0, 1fr); }
   .sessionIdentity { gap: var(--space-2); }
   .sessionIdentity > .unitCode { display: none; }
   .sessionIdentity strong { font-size: var(--font-size-heading-3); }
   .sessionIdentity small { font-size: var(--font-size-body-emphasis); }
   .sessionStats { align-items: center; gap: var(--space-1); flex-wrap: wrap; justify-content: flex-end; }
   .sessionPosition { min-width: 0; min-height: 28px; border: 0; padding: 0 var(--space-1); background: transparent; }
-  .timer { min-width: 0; min-height: 44px; padding: var(--space-1) var(--space-2); gap: var(--space-1); }
+  .timer { min-width: 0; min-height: 40px; padding: var(--space-1) var(--space-2); gap: var(--space-1); }
+  .timerCopy small { display: none; }
   .timer > svg { display: none; }
   .timer strong { font-size: var(--font-size-heading-3); }
   .sessionSummary { font-size: var(--font-size-body-emphasis); }

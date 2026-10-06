@@ -60,9 +60,9 @@
 .chipNote { color: var(--color-accent-text); font-size: var(--font-size-caption); font-weight: 700; line-height: 1.35; }
 .tag { flex: none; padding: 1px 6px; border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface-muted); font-size: var(--font-size-caption); font-weight: 800; }
 .tag[data-kind="practical"] { color: var(--color-accent-text); background: var(--gold-soft); }
-.tag[data-kind="practical-2"] { color: #1d5f86; background: var(--blue-soft); }
+.tag[data-kind="practical-2"] { color: var(--color-info-text); background: var(--blue-soft); }
 .tag[data-kind="mixed"] { color: var(--color-success-text); background: var(--green-soft); }
-.tag[data-kind="assessment"] { color: var(--color-danger-text); background: #fde9e6; }
+.tag[data-kind="assessment"] { color: var(--color-danger-text); background: var(--color-danger-soft); }
 .chip[data-kind="practical"] { --chip-accent: var(--color-accent); }
 .chip[data-kind="practical-2"] { --chip-accent: #2679aa; }
 .chip[data-kind="mixed"] { --chip-accent: var(--color-success, #2f8a57); }

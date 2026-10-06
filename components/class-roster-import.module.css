@@ -11,7 +11,7 @@
 .helpButton svg { width: 14px; height: 14px; }
 .body { padding: 18px 20px; }
 .uploadColumn { display: grid; align-content: start; gap: 10px; }
-.summary { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid #b9dcc5; border-radius: 9px; color: var(--color-success-text); background: #f1fbf4; }
+.summary { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--color-success-border); border-radius: 9px; color: var(--color-success-text); background: var(--color-surface-subtle); }
 .summary>svg { width: 16px; }
 .summary span { display: grid; gap: 1px; }
 .summary strong { font-size: var(--font-size-caption); }
@@ -27,7 +27,7 @@
 .modal>header button { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface); cursor: pointer; }
 .modal>header button svg { width: 16px; }
 .modal>p { margin: 0; padding: 0 20px 12px; color: var(--muted); font-size: var(--font-size-small); line-height: 1.5; }
-.modal pre { min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 20px; padding: 16px; border: 1px solid #d9d5c8; border-radius: 11px; color: var(--color-text); background: #f8f7f2; font: var(--font-size-caption)/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; -webkit-overflow-scrolling: touch; }
+.modal pre { min-height: 0; overflow: auto; overscroll-behavior: contain; margin: 0 20px; padding: 16px; border: 1px solid var(--color-border-strong); border-radius: 11px; color: var(--color-text); background: var(--color-surface-subtle); font: var(--font-size-caption)/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; -webkit-overflow-scrolling: touch; }
 .modal>footer { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 20px 18px; }
 .modal>footer button { min-width: 120px; }
 @keyframes spin { to { transform: rotate(360deg); } }

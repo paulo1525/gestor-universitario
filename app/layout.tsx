@@ -7,6 +7,7 @@ import { I18nProvider } from "@/components/i18n-context";
 import { ModuleProvider } from "@/components/module-context";
 import "./globals.css";
 import "./theme-forum.css";
+import "./theme-dark.css";
 
 const inter = Inter({
   variable: "--font-body",
@@ -32,8 +33,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-PT" data-scroll-behavior="smooth" data-theme="cc" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("gestor-theme");var language=localStorage.getItem("gestor-language");document.documentElement.dataset.theme=theme==="forum"?"forum":"cc";document.documentElement.lang=language==="en"?"en":"pt-PT"}catch(error){document.documentElement.dataset.theme="cc";document.documentElement.lang="pt-PT"}` }} /></head>
+    <html lang="pt-PT" data-scroll-behavior="smooth" data-theme="cc" data-color-scheme="light" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var theme=localStorage.getItem("gestor-theme");var language=localStorage.getItem("gestor-language");document.documentElement.dataset.theme=theme==="forum"?"forum":"cc";document.documentElement.lang=language==="en"?"en":"pt-PT";var scheme=localStorage.getItem("gestor-color-scheme");document.documentElement.dataset.colorScheme=scheme==="dark"||scheme==="system"&&matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}catch(error){document.documentElement.dataset.theme="cc";document.documentElement.lang="pt-PT";document.documentElement.dataset.colorScheme="light"}` }} /></head>
       <body className={`${inter.variable} ${manrope.variable}`}><I18nProvider><AuthProvider><ModuleProvider><FloatingActionsProvider>{children}<CookiePreferences /></FloatingActionsProvider></ModuleProvider></AuthProvider></I18nProvider></body>
     </html>
   );
