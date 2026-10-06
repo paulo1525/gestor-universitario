@@ -11,6 +11,7 @@ import { handleAcademicHubRoute, isAcademicHubPath } from "./academic-hub";
 import { handleCampusRoute, isCampusPath } from "./campus";
 import { announcementAudienceWhere, unreadAnnouncementCount, recordAnnouncementRead } from "./communication-counts";
 import { handleQuizRoute, isQuizPath } from "./quizzes";
+import { handleQuizRankingRoute, isQuizRankingPath } from "./quiz-ranking";
 import { handleStudyAnnotations } from "./study-annotations";
 import { neuroParagraphs } from "@/lib/neuroanatomia-study";
 import { registrationPolicy, ADMIN_VALIDATION_MESSAGE } from "./registration-policy";
@@ -1736,6 +1737,12 @@ async function routeApi(request: Request, env: Env, url: URL, ctx?: ExecutionCon
   if (pathname === "/api/admin/curricular-units" && ["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
     const user = await currentUser(request, env);
     return user ? handleCurricularUnits(request, env, user) : json({ error: "Sessão inválida." }, 401);
+  }
+  if (isQuizRankingPath(pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname)) {
+    const user = await currentUser(request, env);
+    if (!user) return json({ error: "Sessão inválida." }, 401);
+    if (!await isModuleEnabled(env, "quizzes") || !await isModuleEnabled(env, "quizzes.progress")) return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404);
+    return handleQuizRankingRoute(request, env, url, user);
   }
   if (isQuizPath(pathname)) {
     const user = await currentUser(request, env);

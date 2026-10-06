@@ -428,7 +428,47 @@
 .settingGroup { min-width: 0; display: grid; gap: 9px; }
 .settingHeading { display: grid; }
 .settingHeading strong { color: var(--ink); font-size: .75rem; }
-.settingColumns { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr); gap: 16px; }
+
+.countRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+.countChoices {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+
+.countChoices button {
+  min-width: 48px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
+  color: var(--color-text-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-heading-3);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.countChoices button:hover:not(:disabled) { color: var(--color-text); }
+.countChoices button[aria-checked="true"] { color: var(--color-text); background: var(--color-accent); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.countChoices button:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
+.countChoices button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+
+.timerSwitch { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; cursor: pointer; }
+.timerSwitch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.switchTrack { position: relative; width: 38px; height: 22px; flex: none; border-radius: 999px; background: var(--color-border-strong); transition: background .15s ease; }
+.switchTrack > span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--color-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s ease; }
+.timerSwitch input:checked + .switchTrack { background: var(--color-success); }
+.timerSwitch input:checked + .switchTrack > span { transform: translateX(16px); }
+.timerSwitch input:focus-visible + .switchTrack { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.switchLabel { display: inline-flex; align-items: center; gap: var(--space-1); font-variant-numeric: tabular-nums; }
+.switchLabel svg { width: 15px; height: 15px; color: var(--color-text-muted); }
 
 .unitActions {
   display: flex;
@@ -1670,10 +1710,19 @@
   background: var(--green-soft);
 }
 
+.option.optionCorrect.optionSelected { animation: optionPop .34s cubic-bezier(.2, 1.4, .4, 1); }
+.option.optionCorrect > svg { color: var(--color-success); }
+
 .option.optionWrong {
   border-color: #e0aaa2;
   background: var(--color-danger-soft);
+  animation: optionShake .32s ease-in-out;
 }
+
+.option.optionWrong > svg { color: var(--color-danger); }
+
+@keyframes optionPop { 0% { transform: scale(1); } 45% { transform: scale(1.025); } 100% { transform: scale(1); } }
+@keyframes optionShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
 .option:disabled {
   cursor: default;
@@ -1939,6 +1988,9 @@
   display: flex;
   gap: 7px;
 }
+
+.questionUtilities,
+.questionNavigation { display: flex; gap: 7px; }
 
 .textButton {
   min-height: 36px;
@@ -2506,14 +2558,21 @@
     align-items: center;
   }
 
-  .modeGrid,
-  .answerFormatGrid,
   .shortModeChoices { grid-template-columns: minmax(0, 1fr); }
-  .unitSettings { padding: var(--space-4); gap: var(--space-5); }
+  .modeGrid, .answerFormatGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .unitSettings { padding: var(--space-3); gap: var(--space-4); }
   .settingHeading strong, .modeCard strong, .shortModeChoices strong { font-size: var(--font-size-heading-3); }
-  .modeCard, .shortModeChoices button { min-height: 60px; }
-  .modeDescription { font-size: var(--font-size-body-emphasis); }
-  .page .unitActions .startSession { width: 100%; min-height: 48px; font-size: var(--font-size-heading-3); }
+  .modeCard { min-height: 56px; grid-template-columns: 30px minmax(0, 1fr); gap: var(--space-2); padding: var(--space-2); }
+  .modeCard strong { line-height: 1.25; }
+  .modeCheck { display: none; }
+  .shortModeChoices button { min-height: 56px; }
+  .modeDescription { display: none; }
+  .countRow { display: grid; gap: var(--space-2); }
+  .countChoices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .countChoices button { min-width: 0; min-height: 44px; font-size: var(--font-size-heading-2); }
+  .timerSwitch { min-height: 44px; font-size: var(--font-size-heading-3); }
+  .unitActions { position: sticky; z-index: 3; bottom: 0; margin: 0 calc(var(--space-3) * -1) calc(var(--space-3) * -1); padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); background: var(--color-surface); }
+  .page .unitActions .startSession { width: 100%; min-height: 52px; font-size: var(--font-size-heading-2); }
   .page :global(.page-tabs) > button, .page .backLink { min-height: 44px; font-size: var(--font-size-heading-3); }
   .page :global(.filter-bar) { --filter-control-height: 44px; }
   .page :global(.filter-bar) :global(input[type="search"]) { font-size: var(--font-size-heading-2); }
@@ -2606,18 +2665,23 @@
     z-index: 4;
     bottom: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: stretch;
     justify-content: stretch;
-    gap: var(--space-1);
+    gap: var(--space-2);
     min-height: 0;
     padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     background: var(--color-surface);
   }
   .questionActions > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
-  .questionActions button { width: 100%; min-width: 0; min-height: 44px; padding-inline: var(--space-2); font-size: var(--font-size-body-emphasis); }
-  .questionActions .textButton { color: var(--color-text-muted); }
-  .questionActions span { position: static; width: auto; height: auto; overflow: visible; white-space: normal; clip: auto; }
+  .questionActions > .questionUtilities { grid-template-columns: repeat(2, 44px); gap: var(--space-1); }
+  .questionActions > .questionNavigation { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+  .questionActions button { width: 100%; min-width: 0; min-height: 48px; padding-inline: var(--space-2); font-size: var(--font-size-heading-3); }
+  .questionActions .textButton { justify-content: center; padding: 0; border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .questionActions .textButton[aria-expanded="true"] { border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border)); color: var(--color-accent-text); background: var(--color-accent-soft); }
+  .questionActions .textButton svg { width: 19px; height: 19px; }
+  .questionActions .textButton span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .questionActions .questionNavigation span { position: static; width: auto; height: auto; overflow: visible; white-space: normal; clip: auto; }
   .shortAnswerForm button, .revealAnswerButton, .selfAssessmentActions button { min-height: 44px; }
   .page .questionPanel .shortAnswerForm textarea { font-size: var(--font-size-heading-2); }
   .selfAssessmentActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2695,6 +2759,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .spin { animation: none; }
+  .option.optionCorrect.optionSelected, .option.optionWrong { animation: none; }
   .progressTrack > span { transition: none; }
   .questionBody { animation: none; }
 }
