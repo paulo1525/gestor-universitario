@@ -375,7 +375,7 @@
 }
 
 .state button svg { width: 15px; height: 15px; }
-.error { color: var(--color-danger-text); background: #fff0f0; }
+.error { color: var(--color-danger-text); background: var(--color-surface-muted); }
 .spin { animation: spin 900ms linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -151,6 +151,13 @@ Gradientes funcionais, como uma barra de progresso ou um gráfico circular, pode
 - Só se mantém texto auxiliar quando informa uma regra ou uma consequência que o estudante não pode adivinhar (privacidade, anonimato, moderação, campos obrigatórios, limites de ficheiros). Nesse caso usa-se uma única linha discreta (`.surface-note`).
 - `SurfaceHeader`, `AdminSection` e `AdminPageHeader` não aceitam `description` de propósito.
 
+## Modo escuro
+
+- O utilizador escolhe Claro, Escuro ou Sistema no menu do perfil (`gestor-color-scheme`); `app/layout.tsx` resolve `html[data-color-scheme]` para `light` ou `dark` antes da primeira pintura.
+- `app/theme-dark.css` só redefine tokens. Cores em CSS usam sempre tokens (`--color-surface*`, `--color-border*`, `--color-text*`, `--color-*-soft`, `--color-*-border`, `--color-*-text`); não escrever `#fff`, cinzentos claros ou tons suaves literais, porque não mudam com o esquema.
+- Texto sobre o dourado/laranja de destaque usa `--color-accent-contrast`; texto sobre `--ink` usa `--surface`.
+- Cada token de cor novo tem valor no modo escuro dos dois temas (verificado em `tests/dark-mode-tokens.test.mjs`).
+
 ## Escala tipográfica
 
 - Escala compacta definida pelos tokens `--font-size-*` em `app/globals.css`; nenhum texto abaixo de 10px.

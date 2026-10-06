@@ -1,0 +1,110 @@
+/* Modo escuro
+   Only redefines the semantic tokens from globals.css (and theme-forum.css).
+   `data-color-scheme` is resolved to "light" or "dark" before the first paint
+   (app/layout.tsx); the "system" preference is followed in JavaScript. */
+
+html[data-color-scheme="dark"] {
+  color-scheme: dark;
+  --color-bg: #111110;
+  --color-surface: #1a1a18;
+  --color-surface-subtle: #1f1f1d;
+  --color-surface-muted: #292926;
+  --color-surface-raised: #222220;
+  --color-text: #ecebe6;
+  --color-text-soft: #d4d3cd;
+  --color-text-muted: #a3a199;
+  --color-text-subtle: #9a9890;
+  --color-text-disabled: #6a6962;
+  --color-text-inverse: #111110;
+  --color-border: #2f2e2b;
+  --color-border-strong: #3e3d39;
+  --color-border-hover: #57564f;
+  --color-accent: #f6c945;
+  --color-accent-hover: #ffd95f;
+  --color-accent-soft: #352d12;
+  --color-accent-text: #f2cf63;
+  --color-accent-contrast: #161616;
+  --color-accent-border: #6b5a1f;
+  --color-link: #82aef5;
+  --color-success: #3dbb7a;
+  --color-success-text: #7dd7a6;
+  --color-success-soft: #13291d;
+  --color-success-border: #2a5a3f;
+  --color-warning: #e3a93b;
+  --color-warning-soft: #32280f;
+  --color-danger: #f06a5f;
+  --color-danger-text: #ff9f96;
+  --color-danger-soft: #371815;
+  --color-danger-border: #6e2f29;
+  --color-info: #82aef5;
+  --color-info-soft: #152139;
+  --color-info-text: #abc8f7;
+  --color-info-border: #2c4670;
+  --color-focus: #72a5f5;
+  --focus-ring: 0 0 0 3px rgba(114, 165, 245, .32);
+  --focus-ring-accent: 0 0 0 3px rgba(246, 201, 69, .3);
+  --color-overlay: rgba(0, 0, 0, .72);
+  --sidebar-bg: #0b0b0a;
+  --sidebar-surface: #151514;
+  --sidebar-border: #262624;
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, .45);
+  --shadow-raised: 0 18px 50px rgba(0, 0, 0, .6);
+}
+
+html[data-theme="forum"][data-color-scheme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0e1822;
+  --color-surface: #15212d;
+  --color-surface-subtle: #192734;
+  --color-surface-muted: #20303f;
+  --color-surface-raised: #1b2938;
+  --color-text: #e3ebf2;
+  --color-text-soft: #c6d3de;
+  --color-text-muted: #8ea2b4;
+  --color-text-subtle: #8699ab;
+  --color-text-disabled: #5b6d7d;
+  --color-text-inverse: #0e1822;
+  --color-border: #253545;
+  --color-border-strong: #304356;
+  --color-border-hover: #46617b;
+  --color-accent: #f29a2e;
+  --color-accent-hover: #ffad45;
+  --color-accent-soft: #382510;
+  --color-accent-text: #ffbd70;
+  --color-accent-border: #74481a;
+  --color-link: #5db4e6;
+  --color-success: #3dbb7a;
+  --color-success-text: #7dd7a6;
+  --color-success-soft: #12291f;
+  --color-success-border: #285a43;
+  --color-warning: #e3a93b;
+  --color-warning-soft: #32280f;
+  --color-danger: #f06a5f;
+  --color-danger-text: #ff9f96;
+  --color-danger-soft: #36181a;
+  --color-danger-border: #6c3030;
+  --color-info: #4fb0e0;
+  --color-info-soft: #122a3b;
+  --color-info-text: #9fd3f1;
+  --color-info-border: #24506b;
+  --color-focus: #4fb0e0;
+  --focus-ring: 0 0 0 3px rgba(79, 176, 224, .3);
+  --color-overlay: rgba(0, 0, 0, .72);
+  --sidebar-bg: #0b1622;
+  --sidebar-surface: #10202f;
+  --sidebar-border: #1f3448;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, .45);
+  --shadow-raised: 0 12px 30px rgba(0, 0, 0, .6);
+  --surface-header-background: linear-gradient(180deg, #1a2937, #16232f);
+  --surface-header-accent: #2f8fb8;
+  --surface-header-icon-color: #8fd0f0;
+  --surface-header-icon-background: #17354a;
+  --surface-header-meta-color: #a9cbe0;
+  --surface-header-meta-background: #17303f;
+  --surface-header-meta-border: #2b4a5f;
+}
+
+html[data-theme="forum"][data-color-scheme="dark"] body {
+  background: var(--color-bg);
+}
+

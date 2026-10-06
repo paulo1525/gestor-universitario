@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, ContactRound, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, Link2, LogOut, Megaphone, Menu, Palette, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
+import { ChevronLeft, Bell, BookOpen, BrainCircuit, CalendarDays, Check, ChevronDown, ChevronRight, ChevronUp, ContactRound, FileText, FlaskConical, Inbox, Languages, LayoutDashboard, Library, Link2, LogOut, Megaphone, Menu, Monitor, Moon, Palette, Sun, ShieldCheck, Vote, X, MapPinned } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
 import adminNavigationStyles from "@/components/admin-navigation.module.css";
@@ -18,6 +18,20 @@ import {setTestPersona,TEST_PERSONAS,testPersona} from "@/lib/test-mode";
 export type AppShellActive = "overview" | "turmas" | "quizzes" | "quizzes_management" | "notifications" | "useful_links" | "admin" | "modules" | "tickets" | "check" | "placements" | "audit" | "announcements" | "curricular_units" | "curricular_units_management" | "calendar" | "documents" | "requests" | "directory" | "campus" | "polls" | "dashboard" | "search" | "materials";
 type Props = { children: ReactNode; active: AppShellActive; breadcrumb?: string; currentClassId?: number; focusMode?: boolean };
 type SiteTheme = "cc" | "forum";
+type ColorSchemePreference = "light" | "dark" | "system";
+const COLOR_SCHEME_STORAGE_KEY = "gestor-color-scheme";
+
+function readColorSchemePreference(): ColorSchemePreference {
+  try {
+    const saved = window.localStorage.getItem(COLOR_SCHEME_STORAGE_KEY);
+    return saved === "dark" || saved === "system" ? saved : "light";
+  } catch { return "light"; }
+}
+
+function applyColorScheme(preference: ColorSchemePreference) {
+  const dark = preference === "dark" || preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.colorScheme = dark ? "dark" : "light";
+}
 type SiteNavigationGroup = "communication" | "academic" | "community";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "gestor-sidebar-collapsed";
 
@@ -27,6 +41,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
   const [testMenu,setTestMenu]=useState(false);
   const [profileMenu, setProfileMenu] = useState(false);
   const [theme, setTheme] = useState<SiteTheme>(() => typeof document !== "undefined" && document.documentElement.dataset.theme === "forum" ? "forum" : "cc");
+  const [colorScheme, setColorScheme] = useState<ColorSchemePreference>(() => typeof window !== "undefined" ? readColorSchemePreference() : "light");
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [communicationCounts, setCommunicationCounts] = useState({ userId: "", announcements: 0, polls: 0 });
@@ -85,6 +100,18 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
     window.localStorage.setItem("gestor-theme", nextTheme);
     document.documentElement.dataset.theme = nextTheme;
   };
+  const selectColorScheme = (next: ColorSchemePreference) => {
+    setColorScheme(next);
+    try { window.localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, next); } catch { /* A preferência visual não deve bloquear a navegação. */ }
+    applyColorScheme(next);
+  };
+  useEffect(() => {
+    if (colorScheme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const follow = () => applyColorScheme("system");
+    media.addEventListener("change", follow);
+    return () => media.removeEventListener("change", follow);
+  }, [colorScheme]);
   const toggleSidebar = () => {
     setProfileMenu(false);
     setSidebarCollapsed(current => {
@@ -185,6 +212,12 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
               <button type="button" className={`profile-theme-option${theme === "forum" ? " is-active" : ""}`} role="menuitemradio" aria-checked={theme === "forum"} onClick={() => selectTheme("forum")}>
                 <span className="profile-theme-option__preview profile-theme-option__preview--forum"><i/><i/><i/></span><span><strong>{t("profile.themeBlue")}</strong><small>{t("profile.themeBlueDescription")}</small></span>{theme === "forum"&&<Check/>}
               </button>
+            </section>
+            <section role="group" aria-labelledby="profile-appearance-label">
+              <span id="profile-appearance-label" className="profile-menu__label"><Moon/>{t("profile.appearanceLabel")}</span>
+              <div className="profile-language-options profile-appearance-options">
+                {([["light", Sun, t("profile.appearanceLight")], ["dark", Moon, t("profile.appearanceDark")], ["system", Monitor, t("profile.appearanceSystem")]] as const).map(([value, Icon, label]) => <button key={value} type="button" className={colorScheme === value ? "is-active" : ""} role="menuitemradio" aria-checked={colorScheme === value} onClick={() => selectColorScheme(value)}><span><Icon aria-hidden="true"/></span><strong>{label}</strong></button>)}
+              </div>
             </section>
             <section role="group" aria-labelledby="profile-language-label">
               <span id="profile-language-label" className="profile-menu__label"><Languages/>{t("profile.languageLabel")}</span>

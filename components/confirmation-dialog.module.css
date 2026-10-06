@@ -19,7 +19,7 @@
 .footer { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .cancel { cursor: pointer; }
 .confirm { cursor: pointer; }
-.primaryConfirm { border-color: var(--color-accent); color: var(--color-text); background: var(--color-accent); }
+.primaryConfirm { border-color: var(--color-accent); color: var(--color-accent-contrast); background: var(--color-accent); }
 :global(html[data-theme="forum"]) .primaryConfirm { border-color: #185f89; color: #fff; background: #2679aa; }
 .footer button:disabled { cursor: wait; opacity: .6; }
 .spin { width: 14px; height: 14px; animation: spin .8s linear infinite; }

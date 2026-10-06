@@ -29,7 +29,7 @@
 
 /* Empty draft: the send button keeps its colour, just faded. */
 .composer .send:disabled,
-:global(html[data-theme="forum"]) .composer .send:disabled { opacity: .45; border-color: var(--color-accent); color: var(--color-text); background: var(--color-accent); box-shadow: none; }
+:global(html[data-theme="forum"]) .composer .send:disabled { opacity: .45; border-color: var(--color-accent); color: var(--color-accent-contrast); background: var(--color-accent); box-shadow: none; }
 :global(html[data-theme="forum"]) .composer .send:disabled { border-color: #185f89; color: #fff; background: #2679aa; }
 
 .avatarCommission { color: #f6c945; background: #171712; }

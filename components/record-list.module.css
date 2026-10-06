@@ -26,8 +26,8 @@
 .statusPill { padding: 2px 8px; border-radius: 999px; color: var(--color-text-soft); background: var(--color-surface-muted); font-size: var(--font-size-caption); font-weight: 800; white-space: nowrap; }
 .statusPill[data-tone="accent"] { color: var(--color-accent-text); background: var(--gold-soft); }
 .statusPill[data-tone="success"] { color: var(--color-success-text); background: var(--green-soft); }
-.statusPill[data-tone="danger"] { color: var(--color-danger-text); background: #fde9e6; }
-.statusPill[data-tone="info"] { color: #1d5f86; background: var(--blue-soft); }
+.statusPill[data-tone="danger"] { color: var(--color-danger-text); background: var(--color-danger-soft); }
+.statusPill[data-tone="info"] { color: var(--color-info-text); background: var(--blue-soft); }
 /* Groups inside a list (year/semester, book…). */
 .group + .group { border-top: 1px solid var(--color-border); }
 .groupTitle.groupTitle { margin: 0; padding: var(--space-4) var(--space-5) 0; color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
