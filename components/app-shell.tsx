@@ -7,6 +7,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { AdminNavigation, isAdministrativeArea } from "@/components/admin-navigation";
 import adminNavigationStyles from "@/components/admin-navigation.module.css";
 import { FontScale, useAuth } from "@/components/auth-context";
+import { CookiePreferencesSetting } from "@/components/cookie-preferences";
 import { useI18n } from "@/components/i18n-context";
 import { useModules } from "@/components/module-context";
 import { UrgentAnnouncementBanner } from "@/components/urgent-announcement-banner";
@@ -226,6 +227,7 @@ export function AppShell({ children, active, breadcrumb = "Visão geral", focusM
                 <button type="button" className={locale === "en" ? "is-active" : ""} role="menuitemradio" aria-checked={locale === "en"} onClick={() => setLocale("en")}><span>EN</span><strong>{t("profile.languageEn")}</strong>{locale === "en"&&<Check/>}</button>
               </div>
             </section>
+            {!user?.preview&&!user?.testMode&&<CookiePreferencesSetting/>}
             {!user?.preview&&!user?.testMode&&<button type="button" className="profile-menu__logout" role="menuitem" onClick={() => void logout()}><LogOut/><span><strong>{t("profile.logout")}</strong></span></button>}
           </div>}
           <button type="button" className="profile" aria-label={t("profile.menuLabel")} aria-haspopup="menu" aria-expanded={profileMenu} title={sidebarCollapsed ? t("profile.menuLabel") : undefined} onClick={() => setProfileMenu(value => !value)}><span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span><span><strong>{user?.email}</strong><small>{user?.role === "admin" ? t("profile.roleAdmin") : user?.classRepresentative ? t("profile.roleRepresentative") : t("profile.roleStudent")}</small></span><ChevronUp className={profileMenu ? "is-open" : ""}/></button>

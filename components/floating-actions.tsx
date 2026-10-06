@@ -1,6 +1,6 @@
 "use client";
 
-import { Cookie, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/components/i18n-context";
 import { useEscapeKey } from "@/components/use-escape-key";
@@ -14,7 +14,6 @@ type Registry = { register: (action: FloatingAction) => () => void };
 
 const FloatingActionsContext = createContext<Registry | null>(null);
 
-export const OPEN_COOKIE_PREFERENCES = "gu:open-cookie-preferences";
 
 export function useFloatingAction(action: FloatingAction | null) {
   const registry = useContext(FloatingActionsContext);
@@ -57,21 +56,20 @@ function FloatingActionsDial({ actions }: { actions: FloatingAction[] }) {
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
 
-  const openCookies = () => window.dispatchEvent(new Event(OPEN_COOKIE_PREFERENCES));
-
-  // Nothing to add on this page: the button is just the cookie preferences.
-  if (actions.length === 0) {
+  // Pages without creation actions show no floating button; a single action is a direct button.
+  if (actions.length === 0) return null;
+  if (actions.length === 1) {
+    const [action] = actions;
     return (
       <div className="fab-dial">
-        <button className="fab-dial__toggle fab-dial__toggle--quiet" type="button" onClick={openCookies} aria-label={t("cookies.open")} title={t("cookies.open")}><Cookie aria-hidden="true" /></button>
+        <button className="fab-dial__toggle" type="button" onClick={action.onClick} aria-label={action.label} title={action.label}>
+          <Plus aria-hidden="true" />
+        </button>
       </div>
     );
   }
 
-  const items: FloatingAction[] = [
-    ...actions,
-    { id: "cookies", label: t("cookies.title"), icon: <Cookie />, onClick: openCookies },
-  ];
+  const items = actions;
 
   return (
     <div ref={root} className={`fab-dial${open ? " is-open" : ""}`}>

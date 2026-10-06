@@ -713,6 +713,12 @@ a { color: inherit; }
 .profile-language-options button>strong { overflow:hidden; font-size:var(--font-size-caption); text-overflow:ellipsis; white-space:nowrap; }
 .profile-language-options button>svg { width:13px; height:13px; color:var(--color-accent-text); }
 .profile-appearance-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.profile-cookies__option { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:6px 7px; border:1px solid var(--color-border); border-radius:8px; cursor:pointer; }
+.profile-cookies__option>span { min-width:0; display:grid; gap:2px; }
+.profile-cookies__option strong { font-size:var(--font-size-caption); }
+.profile-cookies__option small { color:var(--color-text-muted); font-size:var(--font-size-caption); line-height:1.35; }
+.profile-cookies__policy { display:inline-block; margin-top:6px; color:var(--color-link); font-size:var(--font-size-caption); }
+.profile-cookies__error { margin:6px 0 0; color:var(--color-danger-text); font-size:var(--font-size-caption); }
 .profile-appearance-options button { grid-template-columns:25px minmax(0,1fr); }
 .profile-appearance-options button>span svg { width:13px; height:13px; }
 .profile-menu__logout { width:100%; min-height:50px; display:grid; grid-template-columns:30px 1fr; align-items:center; gap:8px; padding:9px 12px; border:0; border-top:1px solid var(--color-border); color:var(--color-danger-text); background:var(--color-surface); text-align:left; cursor:pointer; }
@@ -1542,12 +1548,12 @@ tbody tr:hover, tbody tr.is-selected { background: var(--color-surface); }
 .cookie-panel__header h2 { margin: 0; font-size: 17px; }
 .cookie-panel__header > button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: var(--color-surface-muted); cursor: pointer; }
 .cookie-panel > p { color: var(--muted); font-size: var(--font-size-small); line-height: 1.55; }
-.cookie-option { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
-.cookie-option strong, .cookie-option span { display: block; }
-.cookie-option strong { font-size: var(--font-size-small); }
-.cookie-option div span { margin-top: 3px; color: var(--muted); font-size: var(--font-size-caption); line-height: 1.4; }
-.cookie-required { flex: 0 0 auto; color: var(--green); font-size: var(--font-size-caption); font-weight: 800; }
-.toggle { width: 38px; height: 20px; accent-color: var(--green); cursor: pointer; }
+.toggle { position: relative; width: 38px; height: 22px; flex: none; margin: 0; border-radius: 999px; background: var(--color-border-strong); appearance: none; -webkit-appearance: none; cursor: pointer; transition: background .15s ease; }
+.toggle::before { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); content: ""; transition: transform .15s ease; }
+.toggle:checked { background: var(--color-success); }
+.toggle:checked::before { transform: translateX(16px); }
+.toggle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.toggle:disabled { opacity: .6; cursor: not-allowed; }
 .cookie-panel__actions { justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
 .cookie-panel__actions a { color: var(--color-text-muted); font-size: var(--font-size-caption); font-weight: 700; }
 .cookie-panel__actions .button { min-height: 36px; padding-inline: 14px; font-size: var(--font-size-caption); }
@@ -6617,8 +6623,6 @@ dialog[data-app-modal-native] [data-app-modal-header] {
 .fab-dial__items button:hover .fab-dial__icon { background: var(--color-surface-muted); }
 @media (max-width: 640px) { .fab-dial { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); } }
 @media (prefers-reduced-motion: reduce) { .fab-dial__toggle, .fab-dial__toggle svg { transition: none; } }
-.fab-dial__toggle--quiet { width: 42px; height: 42px; border: 1px solid #3b3b37; color: var(--gold); background: #161616; box-shadow: 0 8px 25px rgba(0, 0, 0, .2); }
-.fab-dial__toggle--quiet svg { width: 17px; height: 17px; }
 
 /* Modal forms: every modal uses the same field anatomy as the platform's forms
    (plain bold label above, compact control, theme focus ring), whatever module renders it. */
@@ -6673,13 +6677,3 @@ body [data-app-modal="modal"] [data-app-modal-body] .form-label > svg { display:
 @media (max-width: 560px) { .app-modal-backdrop { align-items: end; padding: 10px; } }
 
 /* Cookie preferences inside the shared modal. */
-.cookie-options { display: grid; gap: 0; }
-.cookie-options__intro { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); line-height: 1.5; }
-.cookie-options__error { margin: var(--space-2) 0 0; color: var(--color-danger-text); font-size: var(--font-size-small); line-height: 1.5; }
-.cookie-options .cookie-option { display: flex; min-height: 0; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 0; border-top: 1px solid var(--color-border); cursor: default; }
-.cookie-options label.cookie-option { cursor: pointer; }
-.cookie-options .cookie-option > span { display: grid; gap: 2px; }
-.cookie-options .cookie-option strong { color: var(--color-text); font-size: var(--font-size-body); }
-.cookie-options .cookie-option small { color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 400; }
-.cookie-options .cookie-required { color: var(--color-success-text); font-size: var(--font-size-small); font-weight: 700; }
-.cookie-policy-link { margin-right: auto; color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 700; }

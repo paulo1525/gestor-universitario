@@ -33,32 +33,56 @@ function readSoundEnabled() {
   try { return window.localStorage.getItem(SOUND_STORAGE_KEY) === "on"; } catch { return false; }
 }
 
+function audio(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtor) return null;
+  // iOS mutes Web Audio with the ring/silent switch unless the page declares playback.
+  try { const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession; if (session) session.type = "playback"; } catch { /* unsupported */ }
+  audioContext ??= new AudioCtor();
+  return audioContext;
+}
+
+/** Browsers only start audio inside a user gesture: unlock on the first tap or key press. */
+function unlockAudio() {
+  if (!readSoundEnabled()) return;
+  const context = audio();
+  if (!context || context.state === "running") return;
+  void context.resume();
+  // A silent one-sample buffer completes the unlock on older iOS versions.
+  try { const source = context.createBufferSource(); source.buffer = context.createBuffer(1, 1, 22050); source.connect(context.destination); source.start(0); } catch { /* ignore */ }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pointerdown", unlockAudio, { capture: true, passive: true });
+  window.addEventListener("keydown", unlockAudio, { capture: true });
+}
+
 /** Short synthesised cues (no audio files). Off by default; the student turns them on. */
 export function playQuizSound(kind: SoundKind) {
   if (typeof window === "undefined" || !readSoundEnabled()) return;
   try {
-    const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return;
-    audioContext ??= new AudioCtor();
-    const context = audioContext;
+    const context = audio();
+    if (!context) return;
     if (context.state === "suspended") void context.resume();
     const notes: Record<SoundKind, Array<[number, number, OscillatorType]>> = {
-      correct: [[660, 0, "sine"], [990, 0.09, "sine"]],
-      wrong: [[220, 0, "triangle"], [180, 0.12, "triangle"]],
-      combo: [[660, 0, "sine"], [880, 0.07, "sine"], [1320, 0.14, "sine"]],
-      win: [[523, 0, "sine"], [659, 0.12, "sine"], [784, 0.24, "sine"], [1047, 0.36, "sine"]],
+      correct: [[660, 0, "triangle"], [990, 0.09, "triangle"]],
+      wrong: [[240, 0, "square"], [180, 0.13, "square"]],
+      combo: [[660, 0, "triangle"], [880, 0.07, "triangle"], [1320, 0.14, "triangle"]],
+      win: [[523, 0, "triangle"], [659, 0.12, "triangle"], [784, 0.24, "triangle"], [1047, 0.36, "triangle"]],
     };
     for (const [frequency, delay, type] of notes[kind]) {
       const oscillator = context.createOscillator(), gain = context.createGain();
-      const start = context.currentTime + delay;
+      const start = context.currentTime + 0.01 + delay;
+      const peak = type === "square" ? 0.12 : 0.3;
       oscillator.type = type;
       oscillator.frequency.setValueAtTime(frequency, start);
       gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+      gain.gain.exponentialRampToValueAtTime(peak, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
       oscillator.connect(gain).connect(context.destination);
       oscillator.start(start);
-      oscillator.stop(start + 0.25);
+      oscillator.stop(start + 0.26);
     }
   } catch { /* Audio is a nicety. */ }
 }
@@ -78,7 +102,7 @@ export function useQuizSound(): [boolean, () => void] {
     const next = !readSoundEnabled();
     try { window.localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
     window.dispatchEvent(new Event(SOUND_CHANGED_EVENT));
-    if (next) playQuizSound("correct");
+    if (next) { unlockAudio(); playQuizSound("correct"); }
   };
   return [enabled, toggle];
 }
@@ -123,7 +147,7 @@ export function AnswerVerdict({ correct, message, correctAnswer }: { correct: bo
 const PRAISE = ["Boa!", "Certíssimo!", "Isso mesmo!", "Excelente!", "Na mouche!"];
 
 export function praiseFor(correct: boolean, combo: number, seed: string) {
-  if (!correct) return "Quase! Vê a explicação e segue.";
+  if (!correct) return "Quase! Fica para a próxima.";
   if (combo >= 10) return `Lendário! ${combo} seguidas`;
   if (combo >= 5) return `Imparável! ${combo} seguidas`;
   if (combo >= 3) return `Em chamas! ${combo} seguidas`;

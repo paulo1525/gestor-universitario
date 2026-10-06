@@ -18,14 +18,12 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleHelp,
-  Cookie,
   SlidersHorizontal,
   ZoomIn,
   Clock3,
   Eye,
   EyeOff,
   Flag,
-  Lightbulb,
   Keyboard,
   MessageCircle,
   Play,
@@ -45,12 +43,11 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { OPEN_COOKIE_PREFERENCES } from "@/components/floating-actions";
 import { useEscapeKey } from "@/components/use-escape-key";
 import { AppShell } from "@/components/app-shell";
 import { PageTabs } from "@/components/page-tabs";
 import { SurfaceHeader } from "@/components/surface-header";
-import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState, nextUnansweredIndex } from "@/lib/quiz-session.mjs";
+import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState } from "@/lib/quiz-session.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -411,7 +408,6 @@ export function QuizHub() {
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [sendingComment, setSendingComment] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
   const [statisticsUnitId, setStatisticsUnitId] = useState("");
   const [statistics, setStatistics] = useState<QuizStatistics | null>(null);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
@@ -613,7 +609,6 @@ export function QuizHub() {
       setFinishError("");
       saveQuizProgress(next, 0);
       setRemaining(remainingQuizSeconds(next));
-      setShowExplanation(false);
       setCommentsOpen(false);
       setReplyTo(null);
       setScreen("attempt");
@@ -725,7 +720,6 @@ export function QuizHub() {
     setCurrentIndex(nextIndex);
     saveQuizProgress(active, nextIndex);
     setRemaining(remainingQuizSeconds(active));
-    setShowExplanation(false);
     setCommentsOpen(false);
     setReplyTo(null);
     setScreen("attempt");
@@ -805,7 +799,6 @@ export function QuizHub() {
       attemptRef.current = next;
       return next;
     });
-    if (!isExam && current.correctOptionId) setShowExplanation(true);
     setSavingQuestionIds((ids) => ids.includes(current.id) ? ids : [...ids, current.id]);
 
     const save = (async () => {
@@ -824,7 +817,6 @@ export function QuizHub() {
           attemptRef.current = next;
           return next;
         });
-        if (!isExam) setShowExplanation(true);
       } catch (reason) {
         failedAnswerIds.current.add(current.id);
         setAttempt((previous) => {
@@ -847,7 +839,6 @@ export function QuizHub() {
     if (!attempt || index < 0 || index >= attempt.questions.length) return;
     setCurrentIndex(index);
     saveQuizProgress(attempt, index);
-    setShowExplanation(false);
     setCommentsOpen(false);
     setComments([]);
     setCommentText("");
@@ -1026,7 +1017,6 @@ export function QuizHub() {
             currentAnswer={currentAnswer}
             answering={answering}
             remaining={remaining}
-            showExplanation={showExplanation}
             answerFormat={attempt.answerFormat}
             shortAnswerMode={attempt.shortAnswerMode}
             pinningComment={pinningComment}
@@ -1042,7 +1032,6 @@ export function QuizHub() {
             onQuestion={goToQuestion}
             onPause={async () => { await changeTimer("pause", "automatic"); saveQuizProgress(attemptRef.current ?? attempt, currentIndex); setScreen("catalogue"); }}
             onQuit={() => setAbandonConfirmation(true)}
-            onExplain={() => setShowExplanation((current) => !current)}
             onComments={() => setCommentsOpen((current) => !current)}
             onCommentText={setCommentText}
             onComment={sendComment}
@@ -1211,9 +1200,9 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
   </>;
 }
 
-function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, showExplanation, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onExplain, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
-  attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; showExplanation: boolean; pinningComment: string | null; onPinComment: (comment: Comment) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
-  replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onExplain: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
+  attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; pinningComment: string | null; onPinComment: (comment: Comment) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
+  replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
 }) {
   const questionPanelRef = useRef<HTMLElement>(null);
   const previousQuestionId = useRef<string | null>(null);
@@ -1281,7 +1270,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
     <section className={styles.sessionBar} aria-label="Progresso do teste">
       <div className={styles.hudRow}>
         <div className={styles.sessionIdentity}><span className={styles.unitCode}>{unit?.code ?? "UC"}</span><span><strong>{unit?.name ?? attempt.title}</strong><small>{modeTitle(attempt.mode)} · {currentIndex + 1}/{attempt.questions.length}</small></span></div>
-        <div className={styles.sessionStats}>{remaining !== null ? <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT) * .2) ? styles.lowTime : ""}`} role="timer" aria-live="off" data-timer-state={attempt.timerPaused ? "paused" : remaining <= 60 ? "low" : "running"} aria-label={`Tempo restante: ${formatClock(remaining)}. Limite: ${durationLabel}`}><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>{formatClock(remaining)}</strong><small>{attempt.timerPaused ? "Em pausa" : durationLabel}</small></span></span> : <span className={styles.timer} data-timer-state="untimed"><Clock3 aria-hidden="true" /><strong>Sem limite</strong></span>}{attempt.timed && <button type="button" className={`${styles.secondaryButton} ${styles.timerToggle}`} aria-label={timerBusy ? "A sincronizar cronómetro" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} title={attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}</button>}<SoundToggle className={`${styles.secondaryButton} ${styles.hudIconButton}`} /><SessionTools busy={finishing || savingCount > 0 || timerBusy} timed={attempt.timed} onPause={onPause} onQuit={onQuit} onFinish={onFinish} unanswered={attempt.answers.length < attempt.questions.length} onUnanswered={() => { const next = nextUnansweredIndex(attempt.questions, attempt.answers, currentIndex); if (next >= 0) onQuestion(next); }} /></div>
+        <div className={styles.sessionStats}>{remaining !== null ? <span className={`${styles.timer} ${!attempt.timerPaused && remaining <= Math.min(60, normaliseQuizDurationSeconds(attempt.durationSeconds ?? DEFAULT_TIMED_DURATION_SECONDS, attempt.questions.length || DEFAULT_QUESTION_COUNT) * .2) ? styles.lowTime : ""}`} role="timer" aria-live="off" data-timer-state={attempt.timerPaused ? "paused" : remaining <= 60 ? "low" : "running"} aria-label={`Tempo restante: ${formatClock(remaining)}. Limite: ${durationLabel}`}><Clock3 aria-hidden="true" /><span className={styles.timerCopy}><strong>{formatClock(remaining)}</strong><small>{attempt.timerPaused ? "Em pausa" : durationLabel}</small></span></span> : <span className={styles.timer} data-timer-state="untimed"><Clock3 aria-hidden="true" /><strong>Sem limite</strong></span>}{attempt.timed && <button type="button" className={`${styles.secondaryButton} ${styles.timerToggle}`} aria-label={timerBusy ? "A sincronizar cronómetro" : attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} title={attempt.timerPaused ? "Retomar tempo" : "Pausar tempo"} disabled={timerBusy || finishing} onClick={onTimer}>{attempt.timerPaused ? <Play /> : <Pause />}</button>}<SoundToggle className={`${styles.secondaryButton} ${styles.hudIconButton}`} /><SessionTools busy={finishing || savingCount > 0 || timerBusy} onPause={onPause} onQuit={onQuit} onFinish={onFinish} /></div>
       </div>
       <div className={styles.hudTrack}>
         <QuestionTrack states={trackStates} current={currentIndex} disabled={finishing || sendingComment} onSelect={onQuestion} />
@@ -1322,18 +1311,17 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 </>}
               </div>}
             </section>}
-            {showExplanation && answered && question.explanation && <section className={styles.explanation}><Lightbulb /><div><strong>Explicação</strong><RichTextContent value={question.explanation} className={styles.answerExplanation} /></div></section>}
-            {showExplanation && answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
+            {answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
           </div>
         </div>
-        <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : correctOption?.text} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onExplain} aria-expanded={showExplanation && answered} disabled={!question.explanation || !answered}><Lightbulb /><span>{showExplanation ? "Ocultar explicação" : "Explicação"}</span></button><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
+        <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : correctOption?.text} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
         {commentsOpen && <Comments onPin={onPinComment} pinning={pinningComment} comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
       </section>
     </div>
   </>;
 }
 
-function SessionTools({ busy, timed, unanswered, onPause, onQuit, onFinish, onUnanswered }: { busy: boolean; timed: boolean; unanswered: boolean; onPause: () => void; onQuit: () => void; onFinish: () => void; onUnanswered: () => void }) {
+function SessionTools({ busy, onPause, onQuit, onFinish }: { busy: boolean; onPause: () => void; onQuit: () => void; onFinish: () => void }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -1347,15 +1335,12 @@ function SessionTools({ busy, timed, unanswered, onPause, onQuit, onFinish, onUn
   const run = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
   const [soundOn, toggleSound] = useQuizSound();
   return <div ref={root} className={styles.sessionTools}>
-    <button ref={trigger} type="button" className={styles.toolsTrigger} aria-expanded={open} aria-controls="quiz-session-tools" onClick={() => setOpen((current) => !current)}><SlidersHorizontal aria-hidden="true" /><span>Opções</span><ChevronDown aria-hidden="true" /></button>
+    <button ref={trigger} type="button" className={styles.toolsTrigger} aria-label="Opções do teste" aria-expanded={open} aria-controls="quiz-session-tools" onClick={() => setOpen((current) => !current)}><SlidersHorizontal aria-hidden="true" /><span>Opções</span><ChevronDown aria-hidden="true" /></button>
     {open && <div id="quiz-session-tools" className={styles.toolsPanel}>
-      <button type="button" disabled={busy} onClick={() => run(onPause)}><ArrowLeft aria-hidden="true" />Guardar e sair</button>
-      <button type="button" disabled={busy || !unanswered} onClick={() => run(onUnanswered)}><CircleHelp aria-hidden="true" />Ir para uma pergunta por responder</button>
-      <button type="button" disabled={busy} onClick={() => run(onFinish)}><CheckCircle2 aria-hidden="true" />Concluir sessão</button>
-      <button type="button" className={styles.toolsQuit} disabled={busy} onClick={() => run(onQuit)}><XCircle aria-hidden="true" />Desistir do teste</button>
-      <button type="button" role="menuitemcheckbox" aria-checked={soundOn} onClick={toggleSound}>{soundOn ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}{soundOn ? "Sons ligados · desligar" : "Sons desligados · ligar"}</button>
-      <button type="button" onClick={() => run(() => window.dispatchEvent(new Event(OPEN_COOKIE_PREFERENCES)))}><Cookie aria-hidden="true" />Preferências de cookies</button>
-      {timed && <p>O tempo pausa ao sair deste separador.</p>}
+      <button type="button" disabled={busy} onClick={() => run(onPause)}><Pause aria-hidden="true" /><span><strong>Pausar e sair</strong><small>Continuas mais tarde onde ficaste.</small></span></button>
+      <button type="button" disabled={busy} onClick={() => run(onFinish)}><CheckCircle2 aria-hidden="true" /><span><strong>Terminar e ver resultado</strong><small>As perguntas por responder contam como erradas.</small></span></button>
+      <label className={styles.toolsSwitch}>{soundOn ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}<span><strong>Sons</strong><small>{soundOn ? "Ligados" : "Desligados"}</small></span><input className="toggle" type="checkbox" role="switch" checked={soundOn} onChange={toggleSound} /></label>
+      <button type="button" className={styles.toolsQuit} disabled={busy} onClick={() => run(onQuit)}><XCircle aria-hidden="true" /><span><strong>Desistir do teste</strong><small>Este teste não conta para as estatísticas.</small></span></button>
     </div>}
   </div>;
 }
@@ -1374,7 +1359,7 @@ function ResultsView({ attempt, correctCount, percent, recommendation, profileBe
     <ResultsGame correct={displayedCorrect} total={total} bestCombo={bestCombo} before={profileBefore} after={profileAfter} busy={busy} onAgain={onAgain} onSettings={onRestart} />
     <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
-    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...question.imageUrls, ...question.solutionImageUrls].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}{question.explanation && <div className={styles.reviewExplanation}><Lightbulb /><RichTextContent value={question.explanation} /></div>}</div></article>; })}</div></section>
+    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...question.imageUrls, ...question.solutionImageUrls].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}</div></article>; })}</div></section>
   </>;
 }
 

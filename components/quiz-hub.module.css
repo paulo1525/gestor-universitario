@@ -3,11 +3,6 @@
   min-width: 0;
 }
 
-/* Cookie preferences remain available in the session options without covering answers. */
-:global(body):has(.attemptPage) :global(.fab-dial):has(:global(.fab-dial__toggle--quiet)) {
-  display: none;
-}
-
 .hero {
   margin-bottom: 14px;
 }
@@ -434,6 +429,10 @@
 .answerStyleGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
 .choiceHint { display: none; margin: 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); line-height: 1.5; }
 .sessionRecap { min-width: 0; margin: 0 auto 0 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); font-weight: 650; }
+/* Testes tabs (Praticar · Estatísticas · Ranking) span the whole content width. */
+.page :global(.page-tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.page :global(.page-tabs) > :is(a, button) { justify-content: center; min-height: 36px; }
+
 .countRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
 .countChoices {
@@ -1283,7 +1282,13 @@
 .toolsPanel button:hover:not(:disabled) { background: var(--color-surface-subtle); }
 .toolsPanel button:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
 .toolsPanel .toolsQuit { color: var(--color-danger-text); }
-.toolsPanel p { margin: var(--space-2) var(--space-3); font-size: var(--font-size-body-emphasis); line-height: 1.5; }
+.toolsPanel > :is(button, label) > svg { width: 18px; height: 18px; flex: none; }
+.toolsPanel > :is(button, label) > span { min-width: 0; flex: 1; display: grid; gap: 1px; }
+.toolsPanel strong { font-size: var(--font-size-heading-3); font-weight: 700; }
+.toolsPanel small { color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); line-height: 1.35; }
+.toolsPanel .toolsQuit { margin-top: var(--space-1); border-top: 1px solid var(--color-border); border-radius: 0 0 var(--radius-control) var(--radius-control); }
+.toolsSwitch { min-height: 52px; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); cursor: pointer; }
+.toolsSwitch:hover { background: var(--color-surface-subtle); }
 .timerToggle { min-width: 44px; padding-inline: var(--space-2); }
 .mapMobileLabel { display: none; }
 .mapToggle { min-height: 44px; gap: var(--space-2); }
@@ -1569,8 +1574,15 @@
 
 .questionPanel {
   min-width: 0;
+  min-height: calc(100dvh - 190px);
+  display: flex;
+  flex-direction: column;
   overflow: clip;
   scroll-margin-top: 100px;
+}
+
+@media (min-width: 721px) {
+  .questionActions { position: sticky; z-index: 4; bottom: 0; margin-top: auto; }
 }
 .questionPanel:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
@@ -2602,6 +2614,7 @@
   .unitActions { position: sticky; z-index: 3; bottom: 0; margin: 0 calc(var(--space-3) * -1) calc(var(--space-3) * -1); padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); background: var(--color-surface); }
   .page .unitActions .startSession { width: 100%; min-height: 52px; font-size: var(--font-size-heading-2); }
   .page :global(.page-tabs) > button, .page .backLink { min-height: 44px; font-size: var(--font-size-heading-3); }
+  .page :global(.page-tabs) > button { gap: var(--space-1); padding: 0 var(--space-1); white-space: nowrap; }
   .page :global(.filter-bar) { --filter-control-height: 44px; }
   .page :global(.filter-bar) :global(input[type="search"]) { font-size: var(--font-size-heading-2); }
   :global(body):has(.page) :global([role="listbox"] [role="option"]) { min-height: 44px; font-size: var(--font-size-heading-3); }
@@ -2694,10 +2707,17 @@
     max-height: 360px;
   }
 
+  .questionPanel { min-height: 0; }
+  .attemptPage { padding-bottom: 200px; }
   .questionActions {
-    position: sticky;
-    z-index: 4;
+    position: fixed;
+    z-index: 30;
+    right: 0;
     bottom: 0;
+    left: 0;
+    margin: 0;
+    border-top: 1px solid var(--color-border);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, .08);
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: stretch;
@@ -2708,7 +2728,7 @@
     background: var(--color-surface);
   }
   .questionActions > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
-  .questionActions > .questionUtilities { grid-template-columns: repeat(2, 44px); gap: var(--space-1); }
+  .questionActions > .questionUtilities { grid-template-columns: 48px; gap: var(--space-1); }
   .questionActions > .questionNavigation { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
   .questionActions button { width: 100%; min-width: 0; min-height: 48px; padding-inline: var(--space-2); font-size: var(--font-size-heading-3); }
   .questionActions .textButton { justify-content: center; padding: 0; border: 1px solid var(--color-border); color: var(--color-text-muted); }
