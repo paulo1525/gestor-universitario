@@ -11,7 +11,7 @@ async function compile(path, require) {
   return compiled.exports;
 }
 const policy = await compile("../worker/registration-policy.ts", () => ({}));
-const worker = (await compile("../worker/index.ts", name => name === "./registration-policy" ? policy : { isAcademicHubPath: () => false, isCampusPath: () => false, isQuizPath: () => false })).default;
+const worker = (await compile("../worker/index.ts", name => name === "./registration-policy" ? policy : { isAcademicHubPath: () => false, isCampusPath: () => false, isQuizPath: () => false, isQuizRankingPath: () => false })).default;
 const SQL = await initSqlJs();
 const password = "ExemploSeguro2026!";
 function adapter(db) {
