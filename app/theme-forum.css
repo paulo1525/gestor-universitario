@@ -1189,7 +1189,6 @@ html[data-theme="forum"] .search-field:focus-within {
 
 html[data-theme="forum"] .fab-dial__toggle { color: #fff; background: #2679aa; box-shadow: 0 6px 18px rgba(18, 67, 96, .26); }
 html[data-theme="forum"] .fab-dial__toggle:hover { background: #2f86b6; }
-html[data-theme="forum"] .fab-dial__toggle--quiet, html[data-theme="forum"] .fab-dial__toggle--quiet:hover { border: 1px solid #3b3b37; color: var(--gold); background: #161616; }
 
 /* Disabled primary buttons read as disabled in this theme too. */
 html[data-theme="forum"] .button--primary:disabled,
