@@ -32,6 +32,19 @@ export function AuthForm() {
   const [siteKey, setSiteKey] = useState("");
   const [token, setToken] = useState("");
   const [remember, setRemember] = useState(true);
+  const [validationRequired, setValidationRequired] = useState(false);
+  const [validationClosesAt, setValidationClosesAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!validationClosesAt) return;
+    let timer: number;
+    const check = () => {
+      const remaining = Date.parse(validationClosesAt) - Date.now();
+      if (remaining <= 0) setValidationRequired(true);
+      else timer = window.setTimeout(check, Math.min(remaining, 86_400_000));
+    };
+    timer = window.setTimeout(check, 0);
+    return () => window.clearTimeout(timer);
+  }, [validationClosesAt]);
   // next/script keeps the first onLoad callback, so readiness is state rather than a captured closure.
   const [turnstileReady, setTurnstileReady] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -46,10 +59,12 @@ export function AuthForm() {
   useEffect(() => { if (user) router.replace(next); }, [user, next, router]);
   useEffect(() => {
     fetch("/api/config", { cache: "no-store" })
-      .then(async (response) => await response.json() as { turnstileSiteKey?: string })
+      .then(async (response) => await response.json() as { turnstileSiteKey?: string; administratorValidationRequired?: boolean; emailValidationClosesAt?: string | null })
       .then((result) => {
         const key = result.turnstileSiteKey || "";
         setSiteKey(key);
+        setValidationRequired(Boolean(result.administratorValidationRequired));
+        setValidationClosesAt(result.emailValidationClosesAt || null);
         if (key === "1x00000000000000000000AA") setToken("local-test");
       })
       .catch(() => setError(t("auth.securityLoadError")));
@@ -89,14 +104,22 @@ export function AuthForm() {
     const payload = mode === "verify" ? { email, code, rememberMe: remember } : mode === "reset-request" ? { email, turnstileToken: token } : mode === "reset-confirm" ? { email, code, password } : mode === "register" ? { fullName, email, password, turnstileToken: token, rememberMe: remember } : { email, password, turnstileToken: token, rememberMe: remember };
     try {
       const response = await fetch(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-      const result = await response.json() as { error?: string; code?: string };
+      const result = await response.json() as { error?: string; code?: string; next?: string };
       if (!response.ok) {
         if (result.code === "ACCOUNT_EXISTS") setMode("login");
+        if (result.code === "ADMIN_VALIDATION_REQUIRED") {
+          setValidationRequired(true); setMode("login"); setCode("");
+          setMessage(t("auth.adminValidationPending")); setToken("");
+          window.turnstile?.reset(widget.current); return;
+        }
         throw new Error(result.error || t("auth.requestError"));
       }
       if (mode === "register") {
-        setMode("verify");
-        setMessage(t("auth.registerSent"));
+        if (result.next === "admin-review") {
+          setMode("login"); setCode(""); setPassword(""); setValidationRequired(true);
+          setMessage(t("auth.adminValidationPending")); setToken("");
+          window.turnstile?.reset(widget.current);
+        } else { setMode("verify"); setMessage(t("auth.registerSent")); }
       } else if (mode === "reset-request") {
         setMode("reset-confirm");
         setMessage(t("auth.resetSent"));
@@ -135,6 +158,7 @@ export function AuthForm() {
     <div className="auth-tabs"><button type="button" className={mode === "login" ? "is-active" : ""} onClick={() => change("login")}>{t("auth.login")}</button><button type="button" className={mode === "register" || mode === "verify" ? "is-active" : ""} onClick={() => change("register")}>{t("auth.register")}</button></div>
     <form className="auth-form" onSubmit={submit}>
       <div className="auth-form__intro"><h2>{mode === "login" ? t("auth.welcome") : mode === "register" ? t("auth.register") : mode === "verify" ? t("auth.verify") : t("auth.reset")}</h2><p>{needsCode ? t("auth.codeIntro", { email }) : t("auth.institutionalIntro")}</p></div>
+      {validationRequired && ["login", "register", "verify"].includes(mode) && <p className="auth-message">{t("auth.adminValidationNotice")}</p>}
       {mode === "register" && <label className="auth-field"><span>{t("auth.fullName")}</span><div><UserRound /><input value={fullName} onChange={(event) => setFullName(event.target.value)} minLength={3} required /></div></label>}
       <label className="auth-field"><span>{t("auth.email")}</span><div><Mail /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} onBlur={canonicalizeEmail} placeholder="up123456789@up.pt" pattern="up[0-9]{9}@(up\.pt|edu\.med\.up\.pt)" readOnly={needsCode} required /></div></label>
       {needsPassword && <label className="auth-field"><span>{mode === "reset-confirm" ? t("auth.newPassword") : t("auth.password")}</span><div><LockKeyhole /><input type={show ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} required /><button type="button" onClick={() => setShow((value) => !value)} aria-label={show ? t("auth.hidePassword") : t("auth.showPassword")} title={show ? t("auth.hidePassword") : t("auth.showPassword")}>{show ? <EyeOff /> : <Eye />}</button></div>{mode !== "login" && <small>{t("auth.passwordHelp")}</small>}</label>}
@@ -143,7 +167,7 @@ export function AuthForm() {
       {needsCaptcha && <div className="turnstile-wrap" ref={container} />}
       {message && <p className="auth-message">{message}</p>}
       {error && <p className="auth-error">{error}</p>}
-      <button className="button button--primary button--full auth-submit" disabled={busy || (needsCaptcha && !token)}>{busy ? <LoaderCircle className="spin" /> : <ShieldCheck />}{busy ? t("auth.processing") : mode === "login" ? t("auth.login") : mode === "register" ? t("auth.sendCode") : mode === "verify" ? t("auth.verifyAndEnter") : mode === "reset-request" ? t("auth.sendResetCode") : t("auth.changePassword")}</button>
+      <button className="button button--primary button--full auth-submit" disabled={busy || (needsCaptcha && !token)}>{busy ? <LoaderCircle className="spin" /> : <ShieldCheck />}{busy ? t("auth.processing") : mode === "login" ? t("auth.login") : mode === "register" ? t(validationRequired ? "auth.requestValidation" : "auth.sendCode") : mode === "verify" ? t("auth.verifyAndEnter") : mode === "reset-request" ? t("auth.sendResetCode") : t("auth.changePassword")}</button>
       {mode.startsWith("reset") && <button className="auth-back" type="button" onClick={() => change("login")}>{t("auth.backToLogin")}</button>}
     </form>
   </>;

@@ -13,6 +13,7 @@ import { announcementAudienceWhere, unreadAnnouncementCount, recordAnnouncementR
 import { handleQuizRoute, isQuizPath } from "./quizzes";
 import { handleStudyAnnotations } from "./study-annotations";
 import { neuroParagraphs } from "@/lib/neuroanatomia-study";
+import { registrationPolicy, ADMIN_VALIDATION_MESSAGE } from "./registration-policy";
 
 export interface Env {
   DB: D1Database;
@@ -270,6 +271,15 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
   const code = makeCode();
   const userId = existing?.id ?? crypto.randomUUID();
   const role = Boolean(env.BOOTSTRAP_ADMIN_EMAIL && email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()) ? "admin" : "student";
+  const policy = await registrationPolicy(env);
+  if (policy.administratorValidationRequired) {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO users (id,email,full_name,password_hash,password_salt,password_iterations,role,status,email_verified_at,password_changed_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'pending',0,?,?,?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name,password_hash=excluded.password_hash,password_salt=excluded.password_salt,password_iterations=excluded.password_iterations,status='pending',updated_at=excluded.updated_at WHERE users.email_verified_at=0").bind(userId,email,fullName,hash,salt,PASSWORD_ITERATIONS,role,now,now,now),
+      env.DB.prepare("DELETE FROM pending_registrations WHERE email=?").bind(email),
+    ]);
+    await audit(env,request,"registration_awaiting_admin",true,email,userId);
+    return json({ ok: true, next: "admin-review", message: ADMIN_VALIDATION_MESSAGE });
+  }
   await env.DB.batch([
     env.DB.prepare("INSERT INTO users (id, email, full_name, password_hash, password_salt, password_iterations, role, status, email_verified_at, password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, role=excluded.role, status='pending', updated_at=excluded.updated_at WHERE users.email_verified_at = 0").bind(userId, email, fullName, hash, salt, PASSWORD_ITERATIONS, role, now, now, now),
     env.DB.prepare("INSERT INTO pending_registrations (email, full_name, password_hash, password_salt, password_iterations, code_hash, code_expires_at, code_attempts, last_sent_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?) ON CONFLICT(email) DO UPDATE SET full_name=excluded.full_name, password_hash=excluded.password_hash, password_salt=excluded.password_salt, password_iterations=excluded.password_iterations, code_hash=excluded.code_hash, code_expires_at=excluded.code_expires_at, code_attempts=0, last_sent_at=excluded.last_sent_at").bind(email, fullName, hash, salt, PASSWORD_ITERATIONS, await codeHash(env, email, code), now + CODE_SECONDS * 1000, now, now),
@@ -291,6 +301,8 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   const code = typeof body?.code === "string" ? body.code.trim() : "";
   if (!EMAIL_PATTERN.test(email) || !/^\d{6}$/.test(code)) return json({ error: "Código inválido ou expirado." }, 400);
   if (!await rateLimit(env, "verify", email)) return json({ error: "Demasiadas tentativas. Aguarde antes de tentar novamente." }, 429);
+  // Check at redemption too: codes issued before the deadline cannot activate an account after it.
+  if ((await registrationPolicy(env)).administratorValidationRequired) return json({ error: ADMIN_VALIDATION_MESSAGE, code: "ADMIN_VALIDATION_REQUIRED" }, 403);
   const pending = await env.DB.prepare("SELECT * FROM pending_registrations WHERE email = ?").bind(email).first<PendingRow>();
   const now = Date.now();
   if (!pending || pending.code_expires_at < now || pending.code_attempts >= 5) {
@@ -308,10 +320,11 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   const userId = user.id;
   const role = Boolean(env.BOOTSTRAP_ADMIN_EMAIL && email === env.BOOTSTRAP_ADMIN_EMAIL.toLowerCase()) ? "admin" : "student";
   try {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE users SET full_name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, role = ?, status = 'active', email_verified_at = ?, password_changed_at = ?, updated_at = ? WHERE id = ? AND email_verified_at = 0").bind(pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, userId),
+    const activation = await env.DB.batch([
+      env.DB.prepare("UPDATE users SET full_name = ?, password_hash = ?, password_salt = ?, password_iterations = ?, role = ?, status = 'active', email_verified_at = ?, password_changed_at = ?, updated_at = ? WHERE id = ? AND email_verified_at = 0 AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key='email_validation_closes_at' AND value!='' AND (julianday(value) IS NULL OR julianday(value)<=julianday('now')))").bind(pending.full_name, pending.password_hash, pending.password_salt, pending.password_iterations, role, now, now, now, userId),
       env.DB.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(email),
     ]);
+    if (!activation[0].meta.changes) return json({ error: ADMIN_VALIDATION_MESSAGE, code: "ADMIN_VALIDATION_REQUIRED" }, 403);
   } catch {
     return json({ error: "Não foi possível concluir o registo. A conta poderá já existir." }, 409);
   }
@@ -456,7 +469,8 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   const now = Date.now();
   const accessBlocked = user && user.status !== "active" && !(user.status === "suspended" && user.status_until && user.status_until <= now);
   const activeAdministrativeValidation = Boolean(user && user.status === "active" && user.email_verified_at <= 0);
-  if (!user || (user.email_verified_at <= 0 && !activeAdministrativeValidation) || accessBlocked || (user.locked_until && user.locked_until > now)) {
+  const pendingApproval = user?.status === "pending";
+  if (!user || (((user.email_verified_at <= 0 && !activeAdministrativeValidation) || accessBlocked) && !pendingApproval) || (user.locked_until && user.locked_until > now)) {
     await audit(env, request, "login", false, email, user?.id);
     return json(genericError, 401);
   }
@@ -467,6 +481,11 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     await env.DB.prepare("UPDATE users SET failed_login_count = ?, locked_until = ?, updated_at = ? WHERE id = ?").bind(lockedUntil ? 0 : failures, lockedUntil, now, user.id).run();
     await audit(env, request, "login", false, email, user.id);
     return json(genericError, 401);
+  }
+  if (pendingApproval) {
+    await audit(env, request, "login_pending_validation", false, email, user.id);
+    if ((await registrationPolicy(env)).administratorValidationRequired) return json({ error: ADMIN_VALIDATION_MESSAGE, code: "ADMIN_VALIDATION_REQUIRED" }, 403);
+    return json({ error: "A sua conta ainda não foi validada. Conclua o registo por email ou aguarde a aprovação de um administrador.", code: "VALIDATION_PENDING" }, 403);
   }
   const emailVerifiedAdministratively = activeAdministrativeValidation;
   await env.DB.prepare("UPDATE users SET failed_login_count = 0, locked_until = NULL, status = CASE WHEN status = 'suspended' AND status_until <= ? THEN 'active' ELSE status END, status_reason = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_reason END, status_until = CASE WHEN status = 'suspended' AND status_until <= ? THEN NULL ELSE status_until END, email_verified_at = CASE WHEN ? = 1 THEN ? ELSE email_verified_at END, last_login_at = ?, updated_at = ? WHERE id = ?").bind(now, now, now, emailVerifiedAdministratively ? 1 : 0, now, now, now, user.id).run();
@@ -698,11 +717,22 @@ async function handleAdminUsers(request: Request, env: Env, admin: { id: string 
 }
 
 async function handleAdminSettings(request: Request, env: Env, admin: { id: string }): Promise<Response> {
-  if (request.method === "GET") return json({ ...await maintenanceConfig(env), ...await classSettings(env) });
+  if (request.method === "GET") return json({ ...await maintenanceConfig(env), ...await classSettings(env), ...await registrationPolicy(env) });
   const body = await parseJson(request);
   const section = typeof body?.section === "string" ? body.section : "";
-  if (!['maintenance', 'preference_windows'].includes(section)) return json({ error: "Indique a configuração que pretende guardar." }, 400);
+  if (!['maintenance', 'preference_windows', 'registration'].includes(section)) return json({ error: "Indique a configuração que pretende guardar." }, 400);
   const now = Date.now();
+  if (section === 'registration') {
+    const raw = body?.emailValidationClosesAt;
+    if (raw !== null && (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(raw) || !Number.isFinite(Date.parse(raw)))) return json({ error: "Indique uma data e hora válidas ou desative o prazo." }, 400);
+    const closesAt = raw === null ? "" : new Date(raw).toISOString();
+    if (raw !== null && closesAt.slice(0,19) !== raw.slice(0,19)) return json({ error: "Indique uma data e hora válidas." }, 400);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO app_settings(key,value,updated_at,updated_by) VALUES ('email_validation_closes_at',?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at,updated_by=excluded.updated_by").bind(closesAt,now,admin.id),
+      env.DB.prepare("INSERT INTO admin_audit_log(actor_user_id,action,details,created_at) VALUES (?,'registration_policy_updated',?,?)").bind(admin.id,JSON.stringify({emailValidationClosesAt:closesAt||null}),now),
+    ]);
+    return json({ ok: true, ...await registrationPolicy(env) });
+  }
   if (section === 'maintenance') {
     const enabled = body?.maintenanceMode === true;
     const message = sanitizeAnnouncementHtml(typeof body?.maintenanceMessage === "string" ? body.maintenanceMessage.trim() : "");
@@ -1663,7 +1693,7 @@ async function routeApi(request: Request, env: Env, url: URL, ctx?: ExecutionCon
   if (!validOrigin(request, env)) return json({ error: "Origem do pedido inválida." }, 403);
   if (request.method === "GET" && pathname === "/api/config") {
     try {
-      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env), ...await classSettings(env), serverNow:Date.now() });
+      return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, ...await maintenanceConfig(env), ...await classSettings(env), ...await registrationPolicy(env), serverNow:Date.now() });
     } catch (error) {
       console.error("config_fallback", error instanceof Error ? error.message : "unknown");
       return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY, maintenanceMode: env.MAINTENANCE_MODE === "true", maintenanceMessage: "A plataforma encontra-se temporariamente em manutenção." });
