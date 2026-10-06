@@ -63,15 +63,28 @@ export function playQuizSound(kind: SoundKind) {
   } catch { /* Audio is a nicety. */ }
 }
 
-export function SoundToggle({ className }: { className?: string }) {
+const SOUND_CHANGED_EVENT = "gestor-quiz-sound-change";
+
+/** Shared on/off setting: the HUD icon and the session options stay in sync. */
+export function useQuizSound(): [boolean, () => void] {
   const [enabled, setEnabled] = useState(false);
-  useEffect(() => { setEnabled(readSoundEnabled()); }, []);
+  useEffect(() => {
+    const sync = () => setEnabled(readSoundEnabled());
+    sync();
+    window.addEventListener(SOUND_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(SOUND_CHANGED_EVENT, sync);
+  }, []);
   const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
+    const next = !readSoundEnabled();
     try { window.localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
+    window.dispatchEvent(new Event(SOUND_CHANGED_EVENT));
     if (next) playQuizSound("correct");
   };
+  return [enabled, toggle];
+}
+
+export function SoundToggle({ className }: { className?: string }) {
+  const [enabled, toggle] = useQuizSound();
   return <button type="button" className={className} aria-pressed={enabled} aria-label={enabled ? "Desligar sons" : "Ligar sons"} title={enabled ? "Desligar sons" : "Ligar sons"} onClick={toggle}>{enabled ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}</button>;
 }
 

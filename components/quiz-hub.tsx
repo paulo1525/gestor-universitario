@@ -40,6 +40,8 @@ import {
   Trash2,
   Trophy,
   TriangleAlert,
+  Volume2,
+  VolumeX,
   X,
   XCircle,
 } from "lucide-react";
@@ -59,7 +61,7 @@ import { richTextPlainText, sanitizeRichTextHtml } from "@/lib/announcement-cont
 import styles from "@/components/quiz-hub.module.css";
 import { FilterBar, FilterSearch } from "@/components/filter-bar";
 import { RecordSkeleton } from "@/components/record-list";
-import { AnswerVerdict, ComboPill, fetchQuizProfile, GameStrip, haptic, playQuizSound, praiseFor, QuestionTrack, RankingView, ResultsGame, SoundToggle, StreakBanner, XpCounter, type QuizGameProfile, type TrackState } from "@/components/quiz-game";
+import { AnswerVerdict, ComboPill, fetchQuizProfile, GameStrip, haptic, playQuizSound, praiseFor, QuestionTrack, RankingView, ResultsGame, SoundToggle, StreakBanner, useQuizSound, XpCounter, type QuizGameProfile, type TrackState } from "@/components/quiz-game";
 import { XP_PER_CORRECT } from "@/lib/quiz-gamification.mjs";
 
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic" | "frequency" | "platform_mistakes";
@@ -1305,6 +1307,7 @@ function SessionTools({ busy, timed, unanswered, onPause, onQuit, onFinish, onUn
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [open]);
   const run = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
+  const [soundOn, toggleSound] = useQuizSound();
   return <div ref={root} className={styles.sessionTools}>
     <button ref={trigger} type="button" className={styles.toolsTrigger} aria-expanded={open} aria-controls="quiz-session-tools" onClick={() => setOpen((current) => !current)}><SlidersHorizontal aria-hidden="true" /><span>Opções</span><ChevronDown aria-hidden="true" /></button>
     {open && <div id="quiz-session-tools" className={styles.toolsPanel}>
@@ -1312,6 +1315,7 @@ function SessionTools({ busy, timed, unanswered, onPause, onQuit, onFinish, onUn
       <button type="button" disabled={busy || !unanswered} onClick={() => run(onUnanswered)}><CircleHelp aria-hidden="true" />Ir para uma pergunta por responder</button>
       <button type="button" disabled={busy} onClick={() => run(onFinish)}><CheckCircle2 aria-hidden="true" />Concluir sessão</button>
       <button type="button" className={styles.toolsQuit} disabled={busy} onClick={() => run(onQuit)}><XCircle aria-hidden="true" />Desistir do teste</button>
+      <button type="button" role="menuitemcheckbox" aria-checked={soundOn} onClick={toggleSound}>{soundOn ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}{soundOn ? "Sons ligados · desligar" : "Sons desligados · ligar"}</button>
       <button type="button" onClick={() => run(() => window.dispatchEvent(new Event(OPEN_COOKIE_PREFERENCES)))}><Cookie aria-hidden="true" />Preferências de cookies</button>
       {timed && <p>O tempo pausa ao sair deste separador.</p>}
     </div>}

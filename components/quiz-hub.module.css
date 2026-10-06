@@ -1246,6 +1246,7 @@
 .toolsTrigger:focus-visible, .toolsPanel button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .toolsPanel {
   position: absolute;
+  z-index: 20;
   right: 0;
   top: calc(100% + var(--space-2));
   width: min(320px, calc(100vw - 32px));
