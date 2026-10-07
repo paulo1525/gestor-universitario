@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdtemp, writeFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { restoreQuizContentExport } from "../scripts/restore-quiz-content-export.mjs";
 import ts from "typescript";
 import initSqlJs from "sql.js/dist/sql-asm.js";
 import { prepareQuizJson } from "../scripts/prepare-quiz-json-storage.mjs";
@@ -277,6 +280,66 @@ function fixture(count = 8, splitSources = false) {
 }
 const contentSql =
   /\b(?:FROM|JOIN)\s+(?:quiz_questions|quiz_question_options|question_bank_items|question_bank_topics|question_bank_sources)\b/i;
+
+test("a recuperação privada conserva todos os ficheiros, incluindo arquivados, sem exportar a chave", async () => {
+  const f = fixture(1050);
+  const directory = await mkdtemp(path.join(os.tmpdir(), "quiz-recovery-test-"));
+  try {
+    f.tables.quiz_questions[0].status = "archived";
+    f.tables.quiz_questions[1].deleted_at = 123;
+    const prepared = prepareQuizJson(f.tables, "seed-test", 1);
+    const env = { ...f.env, ASSETS: new Bucket(prepared.artifacts) };
+    const response = await storage.createQuizContentExport(env, { revision: "seed-test", counts: prepared.counts, files: prepared.artifacts });
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+    const firstPart = await response.text();
+    assert.ok(env.ASSETS.reads.length <= 33);
+    const secondPart = await (await storage.createQuizContentExport(env, { revision: "seed-test", counts: prepared.counts, files: prepared.artifacts }, 32)).text();
+    const body = firstPart + secondPart;
+    assert.ok(!body.includes(testKey));
+    const backup = path.join(directory, "backup.ndjson"), output = path.join(directory, "restored");
+    await writeFile(backup, body);
+    const restored = await restoreQuizContentExport(backup, output);
+    assert.equal(restored.files, prepared.artifacts.length);
+    const transfer = JSON.parse(await readFile(path.join(output, "transfer.json"), "utf8"));
+    for (const artifact of prepared.artifacts) {
+      const file = transfer.files.find(file => file.key === artifact.key);
+      assert.deepEqual(JSON.parse(await readFile(path.join(output, file.filename), "utf8")), JSON.parse(artifact.content));
+    }
+    await writeFile(backup, body.trim().split("\n").slice(0, -1).join("\n"));
+    await assert.rejects(restoreQuizContentExport(backup, path.join(directory, "incomplete")), /Incomplete/);
+    await assert.rejects(readFile(path.join(directory, "incomplete", "transfer.json")), /ENOENT/);
+  } finally { f.db.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test("a exportação privada recusa estudantes e sessões ausentes antes de abrir os ficheiros", async () => {
+  const f = fixture();
+  try {
+    const reads = f.bucket.reads.length;
+    assert.equal((await f.request("/api/admin/quizzes/content-export")).status, 403);
+    assert.equal((await f.request("/api/admin/quizzes/content-export", "GET", null, null)).status, 401);
+    assert.equal((await f.request("/api/admin/quizzes/content-export", "POST", {}, admin)).status, 405);
+    assert.equal(f.bucket.reads.length, reads);
+  } finally { f.db.close(); }
+});
+
+test("o índice seleciona a nova chave sem alterar a leitura da versão antiga", async () => {
+  const f = fixture();
+  try {
+    const nextKey = Buffer.alloc(32, 19).toString("base64");
+    const nextStorage = await compile("../worker/quiz-content-store.ts", {
+      "./quiz-content-index.json": { default: { revision: "seed-test", keySlot: "next" } },
+    });
+    const prepared = prepareQuizJson(f.tables, "seed-test", 1);
+    const nextBucket = new Bucket(prepared.artifacts);
+    for (const artifact of prepared.artifacts) nextBucket.objects.set(artifact.key, encryptQuizFile(artifact.content, artifact.key, nextKey));
+    const nextEnv = { ...f.env, ASSETS: nextBucket, QUIZ_CONTENT_KEY_NEXT: nextKey };
+    const next = await nextStorage.QuizContentStore.open(nextEnv);
+    assert.equal((await next.question("q-0")).prompt, f.tables.quiz_questions[0].prompt);
+    const previous = await storage.QuizContentStore.open({ ...f.env, QUIZ_CONTENT_KEY_NEXT: nextKey });
+    assert.equal((await previous.question("q-0")).prompt, f.tables.quiz_questions[0].prompt);
+    await assert.rejects(nextStorage.QuizContentStore.open({ ...nextEnv, QUIZ_CONTENT_KEY_NEXT: undefined }), /ainda não estão disponíveis/);
+  } finally { f.db.close(); }
+});
 
 test("catálogo e detalhe vêm do JSON; o detalhe não revela soluções nem varre perguntas D1", async () => {
   const f = fixture();

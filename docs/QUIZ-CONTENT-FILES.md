@@ -134,6 +134,22 @@ de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrom
 
 ## Histórico e recuperação
 
+Para recuperar uma revisão quando a chave só existe no Worker, um administrador
+pode descarregar `/api/admin/quizzes/content-export`. O backup privado em NDJSON
+inclui todos os ficheiros, sem filtrar conteúdos arquivados ou apagados, e não
+contém a chave. Guardar o download fora do repositório e restaurar para uma pasta
+nova com `node scripts/restore-quiz-content-export.mjs --source PARTE1,PARTE2 --output PASTA`.
+Cada resposta contém até 32 ficheiros; continuar com `?offset=32`, `?offset=64`,
+etc., até ao `fileCount` indicado no índice. As partes têm de pertencer à mesma
+revisão e ser restauradas pela ordem original.
+O restauro confere os checksums e só grava `transfer.json` quando está completo.
+A exportação fica registada na auditoria.
+
+Uma rotação sem interromper a versão atual usa o secret `QUIZ_CONTENT_KEY_NEXT`.
+A versão atual continua a usar `QUIZ_CONTENT_KEY`; só um índice publicado com
+`keySlot: "next"` passa a usar o novo secret. Configurar a nova chave antes de
+publicar os ficheiros correspondentes e conservar a antiga para rollback.
+
 Respostas, comentários, progresso e snapshots de tentativas permanecem na D1.
 Os registos antigos são preservados. Para perguntas novas, o início da tentativa
 regista apenas os IDs e relações necessários às chaves estrangeiras, sem copiar
