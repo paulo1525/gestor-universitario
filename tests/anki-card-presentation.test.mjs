@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import ts from "typescript";
 import { ankiCardPresentation } from "../lib/anki-card-presentation.mjs";
 import { isShortAnswerMatch } from "../lib/short-answer-match.mjs";
+
+const plainTextModule = ts.transpileModule(await readFile(new URL("../lib/announcement-content.ts", import.meta.url), "utf8"), {
+  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+}).outputText;
+const { richTextPlainText } = await import(`data:text/javascript;base64,${Buffer.from(plainTextModule).toString("base64")}`);
 
 const header = "<div>Neuroanatomia::Legendar::AP1::08 Tema visual</div>";
 const prompt = "<div>Identifica a estrutura n.º 9.</div>";
@@ -20,7 +27,7 @@ test("keeps hints separate and preserves nested answer and explanation formattin
 });
 test("written answers are compared without repeated prompt and bibliography", () => {
   const card = ankiCardPresentation(header + prompt, header + prompt + "<div><div>RESPOSTA</div>Articulações fibrosas</div><div>Atlas, p. 558.</div>");
-  assert.equal(isShortAnswerMatch("Articulações fibrosas", card.answer.replace(/<[^>]+>/g, "")), true);
+  assert.equal(isShortAnswerMatch("Articulações fibrosas", richTextPlainText(card.answer)), true);
 });
 test("unknown templates and compendium content are preserved verbatim", () => {
   for (const imported of [true, false]) {
