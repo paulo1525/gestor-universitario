@@ -51,6 +51,8 @@ export function decryptQuizFile(content, objectKey, secret) {
 }
 
 async function main() {
+  const keySlot = process.argv.includes("--key-slot") ? process.argv[process.argv.indexOf("--key-slot") + 1] : "primary";
+  if (!["primary", "next"].includes(keySlot)) throw new Error("Use --key-slot primary or next.");
   const sourceArg = process.argv[process.argv.indexOf("--source") + 1];
   if (!process.argv.includes("--source") || !sourceArg)
     throw new Error("Use --source with the private export directory.");
@@ -71,7 +73,7 @@ async function main() {
   for (const file of transfer.files) {
     if (
       path.basename(file.filename) !== file.filename ||
-      !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
+      !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/media\/[a-f0-9]{64}\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
         file.key,
       )
     )
@@ -96,7 +98,7 @@ async function main() {
     throw new Error("Invalid manifest revision.");
   if (process.argv.includes("--rebuild")) {
     const chunks = prepared
-      .filter((item) => item.file.key !== "quiz-content/v1/manifest.json")
+      .filter((item) => item.file.key !== "quiz-content/v1/manifest.json" && !item.file.key.startsWith("quiz-content/v1/media/"))
       .map((item) => JSON.parse(item.content));
     const bankIndexes = chunks.filter(
       (chunk) => chunk.bankTopics.length || chunk.bankSources.length,
@@ -112,13 +114,16 @@ async function main() {
       question_bank_sources: bankIndexes.flatMap((chunk) => chunk.bankSources),
     });
     transfer = { revision: result.manifest.revision, counts: result.counts };
-    prepared = result.artifacts.map((artifact) => ({
+    const media = prepared.filter(item => /^quiz-content\/v1\/media\//.test(item.file.key));
+    prepared = [...result.artifacts.map((artifact) => ({
       file: artifact,
       content: Buffer.from(artifact.content),
-    }));
+    })), ...media];
   }
-  const secret = configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY,
-    await readFile(path.join(root, ".dev.vars"), "utf8").catch(() => ""));
+  const localVars = await readFile(path.join(root, ".dev.vars"), "utf8").catch(() => "");
+  const secret = keySlot === "next"
+    ? configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY_NEXT, localVars.replace(/^QUIZ_CONTENT_KEY=.*$/mg, "").replace(/^QUIZ_CONTENT_KEY_NEXT=/mg, "QUIZ_CONTENT_KEY="))
+    : configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY, localVars);
   const files = [];
   for (const { file, content } of prepared) {
     const destination = path.join(
@@ -138,6 +143,7 @@ async function main() {
       encrypted = null;
     }
     encrypted ??= encryptQuizFile(content, file.key, secret);
+    if (encrypted.length > 25 * 1024 * 1024) throw new Error("Question asset exceeds the 25 MiB limit: " + file.key);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, encrypted);
     files.push({
@@ -153,6 +159,7 @@ async function main() {
         schemaVersion: 1,
         revision: transfer.revision,
         encrypted: true,
+        keySlot,
         counts: transfer.counts,
         files,
       },

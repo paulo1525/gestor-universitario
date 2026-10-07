@@ -72,6 +72,8 @@ type ShortAnswerMode = "type_and_check" | "reveal_and_self_assess";
 
 type ApiOption = { id: string | number; text?: string; label?: string; content?: string };
 type ApiQuestion = {
+  cardType?: "text" | "label_image";
+  revealed?: boolean;
   seenBefore?: boolean;
   id: string | number;
   text?: string;
@@ -96,6 +98,8 @@ type ApiQuestion = {
   explanation?: string | null;
 };
 type Question = {
+  cardType: "text" | "label_image";
+  revealed: boolean;
   seenBefore: boolean;
   id: string;
   text: string;
@@ -278,6 +282,8 @@ function normalizeQuestion(item: ApiQuestion): Question {
   return {
     id: String(item.id),
     seenBefore: item.seenBefore === true,
+    cardType: item.cardType === "label_image" ? "label_image" : "text",
+    revealed: item.revealed === true,
     text: item.text ?? item.prompt ?? item.question ?? item.statement ?? "Pergunta sem enunciado.",
     imageUrl: item.imageUrl ?? item.image_url ?? null,
     imageUrls: item.imageUrls ?? (item.imageUrl ?? item.image_url ? [String(item.imageUrl ?? item.image_url)] : []),
@@ -401,6 +407,7 @@ export function QuizHub() {
   const [clearStatisticsConfirmation, setClearStatisticsConfirmation] = useState(false);
   const [timed, setTimed] = useState(() => readQuizPreferences().timed !== false);
   const [timerBusy, setTimerBusy] = useState(false);
+  const [revealingLabel, setRevealingLabel] = useState(false);
   const [timerError, setTimerError] = useState("");
   const timerQueue = useRef<Promise<void>>(Promise.resolve());
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
@@ -806,6 +813,20 @@ export function QuizHub() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [savingQuestionIds.length]);
 
+  const revealLabel = async () => {
+    if (!attempt || !question || answering || revealingLabel) return;
+    const attemptId = attempt.id, questionId = question.id;
+    setRevealingLabel(true);
+    try {
+      const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(attemptId)}/reveal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ questionId }) });
+      const payload = await response.json() as { question?: ApiQuestion; error?: string };
+      if (!response.ok || !payload.question) throw new Error(payload.error || "Não foi possível mostrar a legenda.");
+      const revealed = normalizeQuestion(payload.question);
+      setAttempt(previous => previous?.id === attemptId ? { ...previous, questions: previous.questions.map(item => item.id === questionId ? revealed : item) } : previous);
+    } catch (error) { setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível mostrar a legenda." }); }
+    finally { setRevealingLabel(false); }
+  };
+
   const answerQuestion = useCallback((optionId: string) => {
     const active = attemptRef.current;
     const current = active?.questions[currentIndex];
@@ -1045,7 +1066,7 @@ export function QuizHub() {
             question={question}
             currentIndex={currentIndex}
             currentAnswer={currentAnswer}
-            answering={answering}
+            answering={answering || revealingLabel}
             remaining={remaining}
             answerFormat={attempt.answerFormat}
             shortAnswerMode={attempt.shortAnswerMode}
@@ -1057,6 +1078,7 @@ export function QuizHub() {
             commentText={commentText}
             sendingComment={sendingComment}
             onSelect={(optionId) => void answerQuestion(optionId)}
+            onRevealLabel={() => void revealLabel()}
             onNext={() => currentIndex === attempt.questions.length - 1 ? requestFinish() : goToQuestion(currentIndex + 1)}
             onPrevious={() => goToQuestion(currentIndex - 1)}
             onQuestion={goToQuestion}
@@ -1136,6 +1158,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSour
                       { id: "compendium", title: "Perguntas do compêndio", disabled: unit.sources.find(source => source.id === "compendium")?.questionCount === 0 },
                       { id: "anki", title: "Ankis", disabled: !unit.sources.some(source => source.id === "anki" && source.questionCount > 0) },
                     ]} onChange={onSource} />
+                    {selectedSource === "anki" && <p className={styles.sessionRecap}>Nos cartões de legendar, identifica a estrutura, mostra a legenda e avalia se sabias a resposta.</p>}
                   </div>}
                   {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
                   <div className={styles.setupField}>
@@ -1245,7 +1268,8 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
   </>;
 }
 
-function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onRevealLabel, onNext, onPrevious, onQuestion, onPause, onQuit, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
+  onRevealLabel: () => void;
   attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; pinningComment: string | null; onPinComment: (comment: Comment) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
   replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
 }) {
@@ -1334,7 +1358,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
           {question.imageUrls.map((url, index) => <figure key={url} className={styles.questionImage}><a className={styles.imageOpen} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar figura ${index + 1} da pergunta, abre num novo separador`}><img src={url} alt={question.imageAlt || `Figura ${index + 1} da pergunta`} /><span><ZoomIn aria-hidden="true" />Ampliar</span></a></figure>)}
           <div className={styles.questionContent}>
             <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
-            {answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
+            {question.cardType === "label_image" ? <NeuroLabelCard question={question} answered={answered} onReveal={onRevealLabel} onAssess={submitSelfAssessment} disabled={answering || finishing || attempt.timerPaused || Boolean(timerError) || remaining === 0} /> : answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
               {question.options.map((option, index) => {
                 const selected = currentAnswer?.selectedOptionId === option.id;
                 const correct = feedback && option.id === question.correctOptionId;
@@ -1346,7 +1370,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
               {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <div className={styles.cardPrompt}><p>Pensa na resposta antes de a mostrares.</p><button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Mostrar resposta</button></div>}
               {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}>
                 {shortAnswerMode === "type_and_check" && shortDraft.value.trim() && <div className={styles.answerCompare}><span>A tua resposta</span><strong>{shortDraft.value.trim()}</strong></div>}
-                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong></div>
+                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><RichTextContent value={correctOption?.text ?? "Resposta indisponível"} /></div>
                 {!answered && <>
                   <p className={shortDraft.correct === true ? styles.proposalCorrect : shortDraft.correct === false ? styles.proposalIncorrect : styles.selfQuestion}>{shortAnswerMode === "reveal_and_self_assess" ? "Sabias a resposta?" : shortDraft.correct === true ? <><CheckCircle2 aria-hidden="true" />Parece certa. Confirmas?</> : shortDraft.value.trim() ? <><XCircle aria-hidden="true" />Parece diferente da solução. Se disseste o mesmo por outras palavras, marca “Acertei”.</> : "Fica marcada como errada."}</p>
                   <div className={styles.selfAssessmentActions} role="group" aria-label="Confirmar resultado">
@@ -1356,7 +1380,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 </>}
               </div>}
             </section>}
-            {answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
+            {question.cardType !== "label_image" && answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
           </div>
         </div>
         <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : correctOption?.text} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
@@ -1388,6 +1412,21 @@ function SessionTools({ busy, onPause, onQuit, onFinish }: { busy: boolean; onPa
       <button type="button" className={styles.toolsQuit} disabled={busy} onClick={() => run(onQuit)}><XCircle aria-hidden="true" /><span><strong>Desistir do teste</strong><small>Este teste não conta para as estatísticas.</small></span></button>
     </div>}
   </div>;
+}
+
+function NeuroLabelCard({ question, answered, disabled, onReveal, onAssess }: { question: Question; answered: boolean; disabled: boolean; onReveal: () => void; onAssess: (correct: boolean) => void }) {
+  const solution = question.options.find(option => option.id === question.correctOptionId);
+  const revealed = question.revealed || answered;
+  return <section className={styles.shortAnswer} aria-label="Anki de legendar">
+    {!revealed ? <div className={styles.cardPrompt}><button type="button" className={styles.revealAnswerButton} onClick={onReveal} disabled={disabled}><Eye aria-hidden="true" />Mostrar legenda</button></div> : <div className={styles.shortAnswerReveal}>
+      <div className={styles.answerCompare} data-solution><span>Legenda</span><RichTextContent value={solution?.text || "Legenda indisponível"} /></div>
+      {question.solutionImageUrls.filter(url => !question.imageUrls.includes(url)).map((url, index) => <figure key={url} className={styles.reviewImage}><a href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar verso ${index + 1}, abre num novo separador`}><img src={url} alt={`Verso ${index + 1} do cartão de legendar`} /></a></figure>)}
+      {!answered && <><p className={styles.selfQuestion}>Identificaste a estrutura?</p><div className={styles.selfAssessmentActions} role="group" aria-label="Autoavaliação da legenda">
+        <button type="button" className={styles.selfAssessmentIncorrect} onClick={() => onAssess(false)} disabled={disabled}><XCircle aria-hidden="true" />Não sabia</button>
+        <button type="button" className={styles.selfAssessmentCorrect} onClick={() => onAssess(true)} disabled={disabled}><CheckCircle2 aria-hidden="true" />Sabia</button>
+      </div></>}
+    </div>}
+  </section>;
 }
 
 function ResultsView({ attempt, correctCount, percent, recommendation, profileBefore, profileAfter, busy, onAgain, onRestart }: { attempt: Attempt; correctCount: number; percent: number; recommendation: string; profileBefore: QuizGameProfile | null; profileAfter: QuizGameProfile | null; busy: boolean; onAgain: () => void; onRestart: () => void }) {

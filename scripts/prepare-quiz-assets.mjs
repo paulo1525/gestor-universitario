@@ -17,13 +17,14 @@ if (
 const files = [];
 for (const file of index.files) {
   if (
-    !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
+    !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/media\/[a-f0-9]{64}\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
       file.key,
     )
   )
     throw new Error("Invalid question file path.");
   const source = path.join(root, "private", "questions", file.key + ".enc");
   const content = await readFile(source);
+  if (content.length > 25 * 1024 * 1024) throw new Error("Question asset exceeds 25 MiB.");
   if (
     content.length !== file.bytes ||
     createHash("sha256").update(content).digest("hex") !== file.sha256

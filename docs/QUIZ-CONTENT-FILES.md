@@ -119,16 +119,21 @@ Inspeção local de 07/10/2026: a revisão de 02/10 do APKG contém 3.079 cartõ
 O conversor processou todos os cartões e as contagens por aula coincidiram com
 o relatório do baralho. Esta cópia tem SHA-256
 `4fe02de3ba5c4283c301ee2ba53cd8632b74a5aca84b26f4a0e5a9a04cf975fc`,
-diferente do checksum original acima. A importação final depende da confirmação
-da revisão e do acesso à exportação privada atual; a inspeção não constitui
-importação no catálogo nem publicação.
+diferente do checksum original acima. A revisão local foi importada integralmente
+após recuperar a revisão atual pelo Worker autenticado. A diferença de checksum
+fica explícita: não se afirma ter importado o ficheiro de checksum original.
 
-A simulação de empacotamento apenas dos Ankis com os blocos atuais de 32 cartões
-produziu um ficheiro cifrado estimado de 92.429.988 bytes, acima do limite de
-25 MiB por Static Asset do Cloudflare. Antes da importação publicável, o tratamento
-de imagens e o tamanho dos blocos têm de ser adaptados e a memória do Worker
-verificada com sessões reais. Não publicar os cartões com esta divisão fixa.
+Foram preservadas, sem alterar os registos, as 2.799 perguntas, 6.928 opções e
+3.791 itens do banco existentes. Os 3.079 cartões acrescentados incluem 2.433
+cartões de texto e 646 de legendar. Os 646 ficheiros de media são cifrados em
+objetos separados, servidos pela API autenticada `/api/quiz-media/<sha256>`.
+Os bytes das imagens são preservados; nenhum ficheiro cifrado ultrapassa 25 MiB.
+O maior objeto desta revisão tem 2.268.217 bytes.
 
+Cartões de legendar usam um fluxo próprio: imagem original, revelação explícita
+da legenda e do verso, e autoavaliação “Sabia / Não sabia”. Não geram alternativas
+nem exigem uma resposta escrita. A revelação não pontua e fica no snapshot da
+tentativa, permitindo retomar. A API recusa a avaliação antes da revelação.
 Sem cartões importados, a opção Ankis fica desativada. A validação com baralhos
 de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrome.
 

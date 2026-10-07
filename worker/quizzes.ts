@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "../lib/announcement-content";
-import { QuizContentStore, QuizContentError, createQuizContentExport, type QuizContentEnv } from "./quiz-content-store";
+import { QuizContentStore, QuizContentError, createQuizContentExport, readQuizMedia, type QuizContentEnv } from "./quiz-content-store";
 
 export type QuizUser = {
   id: string;
@@ -276,6 +276,7 @@ function topicDto(item: Row) {
 function questionDto(item: Row, options: QuizOption[], includeAnswer = false) {
   return {
     id: item.id, unitId: item.curricular_unit_id, topicId: item.topic_id, prompt: item.prompt, question: item.prompt,
+    cardType: item.anki_card_type === "label_image" ? "label_image" : "text",
     responseType: item.response_type || "multiple_choice", answerText: includeAnswer ? item.answer_text : undefined, imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: includeAnswer ? storedImageUrls(item.solution_images_json) : undefined, explanation: includeAnswer ? item.explanation : undefined, difficulty: item.difficulty,
     status: item.status, options,
     correctOptionId: includeAnswer ? item.correct_option_id : undefined,
@@ -553,15 +554,17 @@ function modeFrom(value: unknown, rawDifficulty: unknown): { mode: QuizMode | nu
   return { mode, difficulty: optionalDifficulty(rawDifficulty) };
 }
 
-function attemptQuestionDto(item: Row, reveal: boolean, completed: boolean) {
+function attemptQuestionDto(item: Row, reveal: boolean, completed: boolean, cardType = "text", revealed = false) {
   const options = parseStoredOptions(item.options_json);
+  const hideLabel = cardType === "label_image" && !revealed && !completed && !item.selected_option_id;
   return {
     id: item.question_id, questionId: item.question_id, position: item.position, prompt: item.prompt, question: item.prompt,
-    imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: reveal && (completed || item.selected_option_id) ? storedImageUrls(item.solution_images_json) : undefined, difficulty: item.difficulty, topicId: item.topic_id, topic: item.topic_title || "Tema geral", unitId: item.curricular_unit_id,
-    options, selectedOptionId: item.selected_option_id,
-    correctOptionId: reveal ? item.correct_option_id : undefined,
+    cardType, revealed,
+    imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: (revealed || reveal && (completed || item.selected_option_id)) ? storedImageUrls(item.solution_images_json) : undefined, difficulty: item.difficulty, topicId: item.topic_id, topic: item.topic_title || "Tema geral", unitId: item.curricular_unit_id,
+    options: hideLabel ? options.map(option => ({ ...option, text: option.id === item.correct_option_id ? "Legenda" : option.text })) : options, selectedOptionId: item.selected_option_id,
+    correctOptionId: reveal || revealed ? item.correct_option_id : undefined,
     correct: reveal && item.is_correct !== null && item.is_correct !== undefined ? Number(item.is_correct) === 1 : undefined,
-    explanation: reveal ? item.explanation : undefined,
+    explanation: !hideLabel && (revealed || reveal) ? item.explanation : undefined,
     answeredAt: item.answered_at, seenBefore: Number(item.seen_before) === 1,
   };
 }
@@ -622,7 +625,28 @@ async function repairAttemptTimer(env: QuizEnv, user: QuizUser, attempt: Row): P
 async function attemptDetail(env: QuizEnv, attempt: Row): Promise<Row> {
   const questions = await env.DB.prepare("SELECT aq.*,t.title AS topic_title FROM quiz_attempt_questions aq LEFT JOIN quiz_topics t ON t.id=aq.topic_id WHERE aq.attempt_id=? ORDER BY aq.position").bind(attempt.id).all();
   const isExam = attempt.mode === "exam";
-  return { ...attemptDto(attempt), questions: questions.results.map((item) => attemptQuestionDto(row(item), attempt.status !== "active" || !isExam, attempt.status !== "active")) };
+  let config: Row = {};
+  try { config = record(JSON.parse(String(attempt.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  const cardTypes = record(config.cardTypes) || {};
+  const revealed = Array.isArray(config.revealedQuestionIds) ? config.revealedQuestionIds : [];
+  return { ...attemptDto(attempt), questions: questions.results.map((item) => attemptQuestionDto(row(item), attempt.status !== "active" || !isExam, attempt.status !== "active", cardTypes[String(item.question_id)] === "label_image" ? "label_image" : "text", revealed.includes(item.question_id))) };
+}
+
+async function revealLabelCard(request: Request, env: QuizEnv, user: QuizUser, attemptId: string): Promise<Response> {
+  const body = await bodyJson(request), questionId = text(body?.questionId, 100);
+  const attempt = await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attemptId, user.id).first<Row>();
+  if (!attempt) return json({ error: "Sessão não encontrada." }, 404);
+  const active = await enforceAttemptExpiry(env, user, attempt);
+  if (active.status !== "active") return json({ error: "Esta sessão já terminou." }, 409);
+  if (attemptDto(active).timerPaused) return json({ error: "Retoma o cronómetro antes de mostrar a legenda.", code: "timer_paused" }, 409);
+  let config: Row = {};
+  try { config = record(JSON.parse(String(active.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  if (record(config.cardTypes)?.[questionId] !== "label_image") return json({ error: "Este cartão não é de legendar." }, 400);
+  const question = await env.DB.prepare("SELECT aq.*,t.title AS topic_title FROM quiz_attempt_questions aq LEFT JOIN quiz_topics t ON t.id=aq.topic_id WHERE aq.attempt_id=? AND aq.question_id=?").bind(attemptId, questionId).first<Row>();
+  if (!question) return json({ error: "Cartão não encontrado." }, 404);
+  const revealed = [...new Set([...(Array.isArray(config.revealedQuestionIds) ? config.revealedQuestionIds : []), questionId])];
+  await env.DB.prepare("UPDATE quiz_attempts SET config_json=json_set(config_json,'$.revealedQuestionIds',json(?)),updated_at=? WHERE id=? AND user_id=? AND status='active'").bind(JSON.stringify(revealed), Date.now(), attemptId, user.id).run();
+  return json({ question: attemptQuestionDto(question, true, false, "label_image", true) });
 }
 
 async function completeAttempt(env: QuizEnv, user: QuizUser, attempt: Row): Promise<Row> {
@@ -710,7 +734,8 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const now = Date.now(), attemptId = crypto.randomUUID(), expiresAt = durationSeconds ? now + durationSeconds * 1000 : null;
 
   const shortAnswerMode = body.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check";
-  const configJson = JSON.stringify({ source, topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, objective: frequency ? "frequency" : platformMistakes ? "platform_mistakes" : null, assessmentPart: frequency ? assessmentPart : null, timerPaused: false, pausedTotalMs: 0 });
+  const cardTypes = Object.fromEntries(snapshots.map(({question}) => [question.id, question.anki_card_type === "label_image" ? "label_image" : "text"]));
+  const configJson = JSON.stringify({ source, cardTypes, topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, objective: frequency ? "frequency" : platformMistakes ? "platform_mistakes" : null, assessmentPart: frequency ? assessmentPart : null, timerPaused: false, pausedTotalMs: 0 });
   const statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO quiz_attempts (id,user_id,mode,curricular_unit_id,topic_id,difficulty_filter,status,question_count,started_at,created_at,updated_at,config_json,duration_seconds,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(attemptId, user.id, mode, unitId || null, topicId, difficulty, "active", snapshots.length, now, now, now, configJson, durationSeconds, expiresAt)];
   if(env.content) {
     // Preserve historical foreign keys for IDs added in future GitHub releases.
@@ -758,6 +783,9 @@ async function answerAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (activeAttempt.status !== "active") return json({ error: "O tempo desta tentativa terminou.", code: "attempt_expired" }, 409);
   const timing = attemptDto(activeAttempt);
   if (timing.timerPaused) return json({ error: "Retoma o cronómetro antes de responder.", code: "timer_paused" }, 409);
+  let config: Row = {};
+  try { config = record(JSON.parse(String(activeAttempt.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  if (record(config.cardTypes)?.[questionId] === "label_image" && !(Array.isArray(config.revealedQuestionIds) && config.revealedQuestionIds.includes(questionId))) return json({ error: "Mostra a legenda antes de avaliar o cartão." }, 409);
   const question = await env.DB.prepare("SELECT * FROM quiz_attempt_questions WHERE attempt_id=? AND question_id=?").bind(attemptId, questionId).first<Row>();
   if (!question || !parseStoredOptions(question.options_json).some((option) => option.id === optionId)) return json({ error: "A opção não pertence a esta pergunta." }, 400);
   if (activeAttempt.mode !== "exam" && question.selected_option_id !== null && question.selected_option_id !== optionId) return json({ error: "A resposta já recebeu feedback e não pode ser alterada.", code: "answer_locked" }, 409);
@@ -1201,6 +1229,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   if (path === "/api/admin/quizzes/content-export") return true;
+  if (/^\/api\/quiz-media\/[a-f0-9]{64}$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/reveal$/.test(path)) return true;
   return path === "/api/quizzes" || path === "/api/question-bank" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
@@ -1263,6 +1292,18 @@ export async function handleQuizRoute(
   if (!user) return unauthenticated();
   if (!(await enabled("quizzes"))) return disabled();
   const path = url.pathname.replace(/\/+$/, "");
+  const labelReveal = path.match(/^\/api\/quiz-attempts\/([^/]+)\/reveal$/);
+  if (labelReveal) {
+    if (!(await enabled("quizzes.practice"))) return disabled();
+    return request.method === "POST" ? revealLabelCard(request, env, user, labelReveal[1]) : json({ error: "Operação não suportada." }, 405);
+  }
+  const media = path.match(/^\/api\/quiz-media\/([a-f0-9]{64})$/);
+  if (media) {
+    if (!(await enabled("quizzes.practice"))) return disabled();
+    if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+    try { return await readQuizMedia(env, media[1]); }
+    catch (error) { if (error instanceof QuizContentError) return json({ error: error.message, code: error.code }, error.status); throw error; }
+  }
   if (path.startsWith("/api/admin/") && !isAdmin(user)) return forbidden();
   if (path === "/api/admin/quizzes/content-export") {
     if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);

@@ -66,6 +66,17 @@ function validKey(key: unknown): key is string {
   );
 }
 
+const mediaKeyPattern = /^quiz-content\/v1\/media\/[a-f0-9]{64}\.json$/;
+
+export async function readQuizMedia(env: QuizContentEnv, id: string): Promise<Response> {
+  const key = "quiz-content/v1/media/" + id + ".json";
+  if (!mediaKeyPattern.test(key) || !contentIndex.files.some(file => file.key === key)) return new Response(null, { status: 404 });
+  const data = await readFile(env, key) as { mimeType?: string; data?: string };
+  if (!data || !["image/png", "image/jpeg", "image/webp"].includes(data.mimeType || "") || typeof data.data !== "string" || data.data.length > 4 * 1024 * 1024) throw new QuizContentError("Imagem privada inválida.");
+  const bytes = Uint8Array.from(atob(data.data), character => character.charCodeAt(0));
+  return new Response(bytes, { headers: { "content-type": data.mimeType!, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+}
+
 function validRows(value: unknown): value is ContentRow[] {
   return (
     Array.isArray(value) &&
@@ -268,7 +279,7 @@ export async function createQuizContentExport(env: QuizContentEnv, index = conte
         }
         const file = position < end ? index.files[position++] : null;
         if (!file) { controller.close(); return; }
-        if (file.key !== QUIZ_CONTENT_MANIFEST_KEY && !validKey(file.key)) throw new QuizContentError("Referência de backup inválida.");
+        if (file.key !== QUIZ_CONTENT_MANIFEST_KEY && !validKey(file.key) && !mediaKeyPattern.test(file.key)) throw new QuizContentError("Referência de backup inválida.");
         const content = JSON.stringify(await readFile(env, file.key));
         const bytes = encoder.encode(content);
         const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2, "0")).join("");

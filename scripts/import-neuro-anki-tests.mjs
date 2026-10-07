@@ -30,7 +30,7 @@ function render(template, fields) {
   return html;
 }
 
-function content(html, media, archive) {
+function content(html, media, archive, assets) {
   const images = [];
   html.replace(/<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi, (_, filename) => {
     // Anki references local media names, never fetch arbitrary remote URLs.
@@ -39,7 +39,9 @@ function content(html, media, archive) {
     const extension = filename.split(".").at(-1)?.toLowerCase();
     const mime = { jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp" }[extension];
     if (!bytes || !mime || bytes.length > 3 * 1024 * 1024) throw new Error("Imagem em falta, formato não suportado ou superior a 3 MiB: " + filename);
-    const uri = `data:image/${mime};base64,${Buffer.from(bytes).toString("base64")}`;
+    const mediaHash = createHash("sha256").update(mime).update(bytes).digest("hex");
+    const uri = "/api/quiz-media/" + mediaHash;
+    assets.set(mediaHash, { key: "quiz-content/v1/media/" + mediaHash + ".json", content: JSON.stringify({ mimeType: "image/" + mime, data: Buffer.from(bytes).toString("base64") }) });
     if (!images.includes(uri)) images.push(uri);
     return "";
   });
@@ -61,7 +63,7 @@ export async function readNeuroAnki(bytes, unitId, now = Date.now()) {
     const models = JSON.parse(col.models), decks = JSON.parse(col.decks);
     const media = new Map(Object.entries(JSON.parse(new TextDecoder().decode(archive.media || new Uint8Array()))).map(([key, value]) => [value, key]));
     const cards = rows("SELECT c.ord,c.did,n.guid,n.mid,n.flds,n.tags FROM cards c JOIN notes n ON n.id=c.nid ORDER BY c.id");
-    const topics = new Map(), questions = [];
+    const topics = new Map(), questions = [], assets = new Map();
     for (const card of cards) {
       const model = models[String(card.mid)], deckName = decks[String(card.did)]?.name || "";
       if (!model || model.type !== 0) throw new Error("O cartão " + card.guid + " requer conversão de oclusão específica.");
@@ -79,17 +81,17 @@ export async function readNeuroAnki(bytes, unitId, now = Date.now()) {
       if (values.length !== model.flds.length) throw new Error("Campos incompletos em " + card.guid);
       const fields = Object.fromEntries(model.flds.map((field, index) => [field.name, values[index]]));
       fields.Deck = deckName; fields.Subdeck = deckName.split("::").at(-1); fields.Tags = card.tags; fields.Type = model.name; fields.Card = template.name;
-      const front = content(render(template.qfmt, fields), media, archive);
-      const back = content(render(template.afmt, fields), media, archive);
+      const front = content(render(template.qfmt, fields), media, archive, assets);
+      const back = content(render(template.afmt, fields), media, archive, assets);
       if (!richTextPlainText(back.html)) throw new Error("Resposta textual ausente em " + card.guid);
       if (!richTextPlainText(front.html) && !front.images.length) throw new Error("Frente vazia em " + card.guid);
       const topicId = "anki-neuro-lesson-" + lesson.toLowerCase();
       const id = "anki-neuro-" + hash(card.guid + ":" + card.ord);
       topics.set(topicId, { id: topicId, curricular_unit_id: unitId, title: lesson, description: JSON.stringify({ source: "anki", lesson }), sort_order: (lesson.startsWith("AT") ? 0 : 100) + number, status: "published", deleted_at: null, created_at: now, updated_at: now });
-      questions.push({ id, curricular_unit_id: unitId, topic_id: topicId, prompt: front.html || "Identifica a estrutura assinalada.", answer_text: back.html, explanation: back.html, response_type: "short_answer", image_url: front.images[0] || null, question_images_json: JSON.stringify(front.images), solution_images_json: JSON.stringify(back.images), difficulty: "medium", status: "published", deleted_at: null, created_at: now, updated_at: now });
+      questions.push({ id, curricular_unit_id: unitId, topic_id: topicId, prompt: front.html || "Identifica a estrutura assinalada.", answer_text: back.html, explanation: back.html, response_type: "short_answer", anki_card_type: front.images.length ? "label_image" : "text", image_url: front.images[0] || null, question_images_json: JSON.stringify(front.images), solution_images_json: JSON.stringify(back.images), difficulty: "medium", status: "published", deleted_at: null, created_at: now, updated_at: now });
     }
     if (!questions.length || new Set(questions.map(q => q.id)).size !== questions.length) throw new Error("Coleção vazia ou identificadores repetidos.");
-    return { topics: [...topics.values()], questions, options: [], counts: { cards: questions.length, lessons: topics.size } };
+    return { topics: [...topics.values()], questions, options: [], media: [...assets.values()], counts: { cards: questions.length, lessons: topics.size } };
   } finally { db.close(); }
 }
 
@@ -139,7 +141,9 @@ async function main() {
   const prepared = prepareQuizJson(mergeNeuroAnki({ quiz_topics: manifest.topics, quiz_questions: shards.flatMap(shard => shard.questions), quiz_question_options: shards.flatMap(shard => shard.options), question_bank_items: bank.flatMap(shard => shard.bankQuestions), question_bank_topics: indexes.flatMap(shard => shard.bankTopics), question_bank_sources: indexes.flatMap(shard => shard.bankSources) }, imported));
   await mkdir(output, { recursive: true });
   const entries = [];
-  for (const artifact of prepared.artifacts) {
+  const mediaFiles = new Map(files.filter(file => /^quiz-content\/v1\/media\//.test(file.key)).map(file => [file.key, { key: file.key, content: JSON.stringify(file.data) }]));
+  for (const asset of imported.media) mediaFiles.set(asset.key, asset);
+  for (const artifact of [...prepared.artifacts, ...mediaFiles.values()].map(artifact => ({ ...artifact, filename: artifact.filename || artifact.key.replaceAll("/", "--") }))) {
     await writeFile(path.join(output, artifact.filename), artifact.content);
     entries.push({ key: artifact.key, filename: artifact.filename, bytes: Buffer.byteLength(artifact.content), sha256: createHash("sha256").update(artifact.content).digest("hex") });
   }

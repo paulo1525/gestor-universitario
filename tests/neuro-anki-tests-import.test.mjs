@@ -42,7 +42,11 @@ test('converter Anki preserva perguntas, respostas, pistas, fontes e imagens dos
   assert.match(imported.questions[1].answer_text, /Estrutura fictícia/);
   assert.equal(JSON.parse(imported.questions[1].question_images_json).length, 1);
   assert.equal(JSON.parse(imported.questions[1].solution_images_json).length, 1);
-  assert.match(imported.questions[1].image_url, /^data:image\/png;base64,/);
+  assert.match(imported.questions[1].image_url, /^\/api\/quiz-media\/[a-f0-9]{64}$/);
+  assert.equal(imported.questions[1].anki_card_type, "label_image");
+  assert.equal(imported.questions[0].anki_card_type, "text");
+  assert.equal(imported.media.length, 1); // Identical front/back bytes share one encrypted asset.
+  assert.deepEqual(Buffer.from(JSON.parse(imported.media[0].content).data, "base64"), Buffer.from(png));
   assert.deepEqual(imported.options, []);
 });
 
@@ -88,7 +92,8 @@ test('imagens do pack real entre 1 e 3 MiB são conservadas sem reduzir a resolu
   bytes.set(png);
   archive[entry] = bytes;
   const imported = await readNeuroAnki(fflate.zipSync(archive), 'neuro');
-  assert.equal(Buffer.from(imported.questions[1].image_url.split(',')[1], 'base64').length, bytes.length);
+  const asset = imported.media.find(asset => asset.key.includes(imported.questions[1].image_url.split('/').at(-1)));
+  assert.deepEqual(Buffer.from(JSON.parse(asset.content).data, 'base64'), Buffer.from(bytes));
   archive[entry] = new Uint8Array(3 * 1024 * 1024 + 1);
   await assert.rejects(readNeuroAnki(fflate.zipSync(archive), 'neuro'), /superior a 3 MiB/);
 });
