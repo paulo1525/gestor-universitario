@@ -471,7 +471,7 @@ export function QuizHub() {
     const topicCounts = new Map<string, number>();
     for (const item of incorrect) topicCounts.set(item.topic, (topicCounts.get(item.topic) ?? 0) + 1);
     const topic = [...topicCounts].sort((a, b) => b[1] - a[1])[0]?.[0];
-    return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "Mantém o ritmo: alterna testes temáticos e aleatórios para consolidar a matéria.";
+    return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "";
   }, [answers, attempt?.questions]);
 
   useEffect(() => { attemptRef.current = attempt; }, [attempt]);
@@ -562,7 +562,7 @@ export function QuizHub() {
     const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
     setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
   }, [availableQuestionCount, catalogueLoading, selectedUnit, selectedMode]);
-  useEffect(() => { saveQuizPreferences({ source: selectedSource, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
+  useEffect(() => { if (selectedUnitId) saveQuizPreferences({ source: selectedSource, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -1012,6 +1012,7 @@ export function QuizHub() {
             availability={availability}
             onUnit={(unitId) => {
               const unit = units.find((item) => item.id === unitId);
+              const saved = readQuizPreferences();
               setAvailability(null);
               setSelectedUnitId(selectedUnitId === unitId ? "" : unitId);
               setExpandedUnitId((current) => current === unitId ? null : unitId);
@@ -1024,6 +1025,12 @@ export function QuizHub() {
                 setQuestionCount(NEURO_QUESTION_COUNT);
                 setTimed(true);
                 if (unit.shortAnswerCount > 0) { setAnswerFormat("short_answer"); setShortAnswerMode("type_and_check"); }
+              }
+              if (unitId !== selectedUnitId && saved.unitId === unitId) {
+                setSelectedSource(saved.source ?? "compendium"); setSelectedTopicIds(saved.topicIds ?? []);
+                setSelectedMode(saved.mode ?? "quick"); setQuestionCount(saved.questionCount ?? DEFAULT_QUESTION_COUNT);
+                setTimed(saved.timed !== false); setAnswerFormat(saved.answerFormat ?? "multiple_choice");
+                setShortAnswerMode(saved.shortAnswerMode ?? "type_and_check");
               }
             }}
             onMode={(mode) => { setAvailability(null); setSelectedMode(mode); if (mode === "frequency") { setQuestionCount(50); setAnswerFormat("multiple_choice"); setSelectedTopicIds([]); } }}
@@ -1441,9 +1448,9 @@ function ResultsView({ attempt, correctCount, percent, recommendation, profileBe
   return <>
     <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} meta={`${percent}%`} />
     <ResultsGame correct={displayedCorrect} total={total} bestCombo={bestCombo} before={profileBefore} after={profileAfter} busy={busy} onAgain={onAgain} onSettings={onRestart} />
-    <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>
+    {recommendation && <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>}
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
-    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...question.imageUrls, ...question.solutionImageUrls].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}</div></article>; })}</div></section>
+    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...new Set([...question.imageUrls, ...question.solutionImageUrls])].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><div><b>{question.cardType === "label_image" ? "A tua avaliação:" : "A tua resposta:"}</b><RichTextContent value={question.cardType === "label_image" && chosen ? correct ? "Sabia" : "Não sabia" : chosen?.text ?? "Não respondida"} /></div>{(!correct || question.cardType === "label_image") && <div><b>{question.cardType === "label_image" ? "Legenda:" : "Correta:"}</b><RichTextContent value={right?.text ?? "Disponível no gabarito"} /></div>}</div></article>; })}</div></section>
   </>;
 }
 
