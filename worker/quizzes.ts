@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "../lib/announcement-content";
-import { QuizContentStore, QuizContentError, type QuizContentEnv } from "./quiz-content-store";
+import { QuizContentStore, QuizContentError, createQuizContentExport, type QuizContentEnv } from "./quiz-content-store";
 
 export type QuizUser = {
   id: string;
@@ -1176,6 +1176,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  if (path === "/api/admin/quizzes/content-export") return true;
   return path === "/api/quizzes" || path === "/api/question-bank" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
@@ -1239,6 +1240,20 @@ export async function handleQuizRoute(
   if (!(await enabled("quizzes"))) return disabled();
   const path = url.pathname.replace(/\/+$/, "");
   if (path.startsWith("/api/admin/") && !isAdmin(user)) return forbidden();
+  if (path === "/api/admin/quizzes/content-export") {
+    if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+    if (!(await enabled("quizzes.management"))) return disabled();
+    if (env.QUIZ_CONTENT_STORAGE !== "files") return json({ error: "O catálogo não usa ficheiros privados." }, 409);
+    try {
+      const offset = Number(url.searchParams.get("offset") || "0");
+      const response = await createQuizContentExport(env, undefined, offset);
+      await audit(env, user, "quiz_content_exported", { format: "private-backup", includesArchived: true, offset });
+      return response;
+    } catch (error) {
+      if (error instanceof QuizContentError) return json({ error: error.message, code: error.code }, error.status);
+      throw error;
+    }
+  }
   if (env.QUIZ_CONTENT_STORAGE === "files" && path.startsWith("/api/admin/")) {
     return json(
       {
