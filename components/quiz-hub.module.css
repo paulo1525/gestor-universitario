@@ -2851,3 +2851,11 @@
 
 .questionJump { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
 .questionGap { min-width: 16px; text-align: center; color: var(--color-text-muted); }
+
+.cardSubject { color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 600; }
+.cardAnswer { color: var(--color-text); font-size: var(--font-size-heading-2); font-weight: 750; line-height: 1.45; }
+.cardReference { margin-top: 12px; color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 400; line-height: 1.6; }
+.cardReference > span { font-weight: 600; }
+.cardDetails { margin-top: 12px; color: var(--color-text-soft); font-size: var(--font-size-body); font-weight: 400; line-height: 1.6; }
+.cardDetails > summary { cursor: pointer; color: var(--color-text); font-weight: 600; }
+.cardDetails[open] > summary { margin-bottom: 8px; }

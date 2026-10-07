@@ -49,6 +49,7 @@ import { AppShell } from "@/components/app-shell";
 import { PageTabs } from "@/components/page-tabs";
 import { SurfaceHeader } from "@/components/surface-header";
 import { normaliseQuizDurationSeconds, remainingQuizSeconds, quizReviewState } from "@/lib/quiz-session.mjs";
+import { ankiCardPresentation } from "@/lib/anki-card-presentation.mjs";
 import { isShortAnswerMatch } from "@/lib/short-answer-match.mjs";
 import { AppToast, ToastKind } from "@/components/app-toast";
 import { AuthGuard } from "@/components/auth-guard";
@@ -1165,7 +1166,6 @@ function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSour
                       { id: "compendium", title: "Perguntas do compêndio", disabled: unit.sources.find(source => source.id === "compendium")?.questionCount === 0 },
                       { id: "anki", title: "Ankis", disabled: !unit.sources.some(source => source.id === "anki" && source.questionCount > 0) },
                     ]} onChange={onSource} />
-                    {selectedSource === "anki" && <p className={styles.sessionRecap}>Nos cartões de legendar, identifica a estrutura, mostra a legenda e avalia se sabias a resposta.</p>}
                   </div>}
                   {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
                   <div className={styles.setupField}>
@@ -1335,7 +1335,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
   const assessShortAnswer = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (finishing || attempt.timerPaused || timerError || remaining === 0 || !correctOption || !shortDraft.value.trim()) return;
-    updateShortDraft({ revealed: true, correct: isShortAnswerMatch(shortDraft.value, correctOption.text) });
+    updateShortDraft({ revealed: true, correct: isShortAnswerMatch(richTextPlainText(shortDraft.value), richTextPlainText(questionPresentation(question).answer)) });
   };
   const submitSelfAssessment = (correct: boolean) => {
     if (finishing || attempt.timerPaused || timerError || remaining === 0) return;
@@ -1364,7 +1364,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
         <div key={question.id} className={`${styles.questionBody} ${question.imageUrl ? styles.questionBodyWithImage : ""}`}>
           {question.imageUrls.map((url, index) => <figure key={url} className={styles.questionImage}><a className={styles.imageOpen} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar figura ${index + 1} da pergunta, abre num novo separador`}><img src={url} alt={question.imageAlt || `Figura ${index + 1} da pergunta`} /><span><ZoomIn aria-hidden="true" />Ampliar</span></a></figure>)}
           <div className={styles.questionContent}>
-            <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
+            <CardQuestion question={question} />
             {question.cardType === "label_image" ? <NeuroLabelCard question={question} answered={answered} onReveal={onRevealLabel} onAssess={submitSelfAssessment} disabled={answering || finishing || attempt.timerPaused || Boolean(timerError) || remaining === 0} /> : answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
               {question.options.map((option, index) => {
                 const selected = currentAnswer?.selectedOptionId === option.id;
@@ -1377,7 +1377,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
               {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <div className={styles.cardPrompt}><p>Pensa na resposta antes de a mostrares.</p><button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Mostrar resposta</button></div>}
               {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}>
                 {shortAnswerMode === "type_and_check" && shortDraft.value.trim() && <div className={styles.answerCompare}><span>A tua resposta</span><strong>{shortDraft.value.trim()}</strong></div>}
-                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><RichTextContent value={correctOption?.text ?? "Resposta indisponível"} /></div>
+                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><CardSolution question={question} /></div>
                 {!answered && <>
                   <p className={shortDraft.correct === true ? styles.proposalCorrect : shortDraft.correct === false ? styles.proposalIncorrect : styles.selfQuestion}>{shortAnswerMode === "reveal_and_self_assess" ? "Sabias a resposta?" : shortDraft.correct === true ? <><CheckCircle2 aria-hidden="true" />Parece certa. Confirmas?</> : shortDraft.value.trim() ? <><XCircle aria-hidden="true" />Parece diferente da solução. Se disseste o mesmo por outras palavras, marca “Acertei”.</> : "Fica marcada como errada."}</p>
                   <div className={styles.selfAssessmentActions} role="group" aria-label="Confirmar resultado">
@@ -1390,7 +1390,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
             {question.cardType !== "label_image" && answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
           </div>
         </div>
-        <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : correctOption?.text} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
+        <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : richTextPlainText(questionPresentation(question).answer)} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
         {commentsOpen && <Comments onPin={onPinComment} pinning={pinningComment} comments={comments} loading={commentsLoading} text={commentText} sending={sendingComment} replyTo={replyTo} onText={onCommentText} onSubmit={onComment} onReply={onReply} onCancelReply={onCancelReply} />}
       </section>
     </div>
@@ -1421,12 +1421,33 @@ function SessionTools({ busy, onPause, onQuit, onFinish }: { busy: boolean; onPa
   </div>;
 }
 
+function questionPresentation(question: Question) {
+  return ankiCardPresentation(question.text, question.options.find(option => option.id === question.correctOptionId)?.text ?? "Resposta indisponível", question.id.startsWith("anki-neuro-"));
+}
+
+function CardQuestion({ question, review = false }: { question: Question; review?: boolean }) {
+  const card = questionPresentation(question);
+  return <>
+    {card.subject && <RichTextContent value={card.subject} className={styles.cardSubject} />}
+    <RichTextContent id={review ? undefined : "question-title"} value={card.prompt} className={review ? styles.reviewQuestion : styles.questionTitle} />
+    {richTextPlainText(card.hint) && <details className={styles.cardDetails}><summary>Pista</summary><RichTextContent value={card.hint} /></details>}
+  </>;
+}
+
+function CardSolution({ question }: { question: Question }) {
+  const card = questionPresentation(question);
+  return <>
+    <RichTextContent value={card.answer} className={styles.cardAnswer} />
+    {richTextPlainText(card.explanation) && <details className={styles.cardDetails}><summary>Explicação</summary><RichTextContent value={card.explanation} /></details>}
+    {richTextPlainText(card.reference) && <div className={styles.cardReference}><span>Fonte</span><RichTextContent value={card.reference} /></div>}
+  </>;
+}
+
 function NeuroLabelCard({ question, answered, disabled, onReveal, onAssess }: { question: Question; answered: boolean; disabled: boolean; onReveal: () => void; onAssess: (correct: boolean) => void }) {
-  const solution = question.options.find(option => option.id === question.correctOptionId);
   const revealed = question.revealed || answered;
   return <section className={styles.shortAnswer} aria-label="Anki de legendar">
     {!revealed ? <div className={styles.cardPrompt}><button type="button" className={styles.revealAnswerButton} onClick={onReveal} disabled={disabled}><Eye aria-hidden="true" />Mostrar legenda</button></div> : <div className={styles.shortAnswerReveal}>
-      <div className={styles.answerCompare} data-solution><span>Legenda</span><RichTextContent value={solution?.text || "Legenda indisponível"} /></div>
+      <div className={styles.answerCompare} data-solution><span>Legenda</span><CardSolution question={question} /></div>
       {question.solutionImageUrls.filter(url => !question.imageUrls.includes(url)).map((url, index) => <figure key={url} className={styles.reviewImage}><a href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar verso ${index + 1}, abre num novo separador`}><img src={url} alt={`Verso ${index + 1} do cartão de legendar`} /></a></figure>)}
       {!answered && <><p className={styles.selfQuestion}>Identificaste a estrutura?</p><div className={styles.selfAssessmentActions} role="group" aria-label="Autoavaliação da legenda">
         <button type="button" className={styles.selfAssessmentIncorrect} onClick={() => onAssess(false)} disabled={disabled}><XCircle aria-hidden="true" />Não sabia</button>
@@ -1450,7 +1471,7 @@ function ResultsView({ attempt, correctCount, percent, recommendation, profileBe
     <ResultsGame correct={displayedCorrect} total={total} bestCombo={bestCombo} before={profileBefore} after={profileAfter} busy={busy} onAgain={onAgain} onSettings={onRestart} />
     {recommendation && <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>}
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
-    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...new Set([...question.imageUrls, ...question.solutionImageUrls])].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><div><b>{question.cardType === "label_image" ? "A tua avaliação:" : "A tua resposta:"}</b><RichTextContent value={question.cardType === "label_image" && chosen ? correct ? "Sabia" : "Não sabia" : chosen?.text ?? "Não respondida"} /></div>{(!correct || question.cardType === "label_image") && <div><b>{question.cardType === "label_image" ? "Legenda:" : "Correta:"}</b><RichTextContent value={right?.text ?? "Disponível no gabarito"} /></div>}</div></article>; })}</div></section>
+    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...new Set([...question.imageUrls, ...question.solutionImageUrls])].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<CardQuestion question={question} review /><div><b>{question.cardType === "label_image" ? "A tua avaliação:" : "A tua resposta:"}</b><RichTextContent value={question.cardType === "label_image" && chosen ? correct ? "Sabia" : "Não sabia" : chosen?.id === question.correctOptionId && question.id.startsWith("anki-neuro-") ? questionPresentation(question).answer : chosen?.text ?? "Não respondida"} /></div>{(!correct || question.cardType === "label_image") && <div><b>{question.cardType === "label_image" ? "Legenda:" : "Correta:"}</b><CardSolution question={question} /></div>}</div></article>; })}</div></section>
   </>;
 }
 
