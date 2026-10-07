@@ -5,12 +5,19 @@ import {
   randomBytes,
 } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareQuizJson } from "./prepare-quiz-json-storage.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+export function configuredQuizContentKey(environmentValue, localVars = "") {
+  const secret = environmentValue || localVars.match(/^QUIZ_CONTENT_KEY=(.+)$/m)?.[1].trim();
+  if (!secret) throw new Error("Configure QUIZ_CONTENT_KEY privately before packing. No key was generated or changed.");
+  if (Buffer.from(secret, "base64").length !== 32) throw new Error("QUIZ_CONTENT_KEY must contain a 32-byte base64 key.");
+  return secret;
+}
 
 export function encryptQuizFile(content, objectKey, secret) {
   const key = Buffer.from(secret, "base64");
@@ -44,6 +51,8 @@ export function decryptQuizFile(content, objectKey, secret) {
 }
 
 async function main() {
+  const keySlot = process.argv.includes("--key-slot") ? process.argv[process.argv.indexOf("--key-slot") + 1] : "primary";
+  if (!["primary", "next"].includes(keySlot)) throw new Error("Use --key-slot primary or next.");
   const sourceArg = process.argv[process.argv.indexOf("--source") + 1];
   if (!process.argv.includes("--source") || !sourceArg)
     throw new Error("Use --source with the private export directory.");
@@ -64,7 +73,7 @@ async function main() {
   for (const file of transfer.files) {
     if (
       path.basename(file.filename) !== file.filename ||
-      !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
+      !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/media\/[a-f0-9]{64}\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(
         file.key,
       )
     )
@@ -89,7 +98,7 @@ async function main() {
     throw new Error("Invalid manifest revision.");
   if (process.argv.includes("--rebuild")) {
     const chunks = prepared
-      .filter((item) => item.file.key !== "quiz-content/v1/manifest.json")
+      .filter((item) => item.file.key !== "quiz-content/v1/manifest.json" && !item.file.key.startsWith("quiz-content/v1/media/"))
       .map((item) => JSON.parse(item.content));
     const bankIndexes = chunks.filter(
       (chunk) => chunk.bankTopics.length || chunk.bankSources.length,
@@ -105,26 +114,16 @@ async function main() {
       question_bank_sources: bankIndexes.flatMap((chunk) => chunk.bankSources),
     });
     transfer = { revision: result.manifest.revision, counts: result.counts };
-    prepared = result.artifacts.map((artifact) => ({
+    const media = prepared.filter(item => /^quiz-content\/v1\/media\//.test(item.file.key));
+    prepared = [...result.artifacts.map((artifact) => ({
       file: artifact,
       content: Buffer.from(artifact.content),
-    }));
+    })), ...media];
   }
-  let secret = process.env.QUIZ_CONTENT_KEY;
-  if (!secret) {
-    const localVars = await readFile(
-      path.join(root, ".dev.vars"),
-      "utf8",
-    ).catch(() => "");
-    secret = localVars.match(/^QUIZ_CONTENT_KEY=(.+)$/m)?.[1].trim();
-    if (!secret) {
-      secret = randomBytes(32).toString("base64");
-      await appendFile(
-        path.join(root, ".dev.vars"),
-        "\nQUIZ_CONTENT_KEY=" + secret + "\n",
-      );
-    }
-  }
+  const localVars = await readFile(path.join(root, ".dev.vars"), "utf8").catch(() => "");
+  const secret = keySlot === "next"
+    ? configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY_NEXT, localVars.replace(/^QUIZ_CONTENT_KEY=.*$/mg, "").replace(/^QUIZ_CONTENT_KEY_NEXT=/mg, "QUIZ_CONTENT_KEY="))
+    : configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY, localVars);
   const files = [];
   for (const { file, content } of prepared) {
     const destination = path.join(
@@ -144,6 +143,7 @@ async function main() {
       encrypted = null;
     }
     encrypted ??= encryptQuizFile(content, file.key, secret);
+    if (encrypted.length > 25 * 1024 * 1024) throw new Error("Question asset exceeds the 25 MiB limit: " + file.key);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, encrypted);
     files.push({
@@ -159,6 +159,7 @@ async function main() {
         schemaVersion: 1,
         revision: transfer.revision,
         encrypted: true,
+        keySlot,
         counts: transfer.counts,
         files,
       },

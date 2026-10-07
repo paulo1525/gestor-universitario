@@ -82,6 +82,61 @@ as suas opções, preservando tentativas, respostas e comentários na D1.
 As conclusões, ressalvas, referências e proveniência da base ficam no conteúdo
 cifrado. Esta operação não lê Ankis nem exige migrations remotas.
 
+## Importar Ankis de Neuroanatomia para os testes
+
+O catálogo distingue `compendium` e `anki`. Os novos IDs têm o prefixo
+`anki-neuro-`; os restantes conteúdos mantêm a origem anterior por defeito.
+O estudante escolhe a origem antes das aulas. Cada tentativa guarda a origem
+no snapshot e seleciona perguntas exclusivamente dessa origem.
+
+Desempacotar a revisão atual com a chave privada existente e converter o
+baralho para uma segunda pasta fora do repositório:
+
+```powershell
+node scripts/unpack-quiz-content.mjs --output C:\CaminhoPrivado\perguntas
+node scripts/import-neuro-anki-tests.mjs --deck C:\CaminhoPrivado\Neuroanatomia_AT1-AT21_AP1-AP13.apkg --source C:\CaminhoPrivado\perguntas --output C:\CaminhoPrivado\perguntas-com-ankis --unit ID_REAL_NEURO --expected-cards 3079 --expected-sha 643d99223fb552e7f5925d681d08bb856d14f759f240fa6a2773f4f914eae1a6
+node scripts/pack-quiz-content.mjs --source C:\CaminhoPrivado\perguntas-com-ankis --rebuild
+```
+
+Substituir `ID_REAL_NEURO` pelo ID da unidade curricular ativa. Usar a mesma
+`QUIZ_CONTENT_KEY` de produção; não gerar outra nem substituir os conteúdos
+atuais por uma exportação histórica. Conferir as contagens e a integridade
+do baralho real antes de empacotar, testar e publicar pelo fluxo normal.
+
+O conversor usa as frentes e versos dos modelos básicos, conserva imagens
+locais e cria respostas curtas com autoavaliação como escolha inicial na UI.
+Não cria alternativas. Modelos de oclusão, áudio, código, aulas ambíguas ou
+imagens incompatíveis interrompem a conversão para permitir adaptação
+explícita ao baralho. IDs derivados do GUID e da ordem do cartão mantêm-se
+estáveis em reimportações; perguntas do compêndio não são alteradas.
+
+A aula indicada no subbaralho prevalece sobre etiquetas que referenciam outras
+aulas. Sem aula no subbaralho, as etiquetas têm de identificar uma única aula.
+Imagens PNG, JPEG e WebP até 3 MiB conservam os bytes originais.
+
+Inspeção local de 07/10/2026: a revisão de 02/10 do APKG contém 3.079 cartões,
+34 aulas (AT1–AT21 e AP1–AP13), 646 ficheiros de media e sete modelos ativos.
+O conversor processou todos os cartões e as contagens por aula coincidiram com
+o relatório do baralho. Esta cópia tem SHA-256
+`4fe02de3ba5c4283c301ee2ba53cd8632b74a5aca84b26f4a0e5a9a04cf975fc`,
+diferente do checksum original acima. A revisão local foi importada integralmente
+após recuperar a revisão atual pelo Worker autenticado. A diferença de checksum
+fica explícita: não se afirma ter importado o ficheiro de checksum original.
+
+Foram preservadas, sem alterar os registos, as 2.799 perguntas, 6.928 opções e
+3.791 itens do banco existentes. Os 3.079 cartões acrescentados incluem 2.433
+cartões de texto e 646 de legendar. Os 646 ficheiros de media são cifrados em
+objetos separados, servidos pela API autenticada `/api/quiz-media/<sha256>`.
+Os bytes das imagens são preservados; nenhum ficheiro cifrado ultrapassa 25 MiB.
+O maior objeto desta revisão tem 2.268.217 bytes.
+
+Cartões de legendar usam um fluxo próprio: imagem original, revelação explícita
+da legenda e do verso, e autoavaliação “Sabia / Não sabia”. Não geram alternativas
+nem exigem uma resposta escrita. A revelação não pontua e fica no snapshot da
+tentativa, permitindo retomar. A API recusa a avaliação antes da revelação.
+Sem cartões importados, a opção Ankis fica desativada. A validação com baralhos
+de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrome.
+
 ## Histórico e recuperação
 
 Para recuperar uma revisão quando a chave só existe no Worker, um administrador
@@ -114,3 +169,11 @@ código, o índice e os ficheiros cifrados da mesma revisão. Não reativar a D1
 catálogo depois de editar os ficheiros: a cópia antiga deixaria de representar
 as perguntas atuais. As migrations históricas já públicas mantêm o conteúdo
 anterior que continham; a cifragem dos novos ficheiros não remove esse histórico.
+
+O empacotador exige uma chave configurada explicitamente: nunca gera nem grava
+uma chave por falta de configuração. Se a única cópia existir no secret do Worker,
+uma rotação exige primeiro uma exportação integral da revisão atual através do
+Worker autorizado, incluindo conteúdos arquivados e o banco de questões. A chave
+antiga não deve ser exposta. Só depois de recuperar e conferir o conteúdo se pode
+voltar a cifrá-lo com uma nova chave privada e preparar a transição de versões.
+Substituir apenas o secret torna os ficheiros atuais indecifráveis.

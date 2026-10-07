@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { richTextPlainText, sanitizeRichTextHtml } from "../lib/announcement-content";
-import { QuizContentStore, QuizContentError, createQuizContentExport, type QuizContentEnv } from "./quiz-content-store";
+import { QuizContentStore, QuizContentError, createQuizContentExport, readQuizMedia, type QuizContentEnv } from "./quiz-content-store";
 
 export type QuizUser = {
   id: string;
@@ -39,6 +39,25 @@ const QUESTION_BANK_CANONICAL_COLUMNS = [
   "Resposta_Validada", "Estado_Validacao", "Aviso_Erro_Discrepancia", "Justificacao_Anatomica_FMUP", "Grau_Confianca",
 ] as const;
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/i;
+
+type QuizSource = "compendium" | "anki";
+
+export function quizSourceForId(id: unknown): QuizSource {
+  return String(id).startsWith("anki-neuro-") ? "anki" : "compendium";
+}
+
+function sourceCounts(topics: Row[], platform: Row[] = []) {
+  return (["compendium", "anki"] as const).map(id => {
+    const rows = topics.filter(topic => quizSourceForId(topic.id) === id);
+    return {
+      id, label: id === "anki" ? "Ankis" : "Perguntas do compêndio",
+      questionCount: rows.reduce((sum, topic) => sum + Number(topic.question_count || 0), 0),
+      multipleChoiceCount: rows.reduce((sum, topic) => sum + Number(topic.multiple_choice_count || 0), 0),
+      shortAnswerCount: rows.reduce((sum, topic) => sum + Number(topic.short_answer_count || 0), 0),
+      platformMistakeCount: platform.filter(item => item.source === id).reduce((sum, item) => sum + Number(item.eligible_count || 0), 0),
+    };
+  });
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -246,7 +265,7 @@ function topicDto(item: Row) {
   let curriculum: Row = {};
   try { curriculum = record(JSON.parse(String(item.description || "{}"))) ?? {}; } catch { /* Ordinary topic description. */ }
   return {
-    id: item.id, unitId: item.curricular_unit_id, title: item.title, name: item.title, description: item.description,
+    source: quizSourceForId(item.id), id: item.id, unitId: item.curricular_unit_id, title: item.title, name: item.title, description: item.description,
     status: item.status, sortOrder: item.sort_order, questionCount: item.question_count ?? 0, multipleChoiceCount: item.multiple_choice_count ?? 0, shortAnswerCount: item.short_answer_count ?? 0,
     publishedAt: item.published_at, archivedAt: item.archived_at, deletedAt: item.deleted_at,
     createdAt: item.created_at, updatedAt: item.updated_at,
@@ -257,6 +276,7 @@ function topicDto(item: Row) {
 function questionDto(item: Row, options: QuizOption[], includeAnswer = false) {
   return {
     id: item.id, unitId: item.curricular_unit_id, topicId: item.topic_id, prompt: item.prompt, question: item.prompt,
+    cardType: item.anki_card_type === "label_image" ? "label_image" : "text",
     responseType: item.response_type || "multiple_choice", answerText: includeAnswer ? item.answer_text : undefined, imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: includeAnswer ? storedImageUrls(item.solution_images_json) : undefined, explanation: includeAnswer ? item.explanation : undefined, difficulty: item.difficulty,
     status: item.status, options,
     correctOptionId: includeAnswer ? item.correct_option_id : undefined,
@@ -302,9 +322,9 @@ async function catalog(request: Request, env: QuizEnv, user: QuizUser | null, en
     env.DB.prepare("SELECT cu.id,cu.code,cu.name,cu.ects,cu.study_year,cu.semester,COUNT(q.id) AS question_count,SUM(CASE WHEN q.response_type='multiple_choice' THEN 1 ELSE 0 END) AS multiple_choice_count,SUM(CASE WHEN q.response_type<>'multiple_choice' THEN 1 ELSE 0 END) AS short_answer_count FROM curricular_units cu JOIN quiz_questions q ON q.curricular_unit_id=cu.id AND q.status='published' AND q.deleted_at IS NULL JOIN quiz_topics t ON t.id=q.topic_id AND t.status='published' AND t.deleted_at IS NULL WHERE cu.active=1 GROUP BY cu.id ORDER BY cu.study_year,cu.semester,cu.name COLLATE NOCASE").all(),
     env.DB.prepare("SELECT t.*,cu.code AS unit_code,cu.name AS unit_name,COUNT(q.id) AS question_count,SUM(CASE WHEN q.response_type='multiple_choice' THEN 1 ELSE 0 END) AS multiple_choice_count,SUM(CASE WHEN q.response_type<>'multiple_choice' THEN 1 ELSE 0 END) AS short_answer_count FROM quiz_topics t JOIN curricular_units cu ON cu.id=t.curricular_unit_id JOIN quiz_questions q ON q.topic_id=t.id AND q.status='published' AND q.deleted_at IS NULL WHERE cu.active=1 AND t.status='published' AND t.deleted_at IS NULL GROUP BY t.id ORDER BY cu.study_year,cu.semester,t.sort_order,t.title COLLATE NOCASE").all(),
     enabled("quizzes.progress").then(async (progressEnabled) => progressEnabled ? env.DB.prepare("SELECT t.id,t.title,t.curricular_unit_id,cu.code AS unit_code,cu.name AS unit_name,COUNT(aq.question_id) AS attempted_count,SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) AS correct_count FROM quiz_attempt_questions aq JOIN quiz_attempts a ON a.id=aq.attempt_id JOIN quiz_topics t ON t.id=aq.topic_id JOIN curricular_units cu ON cu.id=aq.curricular_unit_id WHERE a.user_id=? AND a.status='completed' AND aq.is_correct IS NOT NULL AND t.status='published' AND t.deleted_at IS NULL AND cu.active=1 GROUP BY t.id HAVING COUNT(aq.question_id)>0 ORDER BY (1.0 * SUM(CASE WHEN aq.is_correct=1 THEN 1 ELSE 0 END) / COUNT(aq.question_id)) ASC, COUNT(aq.question_id) DESC LIMIT 1").bind(user.id).first<Row>() : null),
-    env.DB.prepare(`SELECT q.curricular_unit_id,COUNT(*) AS eligible_count FROM quiz_questions q JOIN (${PLATFORM_STATS_SQL}) ps ON ps.question_id=q.id WHERE q.status='published' AND q.deleted_at IS NULL GROUP BY q.curricular_unit_id`).all(),
+    env.DB.prepare(`SELECT q.curricular_unit_id,CASE WHEN q.id GLOB 'anki-neuro-*' THEN 'anki' ELSE 'compendium' END AS source,COUNT(*) AS eligible_count FROM quiz_questions q JOIN (${PLATFORM_STATS_SQL}) ps ON ps.question_id=q.id WHERE q.status='published' AND q.deleted_at IS NULL GROUP BY q.curricular_unit_id,source`).all(),
   ]);
-  const units = unitsResult.results.map((item) => ({ id: item.id, code: item.code, name: item.name, ects: item.ects, year: item.study_year, semester: item.semester, questionCount: item.question_count, multipleChoiceCount: item.multiple_choice_count, shortAnswerCount: item.short_answer_count, platformMistakeCount: Number(platformResult.results.find((stats) => stats.curricular_unit_id === item.id)?.eligible_count || 0) }));
+  const units = unitsResult.results.map((item) => ({ id: item.id, code: item.code, name: item.name, ects: item.ects, year: item.study_year, semester: item.semester, questionCount: item.question_count, multipleChoiceCount: item.multiple_choice_count, shortAnswerCount: item.short_answer_count, platformMistakeCount: platformResult.results.filter(stats => stats.curricular_unit_id === item.id).reduce((sum, stats) => sum + Number(stats.eligible_count || 0), 0), sources: sourceCounts(topicsResult.results.filter(topic => topic.curricular_unit_id === item.id), platformResult.results.filter(stats => stats.curricular_unit_id === item.id)) }));
   const topics = topicsResult.results.map((item) => ({ ...topicDto(row(item)), unitCode: item.unit_code, unitName: item.unit_name }));
   return json({ units, topics, themes: topics, recommendedTopic: recommendation ? { id: recommendation.id, title: recommendation.title, unitId: recommendation.curricular_unit_id, unitCode: recommendation.unit_code, unitName: recommendation.unit_name, attemptedCount: recommendation.attempted_count, correctCount: recommendation.correct_count } : null });
 }
@@ -534,15 +554,17 @@ function modeFrom(value: unknown, rawDifficulty: unknown): { mode: QuizMode | nu
   return { mode, difficulty: optionalDifficulty(rawDifficulty) };
 }
 
-function attemptQuestionDto(item: Row, reveal: boolean, completed: boolean) {
+function attemptQuestionDto(item: Row, reveal: boolean, completed: boolean, cardType = "text", revealed = false) {
   const options = parseStoredOptions(item.options_json);
+  const hideLabel = cardType === "label_image" && !revealed && !completed && !item.selected_option_id;
   return {
     id: item.question_id, questionId: item.question_id, position: item.position, prompt: item.prompt, question: item.prompt,
-    imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: reveal && (completed || item.selected_option_id) ? storedImageUrls(item.solution_images_json) : undefined, difficulty: item.difficulty, topicId: item.topic_id, topic: item.topic_title || "Tema geral", unitId: item.curricular_unit_id,
-    options, selectedOptionId: item.selected_option_id,
-    correctOptionId: reveal ? item.correct_option_id : undefined,
+    cardType, revealed,
+    imageUrl: item.image_url, imageUrls: storedImageUrls(item.question_images_json, item.image_url), solutionImageUrls: (revealed || reveal && (completed || item.selected_option_id)) ? storedImageUrls(item.solution_images_json) : undefined, difficulty: item.difficulty, topicId: item.topic_id, topic: item.topic_title || "Tema geral", unitId: item.curricular_unit_id,
+    options: hideLabel ? options.map(option => ({ ...option, text: option.id === item.correct_option_id ? "Legenda" : option.text })) : options, selectedOptionId: item.selected_option_id,
+    correctOptionId: reveal || revealed ? item.correct_option_id : undefined,
     correct: reveal && item.is_correct !== null && item.is_correct !== undefined ? Number(item.is_correct) === 1 : undefined,
-    explanation: reveal ? item.explanation : undefined,
+    explanation: !hideLabel && (revealed || reveal) ? item.explanation : undefined,
     answeredAt: item.answered_at, seenBefore: Number(item.seen_before) === 1,
   };
 }
@@ -573,6 +595,7 @@ function attemptDto(item: Row) {
     id: item.id, mode: config.objective === "frequency" || config.objective === "platform_mistakes" ? config.objective : item.mode, status: item.status, unitId: item.curricular_unit_id, topicId: item.topic_id,
     assessmentPart: config.assessmentPart === 2 ? 2 : 1,
     topicIds: Array.isArray(config.topicIds) ? config.topicIds.filter((id): id is string => typeof id === "string") : item.topic_id ? [item.topic_id] : [],
+    source: config.source === "anki" ? "anki" : "compendium",
     answerFormat: config.answerFormat === "short_answer" ? "short_answer" : "multiple_choice",
     shortAnswerMode: config.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check",
     difficulty: item.difficulty_filter, questionCount: item.question_count, answeredCount: item.answered_count,
@@ -602,7 +625,28 @@ async function repairAttemptTimer(env: QuizEnv, user: QuizUser, attempt: Row): P
 async function attemptDetail(env: QuizEnv, attempt: Row): Promise<Row> {
   const questions = await env.DB.prepare("SELECT aq.*,t.title AS topic_title FROM quiz_attempt_questions aq LEFT JOIN quiz_topics t ON t.id=aq.topic_id WHERE aq.attempt_id=? ORDER BY aq.position").bind(attempt.id).all();
   const isExam = attempt.mode === "exam";
-  return { ...attemptDto(attempt), questions: questions.results.map((item) => attemptQuestionDto(row(item), attempt.status !== "active" || !isExam, attempt.status !== "active")) };
+  let config: Row = {};
+  try { config = record(JSON.parse(String(attempt.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  const cardTypes = record(config.cardTypes) || {};
+  const revealed = Array.isArray(config.revealedQuestionIds) ? config.revealedQuestionIds : [];
+  return { ...attemptDto(attempt), questions: questions.results.map((item) => attemptQuestionDto(row(item), attempt.status !== "active" || !isExam, attempt.status !== "active", cardTypes[String(item.question_id)] === "label_image" ? "label_image" : "text", revealed.includes(item.question_id))) };
+}
+
+async function revealLabelCard(request: Request, env: QuizEnv, user: QuizUser, attemptId: string): Promise<Response> {
+  const body = await bodyJson(request), questionId = text(body?.questionId, 100);
+  const attempt = await env.DB.prepare("SELECT * FROM quiz_attempts WHERE id=? AND user_id=?").bind(attemptId, user.id).first<Row>();
+  if (!attempt) return json({ error: "Sessão não encontrada." }, 404);
+  const active = await enforceAttemptExpiry(env, user, attempt);
+  if (active.status !== "active") return json({ error: "Esta sessão já terminou." }, 409);
+  if (attemptDto(active).timerPaused) return json({ error: "Retoma o cronómetro antes de mostrar a legenda.", code: "timer_paused" }, 409);
+  let config: Row = {};
+  try { config = record(JSON.parse(String(active.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  if (record(config.cardTypes)?.[questionId] !== "label_image") return json({ error: "Este cartão não é de legendar." }, 400);
+  const question = await env.DB.prepare("SELECT aq.*,t.title AS topic_title FROM quiz_attempt_questions aq LEFT JOIN quiz_topics t ON t.id=aq.topic_id WHERE aq.attempt_id=? AND aq.question_id=?").bind(attemptId, questionId).first<Row>();
+  if (!question) return json({ error: "Cartão não encontrado." }, 404);
+  const revealed = [...new Set([...(Array.isArray(config.revealedQuestionIds) ? config.revealedQuestionIds : []), questionId])];
+  await env.DB.prepare("UPDATE quiz_attempts SET config_json=json_set(config_json,'$.revealedQuestionIds',json(?)),updated_at=? WHERE id=? AND user_id=? AND status='active'").bind(JSON.stringify(revealed), Date.now(), attemptId, user.id).run();
+  return json({ question: attemptQuestionDto(question, true, false, "label_image", true) });
 }
 
 async function completeAttempt(env: QuizEnv, user: QuizUser, attempt: Row): Promise<Row> {
@@ -626,6 +670,8 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (!body) return json({ error: "Pedido JSON inválido." }, 400);
   const { mode, difficulty } = modeFrom(body.mode, body.difficulty);
   const unitId = text(body.curricularUnitId ?? body.unitId, 100);
+  if (body.source !== undefined && body.source !== "anki" && body.source !== "compendium") return json({ error: "Origem das perguntas inválida." }, 400);
+  const source: QuizSource = body.source === "anki" ? "anki" : "compendium";
   const frequency = body.mode === "frequency";
   const platformMistakes = body.mode === "platform_mistakes";
   const assessmentPart = body.assessmentPart === 2 ? 2 : 1;
@@ -633,6 +679,7 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const singleTopicId = text(body.topicId ?? body.themeId, 100);
   let topicIds = [...new Set([...requestedTopicIds, ...(singleTopicId ? [singleTopicId] : [])])];
   const unit = unitId ? await activeUnit(env, unitId) : null;
+  if (source === "anki" && unit?.code !== "NEURO") return json({ error: "Os Ankis estão disponíveis para Neuroanatomia." }, 400);
   if (frequency) {
     if (unit?.code !== "FIS1") return json({ error: "A simulação de frequência está disponível apenas para Fisiologia I." }, 400);
     const lessons = env.content ? {results:env.content.manifest.topics.filter(t=>t.curricular_unit_id===unitId&&t.status==='published'&&t.deleted_at==null).filter(t=>{try{return JSON.parse(String(t.description)).assessmentPart===assessmentPart;}catch{return false;}}).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||String(a.id).localeCompare(String(b.id)))} : await env.DB.prepare("SELECT id FROM quiz_topics WHERE curricular_unit_id=? AND status='published' AND deleted_at IS NULL AND json_valid(description) AND json_extract(description,'$.assessmentPart')=? ORDER BY sort_order,id").bind(unitId, assessmentPart).all();
@@ -649,10 +696,11 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (unitId && !unit) return json({ error: "Unidade curricular inválida." }, 400);
   const selectedTopics = await Promise.all(topicIds.map((id) => activeTopic(env, id)));
   if (selectedTopics.some((topic) => !topic || (unitId && topic.curricular_unit_id !== unitId))) return json({ error: "Um ou mais temas são inválidos para a unidade curricular selecionada." }, 400);
+  if (selectedTopics.some(topic => topic && quizSourceForId(topic.id) !== source)) return json({ error: "As aulas não pertencem à origem escolhida." }, 400);
   const answerFormat = mode !== "exam" && body.answerFormat === "short_answer" ? "short_answer" : "multiple_choice";
   const topicClause = topicIds.length ? ` AND q.topic_id IN (${topicIds.map(() => "?").join(",")})` : "";
   const responseTypeClause = answerFormat === "short_answer" ? " AND q.response_type<>'multiple_choice'" : " AND q.response_type='multiple_choice'";
-  const baseSql = " FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL AND cu.active=1 AND (?='' OR q.curricular_unit_id=?)" + topicClause + " AND (?='' OR q.difficulty=?)" + responseTypeClause;
+  const baseSql = " FROM quiz_questions q JOIN quiz_topics t ON t.id=q.topic_id JOIN curricular_units cu ON cu.id=q.curricular_unit_id WHERE q.status='published' AND q.deleted_at IS NULL AND t.status='published' AND t.deleted_at IS NULL AND cu.active=1 AND (?='' OR q.curricular_unit_id=?)" + topicClause + " AND (?='' OR q.difficulty=?)" + responseTypeClause + (source === "anki" ? " AND q.id GLOB 'anki-neuro-*'" : " AND q.id NOT GLOB 'anki-neuro-*'");
   const baseBinds: unknown[] = [unitId, unitId, ...topicIds, difficulty || "", difficulty || ""];
   const selectionSql = mode === "unseen"
     ? " AND NOT EXISTS (SELECT 1 FROM quiz_attempt_questions seen JOIN quiz_attempts seen_attempt ON seen_attempt.id=seen.attempt_id WHERE seen_attempt.user_id=? AND seen.question_id=q.id AND seen.selected_option_id IS NOT NULL)"
@@ -662,13 +710,13 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const selectionBinds: unknown[] = mode === "unseen" ? [user.id] : mode === "mistakes" ? [user.id, user.id] : [];
   const platformClause = platformMistakes ? ` AND q.id IN (SELECT question_id FROM (${PLATFORM_STATS_SQL}))` : "";
   const order = platformMistakes ? ` ORDER BY (SELECT 1.0*ps.wrong_count/ps.participants FROM (${PLATFORM_STATS_SQL}) ps WHERE ps.question_id=q.id) DESC,q.id` : frequency ? " ORDER BY t.sort_order,q.topic_id,RANDOM()" : " ORDER BY RANDOM()";
-  const candidates = env.content ? await contentCandidates(env,user,unitId,topicIds,difficulty,answerFormat,mode,frequency?2000:requestedCount,frequency,platformMistakes) : await env.DB.prepare("SELECT q.*" + baseSql + selectionSql + platformClause + order + " LIMIT ?")
+  const candidates = env.content ? await contentCandidates(env,user,unitId,topicIds,difficulty,answerFormat,mode,frequency?2000:requestedCount,frequency,platformMistakes,source) : await env.DB.prepare("SELECT q.*" + baseSql + selectionSql + platformClause + order + " LIMIT ?")
     .bind(...baseBinds, ...selectionBinds, frequency ? 2000 : requestedCount).all();
   if (frequency) candidates.results = balancedLessonQuestions(candidates.results.map(row), requestedCount);
   if (platformMistakes && candidates.results.length < requestedCount) return json({ error: "Ainda não há perguntas com respostas suficientes de estudantes distintos para esta seleção.", code: "not_enough_questions", available: candidates.results.length, required: requestedCount }, 409);
   if (mode === "mistakes" && candidates.results.length < requestedCount) return json({ error: "Não há perguntas erradas pessoais suficientes para este teste.", code: "not_enough_mistakes", available: candidates.results.length, required: requestedCount }, 409);
   if (mode === "unseen" && !candidates.results.length) {
-    const total = env.content ? {total:(await contentCandidateMetadata(env,unitId,topicIds,difficulty,answerFormat)).eligible.length} : await env.DB.prepare("SELECT COUNT(*) AS total" + baseSql).bind(...baseBinds).first<Row>();
+    const total = env.content ? {total:(await contentCandidateMetadata(env,unitId,topicIds,difficulty,answerFormat,source)).eligible.length} : await env.DB.prepare("SELECT COUNT(*) AS total" + baseSql).bind(...baseBinds).first<Row>();
     if (Number(total?.total || 0) > 0) return json({ error: "Já respondeu a todas as perguntas elegíveis.", code: "all_questions_seen", available: 0, total: total?.total || 0 }, 409);
   }
   if (!candidates.results.length) return json({ error: "Não existem perguntas publicadas para esta seleção." }, 404);
@@ -686,7 +734,8 @@ async function createAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   const now = Date.now(), attemptId = crypto.randomUUID(), expiresAt = durationSeconds ? now + durationSeconds * 1000 : null;
 
   const shortAnswerMode = body.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : "type_and_check";
-  const configJson = JSON.stringify({ topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, objective: frequency ? "frequency" : platformMistakes ? "platform_mistakes" : null, assessmentPart: frequency ? assessmentPart : null, timerPaused: false, pausedTotalMs: 0 });
+  const cardTypes = Object.fromEntries(snapshots.map(({question}) => [question.id, question.anki_card_type === "label_image" ? "label_image" : "text"]));
+  const configJson = JSON.stringify({ source, cardTypes, topicIds, requestedCount, difficulty, durationSeconds, answerFormat, shortAnswerMode, objective: frequency ? "frequency" : platformMistakes ? "platform_mistakes" : null, assessmentPart: frequency ? assessmentPart : null, timerPaused: false, pausedTotalMs: 0 });
   const statements: D1PreparedStatement[] = [env.DB.prepare("INSERT INTO quiz_attempts (id,user_id,mode,curricular_unit_id,topic_id,difficulty_filter,status,question_count,started_at,created_at,updated_at,config_json,duration_seconds,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(attemptId, user.id, mode, unitId || null, topicId, difficulty, "active", snapshots.length, now, now, now, configJson, durationSeconds, expiresAt)];
   if(env.content) {
     // Preserve historical foreign keys for IDs added in future GitHub releases.
@@ -734,6 +783,9 @@ async function answerAttempt(request: Request, env: QuizEnv, user: QuizUser | nu
   if (activeAttempt.status !== "active") return json({ error: "O tempo desta tentativa terminou.", code: "attempt_expired" }, 409);
   const timing = attemptDto(activeAttempt);
   if (timing.timerPaused) return json({ error: "Retoma o cronómetro antes de responder.", code: "timer_paused" }, 409);
+  let config: Row = {};
+  try { config = record(JSON.parse(String(activeAttempt.config_json || "{}"))) || {}; } catch { /* legacy */ }
+  if (record(config.cardTypes)?.[questionId] === "label_image" && !(Array.isArray(config.revealedQuestionIds) && config.revealedQuestionIds.includes(questionId))) return json({ error: "Mostra a legenda antes de avaliar o cartão." }, 409);
   const question = await env.DB.prepare("SELECT * FROM quiz_attempt_questions WHERE attempt_id=? AND question_id=?").bind(attemptId, questionId).first<Row>();
   if (!question || !parseStoredOptions(question.options_json).some((option) => option.id === optionId)) return json({ error: "A opção não pertence a esta pergunta." }, 400);
   if (activeAttempt.mode !== "exam" && question.selected_option_id !== null && question.selected_option_id !== optionId) return json({ error: "A resposta já recebeu feedback e não pode ser alterada.", code: "answer_locked" }, 409);
@@ -1177,6 +1229,7 @@ function adminCommentsDisabled(user: QuizUser | null): Response {
 export function isQuizPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   if (path === "/api/admin/quizzes/content-export") return true;
+  if (/^\/api\/quiz-media\/[a-f0-9]{64}$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/reveal$/.test(path)) return true;
   return path === "/api/quizzes" || path === "/api/question-bank" || path === "/api/quizzes/export" || /^\/api\/quizzes\/[^/]+$/.test(path) || /^\/api\/quizzes\/[^/]+\/comments$/.test(path) || path === "/api/quiz-attempts" || /^\/api\/quiz-attempts\/[^/]+$/.test(path) || /^\/api\/quiz-attempts\/[^/]+\/(answers|finish|abandon|timer)$/.test(path) || path === "/api/quiz-progress" || path === "/api/quizzes/progress" || path === "/api/quiz-comments" || path === "/api/admin/quizzes" || path === "/api/admin/quizzes/bulk" || path === "/api/admin/quizzes/import" || path === "/api/admin/quizzes/comments" || path === "/api/admin/quiz-comments";
 }
 
@@ -1239,6 +1292,18 @@ export async function handleQuizRoute(
   if (!user) return unauthenticated();
   if (!(await enabled("quizzes"))) return disabled();
   const path = url.pathname.replace(/\/+$/, "");
+  const labelReveal = path.match(/^\/api\/quiz-attempts\/([^/]+)\/reveal$/);
+  if (labelReveal) {
+    if (!(await enabled("quizzes.practice"))) return disabled();
+    return request.method === "POST" ? revealLabelCard(request, env, user, labelReveal[1]) : json({ error: "Operação não suportada." }, 405);
+  }
+  const media = path.match(/^\/api\/quiz-media\/([a-f0-9]{64})$/);
+  if (media) {
+    if (!(await enabled("quizzes.practice"))) return disabled();
+    if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
+    try { return await readQuizMedia(env, media[1]); }
+    catch (error) { if (error instanceof QuizContentError) return json({ error: error.message, code: error.code }, error.status); throw error; }
+  }
   if (path.startsWith("/api/admin/") && !isAdmin(user)) return forbidden();
   if (path === "/api/admin/quizzes/content-export") {
     if (request.method !== "GET") return json({ error: "Operação não suportada." }, 405);
@@ -1413,6 +1478,7 @@ async function contentCatalog(
     if (platformIds.has(q.id)) c.platform++;
     totals.set(q.curricular_unit_id, c);
   }
+  const catalogTopics = contentTopicRows(env, unitRows, false, true);
   const units = unitRows
     .filter((u) => totals.has(u.id))
     .map((u) => {
@@ -1428,9 +1494,10 @@ async function contentCatalog(
         multipleChoiceCount: c.mc,
         shortAnswerCount: c.short,
         platformMistakeCount: c.platform,
+        sources: sourceCounts(catalogTopics.filter(topic => topic.curricular_unit_id === u.id), questions.filter(q => q.curricular_unit_id === u.id && platformIds.has(q.id)).map(q => ({ source: quizSourceForId(q.id), eligible_count: 1 }))),
       };
     });
-  const topics = contentTopicRows(env, unitRows, false, true).map((t) => ({
+  const topics = catalogTopics.map((t) => ({
     ...topicDto(t),
     unitCode: t.unit_code,
     unitName: t.unit_name,
@@ -1465,6 +1532,7 @@ async function contentCandidateMetadata(
   topicIds: string[],
   difficulty: Difficulty | null,
   responseType: string,
+  source?: QuizSource,
 ) {
   const units = await env.DB.prepare(
     "SELECT id,code,name FROM curricular_units WHERE active=1",
@@ -1474,6 +1542,7 @@ async function contentCandidateMetadata(
     new Set(units.results.map((u) => String(u.id))),
   ).filter(
     (q) =>
+      (!source || quizSourceForId(q.id) === source) &&
       (!unitId || q.curricular_unit_id === unitId) &&
       (!topicIds.length || topicIds.includes(String(q.topic_id))) &&
       (!difficulty || q.difficulty === difficulty) &&
@@ -1495,6 +1564,7 @@ async function contentCandidates(
   count: number,
   frequency = false,
   platform = false,
+  source?: QuizSource,
 ): Promise<{ results: Row[] }> {
   const candidates = await contentCandidateMetadata(
       env,
@@ -1502,6 +1572,7 @@ async function contentCandidates(
       topicIds,
       difficulty,
       responseType,
+      source,
     ),
     units = candidates.units;
   let eligible = candidates.eligible;

@@ -75,7 +75,7 @@ class Bucket {
     return value ? new Response(value) : new Response(null, { status: 404 });
   }
 }
-function fixture(count = 8) {
+function fixture(count = 8, splitSources = false) {
   const db = new SQL.Database();
   const statements = [];
   db.run(`PRAGMA foreign_keys=ON;
@@ -87,6 +87,7 @@ function fixture(count = 8) {
     INSERT INTO users VALUES('admin-test','Administrador fictício'),('student-test','Estudante fictício');
     INSERT INTO curricular_units VALUES('unit-test','TEST','Disciplina fictícia',6,2,1,1);`);
   db.run(migration);
+  if (splitSources) db.run("UPDATE curricular_units SET code='NEURO' WHERE id='unit-test'");
   for (const table of ["quiz_questions", "quiz_attempt_questions"])
     db.run(
       "ALTER TABLE " +
@@ -115,14 +116,16 @@ function fixture(count = 8) {
     "INSERT INTO quiz_topics(id,curricular_unit_id,title,status,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
     [topic.id, "unit-test", topic.title, "published", admin.id, admin.id, 1, 1],
   );
+  const ankiTopic = { ...topic, id: "anki-neuro-lesson-at1", title: "AT1" };
   const questions = [],
     options = [];
   for (let i = 0; i < count; i++) {
-    const id = "q-" + i;
+    const isAnki = splitSources && i >= count / 2;
+    const id = (isAnki ? "anki-neuro-" : "q-") + i;
     const q = {
       id,
       curricular_unit_id: "unit-test",
-      topic_id: topic.id,
+      topic_id: isAnki ? ankiTopic.id : topic.id,
       prompt: "Pergunta JSON " + i,
       explanation: "Solução privada " + i,
       image_url: null,
@@ -187,7 +190,7 @@ function fixture(count = 8) {
     sort_order: 0,
   };
   const tables = {
-    quiz_topics: [topic],
+    quiz_topics: splitSources ? [topic, ankiTopic] : [topic],
     quiz_questions: questions,
     quiz_question_options: options,
     question_bank_items: [bank],
@@ -617,4 +620,75 @@ test("IDs novos publicados nos ficheiros preservam as relações do histórico s
   } finally {
     f.db.close();
   }
+});
+
+
+test("a origem escolhida separa os Ankis do compêndio, incluindo ao retomar a sessão", async () => {
+  const f = fixture(10, true);
+  try {
+    const catalogue = await (await f.request("/api/quizzes")).json();
+    assert.deepEqual(catalogue.units[0].sources.map(source => [source.id, source.questionCount]), [["compendium", 5], ["anki", 5]]);
+    for (const source of ["anki", "compendium"]) {
+      const created = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", source, mode: "quick", questionCount: 5, timed: false });
+      assert.equal(created.status, 201);
+      const attempt = (await created.json()).attempt;
+      assert.equal(attempt.source, source);
+      assert.ok(attempt.questions.every(question => question.id.startsWith("anki-neuro-") === (source === "anki")));
+      const resumed = await (await f.request("/api/quiz-attempts/" + attempt.id)).json();
+      assert.equal(resumed.attempt.source, source);
+    }
+    const mismatched = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", source: "compendium", topicIds: ["anki-neuro-lesson-at1"], mode: "quick", questionCount: 5 });
+    assert.equal(mismatched.status, 400);
+    const invalid = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", source: "both", mode: "quick", questionCount: 5 });
+    assert.equal(invalid.status, 400);
+    const defaulted = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", mode: "quick", questionCount: 5, timed: false });
+    assert.equal(defaulted.status, 201);
+    assert.ok((await defaulted.json()).attempt.questions.every(question => !question.id.startsWith("anki-neuro-")));
+  } finally { f.db.close(); }
+});
+
+test("legendar revela o verso sem pontuar e retoma o estado próprio do cartão", async () => {
+  const f = fixture(10, true);
+  try {
+    for (const question of f.tables.quiz_questions.filter(q => q.id.startsWith("anki-neuro-"))) Object.assign(question, { response_type: "short_answer", anki_card_type: "label_image", answer_text: "<p>Legenda privada fictícia</p>", explanation: "Fonte fictícia", question_images_json: JSON.stringify(["/api/quiz-media/" + "a".repeat(64)]), solution_images_json: JSON.stringify(["/api/quiz-media/" + "b".repeat(64)]) });
+    f.env.ASSETS = new Bucket(prepareQuizJson(f.tables, "seed-test", 1).artifacts);
+    const created = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", source: "anki", mode: "quick", questionCount: 5, answerFormat: "short_answer", shortAnswerMode: "type_and_check", timed: false });
+    assert.equal(created.status, 201);
+    const attempt = (await created.json()).attempt, question = attempt.questions[0];
+    assert.equal(question.cardType, "label_image");
+    assert.equal(question.revealed, false);
+    assert.ok(!JSON.stringify(question).includes("Legenda privada"));
+    assert.equal(question.solutionImageUrls, undefined);
+    const answerPath = "/api/quiz-attempts/" + attempt.id + "/answers";
+    assert.equal((await f.request(answerPath, "PUT", { questionId: question.id, optionId: question.correctOptionId })).status, 409);
+    const revealPath = "/api/quiz-attempts/" + attempt.id + "/reveal";
+    assert.equal((await f.request(revealPath, "POST", { questionId: question.id }, admin)).status, 404);
+    const revealed = await (await f.request(revealPath, "POST", { questionId: question.id })).json();
+    assert.equal(revealed.question.revealed, true);
+    assert.equal(revealed.question.solutionImageUrls.length, 1);
+    assert.match(JSON.stringify(revealed.question.options), /Legenda privada/);
+    const resumed = (await (await f.request("/api/quiz-attempts/" + attempt.id)).json()).attempt;
+    assert.equal(resumed.answeredCount, 0);
+    assert.equal(resumed.questions[0].cardType, "label_image");
+    assert.equal(resumed.questions[0].revealed, true);
+    assert.equal(resumed.questions[0].solutionImageUrls.length, 1);
+    assert.equal((await f.request(answerPath, "PUT", { questionId: question.id, optionId: question.correctOptionId })).status, 200);
+    assert.equal((await f.request(answerPath, "PUT", { questionId: question.id, optionId: question.correctOptionId })).status, 200);
+    assert.equal(f.db.exec("SELECT answered_count FROM quiz_attempts WHERE id='" + attempt.id + "'")[0].values[0][0], 1);
+  } finally { f.db.close(); }
+});
+
+test("as imagens privadas conservam os bytes e exigem autenticação", async () => {
+  const f = fixture();
+  try {
+    const id = "c".repeat(64), key = "quiz-content/v1/media/" + id + ".json";
+    const image = Buffer.from("imagem fictícia");
+    const mediaStorage = await compile("../worker/quiz-content-store.ts", { "./quiz-content-index.json": { default: { files: [{ key }] } } });
+    const bucket = new Bucket([{key,content:JSON.stringify({mimeType:"image/png",data:image.toString("base64")})}]);
+    const response = await mediaStorage.readQuizMedia({ ...f.env, ASSETS: bucket }, id);
+    assert.equal(response.headers.get("content-type"), "image/png");
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), image);
+    assert.equal((await mediaStorage.readQuizMedia({ ...f.env, ASSETS: bucket }, "../manifest")).status, 404);
+    assert.equal((await f.request("/api/quiz-media/"+id,"GET",null,null)).status, 401);
+  } finally { f.db.close(); }
 });

@@ -22,6 +22,7 @@ const META_FIELDS = [
   "response_type",
   "difficulty",
   "updated_at",
+  "anki_card_type",
 ];
 const repository = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 

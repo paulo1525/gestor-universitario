@@ -26,7 +26,7 @@ export async function restoreQuizContentExport(source, output) {
       continue;
     }
     if (!index) throw new Error("Invalid export index.");
-    if (entry.type !== "file" || typeof entry.content !== "string" || keys.has(entry.key) || !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(entry.key)) throw new Error("Invalid or repeated export file.");
+    if (entry.type !== "file" || typeof entry.content !== "string" || keys.has(entry.key) || !/^(quiz-content\/v1\/manifest\.json|quiz-content\/v1\/media\/[a-f0-9]{64}\.json|quiz-content\/v1\/units\/[a-zA-Z0-9_%.-]+\/[a-zA-Z0-9-]+\/(quiz-\d+|bank-\d+|bank-index)\.json)$/.test(entry.key)) throw new Error("Invalid or repeated export file.");
     const bytes = Buffer.from(entry.content);
     if (bytes.length !== entry.bytes || createHash("sha256").update(bytes).digest("hex") !== entry.sha256) throw new Error("Export checksum mismatch.");
     const data = JSON.parse(entry.content);

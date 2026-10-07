@@ -3,7 +3,7 @@
 import listStyles from "@/components/record-list.module.css";
 import { UnitThumb } from "@/components/unit-thumb";
 import { quizReadiness } from "@/lib/quiz-readiness.mjs";
-import { quizTopicSelection } from "@/lib/quiz-setup.mjs";
+import { quizSourceSelection, quizTopicSelection } from "@/lib/quiz-setup.mjs";
 import commentStyles from "@/components/announcement-comments.module.css";
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
@@ -62,6 +62,8 @@ import { RecordSkeleton } from "@/components/record-list";
 import { AnswerVerdict, ComboPill, fetchQuizProfile, GameStrip, haptic, playQuizSound, praiseFor, QuestionTrack, RankingView, ResultsGame, SoundToggle, StreakBanner, useQuizSound, XpCounter, type QuizGameProfile, type TrackState } from "@/components/quiz-game";
 import { XP_PER_CORRECT } from "@/lib/quiz-gamification.mjs";
 
+type QuizSource = "compendium" | "anki";
+type SourceCounts = { id: QuizSource; label: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; platformMistakeCount: number };
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic" | "frequency" | "platform_mistakes";
 type Screen = "catalogue" | "statistics" | "ranking" | "attempt" | "results";
 type Notice = { kind: ToastKind; message: string } | null;
@@ -70,6 +72,8 @@ type ShortAnswerMode = "type_and_check" | "reveal_and_self_assess";
 
 type ApiOption = { id: string | number; text?: string; label?: string; content?: string };
 type ApiQuestion = {
+  cardType?: "text" | "label_image";
+  revealed?: boolean;
   seenBefore?: boolean;
   id: string | number;
   text?: string;
@@ -94,6 +98,8 @@ type ApiQuestion = {
   explanation?: string | null;
 };
 type Question = {
+  cardType: "text" | "label_image";
+  revealed: boolean;
   seenBefore: boolean;
   id: string;
   text: string;
@@ -107,10 +113,10 @@ type Question = {
   correctOptionId: string | null;
   explanation: string | null;
 };
-type ApiTopic = { assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
-type Topic = { assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
-type ApiUnit = { platformMistakeCount?: number; id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number; topics?: ApiTopic[] };
-type Unit = { platformMistakeCount: number; id: string; name: string; code: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; topics: Topic[] };
+type ApiTopic = { source?: QuizSource; assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
+type Topic = { source: QuizSource; assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
+type ApiUnit = { sources?: SourceCounts[]; platformMistakeCount?: number; id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number; topics?: ApiTopic[] };
+type Unit = { sources: SourceCounts[]; platformMistakeCount: number; id: string; name: string; code: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; topics: Topic[] };
 type Answer = { questionId: string; selectedOptionId: string; correct: boolean | null };
 type Attempt = {
   id: string;
@@ -136,7 +142,7 @@ type Attempt = {
 type ApiComment = { pinned?: boolean; canPin?: boolean; id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
 type Comment = { pinned?: boolean; canPin?: boolean; id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
-type QuizPreferences = { timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
+type QuizPreferences = { source?: QuizSource; timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
 const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 const SECONDS_PER_QUESTION = 60;
@@ -222,14 +228,14 @@ function readQuizPreferences(): QuizPreferences {
     const questionCount = typeof saved.questionCount === "number" && QUIZ_QUESTION_COUNTS.includes(saved.questionCount) ? saved.questionCount : undefined;
     const answerFormat = saved.answerFormat === "short_answer" ? "short_answer" : saved.answerFormat === "multiple_choice" ? "multiple_choice" : undefined;
     const shortAnswerMode = saved.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : saved.shortAnswerMode === "type_and_check" ? "type_and_check" : undefined;
-    return { timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
+    return { source: saved.source === "anki" ? "anki" : "compendium", timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
   } catch { return {}; }
 }
 
 function saveQuizPreferences(preferences: QuizPreferences) {
   if (typeof document === "undefined") return;
   const preferredQuestionCount = preferences.questionCount ?? DEFAULT_QUESTION_COUNT;
-  const safe = { timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
+  const safe = { source: preferences.source ?? "compendium", timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
   document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
@@ -267,7 +273,7 @@ function value<T>(raw: Record<string, unknown>, ...keys: string[]) {
 }
 
 function normalizeTopic(item: ApiTopic): Topic {
-  return { assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
+  return { source: item.source === "anki" ? "anki" : "compendium", assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
 }
 
 function normalizeQuestion(item: ApiQuestion): Question {
@@ -276,6 +282,8 @@ function normalizeQuestion(item: ApiQuestion): Question {
   return {
     id: String(item.id),
     seenBefore: item.seenBefore === true,
+    cardType: item.cardType === "label_image" ? "label_image" : "text",
+    revealed: item.revealed === true,
     text: item.text ?? item.prompt ?? item.question ?? item.statement ?? "Pergunta sem enunciado.",
     imageUrl: item.imageUrl ?? item.image_url ?? null,
     imageUrls: item.imageUrls ?? (item.imageUrl ?? item.image_url ? [String(item.imageUrl ?? item.image_url)] : []),
@@ -384,6 +392,7 @@ function apiError(data: Record<string, unknown>, fallback: string) {
 
 export function QuizHub() {
   const [units, setUnits] = useState<Unit[]>([]);
+  const [selectedSource, setSelectedSource] = useState<QuizSource>(() => readQuizPreferences().source ?? "compendium");
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
@@ -398,6 +407,7 @@ export function QuizHub() {
   const [clearStatisticsConfirmation, setClearStatisticsConfirmation] = useState(false);
   const [timed, setTimed] = useState(() => readQuizPreferences().timed !== false);
   const [timerBusy, setTimerBusy] = useState(false);
+  const [revealingLabel, setRevealingLabel] = useState(false);
   const [timerError, setTimerError] = useState("");
   const timerQueue = useRef<Promise<void>>(Promise.resolve());
   const [questionCount, setQuestionCount] = useState(() => readQuizPreferences().questionCount ?? DEFAULT_QUESTION_COUNT);
@@ -436,7 +446,7 @@ export function QuizHub() {
   const expirySubmitted = useRef<string | null>(null);
   const commentsRequest = useRef(0);
 
-  const selectedUnit = units.find((unit) => unit.id === selectedUnitId) ?? null;
+  const selectedUnit = useMemo(() => quizSourceSelection(units.find(unit => unit.id === selectedUnitId) ?? null, selectedSource), [units, selectedUnitId, selectedSource]);
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
   const topicSelection = useMemo(() => quizTopicSelection(selectedUnit?.code, topics, assessmentPart, selectedTopicIds), [selectedUnit?.code, topics, assessmentPart, selectedTopicIds]);
   const availableQuestionCount = useMemo(() => {
@@ -461,7 +471,7 @@ export function QuizHub() {
     const topicCounts = new Map<string, number>();
     for (const item of incorrect) topicCounts.set(item.topic, (topicCounts.get(item.topic) ?? 0) + 1);
     const topic = [...topicCounts].sort((a, b) => b[1] - a[1])[0]?.[0];
-    return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "Mantém o ritmo: alterna testes temáticos e aleatórios para consolidar a matéria.";
+    return topic ? `O tema «${topic}» merece uma revisão curta antes da próxima tentativa.` : "";
   }, [answers, attempt?.questions]);
 
   useEffect(() => { attemptRef.current = attempt; }, [attempt]);
@@ -482,6 +492,7 @@ export function QuizHub() {
         multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0),
         shortAnswerCount: Number(item.shortAnswerCount ?? 0),
         platformMistakeCount: Number(item.platformMistakeCount ?? 0),
+        sources: item.sources ?? [],
         topics: (item.topics ?? []).map(normalizeTopic).concat(apiTopics.filter((topic) => topic.unitId === String(item.id))),
       }));
       const nextUnits = apiUnits;
@@ -551,7 +562,7 @@ export function QuizHub() {
     const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
     setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
   }, [availableQuestionCount, catalogueLoading, selectedUnit, selectedMode]);
-  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
+  useEffect(() => { if (selectedUnitId) saveQuizPreferences({ source: selectedSource, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -612,7 +623,7 @@ export function QuizHub() {
     try {
       const activeTopicIds = topicSelection.requestTopicIds;
       const sessionTimed = selectedMode === "frequency" || timed;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: selectedSource, unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -638,7 +649,7 @@ export function QuizHub() {
     } finally {
       setLoadingAttempt(false);
     }
-  }, [assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
+  }, [selectedSource, assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
 
   const finishAttempt = useCallback(async (expired = false) => {
     const requestedAttempt = attemptRef.current;
@@ -801,6 +812,20 @@ export function QuizHub() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [savingQuestionIds.length]);
+
+  const revealLabel = async () => {
+    if (!attempt || !question || answering || revealingLabel) return;
+    const attemptId = attempt.id, questionId = question.id;
+    setRevealingLabel(true);
+    try {
+      const response = await fetch(`/api/quiz-attempts/${encodeURIComponent(attemptId)}/reveal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ questionId }) });
+      const payload = await response.json() as { question?: ApiQuestion; error?: string };
+      if (!response.ok || !payload.question) throw new Error(payload.error || "Não foi possível mostrar a legenda.");
+      const revealed = normalizeQuestion(payload.question);
+      setAttempt(previous => previous?.id === attemptId ? { ...previous, questions: previous.questions.map(item => item.id === questionId ? revealed : item) } : previous);
+    } catch (error) { setNotice({ kind: "error", message: error instanceof Error ? error.message : "Não foi possível mostrar a legenda." }); }
+    finally { setRevealingLabel(false); }
+  };
 
   const answerQuestion = useCallback((optionId: string) => {
     const active = attemptRef.current;
@@ -966,6 +991,11 @@ export function QuizHub() {
             selectedUnitId={selectedUnitId}
             expandedUnitId={expandedUnitId}
             selectedUnit={selectedUnit}
+            selectedSource={selectedSource}
+            onSource={(source) => {
+              setSelectedSource(source); setSelectedTopicIds([]); setAvailability(null); setSelectedMode("quick");
+              if (source === "anki") { setAnswerFormat("short_answer"); setShortAnswerMode("reveal_and_self_assess"); }
+            }}
             assessmentPart={assessmentPart}
             onAssessmentPart={(part) => { setAssessmentPart(part); setSelectedTopicIds([]); setAvailability(null); }}
             selectedMode={selectedMode}
@@ -982,10 +1012,11 @@ export function QuizHub() {
             availability={availability}
             onUnit={(unitId) => {
               const unit = units.find((item) => item.id === unitId);
+              const saved = readQuizPreferences();
               setAvailability(null);
               setSelectedUnitId(selectedUnitId === unitId ? "" : unitId);
               setExpandedUnitId((current) => current === unitId ? null : unitId);
-              if (unitId !== selectedUnitId) { setSelectedTopicIds([]); if (selectedMode === "frequency" && unit?.code !== "FIS1" || selectedMode === "platform_mistakes" && (unit?.platformMistakeCount ?? 0) < 5) setSelectedMode("quick"); }
+              if (unitId !== selectedUnitId) { setSelectedSource("compendium"); setSelectedTopicIds([]); if (selectedMode === "frequency" && unit?.code !== "FIS1" || selectedMode === "platform_mistakes" && (unit?.platformMistakeCount ?? 0) < 5) setSelectedMode("quick"); }
               if (unit && (answerFormat === "short_answer" ? unit.shortAnswerCount === 0 : unit.multipleChoiceCount === 0)) {
                 setAnswerFormat(unit.multipleChoiceCount > 0 ? "multiple_choice" : "short_answer");
               }
@@ -994,6 +1025,12 @@ export function QuizHub() {
                 setQuestionCount(NEURO_QUESTION_COUNT);
                 setTimed(true);
                 if (unit.shortAnswerCount > 0) { setAnswerFormat("short_answer"); setShortAnswerMode("type_and_check"); }
+              }
+              if (unitId !== selectedUnitId && saved.unitId === unitId) {
+                setSelectedSource(saved.source ?? "compendium"); setSelectedTopicIds(saved.topicIds ?? []);
+                setSelectedMode(saved.mode ?? "quick"); setQuestionCount(saved.questionCount ?? DEFAULT_QUESTION_COUNT);
+                setTimed(saved.timed !== false); setAnswerFormat(saved.answerFormat ?? "multiple_choice");
+                setShortAnswerMode(saved.shortAnswerMode ?? "type_and_check");
               }
             }}
             onMode={(mode) => { setAvailability(null); setSelectedMode(mode); if (mode === "frequency") { setQuestionCount(50); setAnswerFormat("multiple_choice"); setSelectedTopicIds([]); } }}
@@ -1036,7 +1073,7 @@ export function QuizHub() {
             question={question}
             currentIndex={currentIndex}
             currentAnswer={currentAnswer}
-            answering={answering}
+            answering={answering || revealingLabel}
             remaining={remaining}
             answerFormat={attempt.answerFormat}
             shortAnswerMode={attempt.shortAnswerMode}
@@ -1048,6 +1085,7 @@ export function QuizHub() {
             commentText={commentText}
             sendingComment={sendingComment}
             onSelect={(optionId) => void answerQuestion(optionId)}
+            onRevealLabel={() => void revealLabel()}
             onNext={() => currentIndex === attempt.questions.length - 1 ? requestFinish() : goToQuestion(currentIndex + 1)}
             onPrevious={() => goToQuestion(currentIndex - 1)}
             onQuestion={goToQuestion}
@@ -1081,8 +1119,9 @@ function TestsTabs({ active, onPractice, onStatistics, onRanking }: { active: "p
   return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }, { id: "ranking", label: "Ranking", icon: <Trophy />, onClick: onRanking }]} />;
 }
 
-function Catalogue({ loading, error, units, selectedUnit, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
+function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSource, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; expandedUnitId: string | null; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
+  selectedSource: QuizSource; onSource: (source: QuizSource) => void;
   assessmentPart: 1 | 2; onAssessmentPart: (part: 1 | 2) => void;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
@@ -1096,7 +1135,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
   const shortageAvailable = availability?.code === "not_enough_questions" ? availability.available : availableQuestionCount;
   const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : DEFAULT_QUESTION_COUNT;
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
-  const hasLessons = topics.some((topic) => /^(T|TP|P)\d+\s*[·—-]/.test(topic.name));
+  const hasLessons = topics.some((topic) => /^(?:(T|TP|P)\d+\s*[·—-]|A[TP]\d+\b)/.test(topic.name));
   const visibleModes = modeCards.filter((mode) => (mode.id !== "frequency" || selectedUnit?.code === "FIS1") && (mode.id !== "platform_mistakes" || (selectedUnit?.platformMistakeCount ?? 0) >= 5));
   const activeMode = visibleModes.find((mode) => mode.id === selectedMode) ?? null;
   const answerStyle: AnswerStyle = answerFormat === "multiple_choice" ? "multiple_choice" : shortAnswerMode;
@@ -1120,10 +1159,18 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
               {selected && <div className={styles.unitSettings}>
                 <section className={styles.settingGroup}>
                   <StepHeading step={1} title="Matéria a estudar" />
+                  {unit.code === NEURO_UNIT_CODE && <div className={styles.setupField}>
+                    <span className={styles.fieldLabel}>Origem das perguntas</span>
+                    <SetupChoices label="Origem das perguntas" value={selectedSource} options={[
+                      { id: "compendium", title: "Perguntas do compêndio", disabled: unit.sources.find(source => source.id === "compendium")?.questionCount === 0 },
+                      { id: "anki", title: "Ankis", disabled: !unit.sources.some(source => source.id === "anki" && source.questionCount > 0) },
+                    ]} onChange={onSource} />
+                    {selectedSource === "anki" && <p className={styles.sessionRecap}>Nos cartões de legendar, identifica a estrutura, mostra a legenda e avalia se sabias a resposta.</p>}
+                  </div>}
                   {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
                   <div className={styles.setupField}>
                     <span className={styles.fieldLabel}>{hasLessons ? "Aulas" : "Temas"}{selectedMode !== "frequency" && <small>opcional</small>}</span>
-                    <TopicPicker key={`${unit.id}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
+                    <TopicPicker key={`${unit.id}-${selectedSource}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
                   </div>
                 </section>
                 <section className={styles.settingGroup}>
@@ -1150,7 +1197,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Aleatório</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes treinar em modo aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Aleatório</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
+                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === NEURO_UNIT_CODE ? selectedSource === "anki" ? "Ankis" : "Perguntas do compêndio" : null, unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
               </div>}
             </article>;
           })}
@@ -1162,14 +1209,14 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
 
 function TopicPicker({ topics, selectedIds, answerFormat, onChange, locked = false }: { topics: Topic[]; selectedIds: string[]; answerFormat: AnswerFormat; onChange: (ids: string[]) => void; locked?: boolean }) {
   const [query, setQuery] = useState("");
-  const hasLessons = topics.some((topic) => /^(T|TP|P)\d+\s*[·—-]/.test(topic.name));
+  const hasLessons = topics.some((topic) => /^(?:(T|TP|P)\d+\s*[·—-]|A[TP]\d+\b)/.test(topic.name));
   const term = query.trim().toLocaleLowerCase("pt-PT");
   const visible = topics.filter((topic) => !term || topic.name.toLocaleLowerCase("pt-PT").includes(term));
   const groups = hasLessons ? [
-    { name: "Teóricas", topics: visible.filter((topic) => /^T\d/.test(topic.name)) },
+    { name: "Teóricas", topics: visible.filter((topic) => /^(T|AT)\d/.test(topic.name)) },
     { name: "Teórico-práticas", topics: visible.filter((topic) => /^TP\d/.test(topic.name)) },
-    { name: "Práticas", topics: visible.filter((topic) => /^P\d/.test(topic.name)) },
-    { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P)\d/.test(topic.name)) },
+    { name: "Práticas", topics: visible.filter((topic) => /^(P|AP)\d/.test(topic.name)) },
+    { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P|AT|AP)\d/.test(topic.name)) },
   ] : [{ name: "Temas", topics: visible }];
   return <details className={styles.lessonPicker}>
     <summary><span>{selectedIds.length ? `${selectedIds.length} ${hasLessons ? (selectedIds.length === 1 ? "aula selecionada" : "aulas selecionadas") : (selectedIds.length === 1 ? "tema selecionado" : "temas selecionados")}` : hasLessons ? "Todas as aulas" : "Todos os temas"}</span><small>{locked ? "" : "Escolher"}</small><ChevronDown aria-hidden="true" /></summary>
@@ -1228,7 +1275,8 @@ function StatisticsView({ statistics, loading, error, totalAvailableQuestions, c
   </>;
 }
 
-function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onNext, onPrevious, onQuestion, onPause, onQuit, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
+function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, answering, remaining, answerFormat, shortAnswerMode, pinningComment, onPinComment, commentsOpen, comments, commentsLoading, commentText, sendingComment, replyTo, onSelect, onRevealLabel, onNext, onPrevious, onQuestion, onPause, onQuit, onComments, onCommentText, onComment, onReply, onCancelReply, onDoubleClick, finishing, savingCount, onFinish, timerBusy, timerError, onTimer }: {
+  onRevealLabel: () => void;
   attempt: Attempt; unit: Unit | null; question: Question; currentIndex: number; currentAnswer: Answer | null; answering: boolean; remaining: number | null; pinningComment: string | null; onPinComment: (comment: Comment) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; commentsOpen: boolean; comments: Comment[]; commentsLoading: boolean; commentText: string; sendingComment: boolean;
   replyTo: Comment | null; onSelect: (id: string) => void; onNext: () => void; onPrevious: () => void; onQuestion: (index: number) => void; onPause: () => void; onQuit: () => void; onComments: () => void; onCommentText: (value: string) => void; onComment: (event: FormEvent<HTMLFormElement>) => void; onReply: (comment: Comment) => void; onCancelReply: () => void; onDoubleClick: () => void; finishing: boolean; savingCount: number; onFinish: () => void; timerBusy: boolean; timerError: string; onTimer: () => void;
 }) {
@@ -1317,7 +1365,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
           {question.imageUrls.map((url, index) => <figure key={url} className={styles.questionImage}><a className={styles.imageOpen} href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar figura ${index + 1} da pergunta, abre num novo separador`}><img src={url} alt={question.imageAlt || `Figura ${index + 1} da pergunta`} /><span><ZoomIn aria-hidden="true" />Ampliar</span></a></figure>)}
           <div className={styles.questionContent}>
             <RichTextContent id="question-title" value={question.text} className={styles.questionTitle} />
-            {answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
+            {question.cardType === "label_image" ? <NeuroLabelCard question={question} answered={answered} onReveal={onRevealLabel} onAssess={submitSelfAssessment} disabled={answering || finishing || attempt.timerPaused || Boolean(timerError) || remaining === 0} /> : answerFormat === "multiple_choice" ? <div className={styles.options} role="radiogroup" aria-label="Opções de resposta">
               {question.options.map((option, index) => {
                 const selected = currentAnswer?.selectedOptionId === option.id;
                 const correct = feedback && option.id === question.correctOptionId;
@@ -1329,7 +1377,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
               {shortAnswerMode === "reveal_and_self_assess" && !shortDraft.revealed && !answered && <div className={styles.cardPrompt}><p>Pensa na resposta antes de a mostrares.</p><button className={styles.revealAnswerButton} type="button" onClick={() => updateShortDraft({ revealed: true })} disabled={!correctOption}><Eye />Mostrar resposta</button></div>}
               {(shortDraft.revealed || answered) && <div className={styles.shortAnswerReveal}>
                 {shortAnswerMode === "type_and_check" && shortDraft.value.trim() && <div className={styles.answerCompare}><span>A tua resposta</span><strong>{shortDraft.value.trim()}</strong></div>}
-                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><strong>{correctOption?.text ?? "Resposta indisponível"}</strong></div>
+                <div className={styles.answerCompare} data-solution><span>Resposta certa</span><RichTextContent value={correctOption?.text ?? "Resposta indisponível"} /></div>
                 {!answered && <>
                   <p className={shortDraft.correct === true ? styles.proposalCorrect : shortDraft.correct === false ? styles.proposalIncorrect : styles.selfQuestion}>{shortAnswerMode === "reveal_and_self_assess" ? "Sabias a resposta?" : shortDraft.correct === true ? <><CheckCircle2 aria-hidden="true" />Parece certa. Confirmas?</> : shortDraft.value.trim() ? <><XCircle aria-hidden="true" />Parece diferente da solução. Se disseste o mesmo por outras palavras, marca “Acertei”.</> : "Fica marcada como errada."}</p>
                   <div className={styles.selfAssessmentActions} role="group" aria-label="Confirmar resultado">
@@ -1339,7 +1387,7 @@ function AttemptView({ attempt, unit, question, currentIndex, currentAnswer, ans
                 </>}
               </div>}
             </section>}
-            {answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
+            {question.cardType !== "label_image" && answered && question.solutionImageUrls.map((url, index) => <figure key={url} className={styles.reviewImage}><img src={url} alt={`Figura ${index + 1} da solução`} /></figure>)}
           </div>
         </div>
         <footer className={styles.questionActions} data-verdict={feedback ? currentAnswer?.correct ? "correct" : "wrong" : undefined}>{feedback && <AnswerVerdict correct={Boolean(currentAnswer?.correct)} message={praiseFor(Boolean(currentAnswer?.correct), attempt.answers.at(-1)?.questionId === question.id ? combo : 1, question.id)} correctAnswer={currentAnswer?.correct ? null : correctOption?.text} />}<div className={styles.questionUtilities}><button type="button" className={styles.textButton} onClick={onComments} aria-expanded={commentsOpen} aria-controls="question-comments"><MessageCircle /><span>Comentários</span></button></div><div className={styles.questionNavigation}><button type="button" className={styles.secondaryButton} aria-keyshortcuts="ArrowLeft" onClick={onPrevious} disabled={currentIndex === 0 || finishing || sendingComment}><ArrowLeft /><span>Anterior</span></button><button type="button" className={styles.primaryButton} aria-keyshortcuts="ArrowRight Enter" onClick={onNext} disabled={finishing || answering || sendingComment}><span>{currentIndex === attempt.questions.length - 1 ? "Concluir" : feedback ? "Continuar" : "Seguinte"}</span><ArrowRight /></button></div></footer>
@@ -1373,6 +1421,21 @@ function SessionTools({ busy, onPause, onQuit, onFinish }: { busy: boolean; onPa
   </div>;
 }
 
+function NeuroLabelCard({ question, answered, disabled, onReveal, onAssess }: { question: Question; answered: boolean; disabled: boolean; onReveal: () => void; onAssess: (correct: boolean) => void }) {
+  const solution = question.options.find(option => option.id === question.correctOptionId);
+  const revealed = question.revealed || answered;
+  return <section className={styles.shortAnswer} aria-label="Anki de legendar">
+    {!revealed ? <div className={styles.cardPrompt}><button type="button" className={styles.revealAnswerButton} onClick={onReveal} disabled={disabled}><Eye aria-hidden="true" />Mostrar legenda</button></div> : <div className={styles.shortAnswerReveal}>
+      <div className={styles.answerCompare} data-solution><span>Legenda</span><RichTextContent value={solution?.text || "Legenda indisponível"} /></div>
+      {question.solutionImageUrls.filter(url => !question.imageUrls.includes(url)).map((url, index) => <figure key={url} className={styles.reviewImage}><a href={url} target="_blank" rel="noopener noreferrer" aria-label={`Ampliar verso ${index + 1}, abre num novo separador`}><img src={url} alt={`Verso ${index + 1} do cartão de legendar`} /></a></figure>)}
+      {!answered && <><p className={styles.selfQuestion}>Identificaste a estrutura?</p><div className={styles.selfAssessmentActions} role="group" aria-label="Autoavaliação da legenda">
+        <button type="button" className={styles.selfAssessmentIncorrect} onClick={() => onAssess(false)} disabled={disabled}><XCircle aria-hidden="true" />Não sabia</button>
+        <button type="button" className={styles.selfAssessmentCorrect} onClick={() => onAssess(true)} disabled={disabled}><CheckCircle2 aria-hidden="true" />Sabia</button>
+      </div></>}
+    </div>}
+  </section>;
+}
+
 function ResultsView({ attempt, correctCount, percent, recommendation, profileBefore, profileAfter, busy, onAgain, onRestart }: { attempt: Attempt; correctCount: number; percent: number; recommendation: string; profileBefore: QuizGameProfile | null; profileAfter: QuizGameProfile | null; busy: boolean; onAgain: () => void; onRestart: () => void }) {
   const [filter, setFilter] = useState<"all" | "incorrect" | "unanswered" | "correct">("all");
   const reviewAnswers = new Map(attempt.answers.map((answer) => [answer.questionId, answer]));
@@ -1385,9 +1448,9 @@ function ResultsView({ attempt, correctCount, percent, recommendation, profileBe
   return <>
     <SurfaceHeader standalone headingLevel="h1" icon={<Trophy />} eyebrow="Concluído" title={`${displayedCorrect}/${total} certas`} meta={`${percent}%`} />
     <ResultsGame correct={displayedCorrect} total={total} bestCombo={bestCombo} before={profileBefore} after={profileAfter} busy={busy} onAgain={onAgain} onSettings={onRestart} />
-    <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>
+    {recommendation && <section className={styles.recommendation}><span><Sparkles /></span><p>{recommendation}</p></section>}
     <section className={styles.resultStats} aria-label="Resumo do resultado"><span><CheckCircle2 /><b>{counts.correct}</b><small>Certas</small></span><span><XCircle /><b>{counts.incorrect}</b><small>Erradas</small></span><span><CircleHelp /><b>{counts.unanswered}</b><small>Por responder</small></span></section>
-    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...question.imageUrls, ...question.solutionImageUrls].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><p><b>A tua resposta:</b> {chosen?.text ?? "Não respondida"}</p>{!correct && <p><b>Correta:</b> {right?.text ?? "Disponível no gabarito"}</p>}</div></article>; })}</div></section>
+    <section className={styles.review} aria-labelledby="review-title"><SurfaceHeader icon={<Flag />} title="Revisão" headingId="review-title" /><div className={styles.reviewFilters} role="group" aria-label="Filtrar revisão">{([{ id: "all", label: "Todas", count: total }, { id: "incorrect", label: "Erradas", count: counts.incorrect }, { id: "unanswered", label: "Por responder", count: counts.unanswered }, { id: "correct", label: "Certas", count: counts.correct }] as const).map((item) => <button key={item.id} type="button" className="button button--secondary" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label} ({item.count})</button>)}</div><div className={styles.reviewList}>{filter !== "all" && counts[filter] === 0 && <p className={styles.statisticsEmpty} role="status">Não há perguntas neste filtro.</p>}{attempt.questions.map((question, index) => { const answer = reviewAnswers.get(question.id); const state = quizReviewState(question, answer); if (filter !== "all" && filter !== state) return null; const correct = state === "correct"; const chosen = question.options.find((option) => option.id === answer?.selectedOptionId); const right = question.options.find((option) => option.id === question.correctOptionId); return <article key={question.id} className={`${styles.reviewItem} ${correct ? styles.reviewGood : styles.reviewBad}`}><span>{correct ? <CheckCircle2 /> : state === "unanswered" ? <CircleHelp /> : <XCircle />}</span><div><small>{index + 1} · {question.topic} · {correct ? "Certa" : state === "unanswered" ? "Por responder" : "Errada"}</small>{[...new Set([...question.imageUrls, ...question.solutionImageUrls])].map((url, imageIndex) => <figure key={`${url}-${imageIndex}`} className={styles.reviewImage}><img src={url} alt={`Figura ${imageIndex + 1} da revisão`} loading="lazy" /></figure>)}<RichTextContent value={question.text} className={styles.reviewQuestion} /><div><b>{question.cardType === "label_image" ? "A tua avaliação:" : "A tua resposta:"}</b><RichTextContent value={question.cardType === "label_image" && chosen ? correct ? "Sabia" : "Não sabia" : chosen?.text ?? "Não respondida"} /></div>{(!correct || question.cardType === "label_image") && <div><b>{question.cardType === "label_image" ? "Legenda:" : "Correta:"}</b><RichTextContent value={right?.text ?? "Disponível no gabarito"} /></div>}</div></article>; })}</div></section>
   </>;
 }
 
@@ -1409,4 +1472,3 @@ function Comments({ pinning, onPin, comments, loading, text, sending, replyTo, o
 }
 
 function State({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) { return <section className={styles.state}>{icon}<strong>{title}</strong><p>{text}</p>{action}</section>; }
-

@@ -1,12 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { quizTopicSelection } from "../lib/quiz-setup.mjs";
+import { quizTopicSelection, quizSourceSelection } from "../lib/quiz-setup.mjs";
 
 const topics = [
   { id: "first", name: "T1 · Aula de teste", assessmentPart: 1, multipleChoiceCount: 15 },
   { id: "second", name: "T2 · Outra aula de teste", assessmentPart: 2, multipleChoiceCount: 30 },
   { id: "unassigned", name: "Sem correspondência curricular confirmada", assessmentPart: null, multipleChoiceCount: 2 },
 ];
+
+test("mudar de origem limita aulas e contagens sem alterar o catálogo original", () => {
+  const unit = { questionCount: 12, multipleChoiceCount: 7, shortAnswerCount: 5, platformMistakeCount: 3,
+    topics: [{ id: "comp", source: "compendium" }, { id: "anki", source: "anki" }],
+    sources: [{ id: "compendium", questionCount: 7, multipleChoiceCount: 7, shortAnswerCount: 0, platformMistakeCount: 3 }, { id: "anki", questionCount: 5, multipleChoiceCount: 0, shortAnswerCount: 5, platformMistakeCount: 0 }],
+  };
+  const result = quizSourceSelection(unit, "anki");
+  assert.equal(result.shortAnswerCount, 5);
+  assert.equal(result.multipleChoiceCount, 0);
+  assert.equal(result.platformMistakeCount, 0);
+  assert.deepEqual(result.topics.map(topic => topic.id), ["anki"]);
+  assert.equal(unit.questionCount, 12);
+  assert.equal(unit.topics.length, 2);
+  assert.equal(quizSourceSelection(null, "anki"), null);
+});
+
+test("um catálogo antigo preserva o compêndio sem inventar cartões Anki", () => {
+  const legacy = { questionCount: 7, multipleChoiceCount: 7, shortAnswerCount: 0, platformMistakeCount: 0, topics: [{ id: "legacy" }] };
+  assert.equal(quizSourceSelection(legacy, "compendium").questionCount, 7);
+  assert.equal(quizSourceSelection(legacy, "anki").questionCount, 0);
+  assert.deepEqual(quizSourceSelection(legacy, "anki").topics, []);
+});
 
 test("all lessons restricts Fisiologia practice to the chosen frequency", () => {
   for (const part of [1, 2]) {
