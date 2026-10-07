@@ -7,6 +7,8 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { RecordSkeleton } from "@/components/record-list";
 import { SurfaceHeader } from "@/components/surface-header";
 import { attemptXp, isRankingPass, quizLevel, XP_PER_CORRECT, type QuizGameProfile, type RankingPeriod } from "@/lib/quiz-gamification.mjs";
+import { SOUND_STORAGE_KEY, readSoundEnabled, playQuizSound, stopQuizSound } from "@/lib/quiz-audio";
+export { playQuizSound } from "@/lib/quiz-audio";
 import styles from "@/components/quiz-game.module.css";
 
 export type { QuizGameProfile };
@@ -25,68 +27,6 @@ export function haptic(pattern: number | number[]) {
   try { if (typeof navigator !== "undefined" && "vibrate" in navigator && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) navigator.vibrate(pattern); } catch { /* unsupported */ }
 }
 
-const SOUND_STORAGE_KEY = "gestor-quiz-sound";
-type SoundKind = "correct" | "wrong" | "combo" | "win";
-let audioContext: AudioContext | null = null;
-
-function readSoundEnabled() {
-  try { return window.localStorage.getItem(SOUND_STORAGE_KEY) === "on"; } catch { return false; }
-}
-
-function audio(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtor) return null;
-  // iOS mutes Web Audio with the ring/silent switch unless the page declares playback.
-  try { const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession; if (session) session.type = "playback"; } catch { /* unsupported */ }
-  audioContext ??= new AudioCtor();
-  return audioContext;
-}
-
-/** Browsers only start audio inside a user gesture: unlock on the first tap or key press. */
-function unlockAudio() {
-  if (!readSoundEnabled()) return;
-  const context = audio();
-  if (!context || context.state === "running") return;
-  void context.resume();
-  // A silent one-sample buffer completes the unlock on older iOS versions.
-  try { const source = context.createBufferSource(); source.buffer = context.createBuffer(1, 1, 22050); source.connect(context.destination); source.start(0); } catch { /* ignore */ }
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener("pointerdown", unlockAudio, { capture: true, passive: true });
-  window.addEventListener("keydown", unlockAudio, { capture: true });
-}
-
-/** Short synthesised cues (no audio files). Off by default; the student turns them on. */
-export function playQuizSound(kind: SoundKind) {
-  if (typeof window === "undefined" || !readSoundEnabled()) return;
-  try {
-    const context = audio();
-    if (!context) return;
-    if (context.state === "suspended") void context.resume();
-    const notes: Record<SoundKind, Array<[number, number, OscillatorType]>> = {
-      correct: [[660, 0, "triangle"], [990, 0.09, "triangle"]],
-      wrong: [[240, 0, "square"], [180, 0.13, "square"]],
-      combo: [[660, 0, "triangle"], [880, 0.07, "triangle"], [1320, 0.14, "triangle"]],
-      win: [[523, 0, "triangle"], [659, 0.12, "triangle"], [784, 0.24, "triangle"], [1047, 0.36, "triangle"]],
-    };
-    for (const [frequency, delay, type] of notes[kind]) {
-      const oscillator = context.createOscillator(), gain = context.createGain();
-      const start = context.currentTime + 0.01 + delay;
-      const peak = type === "square" ? 0.12 : 0.3;
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(peak, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
-      oscillator.connect(gain).connect(context.destination);
-      oscillator.start(start);
-      oscillator.stop(start + 0.26);
-    }
-  } catch { /* Audio is a nicety. */ }
-}
-
 const SOUND_CHANGED_EVENT = "gestor-quiz-sound-change";
 
 /** Shared on/off setting: the HUD icon and the session options stay in sync. */
@@ -95,14 +35,23 @@ export function useQuizSound(): [boolean, () => void] {
   useEffect(() => {
     const sync = () => setEnabled(readSoundEnabled());
     sync();
+    const onVisibilityChange = () => { if (document.visibilityState === "hidden") stopQuizSound(); };
     window.addEventListener(SOUND_CHANGED_EVENT, sync);
-    return () => window.removeEventListener(SOUND_CHANGED_EVENT, sync);
+    window.addEventListener("pagehide", stopQuizSound);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener(SOUND_CHANGED_EVENT, sync);
+      window.removeEventListener("pagehide", stopQuizSound);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopQuizSound();
+    };
   }, []);
   const toggle = () => {
     const next = !readSoundEnabled();
     try { window.localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off"); } catch { /* ignore */ }
     window.dispatchEvent(new Event(SOUND_CHANGED_EVENT));
-    if (next) { unlockAudio(); playQuizSound("correct"); }
+    if (next) playQuizSound("correct");
+    else stopQuizSound();
   };
   return [enabled, toggle];
 }
