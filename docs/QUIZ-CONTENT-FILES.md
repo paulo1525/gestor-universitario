@@ -82,6 +82,37 @@ as suas opções, preservando tentativas, respostas e comentários na D1.
 As conclusões, ressalvas, referências e proveniência da base ficam no conteúdo
 cifrado. Esta operação não lê Ankis nem exige migrations remotas.
 
+## Importar Ankis de Neuroanatomia para os testes
+
+O catálogo distingue `compendium` e `anki`. Os novos IDs têm o prefixo
+`anki-neuro-`; os restantes conteúdos mantêm a origem anterior por defeito.
+O estudante escolhe a origem antes das aulas. Cada tentativa guarda a origem
+no snapshot e seleciona perguntas exclusivamente dessa origem.
+
+Desempacotar a revisão atual com a chave privada existente e converter o
+baralho para uma segunda pasta fora do repositório:
+
+```powershell
+node scripts/unpack-quiz-content.mjs --output C:\CaminhoPrivado\perguntas
+node scripts/import-neuro-anki-tests.mjs --deck C:\CaminhoPrivado\Neuroanatomia_AT1-AT21_AP1-AP13.apkg --source C:\CaminhoPrivado\perguntas --output C:\CaminhoPrivado\perguntas-com-ankis --unit ID_REAL_NEURO --expected-cards 3079 --expected-sha 643d99223fb552e7f5925d681d08bb856d14f759f240fa6a2773f4f914eae1a6
+node scripts/pack-quiz-content.mjs --source C:\CaminhoPrivado\perguntas-com-ankis --rebuild
+```
+
+Substituir `ID_REAL_NEURO` pelo ID da unidade curricular ativa. Usar a mesma
+`QUIZ_CONTENT_KEY` de produção; não gerar outra nem substituir os conteúdos
+atuais por uma exportação histórica. Conferir as contagens e a integridade
+do baralho real antes de empacotar, testar e publicar pelo fluxo normal.
+
+O conversor usa as frentes e versos dos modelos básicos, conserva imagens
+locais e cria respostas curtas com autoavaliação como escolha inicial na UI.
+Não cria alternativas. Modelos de oclusão, áudio, código, aulas ambíguas ou
+imagens incompatíveis interrompem a conversão para permitir adaptação
+explícita ao baralho. IDs derivados do GUID e da ordem do cartão mantêm-se
+estáveis em reimportações; perguntas do compêndio não são alteradas.
+
+Sem cartões importados, a opção Ankis fica desativada. A validação com baralhos
+de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrome.
+
 ## Histórico e recuperação
 
 Respostas, comentários, progresso e snapshots de tentativas permanecem na D1.

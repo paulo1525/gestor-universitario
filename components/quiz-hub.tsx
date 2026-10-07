@@ -3,7 +3,7 @@
 import listStyles from "@/components/record-list.module.css";
 import { UnitThumb } from "@/components/unit-thumb";
 import { quizReadiness } from "@/lib/quiz-readiness.mjs";
-import { quizTopicSelection } from "@/lib/quiz-setup.mjs";
+import { quizSourceSelection, quizTopicSelection } from "@/lib/quiz-setup.mjs";
 import commentStyles from "@/components/announcement-comments.module.css";
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
@@ -62,6 +62,8 @@ import { RecordSkeleton } from "@/components/record-list";
 import { AnswerVerdict, ComboPill, fetchQuizProfile, GameStrip, haptic, playQuizSound, praiseFor, QuestionTrack, RankingView, ResultsGame, SoundToggle, StreakBanner, useQuizSound, XpCounter, type QuizGameProfile, type TrackState } from "@/components/quiz-game";
 import { XP_PER_CORRECT } from "@/lib/quiz-gamification.mjs";
 
+type QuizSource = "compendium" | "anki";
+type SourceCounts = { id: QuizSource; label: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; platformMistakeCount: number };
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic" | "frequency" | "platform_mistakes";
 type Screen = "catalogue" | "statistics" | "ranking" | "attempt" | "results";
 type Notice = { kind: ToastKind; message: string } | null;
@@ -107,10 +109,10 @@ type Question = {
   correctOptionId: string | null;
   explanation: string | null;
 };
-type ApiTopic = { assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
-type Topic = { assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
-type ApiUnit = { platformMistakeCount?: number; id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number; topics?: ApiTopic[] };
-type Unit = { platformMistakeCount: number; id: string; name: string; code: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; topics: Topic[] };
+type ApiTopic = { source?: QuizSource; assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
+type Topic = { source: QuizSource; assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
+type ApiUnit = { sources?: SourceCounts[]; platformMistakeCount?: number; id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number; topics?: ApiTopic[] };
+type Unit = { sources: SourceCounts[]; platformMistakeCount: number; id: string; name: string; code: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; topics: Topic[] };
 type Answer = { questionId: string; selectedOptionId: string; correct: boolean | null };
 type Attempt = {
   id: string;
@@ -136,7 +138,7 @@ type Attempt = {
 type ApiComment = { pinned?: boolean; canPin?: boolean; id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
 type Comment = { pinned?: boolean; canPin?: boolean; id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
-type QuizPreferences = { timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
+type QuizPreferences = { source?: QuizSource; timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
 const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 const SECONDS_PER_QUESTION = 60;
@@ -222,14 +224,14 @@ function readQuizPreferences(): QuizPreferences {
     const questionCount = typeof saved.questionCount === "number" && QUIZ_QUESTION_COUNTS.includes(saved.questionCount) ? saved.questionCount : undefined;
     const answerFormat = saved.answerFormat === "short_answer" ? "short_answer" : saved.answerFormat === "multiple_choice" ? "multiple_choice" : undefined;
     const shortAnswerMode = saved.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : saved.shortAnswerMode === "type_and_check" ? "type_and_check" : undefined;
-    return { timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
+    return { source: saved.source === "anki" ? "anki" : "compendium", timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
   } catch { return {}; }
 }
 
 function saveQuizPreferences(preferences: QuizPreferences) {
   if (typeof document === "undefined") return;
   const preferredQuestionCount = preferences.questionCount ?? DEFAULT_QUESTION_COUNT;
-  const safe = { timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
+  const safe = { source: preferences.source ?? "compendium", timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
   document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
@@ -267,7 +269,7 @@ function value<T>(raw: Record<string, unknown>, ...keys: string[]) {
 }
 
 function normalizeTopic(item: ApiTopic): Topic {
-  return { assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
+  return { source: item.source === "anki" ? "anki" : "compendium", assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
 }
 
 function normalizeQuestion(item: ApiQuestion): Question {
@@ -384,6 +386,7 @@ function apiError(data: Record<string, unknown>, fallback: string) {
 
 export function QuizHub() {
   const [units, setUnits] = useState<Unit[]>([]);
+  const [selectedSource, setSelectedSource] = useState<QuizSource>(() => readQuizPreferences().source ?? "compendium");
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
@@ -436,7 +439,7 @@ export function QuizHub() {
   const expirySubmitted = useRef<string | null>(null);
   const commentsRequest = useRef(0);
 
-  const selectedUnit = units.find((unit) => unit.id === selectedUnitId) ?? null;
+  const selectedUnit = useMemo(() => quizSourceSelection(units.find(unit => unit.id === selectedUnitId) ?? null, selectedSource), [units, selectedUnitId, selectedSource]);
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
   const topicSelection = useMemo(() => quizTopicSelection(selectedUnit?.code, topics, assessmentPart, selectedTopicIds), [selectedUnit?.code, topics, assessmentPart, selectedTopicIds]);
   const availableQuestionCount = useMemo(() => {
@@ -482,6 +485,7 @@ export function QuizHub() {
         multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0),
         shortAnswerCount: Number(item.shortAnswerCount ?? 0),
         platformMistakeCount: Number(item.platformMistakeCount ?? 0),
+        sources: item.sources ?? [],
         topics: (item.topics ?? []).map(normalizeTopic).concat(apiTopics.filter((topic) => topic.unitId === String(item.id))),
       }));
       const nextUnits = apiUnits;
@@ -551,7 +555,7 @@ export function QuizHub() {
     const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
     setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
   }, [availableQuestionCount, catalogueLoading, selectedUnit, selectedMode]);
-  useEffect(() => { saveQuizPreferences({ unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
+  useEffect(() => { saveQuizPreferences({ source: selectedSource, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -612,7 +616,7 @@ export function QuizHub() {
     try {
       const activeTopicIds = topicSelection.requestTopicIds;
       const sessionTimed = selectedMode === "frequency" || timed;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: selectedSource, unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -638,7 +642,7 @@ export function QuizHub() {
     } finally {
       setLoadingAttempt(false);
     }
-  }, [assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
+  }, [selectedSource, assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
 
   const finishAttempt = useCallback(async (expired = false) => {
     const requestedAttempt = attemptRef.current;
@@ -966,6 +970,11 @@ export function QuizHub() {
             selectedUnitId={selectedUnitId}
             expandedUnitId={expandedUnitId}
             selectedUnit={selectedUnit}
+            selectedSource={selectedSource}
+            onSource={(source) => {
+              setSelectedSource(source); setSelectedTopicIds([]); setAvailability(null); setSelectedMode("quick");
+              if (source === "anki") { setAnswerFormat("short_answer"); setShortAnswerMode("reveal_and_self_assess"); }
+            }}
             assessmentPart={assessmentPart}
             onAssessmentPart={(part) => { setAssessmentPart(part); setSelectedTopicIds([]); setAvailability(null); }}
             selectedMode={selectedMode}
@@ -985,7 +994,7 @@ export function QuizHub() {
               setAvailability(null);
               setSelectedUnitId(selectedUnitId === unitId ? "" : unitId);
               setExpandedUnitId((current) => current === unitId ? null : unitId);
-              if (unitId !== selectedUnitId) { setSelectedTopicIds([]); if (selectedMode === "frequency" && unit?.code !== "FIS1" || selectedMode === "platform_mistakes" && (unit?.platformMistakeCount ?? 0) < 5) setSelectedMode("quick"); }
+              if (unitId !== selectedUnitId) { setSelectedSource("compendium"); setSelectedTopicIds([]); if (selectedMode === "frequency" && unit?.code !== "FIS1" || selectedMode === "platform_mistakes" && (unit?.platformMistakeCount ?? 0) < 5) setSelectedMode("quick"); }
               if (unit && (answerFormat === "short_answer" ? unit.shortAnswerCount === 0 : unit.multipleChoiceCount === 0)) {
                 setAnswerFormat(unit.multipleChoiceCount > 0 ? "multiple_choice" : "short_answer");
               }
@@ -1081,8 +1090,9 @@ function TestsTabs({ active, onPractice, onStatistics, onRanking }: { active: "p
   return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }, { id: "ranking", label: "Ranking", icon: <Trophy />, onClick: onRanking }]} />;
 }
 
-function Catalogue({ loading, error, units, selectedUnit, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
+function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSource, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; expandedUnitId: string | null; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
+  selectedSource: QuizSource; onSource: (source: QuizSource) => void;
   assessmentPart: 1 | 2; onAssessmentPart: (part: 1 | 2) => void;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
@@ -1096,7 +1106,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
   const shortageAvailable = availability?.code === "not_enough_questions" ? availability.available : availableQuestionCount;
   const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : DEFAULT_QUESTION_COUNT;
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
-  const hasLessons = topics.some((topic) => /^(T|TP|P)\d+\s*[·—-]/.test(topic.name));
+  const hasLessons = topics.some((topic) => /^(?:(T|TP|P)\d+\s*[·—-]|A[TP]\d+\b)/.test(topic.name));
   const visibleModes = modeCards.filter((mode) => (mode.id !== "frequency" || selectedUnit?.code === "FIS1") && (mode.id !== "platform_mistakes" || (selectedUnit?.platformMistakeCount ?? 0) >= 5));
   const activeMode = visibleModes.find((mode) => mode.id === selectedMode) ?? null;
   const answerStyle: AnswerStyle = answerFormat === "multiple_choice" ? "multiple_choice" : shortAnswerMode;
@@ -1120,10 +1130,17 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
               {selected && <div className={styles.unitSettings}>
                 <section className={styles.settingGroup}>
                   <StepHeading step={1} title="Matéria a estudar" />
+                  {unit.code === NEURO_UNIT_CODE && <div className={styles.setupField}>
+                    <span className={styles.fieldLabel}>Origem das perguntas</span>
+                    <SetupChoices label="Origem das perguntas" value={selectedSource} options={[
+                      { id: "compendium", title: "Perguntas do compêndio", disabled: unit.sources.find(source => source.id === "compendium")?.questionCount === 0 },
+                      { id: "anki", title: "Ankis", disabled: !unit.sources.some(source => source.id === "anki" && source.questionCount > 0) },
+                    ]} onChange={onSource} />
+                  </div>}
                   {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
                   <div className={styles.setupField}>
                     <span className={styles.fieldLabel}>{hasLessons ? "Aulas" : "Temas"}{selectedMode !== "frequency" && <small>opcional</small>}</span>
-                    <TopicPicker key={`${unit.id}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
+                    <TopicPicker key={`${unit.id}-${selectedSource}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
                   </div>
                 </section>
                 <section className={styles.settingGroup}>
@@ -1150,7 +1167,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Aleatório</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes treinar em modo aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Aleatório</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
+                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === NEURO_UNIT_CODE ? selectedSource === "anki" ? "Ankis" : "Perguntas do compêndio" : null, unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
               </div>}
             </article>;
           })}
@@ -1162,14 +1179,14 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
 
 function TopicPicker({ topics, selectedIds, answerFormat, onChange, locked = false }: { topics: Topic[]; selectedIds: string[]; answerFormat: AnswerFormat; onChange: (ids: string[]) => void; locked?: boolean }) {
   const [query, setQuery] = useState("");
-  const hasLessons = topics.some((topic) => /^(T|TP|P)\d+\s*[·—-]/.test(topic.name));
+  const hasLessons = topics.some((topic) => /^(?:(T|TP|P)\d+\s*[·—-]|A[TP]\d+\b)/.test(topic.name));
   const term = query.trim().toLocaleLowerCase("pt-PT");
   const visible = topics.filter((topic) => !term || topic.name.toLocaleLowerCase("pt-PT").includes(term));
   const groups = hasLessons ? [
-    { name: "Teóricas", topics: visible.filter((topic) => /^T\d/.test(topic.name)) },
+    { name: "Teóricas", topics: visible.filter((topic) => /^(T|AT)\d/.test(topic.name)) },
     { name: "Teórico-práticas", topics: visible.filter((topic) => /^TP\d/.test(topic.name)) },
-    { name: "Práticas", topics: visible.filter((topic) => /^P\d/.test(topic.name)) },
-    { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P)\d/.test(topic.name)) },
+    { name: "Práticas", topics: visible.filter((topic) => /^(P|AP)\d/.test(topic.name)) },
+    { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P|AT|AP)\d/.test(topic.name)) },
   ] : [{ name: "Temas", topics: visible }];
   return <details className={styles.lessonPicker}>
     <summary><span>{selectedIds.length ? `${selectedIds.length} ${hasLessons ? (selectedIds.length === 1 ? "aula selecionada" : "aulas selecionadas") : (selectedIds.length === 1 ? "tema selecionado" : "temas selecionados")}` : hasLessons ? "Todas as aulas" : "Todos os temas"}</span><small>{locked ? "" : "Escolher"}</small><ChevronDown aria-hidden="true" /></summary>
@@ -1409,4 +1426,3 @@ function Comments({ pinning, onPin, comments, loading, text, sending, replyTo, o
 }
 
 function State({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: React.ReactNode }) { return <section className={styles.state}>{icon}<strong>{title}</strong><p>{text}</p>{action}</section>; }
-
