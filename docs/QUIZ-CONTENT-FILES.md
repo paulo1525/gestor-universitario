@@ -110,6 +110,25 @@ imagens incompatíveis interrompem a conversão para permitir adaptação
 explícita ao baralho. IDs derivados do GUID e da ordem do cartão mantêm-se
 estáveis em reimportações; perguntas do compêndio não são alteradas.
 
+A aula indicada no subbaralho prevalece sobre etiquetas que referenciam outras
+aulas. Sem aula no subbaralho, as etiquetas têm de identificar uma única aula.
+Imagens PNG, JPEG e WebP até 3 MiB conservam os bytes originais.
+
+Inspeção local de 07/10/2026: a revisão de 02/10 do APKG contém 3.079 cartões,
+34 aulas (AT1–AT21 e AP1–AP13), 646 ficheiros de media e sete modelos ativos.
+O conversor processou todos os cartões e as contagens por aula coincidiram com
+o relatório do baralho. Esta cópia tem SHA-256
+`4fe02de3ba5c4283c301ee2ba53cd8632b74a5aca84b26f4a0e5a9a04cf975fc`,
+diferente do checksum original acima. A importação final depende da confirmação
+da revisão e do acesso à exportação privada atual; a inspeção não constitui
+importação no catálogo nem publicação.
+
+A simulação de empacotamento apenas dos Ankis com os blocos atuais de 32 cartões
+produziu um ficheiro cifrado estimado de 92.429.988 bytes, acima do limite de
+25 MiB por Static Asset do Cloudflare. Antes da importação publicável, o tratamento
+de imagens e o tamanho dos blocos têm de ser adaptados e a memória do Worker
+verificada com sessões reais. Não publicar os cartões com esta divisão fixa.
+
 Sem cartões importados, a opção Ankis fica desativada. A validação com baralhos
 de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrome.
 
@@ -129,3 +148,11 @@ código, o índice e os ficheiros cifrados da mesma revisão. Não reativar a D1
 catálogo depois de editar os ficheiros: a cópia antiga deixaria de representar
 as perguntas atuais. As migrations históricas já públicas mantêm o conteúdo
 anterior que continham; a cifragem dos novos ficheiros não remove esse histórico.
+
+O empacotador exige uma chave configurada explicitamente: nunca gera nem grava
+uma chave por falta de configuração. Se a única cópia existir no secret do Worker,
+uma rotação exige primeiro uma exportação integral da revisão atual através do
+Worker autorizado, incluindo conteúdos arquivados e o banco de questões. A chave
+antiga não deve ser exposta. Só depois de recuperar e conferir o conteúdo se pode
+voltar a cifrá-lo com uma nova chave privada e preparar a transição de versões.
+Substituir apenas o secret torna os ficheiros atuais indecifráveis.

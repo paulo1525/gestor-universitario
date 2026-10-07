@@ -38,7 +38,7 @@ function content(html, media, archive) {
     const bytes = entry && archive[entry];
     const extension = filename.split(".").at(-1)?.toLowerCase();
     const mime = { jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp" }[extension];
-    if (!bytes || !mime || bytes.length > 1024 * 1024) throw new Error("Imagem em falta, formato não suportado ou superior a 1 MiB: " + filename);
+    if (!bytes || !mime || bytes.length > 3 * 1024 * 1024) throw new Error("Imagem em falta, formato não suportado ou superior a 3 MiB: " + filename);
     const uri = `data:image/${mime};base64,${Buffer.from(bytes).toString("base64")}`;
     if (!images.includes(uri)) images.push(uri);
     return "";
@@ -65,7 +65,11 @@ export async function readNeuroAnki(bytes, unitId, now = Date.now()) {
     for (const card of cards) {
       const model = models[String(card.mid)], deckName = decks[String(card.did)]?.name || "";
       if (!model || model.type !== 0) throw new Error("O cartão " + card.guid + " requer conversão de oclusão específica.");
-      const lessons = [...new Set((deckName + " " + card.tags).match(/\b(?:AT|AP)\s*\d{1,2}\b/gi)?.map(value => value.replace(/\s/g, "").toUpperCase()) || [])];
+      // Deck placement defines the lesson; tags can cross-reference other lessons.
+      // Only fall back to tags when the deck itself has no lesson identifier.
+      const lessonIds = value => [...new Set(value.match(/\b(?:AT|AP)\s*\d{1,2}\b/gi)?.map(value => value.replace(/\s/g, "").toUpperCase()) || [])];
+      const deckLessons = lessonIds(deckName);
+      const lessons = deckLessons.length ? deckLessons : lessonIds(card.tags);
       if (lessons.length !== 1) throw new Error("Aula ausente ou ambígua no cartão " + card.guid);
       const lesson = lessons[0], number = Number(lesson.slice(2));
       if (number < 1 || number > (lesson.startsWith("AT") ? 21 : 13)) throw new Error("Aula fora do pack: " + lesson);

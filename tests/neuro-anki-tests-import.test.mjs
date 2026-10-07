@@ -5,6 +5,7 @@ import ts from 'typescript';
 import * as fflate from 'fflate';
 import initSqlJs from 'sql.js/dist/sql-asm.js';
 import { readNeuroAnki, mergeNeuroAnki } from '../scripts/import-neuro-anki-tests.mjs';
+import { configuredQuizContentKey } from '../scripts/pack-quiz-content.mjs';
 
 async function compile(relative, dependencies = {}) {
   const source = await readFile(new URL(relative, import.meta.url), 'utf8');
@@ -66,4 +67,36 @@ test('aulas ambíguas e imagens em falta impedem uma importação incompleta', a
   const media = JSON.parse(fflate.strFromU8(archive.media));
   delete archive[Object.keys(media)[0]];
   await assert.rejects(readNeuroAnki(fflate.zipSync(archive), 'neuro'), /Imagem em falta/);
+});
+
+test('a aula do subbaralho prevalece sobre etiquetas de referência cruzada', async () => {
+  const archive = fflate.unzipSync((await deck('Neuroanatomia::Resposta curta::AP5')).bytes);
+  const SQL = await initSqlJs();
+  const db = new SQL.Database(archive['collection.anki2']);
+  db.run("UPDATE notes SET tags=' AP1 ap5 origem_codex '");
+  archive['collection.anki2'] = db.export();
+  db.close();
+  const imported = await readNeuroAnki(fflate.zipSync(archive), 'neuro');
+  assert.deepEqual(imported.topics.map(topic => topic.title), ['AP5']);
+});
+
+test('imagens do pack real entre 1 e 3 MiB são conservadas sem reduzir a resolução', async () => {
+  const archive = fflate.unzipSync((await deck()).bytes);
+  const media = JSON.parse(fflate.strFromU8(archive.media));
+  const entry = Object.keys(media)[0];
+  const bytes = new Uint8Array(2 * 1024 * 1024);
+  bytes.set(png);
+  archive[entry] = bytes;
+  const imported = await readNeuroAnki(fflate.zipSync(archive), 'neuro');
+  assert.equal(Buffer.from(imported.questions[1].image_url.split(',')[1], 'base64').length, bytes.length);
+  archive[entry] = new Uint8Array(3 * 1024 * 1024 + 1);
+  await assert.rejects(readNeuroAnki(fflate.zipSync(archive), 'neuro'), /superior a 3 MiB/);
+});
+
+test('empacotar exige uma chave privada explícita e nunca gera outra automaticamente', () => {
+  assert.throws(() => configuredQuizContentKey(undefined, ''), /No key was generated or changed/);
+  assert.throws(() => configuredQuizContentKey('invalid'), /32-byte/);
+  const key = Buffer.alloc(32, 9).toString('base64');
+  assert.equal(configuredQuizContentKey(undefined, 'QUIZ_CONTENT_KEY=' + key), key);
+  assert.equal(configuredQuizContentKey(key, 'QUIZ_CONTENT_KEY=invalid'), key);
 });

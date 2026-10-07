@@ -5,12 +5,19 @@ import {
   randomBytes,
 } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareQuizJson } from "./prepare-quiz-json-storage.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+export function configuredQuizContentKey(environmentValue, localVars = "") {
+  const secret = environmentValue || localVars.match(/^QUIZ_CONTENT_KEY=(.+)$/m)?.[1].trim();
+  if (!secret) throw new Error("Configure QUIZ_CONTENT_KEY privately before packing. No key was generated or changed.");
+  if (Buffer.from(secret, "base64").length !== 32) throw new Error("QUIZ_CONTENT_KEY must contain a 32-byte base64 key.");
+  return secret;
+}
 
 export function encryptQuizFile(content, objectKey, secret) {
   const key = Buffer.from(secret, "base64");
@@ -110,21 +117,8 @@ async function main() {
       content: Buffer.from(artifact.content),
     }));
   }
-  let secret = process.env.QUIZ_CONTENT_KEY;
-  if (!secret) {
-    const localVars = await readFile(
-      path.join(root, ".dev.vars"),
-      "utf8",
-    ).catch(() => "");
-    secret = localVars.match(/^QUIZ_CONTENT_KEY=(.+)$/m)?.[1].trim();
-    if (!secret) {
-      secret = randomBytes(32).toString("base64");
-      await appendFile(
-        path.join(root, ".dev.vars"),
-        "\nQUIZ_CONTENT_KEY=" + secret + "\n",
-      );
-    }
-  }
+  const secret = configuredQuizContentKey(process.env.QUIZ_CONTENT_KEY,
+    await readFile(path.join(root, ".dev.vars"), "utf8").catch(() => ""));
   const files = [];
   for (const { file, content } of prepared) {
     const destination = path.join(
