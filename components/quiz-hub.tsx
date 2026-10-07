@@ -3,11 +3,12 @@
 import listStyles from "@/components/record-list.module.css";
 import { UnitThumb } from "@/components/unit-thumb";
 import { quizReadiness } from "@/lib/quiz-readiness.mjs";
+import { quizTopicSelection } from "@/lib/quiz-setup.mjs";
 import commentStyles from "@/components/announcement-comments.module.css";
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @next/next/no-img-element */
 
-import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -165,9 +166,9 @@ const EMPTY_TOPICS: Topic[] = [];
 
 const modeCards: Array<{ id: Mode; title: string; description: string; icon: typeof Play }> = [
   { id: "quick", title: "Aleatório", description: "Mistura perguntas para consolidar o que já estudaste.", icon: BrainCircuit },
-  { id: "unseen", title: "Matéria nova", description: "Descobre conceitos através de perguntas que ainda não viste.", icon: EyeOff },
-  { id: "mistakes", title: "Só erros", description: "Recupera perguntas falhadas e corrige confusões recentes.", icon: RotateCcw },
-  { id: "frequency", title: "Simulação de frequência", description: "50 perguntas distribuídas pelas aulas · 60 minutos.", icon: Clock3 },
+  { id: "unseen", title: "Perguntas novas", description: "Perguntas a que ainda não respondeste.", icon: EyeOff },
+  { id: "mistakes", title: "Rever erros", description: "Perguntas que erraste em sessões anteriores.", icon: RotateCcw },
+  { id: "frequency", title: "Simular frequência", description: "50 perguntas · 60 min", icon: Clock3 },
   { id: "platform_mistakes", title: "Mais erradas na plataforma", description: "Perguntas com mais erros entre estudantes distintos.", icon: RotateCcw },
 ];
 
@@ -179,7 +180,22 @@ const answerStyleCards: Array<{ id: AnswerStyle; title: string; description: str
 ];
 
 function StepHeading({ step, title, optional = false }: { step: number; title: string; optional?: boolean }) {
-  return <div className={styles.settingHeading}><span className={styles.stepNumber} aria-hidden="true">{step}</span><strong>{title}</strong>{optional && <small>opcional</small>}</div>;
+  return <h2 className={styles.settingHeading}><span className={styles.stepNumber} aria-hidden="true">{step}</span><strong>{title}</strong>{optional && <small>opcional</small>}</h2>;
+}
+
+function SetupChoices<T extends string | number>({ label, value, options, onChange, cards = false }: {
+  label: string; value: T; options: Array<{ id: T; title: string; description?: string; icon?: typeof Play; disabled?: boolean }>;
+  onChange: (value: T) => void; cards?: boolean;
+}) {
+  const name = useId();
+  return <div className={cards ? styles.modeGrid : styles.segmentedChoices} role="radiogroup" aria-label={label}>
+    {options.map((option) => { const Icon = option.icon; return <label key={option.id} className={cards ? styles.modeCard : styles.segmentedChoice}>
+      <input className={styles.choiceInput} type="radio" name={name} value={option.id} checked={value === option.id} disabled={option.disabled} onChange={() => onChange(option.id)} />
+      {Icon && <span className={styles.modeIcon} aria-hidden="true"><Icon /></span>}
+      <span className={styles.choiceCopy}><strong>{option.title}</strong>{option.description && <small className={styles.modeDescription}>{option.description}</small>}</span>
+      {cards && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}
+    </label>; })}
+  </div>;
 }
 
 function modeTitle(mode: Mode) {
@@ -422,13 +438,17 @@ export function QuizHub() {
 
   const selectedUnit = units.find((unit) => unit.id === selectedUnitId) ?? null;
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
+  const topicSelection = useMemo(() => quizTopicSelection(selectedUnit?.code, topics, assessmentPart, selectedTopicIds), [selectedUnit?.code, topics, assessmentPart, selectedTopicIds]);
   const availableQuestionCount = useMemo(() => {
     if (!selectedUnit) return 0;
     if (selectedMode === "frequency") return topics.filter((topic) => topic.assessmentPart === assessmentPart).reduce((total, topic) => total + topic.multipleChoiceCount, 0);
+    if (topicSelection.restricted) {
+      const count = topicSelection.activeTopics.reduce((total, topic) => total + (answerFormat === "short_answer" ? topic.shortAnswerCount : topic.multipleChoiceCount), 0);
+      return selectedMode === "platform_mistakes" ? Math.min(count, selectedUnit.platformMistakeCount) : count;
+    }
     if (selectedMode === "platform_mistakes") return selectedUnit.platformMistakeCount;
-    if (selectedTopicIds.length) return topics.filter((topic) => selectedTopicIds.includes(topic.id)).reduce((total, topic) => total + (answerFormat === "short_answer" ? topic.shortAnswerCount : topic.multipleChoiceCount), 0);
     return answerFormat === "short_answer" ? selectedUnit.shortAnswerCount : selectedUnit.multipleChoiceCount;
-  }, [selectedTopicIds, selectedUnit, topics, answerFormat, assessmentPart, selectedMode]);
+  }, [topicSelection, selectedUnit, topics, answerFormat, assessmentPart, selectedMode]);
   const question = attempt?.questions[currentIndex] ?? null;
   const answers = useMemo(() => new Map((attempt?.answers ?? []).map((answer) => [answer.questionId, answer])), [attempt?.answers]);
   const currentAnswer = question ? answers.get(question.id) ?? null : null;
@@ -590,8 +610,9 @@ export function QuizHub() {
     setLoadingAttempt(true);
     setAvailability(null);
     try {
-      const activeTopicIds = selectedTopicIds;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: timed ? questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed, assessmentPart }) });
+      const activeTopicIds = topicSelection.requestTopicIds;
+      const sessionTimed = selectedMode === "frequency" || timed;
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -617,7 +638,7 @@ export function QuizHub() {
     } finally {
       setLoadingAttempt(false);
     }
-  }, [assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, updateAttempt]);
+  }, [assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
 
   const finishAttempt = useCallback(async (expired = false) => {
     const requestedAttempt = attemptRef.current;
@@ -946,10 +967,10 @@ export function QuizHub() {
             expandedUnitId={expandedUnitId}
             selectedUnit={selectedUnit}
             assessmentPart={assessmentPart}
-            onAssessmentPart={(part) => { setAssessmentPart(part); setAvailability(null); }}
+            onAssessmentPart={(part) => { setAssessmentPart(part); setSelectedTopicIds([]); setAvailability(null); }}
             selectedMode={selectedMode}
-            selectedTopicIds={selectedTopicIds}
-            topics={topics}
+            selectedTopicIds={topicSelection.selectedIds}
+            topics={topicSelection.topics}
             questionCount={questionCount}
             timed={timed}
             onTimed={setTimed}
@@ -1075,7 +1096,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
   const shortageAvailable = availability?.code === "not_enough_questions" ? availability.available : availableQuestionCount;
   const shortageRequired = availability?.code === "not_enough_questions" ? availability.required : DEFAULT_QUESTION_COUNT;
   const resumeUnit = resumeAttempt ? units.find((unit) => unit.id === resumeAttempt.unitId) ?? null : null;
-  const countOptions = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
+  const hasLessons = topics.some((topic) => /^(T|TP|P)\d+\s*[·—-]/.test(topic.name));
   const visibleModes = modeCards.filter((mode) => (mode.id !== "frequency" || selectedUnit?.code === "FIS1") && (mode.id !== "platform_mistakes" || (selectedUnit?.platformMistakeCount ?? 0) >= 5));
   const activeMode = visibleModes.find((mode) => mode.id === selectedMode) ?? null;
   const answerStyle: AnswerStyle = answerFormat === "multiple_choice" ? "multiple_choice" : shortAnswerMode;
@@ -1098,31 +1119,38 @@ function Catalogue({ loading, error, units, selectedUnit, selectedMode, selected
             return <article key={unit.id} className={`${styles.unitCard} ${selected ? styles.unitCardSelected : ""}`}>
               {selected && <div className={styles.unitSettings}>
                 <section className={styles.settingGroup}>
-                  <StepHeading step={1} title="Modo de treino" />
-                  <div className={styles.modeGrid} role="radiogroup" aria-label={`Objetivo da sessão de ${unit.name}`}>{visibleModes.map((mode) => { const Icon = mode.icon; const active = selectedMode === mode.id; return <button key={mode.id} type="button" role="radio" aria-checked={active} aria-label={`${mode.title}. ${mode.description}`} className={`${styles.modeCard} ${active ? styles.selected : ""}`} onClick={() => onMode(mode.id)}><span className={styles.modeIcon}><Icon /></span><strong>{mode.title}<small className={styles.modeDescription}>{mode.description}</small></strong>{active && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}</div>
-                  {activeMode && <p className={styles.choiceHint}>{activeMode.description}</p>}
-                  {unit.code === "FIS1" && <div className={styles.frequencyChoices} role="radiogroup" aria-label="Frequência">{([1, 2] as const).map((part) => <button key={part} type="button" role="radio" aria-checked={assessmentPart === part} className={`button ${assessmentPart === part ? "button--primary" : "button--secondary"}`} onClick={() => onAssessmentPart(part)}>{part}.ª frequência</button>)}</div>}
-                </section>
-                {answerStyles.length > 1 && <section className={styles.settingGroup}>
-                  <StepHeading step={2} title="Como respondes" />
-                  <div className={styles.answerStyleGrid} role="radiogroup" aria-label="Como respondes">{answerStyles.map((option) => { const Icon = option.icon; const active = answerStyle === option.id; return <button key={option.id} type="button" role="radio" aria-checked={active} aria-label={`${option.title}. ${option.description}`} className={`${styles.modeCard} ${active ? styles.selected : ""}`} onClick={() => onAnswerStyle(option.id)}><span className={styles.modeIcon}><Icon /></span><strong>{option.title}<small className={styles.modeDescription}>{option.description}</small></strong>{active && <CheckCircle2 className={styles.modeCheck} aria-hidden="true" />}</button>; })}</div>
-                  {activeAnswerStyle && <p className={styles.choiceHint}>{activeAnswerStyle.description}</p>}
-                </section>}
-                <section className={styles.settingGroup}>
-                  <StepHeading step={answerStyles.length > 1 ? 3 : 2} title="Quantas perguntas" />
-                  <div className={styles.countRow}>
-                    <div className={styles.countChoices} role="radiogroup" aria-label="Número de perguntas e duração da sessão">{(selectedMode === "frequency" ? [50] : QUIZ_QUESTION_COUNTS).map((count) => { const active = selectedMode === "frequency" || questionCount === count && countOptions.includes(count); return <button key={count} type="button" role="radio" aria-checked={active} disabled={selectedMode !== "frequency" && count > availableQuestionCount} onClick={() => onQuestionCount(count)}>{count}</button>; })}</div>
-                    <label className={styles.timerSwitch}><input type="checkbox" role="switch" checked={timed} onChange={(event) => onTimed(event.target.checked)} /><span aria-hidden="true" className={styles.switchTrack}><span /></span><span className={styles.switchLabel}><Clock3 aria-hidden="true" />{timed ? `Cronómetro · ${minutes} min` : "Sem cronómetro"}</span></label>
+                  <StepHeading step={1} title="Matéria a estudar" />
+                  {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
+                  <div className={styles.setupField}>
+                    <span className={styles.fieldLabel}>{hasLessons ? "Aulas" : "Temas"}{selectedMode !== "frequency" && <small>opcional</small>}</span>
+                    <TopicPicker key={`${unit.id}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
                   </div>
                 </section>
                 <section className={styles.settingGroup}>
-                  <StepHeading step={answerStyles.length > 1 ? 4 : 3} title="Temas" optional />
-                  <TopicPicker key={`${unit.id}-${assessmentPart}`} topics={unit.code === "FIS1" ? topics.filter((topic) => topic.assessmentPart === assessmentPart || selectedMode !== "frequency" && topic.assessmentPart === null) : topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
+                  <StepHeading step={2} title="Modo de treino" />
+                  <SetupChoices cards label={`Modo de treino de ${unit.name}`} value={selectedMode} options={visibleModes.map((mode) => ({ ...mode, description: mode.id === "frequency" ? mode.description : undefined }))} onChange={onMode} />
+                </section>
+                {answerStyles.length > 1 && <section className={styles.settingGroup}>
+                  <StepHeading step={3} title="Como respondes" />
+                  <SetupChoices cards label="Como respondes" value={answerStyle} options={answerStyles.map((option) => ({ ...option, description: option.id === "type_and_check" ? "Escreves e confirmas a correção." : option.id === "reveal_and_self_assess" ? "Revelas a solução e avalias a resposta." : undefined }))} onChange={onAnswerStyle} />
+                </section>}
+                <section className={styles.settingGroup}>
+                  <StepHeading step={answerStyles.length > 1 ? 4 : 3} title="Sessão" />
+                  <div className={styles.countRow}>
+                    <div className={styles.setupField}>
+                      <span className={styles.fieldLabel}>Perguntas</span>
+                      {selectedMode === "frequency" ? <p className={styles.fixedSetting}>50 perguntas</p> : <SetupChoices label="Número de perguntas" value={questionCount} options={QUIZ_QUESTION_COUNTS.map((count) => ({ id: count, title: String(count), disabled: count > availableQuestionCount }))} onChange={onQuestionCount} />}
+                    </div>
+                    <div className={styles.setupField}>
+                      <span className={styles.fieldLabel}>Limite de tempo</span>
+                      {selectedMode === "frequency" ? <p className={styles.fixedSetting}><Clock3 aria-hidden="true" />60 min</p> : <label className={styles.timerSwitch}><input type="checkbox" role="switch" aria-label="Limite de tempo" checked={timed} onChange={(event) => onTimed(event.target.checked)} /><span aria-hidden="true" className={styles.switchTrack}><span /></span><span className={styles.switchLabel}>{timed ? `${minutes} min` : "Sem limite"}</span></label>}
+                    </div>
+                  </div>
                 </section>
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Aleatório</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes treinar em modo aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Aleatório</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, timed ? `${minutes} min` : "sem cronómetro", selectedTopicIds.length ? `${selectedTopicIds.length} ${selectedTopicIds.length === 1 ? "tema" : "temas"}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar"}</button></footer>
+                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
               </div>}
             </article>;
           })}
@@ -1144,7 +1172,7 @@ function TopicPicker({ topics, selectedIds, answerFormat, onChange, locked = fal
     { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P)\d/.test(topic.name)) },
   ] : [{ name: "Temas", topics: visible }];
   return <details className={styles.lessonPicker}>
-    <summary><span>{selectedIds.length ? `${selectedIds.length} ${hasLessons ? (selectedIds.length === 1 ? "aula escolhida" : "aulas escolhidas") : (selectedIds.length === 1 ? "tema escolhido" : "temas escolhidos")}` : hasLessons ? "Todas as aulas" : "Todos os temas"}</span><small>{locked ? "" : "Escolher"}</small><ChevronDown aria-hidden="true" /></summary>
+    <summary><span>{selectedIds.length ? `${selectedIds.length} ${hasLessons ? (selectedIds.length === 1 ? "aula selecionada" : "aulas selecionadas") : (selectedIds.length === 1 ? "tema selecionado" : "temas selecionados")}` : hasLessons ? "Todas as aulas" : "Todos os temas"}</span><small>{locked ? "" : "Escolher"}</small><ChevronDown aria-hidden="true" /></summary>
     <FilterBar label={hasLessons ? "Filtrar aulas" : "Filtrar temas"}><FilterSearch label={hasLessons ? "Pesquisar aulas" : "Pesquisar temas"} value={query} onChange={setQuery} placeholder={hasLessons ? "Pesquisar aulas" : "Pesquisar temas"} /></FilterBar>
     <div className={styles.lessonList}>
       {groups.filter((group) => group.topics.length).map((group) => <section key={group.name} aria-label={group.name}>

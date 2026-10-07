@@ -415,54 +415,64 @@
 
 .unitSettings {
   display: grid;
-  gap: 16px;
+  gap: var(--space-5);
   padding: var(--space-4) var(--space-5);
-  background: color-mix(in srgb, var(--color-surface-subtle) 42%, var(--surface));
+  background: var(--color-surface);
 }
 
 .settingGroup { min-width: 0; display: grid; gap: 9px; }
 .settingHeading strong { color: var(--ink); font-size: var(--font-size-heading-3); }
 
-.settingHeading { display: flex; align-items: center; gap: var(--space-2); }
+.settingHeading { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
 .settingHeading small { color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 600; }
-.stepNumber { width: 22px; height: 22px; display: grid; place-items: center; flex: none; border-radius: 50%; color: var(--color-accent-contrast); background: var(--color-accent); font-size: var(--font-size-small); font-weight: 850; }
-.answerStyleGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
-.choiceHint { display: none; margin: 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); line-height: 1.5; }
+.stepNumber { width: 22px; height: 22px; display: grid; place-items: center; flex: none; border-radius: 50%; color: var(--color-accent-text); background: var(--color-accent-soft); font-size: var(--font-size-small); font-weight: 850; }
 .sessionRecap { min-width: 0; margin: 0 auto 0 0; color: var(--color-text-muted); font-size: var(--font-size-body-emphasis); font-weight: 650; }
 /* Testes tabs (Praticar · Estatísticas · Ranking) span the whole content width. */
 .page :global(.page-tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
 .page :global(.page-tabs) > :is(a, button) { justify-content: center; min-height: 36px; }
 
-.countRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.countRow { display: flex; flex-wrap: wrap; align-items: start; gap: var(--space-5); }
+.setupField { min-width: 0; display: grid; gap: var(--space-2); }
+.fieldLabel { display: flex; align-items: baseline; gap: var(--space-2); color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; }
+.fieldLabel small { color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: 400; }
+.fixedSetting { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); margin: 0; color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; }
+.fixedSetting svg { width: 16px; height: 16px; }
+.choiceInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.choiceCopy { min-width: 0; }
 
-.countChoices {
+.segmentedChoices {
   display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
   gap: 3px;
   padding: 3px;
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
 }
 
-.countChoices button {
+.segmentedChoice {
+  position: relative;
+  display: grid;
+  place-items: center;
   min-width: 48px;
-  min-height: 36px;
+  min-height: var(--control-height);
   padding: 0 var(--space-3);
   border: 0;
   border-radius: calc(var(--radius-control) - 2px);
   color: var(--color-text-muted);
   background: transparent;
   font: inherit;
-  font-size: var(--font-size-heading-3);
+  font-size: var(--font-size-body-emphasis);
   font-weight: 750;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
 
-.countChoices button:hover:not(:disabled) { color: var(--color-text); }
-.countChoices button[aria-checked="true"] { color: var(--color-accent-contrast); background: var(--color-accent); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
-.countChoices button:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
-.countChoices button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.segmentedChoice:hover:not(:has(input:disabled)) { color: var(--color-text); }
+.segmentedChoice:has(input:checked) { color: var(--color-accent-text); background: var(--color-accent-soft); box-shadow: inset 0 0 0 1px var(--color-accent); }
+.segmentedChoice:has(input:disabled) { color: var(--color-text-disabled); cursor: not-allowed; }
+.segmentedChoice:has(input:focus-visible), .modeCard:has(input:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 2px; box-shadow: var(--focus-ring); }
 
 .timerSwitch { position: relative; display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); color: var(--color-text); font-size: var(--font-size-body-emphasis); font-weight: 700; cursor: pointer; }
 .timerSwitch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -611,6 +621,7 @@
 }
 
 .modeCard {
+  position: relative;
   min-width: 0;
   min-height: 58px;
   display: grid;
@@ -628,24 +639,23 @@
   transition: border-color .15s ease, background .15s ease;
 }
 
-.modeCard:hover:not(:disabled),
-.modeCard:focus-visible {
+.modeCard:hover:not(:has(input:disabled)) {
   border-color: var(--color-border-hover);
   background: var(--color-surface-subtle);
 }
 
-.modeCard:disabled {
+.modeCard:has(input:disabled) {
   color: var(--color-text-disabled);
   background: var(--color-surface-muted);
   cursor: not-allowed;
 }
 
-.modeCard:disabled .modeIcon {
+.modeCard:has(input:disabled) .modeIcon {
   color: var(--color-text-disabled);
   background: var(--color-surface-muted);
 }
 
-.modeCard.selected {
+.modeCard:has(input:checked) {
   border-color: color-mix(in srgb, var(--gold) 70%, var(--line));
   background: color-mix(in srgb, var(--gold-soft) 62%, var(--surface));
 }
@@ -655,7 +665,7 @@
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   color: var(--color-accent-text);
   background: var(--gold-soft);
 }
@@ -665,13 +675,15 @@
 }
 
 .modeCard strong {
-  font-size: .75rem;
+  font-size: var(--font-size-body-emphasis);
 }
 
 .modeCheck {
   width: 16px;
   color: var(--color-accent-text);
+  visibility: hidden;
 }
+.modeCard:has(input:checked) .modeCheck { visibility: visible; }
 
 .answerFormatStack,
 .shortModePicker {
@@ -1302,7 +1314,7 @@
 .reviewFilters button[aria-pressed="true"] { background: var(--gold-soft); border-color: var(--color-accent); color: var(--color-accent-text); }
 .reviewImage { margin: var(--space-3) 0; }
 .reviewImage img { display: block; max-width: 100%; max-height: 360px; object-fit: contain; }
-.modeDescription { display: block; margin-top: var(--space-1); color: var(--muted); font-size: .75rem; font-weight: 400; line-height: 1.5; }
+.modeDescription { display: block; margin-top: var(--space-1); color: var(--muted); font-size: var(--font-size-small); font-weight: 400; line-height: 1.5; }
 .questionNumber:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 
 /* Attempt */
@@ -2598,18 +2610,16 @@
   .modeGrid, .answerFormatGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .unitSettings { padding: var(--space-3); gap: var(--space-4); }
   .settingHeading strong, .modeCard strong, .shortModeChoices strong { font-size: var(--font-size-heading-3); }
-  .modeCard { min-height: 56px; grid-template-columns: 30px minmax(0, 1fr); gap: var(--space-2); padding: var(--space-2); }
+  .modeCard { min-height: 56px; grid-template-columns: 24px minmax(0, 1fr) 14px; gap: var(--space-1); padding: var(--space-2); }
+  .modeIcon { width: 24px; height: 28px; }
   .modeCard strong { line-height: 1.25; }
-  .modeCheck { display: none; }
+  .modeCheck { width: 14px; }
   .shortModeChoices button { min-height: 56px; }
-  .modeDescription { display: none; }
-  .choiceHint { display: block; }
-  .answerStyleGrid { grid-template-columns: 1fr; }
   .sessionRecap { width: 100%; margin: 0; text-align: center; }
   .shortAnswerComposer footer { flex-direction: row !important; }
   .countRow { display: grid; gap: var(--space-2); }
-  .countChoices { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .countChoices button { min-width: 0; min-height: 44px; font-size: var(--font-size-heading-2); }
+  .segmentedChoices { display: flex; width: 100%; }
+  .segmentedChoice { flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--space-2); }
   .timerSwitch { min-height: 44px; font-size: var(--font-size-heading-3); }
   .unitActions { position: sticky; z-index: 3; bottom: 0; margin: 0 calc(var(--space-3) * -1) calc(var(--space-3) * -1); padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); background: var(--color-surface); }
   .page .unitActions .startSession { width: 100%; min-height: 52px; font-size: var(--font-size-heading-2); }
@@ -2818,7 +2828,6 @@
   .questionBody { animation: none; }
 }
 
-.frequencyChoices { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .seenBadge { padding: 3px 8px; border-radius: var(--radius-control); font-size: var(--font-size-caption); font-weight: 600; white-space: nowrap; }
 .seenBadgeViewed { color: var(--color-text-muted); background: var(--color-surface-muted); }
 .seenBadgeNew { color: var(--color-success-text); background: var(--color-success-soft); }
