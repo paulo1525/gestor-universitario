@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, Video, type LucideIcon } from "lucide-react";
+import { BookOpen, CircleCheck, ChevronLeft, ChevronRight, ClipboardCheck, Download, ExternalLink, FileText, GraduationCap, Library, NotebookPen, Package, Presentation, ScrollText, Star, Video, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/components/i18n-context";
 import { FilterBar, FilterSearch, FilterSegmented, FilterSelect } from "@/components/filter-bar";
 import { MATERIAL_COMPENDIUM_UNITS, resolveMaterialCompendiumUnit } from "@/lib/material-compendium-units";
@@ -27,7 +27,7 @@ type CatalogSection = VideoFolder | MaterialResourceCategory | "summaries" | "no
 /** Unit offered in the picker; `code` is the stable key shared by the catalogue and the submissions. */
 export type MaterialUnitOption = { id: string; code: string; name: string; year?: number | null; semester?: number | null };
 type BibliographyFormat = "complete" | "excerpt" | "translation";
-type CatalogItem = { studyCategory?: "sebenta" | null; views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
+type CatalogItem = { studyCategory?: "sebenta" | null; views?: number | null; updatedAt?: number; id: string; kind: string; resourceCategory?: MaterialResourceCategory | null; bibliographyFormat?: BibliographyFormat | null; summaryFormat?: "lecture" | "notes" | null; favorite?: boolean; completed?: boolean; isLink?: boolean; otherFormat?: "slides" | "compendium" | null; title: string; description?: string; fileName?: string; mimeType?: string; downloadUrl?: string | null; viewUrl?: string | null; verification?: "original" | "verified" | "pending" | string; recommended?: boolean; unitCode?: string | null; unitId?: string | null; unitName?: string | null; lessonCode?: string | null; lessonCodes?: string[]; storage?: { backend?: string; state?: string; ready?: boolean }; source?: { title?: string; edition?: string; author?: string } | null; pages?: { printedStart?: string; printedEnd?: string; physicalStart?: string; physicalEnd?: string; note?: string | null } };
 type Lesson = { id: string; unitId?: string; code: string; title: string; type: string; cardCount?: number };
 type Deck = { views?: number | null; id: string; unitId?: string | null; title: string; description: string; cardCount: number; mediaCount: number; downloadUrl?: string | null; storage: { state: string; ready: boolean }; lessons: Array<{ id: string; code: string; title: string; cardCount: number }> };
 
@@ -104,20 +104,21 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   const [legacyResourceId] = useHashRecord("recurso", { scroll: false });
   const [legacyReadId] = useHashRecord("ler", { scroll: false });
   const router = useRouter();
-  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "favorites" | "recommended" | "original" | "verified" | "pending">("all"), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [favoritesEnabled, setFavoritesEnabled] = useState(false);
+  const [items, setItems] = useState<CatalogItem[]>([]), [lessons, setLessons] = useState<Lesson[]>([]), [decks, setDecks] = useState<Deck[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState(""), [catalogAttempt, setCatalogAttempt] = useState(0), [search, setSearch] = useState(""), [lessonFilter, setLessonFilter] = useState(""), [verificationFilter, setVerificationFilter] = useState<"all" | "favorites" | "completed" | "pending-study" | "recommended" | "original" | "verified" | "pending">("all"), [formatFilter, setFormatFilter] = useState<"all" | BibliographyFormat>("all"), [unitSearch, setUnitSearch] = useState(""), [favoritesEnabled, setFavoritesEnabled] = useState(false), [completionsEnabled, setCompletionsEnabled] = useState(false);
   const [sortOrder, setSortOrder] = useState("lesson");
   const loadCatalog = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/material-catalog", { cache: "no-store", signal });
-      const data = await response.json() as { items?: CatalogItem[]; lessons?: Lesson[]; decks?: Deck[]; capabilities?: { favorites?: boolean }; error?: string };
+      const data = await response.json() as { items?: CatalogItem[]; lessons?: Lesson[]; decks?: Deck[]; capabilities?: { favorites?: boolean; completions?: boolean }; error?: string };
       if (!response.ok) throw new Error(data.error || t("community.materials.catalog.loadError"));
       if (signal.aborted) return;
       setItems(Array.isArray(data.items) ? data.items : []);
       setLessons(Array.isArray(data.lessons) ? data.lessons : []);
       setDecks(Array.isArray(data.decks) ? data.decks : []);
       setFavoritesEnabled(Boolean(data.capabilities?.favorites));
+      setCompletionsEnabled(Boolean(data.capabilities?.completions));
     } catch (reason) {
       if (!signal.aborted) setError(reason instanceof Error ? reason.message : t("community.materials.catalog.loadError"));
     } finally {
@@ -171,7 +172,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
       return (activeTab === "overview" || catalogSection(item) === activeTab) &&
         (!normalizedSearch || searchable.includes(normalizedSearch)) &&
         (!lessonFilter || itemLessons.includes(lessonFilter)) &&
-        (verificationFilter === "all" || (verificationFilter === "favorites" ? item.favorite : verificationFilter === "recommended" ? item.recommended : item.verification === verificationFilter));
+        (verificationFilter === "all" || (verificationFilter === "favorites" ? item.favorite : verificationFilter === "completed" ? item.completed : verificationFilter === "pending-study" ? !item.isLink && !item.completed : verificationFilter === "recommended" ? item.recommended : item.verification === verificationFilter));
     }).sort((a, b) => (sortOrder === "views" ? (b.views || 0) - (a.views || 0) : sortOrder === "recent" ? (b.updatedAt || 0) - (a.updatedAt || 0) : 0) || compareCatalogItems(a, b));
   }, [activeTab, lessonFilter, search, unitItems, verificationFilter, sortOrder]);
   const formatCounts = useMemo(() => Object.fromEntries(formats.map((format) => [format, filtered.filter((item) => bibliographyFormat(item) === format).length])) as Record<BibliographyFormat, number>, [filtered]);
@@ -272,6 +273,18 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     flip(next);
     try {
       const response = await fetch(`/api/material-catalog/${encodeURIComponent(item.id)}/favorite`, { method: next ? "POST" : "DELETE" });
+      if (!response.ok) throw new Error();
+    } catch {
+      flip(!next);
+    }
+  };
+  // Same optimistic pattern for "completed"; external links never show the toggle.
+  const toggleCompleted = async (item: CatalogItem) => {
+    const next = !item.completed;
+    const flip = (value: boolean) => setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, completed: value } : entry));
+    flip(next);
+    try {
+      const response = await fetch(`/api/material-catalog/${encodeURIComponent(item.id)}/complete`, { method: next ? "POST" : "DELETE" });
       if (!response.ok) throw new Error();
     } catch {
       flip(!next);
@@ -397,13 +410,13 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
             <FilterSearch label={t("community.materials.catalog.search")} value={search} onChange={setSearch} placeholder={t("community.materials.catalog.searchPlaceholder")} />
             {activeTab === "bibliography" && <FilterSegmented label={t("community.materials.catalog.format.label")} value={formatFilter} onChange={setFormatFilter} options={[{ value: "all", label: t("community.materials.catalog.format.all") }, ...formats.filter((format) => formatCounts[format] > 0).map((format) => ({ value: format, label: formatLabel(format), count: formatCounts[format] }))]} />}
             {unitLessons.length > 0 && <FilterSelect label={t("community.materials.catalog.lesson")} value={lessonFilter} onChange={setLessonFilter} defaultValue="" options={[{ value: "", label: t("community.materials.catalog.allLessons") }, ...unitLessons.map((lesson) => ({ value: lesson.code, label: `${lesson.code} · ${lesson.title}` }))]} />}
-            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), { value: "recommended", label: t("community.materials.catalog.recommendedOnly") }]} />
+            <FilterSelect label={t("community.materials.catalog.editorialStatus")} value={verificationFilter} onChange={(value) => setVerificationFilter(value as typeof verificationFilter)} options={[{ value: "all", label: t("community.materials.catalog.allStatuses") }, ...(favoritesEnabled ? [{ value: "favorites", label: t("community.materials.favorites") }] : []), ...(completionsEnabled ? [{ value: "completed", label: t("community.materials.catalog.completedOnly") }, { value: "pending-study", label: t("community.materials.catalog.notCompletedOnly") }] : []), { value: "recommended", label: t("community.materials.catalog.recommendedOnly") }]} />
             <FilterSelect label={t("community.materials.catalog.sort")} value={sortOrder} onChange={setSortOrder} defaultValue="lesson" options={[{ value: "lesson", label: t("community.materials.catalog.sort.lesson") }, { value: "views", label: t("community.materials.catalog.sort.views") }, { value: "recent", label: t("community.materials.catalog.sort.recent") }]} />
           </FilterBar>
           <div className={styles.resourceList}>
             {loading ? <RecordSkeleton label={t("community.materials.catalog.loading")} /> : error ? <div className={list.empty} role="alert"><FileText /><strong>{t("community.materials.catalog.loadError")}</strong><button className="button button--ghost button--compact" type="button" onClick={retryCatalog}>{t("community.materials.catalog.retry")}</button></div> : visible.length ? pageGroups.map((group) => <div className={list.group} key={group.key || "other"}>
               {group.title && <h3 className={list.groupTitle}>{group.title}</h3>}
-              <ul className={list.rows}>{group.items.map((item) => <li className={`${list.row} ${styles.materialRow}`} key={item.id} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
+              <ul className={list.rows}>{group.items.map((item) => <li className={`${list.row} ${styles.materialRow}`} key={item.id} data-completed={item.completed || undefined} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
                 <span className={list.rowIcon} aria-hidden="true">{(() => { const Icon = SECTION_ICON[catalogSection(item)]; return <Icon />; })()}</span>
                 <div className={list.rowMain}>
                   <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={materialReaderHref(item.id, item)} target="_blank" rel="noopener">{item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={item.downloadUrl} onClick={() => void recordOpening(item)} download={item.fileName || true}>{item.title}</a> : <span className={`${list.titleLink} ${styles.materialTitle}`}>{item.title}</span>}</h3>
@@ -413,6 +426,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
                   </div></details>}
                 </div>
                 <span className={list.rowEnd}>
+                  {completionsEnabled && !item.isLink && <button type="button" className={`${list.rowAction} ${styles.complete}`} data-icon-only="true" aria-pressed={Boolean(item.completed)} aria-label={`${t(item.completed ? "community.materials.catalog.uncomplete" : "community.materials.catalog.complete")} · ${item.title}`} title={t(item.completed ? "community.materials.catalog.uncomplete" : "community.materials.catalog.complete")} onClick={() => void toggleCompleted(item)}><CircleCheck aria-hidden="true" /></button>}
                   {favoritesEnabled && <button type="button" className={`${list.rowAction} ${styles.star}`} data-icon-only="true" aria-pressed={Boolean(item.favorite)} aria-label={`${t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} · ${item.title}`} title={t(item.favorite ? "community.materials.unfavorite" : "community.materials.favorite")} onClick={() => void toggleFavorite(item)}><Star aria-hidden="true" /></button>}
                   {item.downloadUrl && <span className={list.rowActions}>
                     <a className={list.rowAction} data-icon-only="true" href={item.downloadUrl} onClick={() => void recordOpening(item)} download={item.fileName || true} aria-label={`Descarregar · ${item.title}`} title="Descarregar"><Download aria-hidden="true" /></a>

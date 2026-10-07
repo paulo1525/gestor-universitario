@@ -62,6 +62,22 @@ function unauthenticated(): Response { return json({ error: "Sessão inválida."
 function disabled(): Response { return json({ error: "Este módulo está temporariamente desativado.", code: "MODULE_DISABLED" }, 404); }
 const bibliographyFormats = new Set(["complete", "excerpt", "translation"]);
 /** Formato explícito da migration 0065; antes dela, as páginas definem um excerto. */
+function missingCompletions(reason: unknown) {
+  return /no such table.*material_catalog_completions/i.test(String((reason as { message?: unknown } | null)?.message ?? ""));
+}
+/** Ids the user marked as completed; null until migration 0124 is applied. */
+async function completedMaterialIds(env: MaterialsCatalogEnv, userId: string): Promise<Set<string> | null> {
+  try {
+    const rows = await env.DB.prepare("SELECT material_id FROM material_catalog_completions WHERE user_id=?").bind(userId).all<{ material_id: string }>();
+    return new Set(rows.results.map((item) => String(item.material_id)));
+  } catch (reason) {
+    if (!missingCompletions(reason)) throw reason;
+    return null;
+  }
+}
+function isExternalLink(item: Record<string, unknown>): boolean {
+  return item.storage_backend === "external" || (typeof item.external_url === "string" && /^https?:\/\//i.test(item.external_url));
+}
 function bibliographyFormat(item: Record<string, unknown>): string {
   if (typeof item.bibliography_format === "string" && bibliographyFormats.has(item.bibliography_format)) return item.bibliography_format;
   return item.printed_page_start || item.physical_page_start ? "excerpt" : "complete";
@@ -91,6 +107,7 @@ function mapCatalogItem(item: Record<string, unknown>, lessonCodes: string[] = [
     fileName: item.file_name,
     mimeType: item.mime_type,
     storage: { backend: item.storage_backend, state: item.storage_state, ready, size: item.byte_size, checksum: item.checksum_sha256 },
+    isLink: isExternalLink(item),
     downloadUrl: ready && item.storage_backend !== "inline"
       ? externalUrl || `/api/material-catalog/${encodeURIComponent(String(item.id))}/download`
       : null,
@@ -232,13 +249,13 @@ async function catalog(request: Request, env: MaterialsCatalogEnv, url: URL, use
   ]);
   const lessons = lessonsResult.results.map(row);
   const materialIds = itemsResult.results.map((item) => String(row(item).id));
-  const [catalogViews, deckViews] = await Promise.all([materialViewCounts(env, "catalog", materialIds), materialViewCounts(env, "anki", deckResult.results.map((item) => String(row(item).id)))]);
+  const [catalogViews, deckViews, completed] = await Promise.all([materialViewCounts(env, "catalog", materialIds), materialViewCounts(env, "anki", deckResult.results.map((item) => String(row(item).id))), completedMaterialIds(env, user.id)]);
   const catalogItems = itemsResult.results.map((item) => {
     const material = row(item);
-    return { ...mapCatalogItem(material, JSON.parse(String(material.lesson_codes || "[]"))), favorite: Number(material.is_favorite) === 1, views: catalogViews ? catalogViews.get(String(material.id)) || 0 : null };
+    return { ...mapCatalogItem(material, JSON.parse(String(material.lesson_codes || "[]"))), favorite: Number(material.is_favorite) === 1, completed: !isExternalLink(material) && Boolean(completed?.has(String(material.id))), views: catalogViews ? catalogViews.get(String(material.id)) || 0 : null };
   });
   const decks = deckResult.results.map((item) => ({ ...mapDeck(row(item), deckLessonsResult.results.map(row)), views: deckViews ? deckViews.get(String(row(item).id)) || 0 : null }));
-  return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { favorites: favoritesEnabled, manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
+  return json({ items: catalogItems, materials: catalogItems, lessons: lessons.map((item) => ({ id: item.id, unitId: item.curricular_unit_id, code: item.code, title: item.title, type: item.lesson_type, order: item.sort_order })), sources: sourcesResult.results.map((item) => ({ id: item.id, title: item.title, author: item.author, edition: item.edition, citation: item.citation })), decks, filters: { unitId, lesson: lessonCode, kind, query }, capabilities: { favorites: favoritesEnabled, completions: completed !== null, manage: isManager(user), storage: Boolean(env.MATERIALS_BUCKET) } });
 }
 
 /** One published material, for the annotator page (/materiais/ler/?id=…). */
@@ -666,9 +683,30 @@ async function catalogFavorite(request: Request, env: MaterialsCatalogEnv, id: s
   return json({ ok: true, favorite: true });
 }
 
+/** Mark or unmark one published study file as completed (POST adds, DELETE removes). External links cannot be completed. */
+async function catalogCompletion(request: Request, env: MaterialsCatalogEnv, id: string, user: MaterialsCatalogUser, enabled: ModuleChecker): Promise<Response> {
+  if (!await enabled("materials.catalog")) return disabled();
+  if (request.method !== "POST" && request.method !== "DELETE") return json({ error: "Operação não suportada." }, 405);
+  const materialId = text(id, 160);
+  try {
+    if (request.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM material_catalog_completions WHERE user_id=? AND material_id=?").bind(user.id, materialId).run();
+      return json({ ok: true, completed: false });
+    }
+    const item = await env.DB.prepare("SELECT storage_backend,external_url FROM material_catalog WHERE id=? AND publication_status='published'").bind(materialId).first<Record<string, unknown>>();
+    if (!item) return json({ error: "Material não encontrado." }, 404);
+    if (isExternalLink(item)) return json({ error: "Ligações externas não podem ser marcadas como concluídas." }, 400);
+    await env.DB.prepare("INSERT OR IGNORE INTO material_catalog_completions(user_id,material_id,completed_at) VALUES (?,?,?)").bind(user.id, materialId, Date.now()).run();
+    return json({ ok: true, completed: true });
+  } catch (reason) {
+    if (!missingCompletions(reason)) throw reason;
+    return json({ error: "Funcionalidade indisponível." }, 503);
+  }
+}
+
 export function isMaterialsCatalogPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return /^\/api\/material-views\/(catalog|anki)\/[^/]+$/.test(path) || path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights|favorite))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
+  return /^\/api\/material-views\/(catalog|anki)\/[^/]+$/.test(path) || path === "/api/material-catalog" || path === "/api/material-anki" || path === "/api/public-materials" || path === "/api/drive-sync" || /^\/api\/material-catalog\/[^/]+(?:\/(download|view|highlights|favorite|complete))?$/.test(path) || /^\/api\/material-anki\/[^/]+\/download$/.test(path);
 }
 
 export async function handleMaterialsCatalogRoute(request: Request, env: MaterialsCatalogEnv, url: URL, user: MaterialsCatalogUser | null, enabled: ModuleChecker, waitUntil?: WaitUntil): Promise<Response> {
@@ -688,6 +726,8 @@ export async function handleMaterialsCatalogRoute(request: Request, env: Materia
   if (highlights) return user ? pdfHighlights(request, env, decodeURIComponent(highlights[1]), user, enabled) : unauthenticated();
   const favorite = path.match(/^\/api\/material-catalog\/([^/]+)\/favorite$/);
   if (favorite) return user ? catalogFavorite(request, env, decodeURIComponent(favorite[1]), user, enabled) : unauthenticated();
+  const completion = path.match(/^\/api\/material-catalog\/([^/]+)\/complete$/);
+  if (completion) return user ? catalogCompletion(request, env, decodeURIComponent(completion[1]), user, enabled) : unauthenticated();
   const single = path.match(/^\/api\/material-catalog\/([^/]+)$/);
   if (single) return user ? catalogItem(request, env, decodeURIComponent(single[1]), enabled) : unauthenticated();
   const deck = path.match(/^\/api\/material-anki\/([^/]+)\/download$/);

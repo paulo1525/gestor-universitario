@@ -38,6 +38,7 @@ function fixture(size, externalDeckUrl = null) {
   sqlite.exec(migration.split("-- Aulas da Neuroanatomia")[0]);
   sqlite.exec(readFileSync(new URL("../migrations/0081_material_catalog_favorites.sql", import.meta.url), "utf8"));
   sqlite.exec(readFileSync(new URL("../migrations/0091_material_views.sql", import.meta.url), "utf8"));
+  sqlite.exec(readFileSync(new URL("../migrations/0124_material_catalog_completions.sql", import.meta.url), "utf8"));
   if (externalDeckUrl) {
     sqlite.exec("ALTER TABLE material_anki_decks ADD COLUMN public_access INTEGER NOT NULL DEFAULT 0");
     sqlite.prepare("INSERT INTO material_anki_decks(id,curricular_unit_id,title,variant,storage_backend,storage_key,storage_state,publication_status,created_at,updated_at) VALUES('neuro-external','fis','Anki','custom','external',?,'ready','published',0,0)").run(externalDeckUrl);
@@ -69,6 +70,7 @@ function fixture(size, externalDeckUrl = null) {
       },
       async all() { return { results: statement.all(...parameters) }; },
       async first() { return statement.get(...parameters) || null; },
+      async run() { return { meta: { changes: Number(statement.run(...parameters).changes) } }; },
     };
   } };
   return { database, queries, close: () => sqlite.close() };
@@ -93,7 +95,7 @@ for (const size of [143, 500]) {
       assert.equal(linked.favorite, true);
       assert.equal(linked.views, 7);
       assert.equal(data.items.find((item) => item.id === "file-1").favorite, false);
-      assert.equal(queries.length, 6, "Número constante de consultas, sem leitura de contadores de baralhos vazios");
+      assert.equal(queries.length, 7, "Número constante de consultas, sem leitura de contadores de baralhos vazios");
       assert.equal(data.items.some((item) => item.id === "draft" || item.id === "archived"), false);
 
       const filtered = await catalog(database, "?unitId=fis&lesson=AP1");
@@ -125,5 +127,44 @@ test('external Anki downloads link to OneDrive and retain access checks without 
     assert.equal(response.headers.get('location'), link);
     const anonymous = await exported.handleMaterialsCatalogRoute(new Request(url), env, url, null, async () => true);
     assert.equal(anonymous.status, 401);
+  } finally { close(); }
+});
+test("materiais de estudo podem ser marcados como concluídos, exceto ligações externas", async () => {
+  const { database, close } = fixture(3);
+  try {
+    database.prepare("UPDATE material_catalog SET storage_backend='external' WHERE id='file-2'").bind().run();
+    const route = (path, method) => {
+      const url = new URL(`https://example.test${path}`);
+      return exported.handleMaterialsCatalogRoute(new Request(url, { method }), { DB: database }, url, { id: "student", role: "student" }, async () => true);
+    };
+    let data = await catalog(database);
+    assert.equal(data.capabilities.completions, true);
+    assert.equal(data.items.find((item) => item.id === "file-1").completed, false);
+    assert.equal(data.items.find((item) => item.id === "file-2").isLink, true);
+
+    assert.equal((await route("/api/material-catalog/file-1/complete", "POST")).status, 200);
+    assert.equal((await route("/api/material-catalog/file-2/complete", "POST")).status, 400);
+    assert.equal((await route("/api/material-catalog/draft/complete", "POST")).status, 404);
+    assert.equal((await route("/api/material-catalog/file-1/complete", "GET")).status, 405);
+    data = await catalog(database);
+    assert.equal(data.items.find((item) => item.id === "file-1").completed, true);
+    assert.equal(data.items.find((item) => item.id === "file-2").completed, false);
+
+    assert.equal((await route("/api/material-catalog/file-1/complete", "DELETE")).status, 200);
+    data = await catalog(database);
+    assert.equal(data.items.find((item) => item.id === "file-1").completed, false);
+
+    const url = new URL("https://example.test/api/material-catalog/file-1/complete");
+    assert.equal((await exported.handleMaterialsCatalogRoute(new Request(url, { method: "POST" }), { DB: database }, url, null, async () => true)).status, 401);
+  } finally { close(); }
+});
+
+test("o catálogo continua disponível antes da migration de materiais concluídos", async () => {
+  const { database, close } = fixture(2);
+  try {
+    database.prepare("DROP TABLE material_catalog_completions").bind().run();
+    const data = await catalog(database);
+    assert.equal(data.capabilities.completions, false);
+    assert.equal(data.items.every((item) => item.completed === false), true);
   } finally { close(); }
 });
