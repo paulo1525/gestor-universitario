@@ -27,6 +27,7 @@ export type QuizContentEnv = {
   ASSETS?: Fetcher;
   QUIZ_CONTENT_STORAGE?: string;
   QUIZ_CONTENT_KEY?: string;
+  QUIZ_CONTENT_KEY_NEXT?: string;
 };
 
 export class QuizContentError extends Error {
@@ -160,8 +161,13 @@ const keys = new WeakMap<
   { encoded: string; value: Promise<CryptoKey> }
 >();
 
+function contentSecret(env: QuizContentEnv): string | undefined {
+  return (contentIndex as { keySlot?: string }).keySlot === "next" ? env.QUIZ_CONTENT_KEY_NEXT : env.QUIZ_CONTENT_KEY;
+}
+
 async function readFile(env: QuizContentEnv, key: string): Promise<unknown> {
-  if (!env.ASSETS || !env.QUIZ_CONTENT_KEY)
+  const secret = contentSecret(env);
+  if (!env.ASSETS || !secret)
     throw new QuizContentError(
       "Os ficheiros privados das perguntas ainda não estão disponíveis.",
       503,
@@ -169,13 +175,13 @@ async function readFile(env: QuizContentEnv, key: string): Promise<unknown> {
     );
   try {
     let saved = keys.get(env.ASSETS);
-    if (!saved || saved.encoded !== env.QUIZ_CONTENT_KEY) {
-      const bytes = Uint8Array.from(atob(env.QUIZ_CONTENT_KEY), (c) =>
+    if (!saved || saved.encoded !== secret) {
+      const bytes = Uint8Array.from(atob(secret), (c) =>
         c.charCodeAt(0),
       );
       if (bytes.length !== 32) throw new Error("Invalid key");
       saved = {
-        encoded: env.QUIZ_CONTENT_KEY,
+        encoded: secret,
         value: crypto.subtle.importKey(
           "raw",
           bytes,
@@ -243,6 +249,41 @@ async function readManifest(env: QuizContentEnv): Promise<ManifestVersion> {
   }
 }
 
+// A complete maintenance backup, including archived/deleted content. The secret
+// stays in the Worker; only authenticated administrators can reach this stream.
+export async function createQuizContentExport(env: QuizContentEnv, index = contentIndex, offset = 0): Promise<Response> {
+  if (!Number.isInteger(offset) || offset < 0 || offset >= index.files.length || offset % 32 !== 0) throw new QuizContentError("Parte de backup inválida.", 400);
+  await readManifest(env);
+  const encoder = new TextEncoder();
+  let position = -1;
+  const end = Math.min(offset + 32, index.files.length);
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        if (position === -1) {
+          const units = await env.DB.prepare("SELECT id,code FROM curricular_units ORDER BY id").all<ContentRow>();
+          controller.enqueue(encoder.encode(JSON.stringify({ type: "index", revision: index.revision, counts: index.counts, fileCount: index.files.length, offset, partFileCount: end - offset, units: units.results }) + "\n"));
+          position = offset;
+          return;
+        }
+        const file = position < end ? index.files[position++] : null;
+        if (!file) { controller.close(); return; }
+        if (file.key !== QUIZ_CONTENT_MANIFEST_KEY && !validKey(file.key)) throw new QuizContentError("Referência de backup inválida.");
+        const content = JSON.stringify(await readFile(env, file.key));
+        const bytes = encoder.encode(content);
+        const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2, "0")).join("");
+        controller.enqueue(encoder.encode(JSON.stringify({ type: "file", key: file.key, bytes: bytes.length, sha256, content }) + "\n"));
+      } catch { controller.error(new Error("Não foi possível concluir a exportação privada.")); }
+    },
+  });
+  return new Response(stream, { headers: {
+    "content-type": "application/x-ndjson; charset=utf-8",
+    "content-disposition": 'attachment; filename="quiz-content-private-backup-' + String(offset).padStart(4, "0") + '.ndjson"',
+    "cache-control": "private, no-store",
+    "x-content-type-options": "nosniff",
+  } });
+}
+
 export class QuizContentStore {
   private constructor(
     private env: QuizContentEnv,
@@ -250,14 +291,14 @@ export class QuizContentStore {
   ) {}
   static async open(env: QuizContentEnv): Promise<QuizContentStore | null> {
     if (env.QUIZ_CONTENT_STORAGE !== "files") return null;
-    if (!env.ASSETS || !env.QUIZ_CONTENT_KEY)
+    if (!env.ASSETS || !contentSecret(env))
       throw new QuizContentError(
         "Os ficheiros privados das perguntas ainda não estão disponíveis.",
         503,
         "QUIZ_CONTENT_NOT_READY",
       );
     const cache = cacheFor(env.ASSETS);
-    if (keys.get(env.ASSETS)?.encoded !== env.QUIZ_CONTENT_KEY) {
+    if (keys.get(env.ASSETS)?.encoded !== contentSecret(env)) {
       delete cache.version;
       cache.shards.clear();
     }

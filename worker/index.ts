@@ -20,6 +20,7 @@ export interface Env {
   DB: D1Database;
   QUIZ_CONTENT_STORAGE?: string;
   QUIZ_CONTENT_KEY?: string;
+  QUIZ_CONTENT_KEY_NEXT?: string;
   moduleStatesPromise?: Promise<Record<string, boolean>>;
   // The binding is optional for local/preview databases so catalog endpoints
   // can expose metadata while returning STORAGE_NOT_READY until R2 is ready.
