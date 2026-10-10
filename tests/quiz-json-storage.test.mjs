@@ -97,7 +97,7 @@ function fixture(count = 8, splitSources = false) {
         " ADD COLUMN solution_images_json TEXT DEFAULT '[]';",
     );
   db.run(
-    "ALTER TABLE quiz_questions ADD COLUMN response_type TEXT DEFAULT 'multiple_choice';ALTER TABLE quiz_questions ADD COLUMN answer_text TEXT DEFAULT '';ALTER TABLE quiz_attempt_questions ADD COLUMN seen_before INTEGER DEFAULT 0;",
+    "ALTER TABLE quiz_questions ADD COLUMN response_type TEXT DEFAULT 'multiple_choice';ALTER TABLE quiz_questions ADD COLUMN answer_text TEXT DEFAULT '';ALTER TABLE quiz_questions ADD COLUMN anki_card_type TEXT;ALTER TABLE quiz_attempt_questions ADD COLUMN seen_before INTEGER DEFAULT 0;",
   );
   const topic = {
     id: "topic-test",
@@ -117,6 +117,10 @@ function fixture(count = 8, splitSources = false) {
     [topic.id, "unit-test", topic.title, "published", admin.id, admin.id, 1, 1],
   );
   const ankiTopic = { ...topic, id: "anki-neuro-lesson-at1", title: "AT1" };
+  if (splitSources) db.run(
+    "INSERT INTO quiz_topics(id,curricular_unit_id,title,status,created_by,updated_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+    [ankiTopic.id, "unit-test", ankiTopic.title, "published", admin.id, admin.id, 1, 1],
+  );
   const questions = [],
     options = [];
   for (let i = 0; i < count; i++) {
@@ -144,7 +148,7 @@ function fixture(count = 8, splitSources = false) {
     questions.push(q);
     db.run(
       "INSERT INTO quiz_questions(id,curricular_unit_id,topic_id,prompt,status,created_by,updated_by,created_at,updated_at)VALUES(?,?,?,'Legacy DB body','published',?,?,1,1)",
-      [id, "unit-test", topic.id, admin.id, admin.id],
+      [id, "unit-test", isAnki ? ankiTopic.id : topic.id, admin.id, admin.id],
     );
     options.push(
       {
@@ -644,6 +648,114 @@ test("a origem escolhida separa os Ankis do compêndio, incluindo ao retomar a s
     const defaulted = await f.request("/api/quiz-attempts", "POST", { unitId: "unit-test", mode: "quick", questionCount: 5, timed: false });
     assert.equal(defaulted.status, 201);
     assert.ok((await defaulted.json()).attempt.questions.every(question => !question.id.startsWith("anki-neuro-")));
+  } finally { f.db.close(); }
+});
+
+test("o catálogo e as sessões filtram Ankis de legendar e perguntas textuais em todos os modos pessoais", async () => {
+  const f = fixture(20, true);
+  try {
+    const ankiQuestions = f.tables.quiz_questions.filter(q => q.id.startsWith("anki-neuro-"));
+    for (const [index, question] of ankiQuestions.entries()) Object.assign(question, {
+      response_type: "short_answer",
+      anki_card_type: index % 2 === 0 ? "label_image" : "text",
+      answer_text: "Resposta fictícia " + index,
+      question_images_json: index % 2 === 0 ? JSON.stringify(["/api/quiz-media/" + String(index).padStart(64, "a")]) : "[]",
+    });
+    f.env.ASSETS = new Bucket(prepareQuizJson(f.tables, "seed-test", 2).artifacts);
+
+    const catalogue = await (await f.request("/api/quizzes")).json();
+    const ankiSource = catalogue.units[0].sources.find(source => source.id === "anki");
+    assert.equal(ankiSource.labelImageCount, 5);
+    assert.equal(ankiSource.textQuestionCount, 5);
+    assert.equal(ankiSource.labelImagePlatformMistakeCount, 0);
+    assert.equal(ankiSource.textQuestionPlatformMistakeCount, 0);
+    const ankiTopic = catalogue.topics.find(topic => topic.id === "anki-neuro-lesson-at1");
+    assert.equal(ankiTopic.labelImageCount, 5);
+    assert.equal(ankiTopic.textQuestionCount, 5);
+    assert.equal(ankiTopic.labelImagePlatformMistakeCount, 0);
+    assert.equal(ankiTopic.textQuestionPlatformMistakeCount, 0);
+
+    for (const [filter, cardType] of [["label_image", "label_image"], ["short_answer", "text"]]) {
+      const created = await f.request("/api/quiz-attempts", "POST", {
+        unitId: "unit-test", source: "anki", ankiCardType: filter, answerFormat: "short_answer",
+        mode: "quick", questionCount: 5, timed: false,
+      });
+      assert.equal(created.status, 201);
+      const attempt = (await created.json()).attempt;
+      assert.equal(attempt.ankiCardType, filter);
+      assert.equal(attempt.questions.length, 5);
+      assert.ok(attempt.questions.every(question => question.cardType === cardType));
+      const resumed = await (await f.request("/api/quiz-attempts/" + attempt.id)).json();
+      assert.equal(resumed.attempt.ankiCardType, filter);
+      assert.ok(resumed.attempt.questions.every(question => question.cardType === cardType));
+    }
+
+    const invalidForCompendium = await f.request("/api/quiz-attempts", "POST", {
+      unitId: "unit-test", ankiCardType: "label_image", mode: "quick", questionCount: 5,
+    });
+    assert.equal(invalidForCompendium.status, 400);
+    const invalidValue = await f.request("/api/quiz-attempts", "POST", {
+      unitId: "unit-test", source: "anki", ankiCardType: "image", mode: "quick", questionCount: 5,
+    });
+    assert.equal(invalidValue.status, 400);
+
+    // Seed a personal error in a textual Anki; label cards are revealed and
+    // are intentionally not scored by the answer endpoint.
+    const seed = await f.request("/api/quiz-attempts", "POST", {
+      unitId: "unit-test", source: "anki", answerFormat: "short_answer", mode: "quick", questionCount: 5, timed: false,
+    });
+    assert.equal(seed.status, 201);
+    const seedAttempt = (await seed.json()).attempt;
+    const textQuestion = seedAttempt.questions.find(item => item.cardType === "text");
+    assert.ok(textQuestion);
+    const wrong = textQuestion.options.find(option => option.id !== textQuestion.correctOptionId);
+    const answer = await f.request("/api/quiz-attempts/" + seedAttempt.id + "/answers", "PUT", { questionId: textQuestion.id, optionId: wrong.id });
+    assert.equal(answer.status, 200);
+    for (const [filter, available] of [["label_image", 0], ["short_answer", 1]]) {
+      const mistakes = await f.request("/api/quiz-attempts", "POST", {
+        unitId: "unit-test", source: "anki", ankiCardType: filter, answerFormat: "short_answer",
+        mode: "mistakes", questionCount: 5, timed: false,
+      });
+      assert.equal(mistakes.status, 409);
+      assert.equal((await mistakes.json()).available, available);
+    }
+  } finally { f.db.close(); }
+});
+
+test("o caminho D1 separa contagens e aplica o filtro de tipo antes de não vistas e erros", async () => {
+  const f = fixture(20, true);
+  try {
+    f.env.QUIZ_CONTENT_STORAGE = "disabled";
+    const ankiQuestions = f.tables.quiz_questions.filter(q => q.id.startsWith("anki-neuro-"));
+    for (const [index, question] of ankiQuestions.entries()) {
+      const cardType = index % 2 === 0 ? "label_image" : "text";
+      f.db.run("UPDATE quiz_questions SET response_type='short_answer',answer_text=?,anki_card_type=?,question_images_json=? WHERE id=?", ["Resposta D1 " + index, cardType, cardType === "label_image" ? '["/api/quiz-media/' + String(index).padStart(64, "a") + '"]' : "[]", question.id]);
+    }
+
+    const catalogue = await (await f.request("/api/quizzes")).json();
+    const ankiSource = catalogue.units[0].sources.find(source => source.id === "anki");
+    assert.equal(ankiSource.labelImageCount, 5);
+    assert.equal(ankiSource.textQuestionCount, 5);
+    const ankiTopic = catalogue.topics.find(topic => topic.id === "anki-neuro-lesson-at1");
+    assert.equal(ankiTopic.labelImageCount, 5);
+    assert.equal(ankiTopic.textQuestionCount, 5);
+
+    for (const [filter, cardType] of [["label_image", "label_image"], ["short_answer", "text"]]) {
+      const created = await f.request("/api/quiz-attempts", "POST", {
+        unitId: "unit-test", source: "anki", ankiCardType: filter, answerFormat: "short_answer",
+        mode: "unseen", questionCount: 5, timed: false,
+      });
+      assert.equal(created.status, 201);
+      const attempt = (await created.json()).attempt;
+      assert.ok(attempt.questions.every(question => question.cardType === cardType));
+    }
+
+    const noLabelMistakes = await f.request("/api/quiz-attempts", "POST", {
+      unitId: "unit-test", source: "anki", ankiCardType: "label_image", answerFormat: "short_answer",
+      mode: "mistakes", questionCount: 5, timed: false,
+    });
+    assert.equal(noLabelMistakes.status, 409);
+    assert.equal((await noLabelMistakes.json()).available, 0);
   } finally { f.db.close(); }
 });
 
