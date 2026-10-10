@@ -14,8 +14,8 @@ test("intumescência cervical aceita Gray/AP2 e Nolte, sem aproximar segmentos e
 });
 test("Clarke aceita todos os pares documentados e exige os dois limites", () => {
   const expected = SEGMENT_CORRECTIONS.Q1196.answer;
-  for (const answer of ["C8 a L3", "C8-L2", "T1-L2", "T1–L3", "De C 8 até L 3."]) assert.equal(isShortAnswerMatch(answer, expected), true, answer);
-  for (const answer of ["C7-L3", "C8-L4", "T2-L2", "L3-C8", "C8", "L3", "não C8-L3", "C8-L3 e S2-S4"]) assert.equal(isShortAnswerMatch(answer, expected), false, answer);
+  for (const answer of ["C8 a L3", "C8-L2", "C8-L4", "T1-L2", "T1–L3", "De C 8 até L 3."]) assert.equal(isShortAnswerMatch(answer, expected), true, answer);
+  for (const answer of ["C7-L3", "C8-L5", "T1-L4", "T2-L2", "L3-C8", "C8", "L3", "não C8-L3", "C8-L3 e S2-S4"]) assert.equal(isShortAnswerMatch(answer, expected), false, answer);
   assert.equal(isShortAnswerMatch("C8-L3", SEGMENT_CORRECTIONS.Q0118.answer), false, "um intervalo não responde às várias alíneas da Q0118");
 });
 test("segmentos não recebem tolerância tipográfica no comparador genérico", () => {

@@ -148,6 +148,37 @@ de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrom
 
 ## Histórico e recuperação
 
+### Revisão curricular individual de Neuroanatomia
+
+O compêndio usa uma aula principal por pergunta. A aula que trata especificamente
+da matéria prevalece sobre referências introdutórias; uma prática específica
+também pode ser a principal. Aulas associadas ficam registadas como contexto,
+sem duplicar perguntas. Os conjuntos anteriormente combinados AT4/AT5,
+AT9/AT10, AT12/AT13 e AT16/AT17 ficam separados, e AP5 tem um conjunto próprio
+para os espaços craniofaciais. As associações baseadas apenas no plano provisório
+ou em enunciados ambíguos permanecem identificadas como provisórias.
+
+`scripts/reclassify-neuro-compendium.mjs` recebe uma revisão privada com todos
+os IDs canónicos, aula principal, associações, evidência por página e checksums
+das fontes. Exige cobertura integral, identidade estável e concordância das
+respostas entre a base e os testes/banco. Conserva imagens, opções, exclusões,
+soluções, histórico, cartões Anki e conteúdos das outras unidades. Uma partição
+de transcrição exige conferência da fonte e preserva o texto original.
+
+```powershell
+node scripts/reclassify-neuro-compendium.mjs --content C:\CaminhoPrivado\perguntas --questions C:\CaminhoPrivado\questoes.json --plan C:\CaminhoPrivado\plano-curricular.json --dry-run
+node scripts/reclassify-neuro-compendium.mjs --content C:\CaminhoPrivado\perguntas --questions C:\CaminhoPrivado\questoes.json --plan C:\CaminhoPrivado\plano-curricular.json
+node scripts/pack-quiz-content.mjs --source C:\CaminhoPrivado\perguntas --rebuild
+```
+
+Usar o key slot da revisão atual. A exportação revista exige `--rebuild`:
+o empacotamento reconstrói os metadados das perguntas e o índice do banco,
+evitando filtros com a associação anterior. Guardar os backups privados antes
+de substituir ficheiros; se uma gravação falhar, restaurar a exportação e a base
+coerentes antes de repetir. A revisão curricular não certifica as respostas
+científicas. Correções científicas delimitadas usam separadamente
+`scripts/apply-reviewed-neuro-corrections.mjs`, com fontes verificadas e histórico.
+
 Para recuperar uma revisão quando a chave só existe no Worker, um administrador
 pode descarregar `/api/admin/quizzes/content-export`. O backup privado em NDJSON
 inclui todos os ficheiros, sem filtrar conteúdos arquivados ou apagados, e não
