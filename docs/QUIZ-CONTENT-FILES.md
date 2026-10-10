@@ -15,6 +15,15 @@ A administração não tem editor, importação ou publicação de perguntas. A 
 rota redireciona para `/admin/` e a API de gestão recusa alterações no modo
 `files`. As atualizações seguem o fluxo GitHub → Cloudflare Workers Build.
 
+Na revisão de 10/10/2026, Q0104/Q1048 aceitam C3–T2 (Gray 42, p. 856,
+e sumário AP2) e C5–T1 (Nolte 6/7). Q1196 admite C8–L2/L3
+(Blumenfeld, p. 709) e T1–L2/L3 (Nolte); Q0118 conserva a resposta completa
+às suas várias alíneas com os mesmos limites. A primeira frase das respostas
+de intervalo enumera os pares aceites, separados por vírgulas ou «ou»;
+o comparador exige os dois extremos exatos e não aproxima números de segmentos.
+`scripts/correct-neuro-segment-limits.mjs` atualiza apenas estas quatro perguntas
+e os respetivos itens do banco, preservando IDs, imagens e proveniência.
+
 ## Configuração inicial
 
 Antes da primeira publicação, guardar `QUIZ_CONTENT_KEY` como segredo do Worker
