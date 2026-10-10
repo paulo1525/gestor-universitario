@@ -64,7 +64,9 @@ import { AnswerVerdict, ComboPill, fetchQuizProfile, GameStrip, haptic, playQuiz
 import { XP_PER_CORRECT } from "@/lib/quiz-gamification.mjs";
 
 type QuizSource = "compendium" | "anki";
-type SourceCounts = { id: QuizSource; label: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; platformMistakeCount: number };
+type AnkiCardType = "all" | "label_image" | "short_answer";
+type AnkiCounts = { platformMistakeCount?: number; labelImageCount?: number; textQuestionCount?: number; labelImagePlatformMistakeCount?: number; textQuestionPlatformMistakeCount?: number };
+type SourceCounts = AnkiCounts & { id: QuizSource; label: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; platformMistakeCount: number };
 type Mode = "quick" | "exam" | "unseen" | "mistakes" | "topic" | "frequency" | "platform_mistakes";
 type Screen = "catalogue" | "statistics" | "ranking" | "attempt" | "results";
 type Notice = { kind: ToastKind; message: string } | null;
@@ -114,8 +116,8 @@ type Question = {
   correctOptionId: string | null;
   explanation: string | null;
 };
-type ApiTopic = { source?: QuizSource; assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
-type Topic = { source: QuizSource; assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
+type ApiTopic = AnkiCounts & { source?: QuizSource; assessmentPart?: 1 | 2 | null; id: string | number; unitId?: string | number; unit_id?: string | number; curricularUnitId?: string | number; curricular_unit_id?: string | number; name?: string; title?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number };
+type Topic = AnkiCounts & { source: QuizSource; assessmentPart: 1 | 2 | null; id: string; unitId: string; name: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number };
 type ApiUnit = { sources?: SourceCounts[]; platformMistakeCount?: number; id: string | number; name?: string; title?: string; code?: string; questionCount?: number; question_count?: number; multipleChoiceCount?: number; shortAnswerCount?: number; topics?: ApiTopic[] };
 type Unit = { sources: SourceCounts[]; platformMistakeCount: number; id: string; name: string; code: string; questionCount: number; multipleChoiceCount: number; shortAnswerCount: number; topics: Topic[] };
 type Answer = { questionId: string; selectedOptionId: string; correct: boolean | null };
@@ -143,7 +145,7 @@ type Attempt = {
 type ApiComment = { pinned?: boolean; canPin?: boolean; id: string | number; body?: string; text?: string; authorName?: string; author_name?: string; authorRole?: string; author_role?: string; isAdmin?: boolean; is_admin?: boolean; parentCommentId?: string | number | null; parent_comment_id?: string | number | null; replyTo?: { authorName?: string; author_name?: string } | null; createdAt?: string | number; created_at?: string | number; status?: string };
 type Comment = { pinned?: boolean; canPin?: boolean; id: string; body: string; authorName: string; authorRole?: string; isAdmin?: boolean; createdAt: string | null; status: string; parentCommentId?: string; replyToName?: string; isLocal?: boolean };
 
-type QuizPreferences = { source?: QuizSource; timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
+type QuizPreferences = { source?: QuizSource; ankiCardType?: AnkiCardType; timed?: boolean; unitId?: string; mode?: Mode; topicIds?: string[]; questionCount?: number; answerFormat?: AnswerFormat; shortAnswerMode?: ShortAnswerMode };
 const QUIZ_QUESTION_COUNTS: readonly number[] = [5, 10, 15, 30, 50];
 const DEFAULT_QUESTION_COUNT = QUIZ_QUESTION_COUNTS[0];
 const SECONDS_PER_QUESTION = 60;
@@ -229,14 +231,14 @@ function readQuizPreferences(): QuizPreferences {
     const questionCount = typeof saved.questionCount === "number" && QUIZ_QUESTION_COUNTS.includes(saved.questionCount) ? saved.questionCount : undefined;
     const answerFormat = saved.answerFormat === "short_answer" ? "short_answer" : saved.answerFormat === "multiple_choice" ? "multiple_choice" : undefined;
     const shortAnswerMode = saved.shortAnswerMode === "reveal_and_self_assess" ? "reveal_and_self_assess" : saved.shortAnswerMode === "type_and_check" ? "type_and_check" : undefined;
-    return { source: saved.source === "anki" ? "anki" : "compendium", timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
+    return { source: saved.source === "anki" ? "anki" : "compendium", ankiCardType: saved.ankiCardType === "label_image" || saved.ankiCardType === "short_answer" ? saved.ankiCardType : "all", timed: saved.timed !== false, unitId: typeof saved.unitId === "string" ? saved.unitId.slice(0, 100) : undefined, mode, topicIds: Array.isArray(saved.topicIds) ? saved.topicIds.filter((id): id is string => typeof id === "string").slice(0, 30) : undefined, questionCount, answerFormat, shortAnswerMode };
   } catch { return {}; }
 }
 
 function saveQuizPreferences(preferences: QuizPreferences) {
   if (typeof document === "undefined") return;
   const preferredQuestionCount = preferences.questionCount ?? DEFAULT_QUESTION_COUNT;
-  const safe = { source: preferences.source ?? "compendium", timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
+  const safe = { source: preferences.source ?? "compendium", ankiCardType: preferences.ankiCardType ?? "all", timed: preferences.timed !== false, unitId: preferences.unitId?.slice(0, 100) ?? "", mode: preferences.mode ?? "quick", topicIds: (preferences.topicIds ?? []).slice(0, 30), questionCount: QUIZ_QUESTION_COUNTS.includes(preferredQuestionCount) ? preferredQuestionCount : DEFAULT_QUESTION_COUNT, answerFormat: preferences.answerFormat ?? "multiple_choice", shortAnswerMode: preferences.shortAnswerMode ?? "type_and_check" };
   document.cookie = `${QUIZ_PREFERENCES_COOKIE}=${encodeURIComponent(JSON.stringify(safe))}; Path=/; Max-Age=15552000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
 }
 
@@ -274,7 +276,7 @@ function value<T>(raw: Record<string, unknown>, ...keys: string[]) {
 }
 
 function normalizeTopic(item: ApiTopic): Topic {
-  return { source: item.source === "anki" ? "anki" : "compendium", assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
+  return { labelImageCount: item.labelImageCount, textQuestionCount: item.textQuestionCount, labelImagePlatformMistakeCount: item.labelImagePlatformMistakeCount, textQuestionPlatformMistakeCount: item.textQuestionPlatformMistakeCount, source: item.source === "anki" ? "anki" : "compendium", assessmentPart: item.assessmentPart ?? null, id: String(item.id), unitId: String(item.unitId ?? item.unit_id ?? item.curricularUnitId ?? item.curricular_unit_id ?? ""), name: item.name ?? item.title ?? "Tema", questionCount: Number(item.questionCount ?? item.question_count ?? 0), multipleChoiceCount: Number(item.multipleChoiceCount ?? item.questionCount ?? 0), shortAnswerCount: Number(item.shortAnswerCount ?? 0) };
 }
 
 function normalizeQuestion(item: ApiQuestion): Question {
@@ -394,6 +396,7 @@ function apiError(data: Record<string, unknown>, fallback: string) {
 export function QuizHub() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [selectedSource, setSelectedSource] = useState<QuizSource>(() => readQuizPreferences().source ?? "compendium");
+  const [ankiCardType, setAnkiCardType] = useState<AnkiCardType>(() => readQuizPreferences().ankiCardType ?? "all");
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(() => readQuizPreferences().topicIds ?? []);
@@ -447,7 +450,7 @@ export function QuizHub() {
   const expirySubmitted = useRef<string | null>(null);
   const commentsRequest = useRef(0);
 
-  const selectedUnit = useMemo(() => quizSourceSelection(units.find(unit => unit.id === selectedUnitId) ?? null, selectedSource), [units, selectedUnitId, selectedSource]);
+  const selectedUnit = useMemo(() => quizSourceSelection(units.find(unit => unit.id === selectedUnitId) ?? null, selectedSource, ankiCardType), [units, selectedUnitId, selectedSource, ankiCardType]);
   const topics = selectedUnit?.topics ?? EMPTY_TOPICS;
   const topicSelection = useMemo(() => quizTopicSelection(selectedUnit?.code, topics, assessmentPart, selectedTopicIds), [selectedUnit?.code, topics, assessmentPart, selectedTopicIds]);
   const availableQuestionCount = useMemo(() => {
@@ -455,7 +458,11 @@ export function QuizHub() {
     if (selectedMode === "frequency") return topics.filter((topic) => topic.assessmentPart === assessmentPart).reduce((total, topic) => total + topic.multipleChoiceCount, 0);
     if (topicSelection.restricted) {
       const count = topicSelection.activeTopics.reduce((total, topic) => total + (answerFormat === "short_answer" ? topic.shortAnswerCount : topic.multipleChoiceCount), 0);
-      return selectedMode === "platform_mistakes" ? Math.min(count, selectedUnit.platformMistakeCount) : count;
+      if (selectedMode !== "platform_mistakes") return count;
+      const topicMistakes = topicSelection.activeTopics.every((topic) => typeof topic.platformMistakeCount === "number")
+        ? topicSelection.activeTopics.reduce((total, topic) => total + (topic.platformMistakeCount ?? 0), 0)
+        : selectedUnit.platformMistakeCount;
+      return Math.min(count, topicMistakes);
     }
     if (selectedMode === "platform_mistakes") return selectedUnit.platformMistakeCount;
     return answerFormat === "short_answer" ? selectedUnit.shortAnswerCount : selectedUnit.multipleChoiceCount;
@@ -563,7 +570,7 @@ export function QuizHub() {
     const supportedCounts = QUIZ_QUESTION_COUNTS.filter((count) => count <= availableQuestionCount);
     setQuestionCount((current) => supportedCounts.includes(current) ? current : supportedCounts.at(-1) ?? DEFAULT_QUESTION_COUNT);
   }, [availableQuestionCount, catalogueLoading, selectedUnit, selectedMode]);
-  useEffect(() => { if (selectedUnitId) saveQuizPreferences({ source: selectedSource, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
+  useEffect(() => { if (selectedUnitId) saveQuizPreferences({ source: selectedSource, ankiCardType, unitId: selectedUnitId, mode: selectedMode, topicIds: selectedTopicIds, questionCount, answerFormat, shortAnswerMode, timed }); }, [selectedSource, ankiCardType, timed, answerFormat, questionCount, selectedMode, selectedTopicIds, selectedUnitId, shortAnswerMode]);
 
   const updateAttempt = useCallback((raw: Record<string, unknown>, fallbackMode: Mode) => {
     const next = normalizeAttempt(raw, fallbackMode);
@@ -624,7 +631,7 @@ export function QuizHub() {
     try {
       const activeTopicIds = topicSelection.requestTopicIds;
       const sessionTimed = selectedMode === "frequency" || timed;
-      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: selectedSource, unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
+      const response = await fetch("/api/quiz-attempts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: selectedSource, ankiCardType: selectedSource === "anki" ? ankiCardType : "all", unitId: selectedUnit.id, mode: selectedMode, topicId: activeTopicIds[0] ?? null, topicIds: activeTopicIds, questionCount, durationSeconds: sessionTimed ? selectedMode === "frequency" ? 3600 : questionCount * SECONDS_PER_QUESTION : null, answerFormat, shortAnswerMode, timed: sessionTimed, assessmentPart }) });
       const data = await response.json() as Record<string, unknown>;
       if (!response.ok) {
         const code = data.code;
@@ -650,7 +657,7 @@ export function QuizHub() {
     } finally {
       setLoadingAttempt(false);
     }
-  }, [selectedSource, assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
+  }, [selectedSource, ankiCardType, assessmentPart, timed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, restoringAttempt, restoreError, questionCount, selectedMode, selectedTopicIds, selectedUnit, topicSelection, updateAttempt]);
 
   const finishAttempt = useCallback(async (expired = false) => {
     const requestedAttempt = attemptRef.current;
@@ -993,6 +1000,8 @@ export function QuizHub() {
             expandedUnitId={expandedUnitId}
             selectedUnit={selectedUnit}
             selectedSource={selectedSource}
+            ankiCardType={ankiCardType}
+            onAnkiCardType={(type) => { setAnkiCardType(type); setSelectedTopicIds([]); setAvailability(null); if (type === "label_image") setShortAnswerMode("reveal_and_self_assess"); }}
             onSource={(source) => {
               setSelectedSource(source); setSelectedTopicIds([]); setAvailability(null); setSelectedMode("quick");
               if (source === "anki") { setAnswerFormat("short_answer"); setShortAnswerMode("reveal_and_self_assess"); }
@@ -1028,7 +1037,7 @@ export function QuizHub() {
                 if (unit.shortAnswerCount > 0) { setAnswerFormat("short_answer"); setShortAnswerMode("type_and_check"); }
               }
               if (unitId !== selectedUnitId && saved.unitId === unitId) {
-                setSelectedSource(saved.source ?? "compendium"); setSelectedTopicIds(saved.topicIds ?? []);
+                setSelectedSource(saved.source ?? "compendium"); setAnkiCardType(saved.ankiCardType ?? "all"); setSelectedTopicIds(saved.topicIds ?? []);
                 setSelectedMode(saved.mode ?? "quick"); setQuestionCount(saved.questionCount ?? DEFAULT_QUESTION_COUNT);
                 setTimed(saved.timed !== false); setAnswerFormat(saved.answerFormat ?? "multiple_choice");
                 setShortAnswerMode(saved.shortAnswerMode ?? "type_and_check");
@@ -1120,9 +1129,10 @@ function TestsTabs({ active, onPractice, onStatistics, onRanking }: { active: "p
   return <PageTabs label="Testes" active={active} tabs={[{ id: "practice", label: "Praticar", icon: <BrainCircuit />, onClick: onPractice }, { id: "statistics", label: "Estatísticas", icon: <BarChart3 />, onClick: onStatistics }, { id: "ranking", label: "Ranking", icon: <Trophy />, onClick: onRanking }]} />;
 }
 
-function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSource, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
+function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSource, ankiCardType, onAnkiCardType, selectedMode, selectedTopicIds, topics, assessmentPart, onAssessmentPart, questionCount, timed, onTimed, answerFormat, shortAnswerMode, availableQuestionCount, loadingAttempt, resumeAttempt, availability, onUnit, onMode, onTopics, onQuestionCount, onAnswerFormat, onShortAnswerMode, onStart, onResume, onRetry, onNormal, onMistakes, onStatistics, onRanking, profile }: {
   loading: boolean; error: string; units: Unit[]; selectedUnitId: string; expandedUnitId: string | null; selectedUnit: Unit | null; selectedMode: Mode; selectedTopicIds: string[]; topics: Topic[]; questionCount: number; timed: boolean; onTimed: (value: boolean) => void; answerFormat: AnswerFormat; shortAnswerMode: ShortAnswerMode; availableQuestionCount: number; loadingAttempt: boolean;
   selectedSource: QuizSource; onSource: (source: QuizSource) => void;
+  ankiCardType: AnkiCardType; onAnkiCardType: (type: AnkiCardType) => void;
   assessmentPart: 1 | 2; onAssessmentPart: (part: 1 | 2) => void;
   resumeAttempt: Attempt | null;
   availability: { code: "not_enough_mistakes" | "all_questions_seen" | "not_enough_questions"; available: number; required: number; total: number } | null;
@@ -1140,7 +1150,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSour
   const visibleModes = modeCards.filter((mode) => (mode.id !== "frequency" || selectedUnit?.code === "FIS1") && (mode.id !== "platform_mistakes" || (selectedUnit?.platformMistakeCount ?? 0) >= 5));
   const activeMode = visibleModes.find((mode) => mode.id === selectedMode) ?? null;
   const answerStyle: AnswerStyle = answerFormat === "multiple_choice" ? "multiple_choice" : shortAnswerMode;
-  const answerStyles = answerStyleCards.filter((option) => option.id === "multiple_choice" ? (selectedUnit?.multipleChoiceCount ?? 0) > 0 && selectedUnit?.code !== NEURO_UNIT_CODE : (selectedUnit?.shortAnswerCount ?? 0) > 0 && selectedMode !== "frequency");
+  const answerStyles = answerStyleCards.filter((option) => option.id === "multiple_choice" ? (selectedUnit?.multipleChoiceCount ?? 0) > 0 && selectedUnit?.code !== NEURO_UNIT_CODE : (selectedUnit?.shortAnswerCount ?? 0) > 0 && selectedMode !== "frequency" && !(selectedSource === "anki" && ankiCardType === "label_image" && option.id === "type_and_check"));
   const activeAnswerStyle = answerStyles.find((option) => option.id === answerStyle) ?? null;
   const minutes = selectedMode === "frequency" ? 60 : questionCount;
   const onAnswerStyle = (style: AnswerStyle) => { if (style === "multiple_choice") onAnswerFormat("multiple_choice"); else { onAnswerFormat("short_answer"); onShortAnswerMode(style); } };
@@ -1167,10 +1177,18 @@ function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSour
                       { id: "anki", title: "Ankis", disabled: !unit.sources.some(source => source.id === "anki" && source.questionCount > 0) },
                     ]} onChange={onSource} />
                   </div>}
+                  {selectedSource === "anki" && <div className={styles.setupField}>
+                    <span className={styles.fieldLabel}>Tipo de Anki</span>
+                    <SetupChoices<AnkiCardType> label="Tipo de Anki" value={ankiCardType} options={[
+                      { id: "all", title: "Ambos" },
+                      { id: "label_image", title: "Legendar", disabled: !unit.sources.some(source => source.id === "anki" && (source.labelImageCount ?? 0) > 0) },
+                      { id: "short_answer", title: "Responder a perguntas", disabled: !unit.sources.some(source => source.id === "anki" && (source.textQuestionCount ?? 0) > 0) },
+                    ]} onChange={onAnkiCardType} />
+                  </div>}
                   {unit.code === "FIS1" && <SetupChoices label="Frequência" value={assessmentPart} options={[{ id: 1, title: "1.ª frequência" }, { id: 2, title: "2.ª frequência" }]} onChange={onAssessmentPart} />}
                   <div className={styles.setupField}>
                     <span className={styles.fieldLabel}>{hasLessons ? "Aulas" : "Temas"}{selectedMode !== "frequency" && <small>opcional</small>}</span>
-                    <TopicPicker key={`${unit.id}-${selectedSource}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
+                    <TopicPicker key={`${unit.id}-${selectedSource}-${ankiCardType}-${assessmentPart}`} topics={topics} selectedIds={selectedTopicIds} answerFormat={answerFormat} onChange={onTopics} locked={selectedMode === "frequency"} />
                   </div>
                 </section>
                 <section className={styles.settingGroup}>
@@ -1197,7 +1215,7 @@ function Catalogue({ loading, error, units, selectedUnit, selectedSource, onSour
                 {availability?.code === "not_enough_mistakes" && <aside className={styles.availability} role="status"><RotateCcw /><div><strong>Ainda não tens erros suficientes</strong><p>Tens {availability.available} para rever e escolheste {availability.required}.</p></div><button type="button" onClick={onNormal}>Aleatório</button></aside>}
                 {availability?.code === "all_questions_seen" && <aside className={styles.availability} role="status"><CheckCircle2 /><div><strong>Já respondeste a todas as perguntas</strong><p>Podes treinar em modo aleatório ou rever os teus erros.</p></div><span className={styles.availabilityActions}><button type="button" onClick={onNormal}>Aleatório</button><button type="button" onClick={onMistakes}>Só erros</button></span></aside>}
                 {(insufficientBank || availability?.code === "not_enough_questions") && <aside className={styles.availability} role="alert"><TriangleAlert /><div><strong>Banco de perguntas insuficiente</strong><p>{availability?.code === "not_enough_questions" ? <>Esta seleção tem {shortageAvailable} perguntas disponíveis; a sessão escolhida requer {shortageRequired}. Escolhe uma opção mais curta.</> : <>Esta seleção tem apenas {shortageAvailable} perguntas. São necessárias pelo menos 5 para iniciar uma sessão.</>}</p></div></aside>}
-                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === NEURO_UNIT_CODE ? selectedSource === "anki" ? "Ankis" : "Perguntas do compêndio" : null, unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
+                <footer className={styles.unitActions}><p className={styles.sessionRecap}>{[unit.code === NEURO_UNIT_CODE ? selectedSource === "anki" ? ankiCardType === "label_image" ? "Ankis · Legendar" : ankiCardType === "short_answer" ? "Ankis · Responder a perguntas" : "Ankis · Ambos" : "Perguntas do compêndio" : null, unit.code === "FIS1" ? `${assessmentPart}.ª frequência` : null, activeMode?.title, activeAnswerStyle?.title, `${selectedMode === "frequency" ? 50 : questionCount} perguntas`, selectedMode === "frequency" || timed ? `${minutes} min` : "sem limite", selectedTopicIds.length ? `${selectedTopicIds.length} ${hasLessons ? (selectedTopicIds.length === 1 ? "aula" : "aulas") : (selectedTopicIds.length === 1 ? "tema" : "temas")}` : null].filter(Boolean).join(" · ")}</p><button className={`button button--primary ${styles.startSession}`} type="button" onClick={onStart} disabled={!canStart || Boolean(resumeAttempt)}><Play aria-hidden="true" />{loadingAttempt ? "A iniciar…" : selectedMode === "frequency" ? "Começar frequência" : "Começar treino"}</button></footer>
               </div>}
             </article>;
           })}
@@ -1213,7 +1231,7 @@ function TopicPicker({ topics, selectedIds, answerFormat, onChange, locked = fal
   const term = query.trim().toLocaleLowerCase("pt-PT");
   const visible = topics.filter((topic) => !term || topic.name.toLocaleLowerCase("pt-PT").includes(term));
   const groups = hasLessons ? [
-    { name: "Teóricas", topics: visible.filter((topic) => /^(T|AT)\d/.test(topic.name)) },
+    { name: topics.some((topic) => /^AT\d+.*\/\s*AP\d+/.test(topic.name)) ? "Teóricas e práticas" : "Teóricas", topics: visible.filter((topic) => /^(T|AT)\d/.test(topic.name)) },
     { name: "Teórico-práticas", topics: visible.filter((topic) => /^TP\d/.test(topic.name)) },
     { name: "Práticas", topics: visible.filter((topic) => /^(P|AP)\d/.test(topic.name)) },
     { name: "Outros temas", topics: visible.filter((topic) => !/^(T|TP|P|AT|AP)\d/.test(topic.name)) },

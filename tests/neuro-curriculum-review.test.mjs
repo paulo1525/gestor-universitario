@@ -98,3 +98,24 @@ test("a source-checked transcription partition keeps the persistent parent and r
   f.plan.assignments[0].display_repair.prompt = "Texto inventado";
   assert.throws(() => reclassifyNeuroCompendium(f.tables, f.source, f.plan));
 });
+
+test("whole lesson grouping reunites AP5 topics and archives the empty split without changing saved identities", () => {
+  const f = fixture();
+  f.plan.grouping = "whole_curricular_lesson";
+  f.plan.groups = [{ code: "AT8 / AP5", title: "Nervos IX–XII e espaços craniofaciais", topic_id: "quiz-topic-neuro-ap1", indices: [0, 1], lesson_codes: ["AT8", "AP5"], count: 2 }];
+  for (const a of f.plan.assignments) Object.assign(a, { target_topic_index: 0, primary_lesson: "AP5", associated_lessons: ["AT8"] });
+  f.tables.quiz_topics[1].status = f.tables.question_bank_topics[1].status = "published";
+  f.tables.quiz_topics[1].description = '{"compendiumGroup":23}';
+  f.tables.question_bank_topics[1].description = f.tables.quiz_topics[1].description;
+  const result = reclassifyNeuroCompendium(f.tables, f.source, f.plan, 42);
+  assert.deepEqual(validateCurriculumPlan(f.plan, f.bytes), f.source);
+  assert.ok(result.tables.quiz_questions.slice(0, 2).every(q => q.topic_id === "quiz-topic-neuro-ap1"));
+  assert.ok(result.tables.question_bank_items.every(q => q.topic_id === "quiz-topic-neuro-ap1"));
+  assert.equal(result.tables.quiz_topics[1].id, "specific");
+  assert.equal(result.tables.quiz_topics[1].status, "archived");
+  assert.equal(result.tables.quiz_topics[1].archived_at, 42);
+  assert.equal(result.tables.question_bank_topics[1].status, "archived");
+  assert.equal(result.tables.quiz_topics[2].status, "published");
+  f.plan.groups.push({ code: "AP5", title: "Split incorreto", topic_id: "specific", indices: [23], lesson_codes: ["AP5"], count: 0 });
+  assert.throws(() => validateCurriculumPlan(f.plan, f.bytes), /cannot be split/);
+});

@@ -1,0 +1,11 @@
+-- Keep the material identities; align both private PDFs with the current curriculum.
+UPDATE material_catalog SET description='1.164 perguntas teóricas de resposta aberta em 366 páginas, organizadas em 17 conjuntos segundo o plano curricular atual 2026/27. Teóricas e práticas correspondentes reunidas; AP5 integral com nervos IX–XII e espaços comuns ao crânio e à face. Associações específicas e ressalvas científicas preservadas.',file_name='Neuroanatomia_FMUP_Compendio_2026-10-10_com_solucoes.pdf',storage_key='materials/neuroanatomia/compendios/9ff564d966538465cb40ef4b30ef8ed4272f43ead38210e8424334e57152cbc9.pdf',byte_size=7871019,checksum_sha256='9ff564d966538465cb40ef4b30ef8ed4272f43ead38210e8424334e57152cbc9',storage_state='ready',version_number=5,updated_at=unixepoch()*1000 WHERE id='material-neuro-compendium-solutions';
+
+UPDATE material_catalog SET description='1.164 perguntas teóricas de resposta aberta em 175 páginas, organizadas em 17 conjuntos segundo o plano curricular atual 2026/27. Teóricas e práticas correspondentes reunidas; AP5 integral com nervos IX–XII e espaços comuns ao crânio e à face. Associações específicas e ressalvas científicas preservadas.',file_name='Neuroanatomia_FMUP_Compendio_2026-10-10_sem_solucoes.pdf',storage_key='materials/neuroanatomia/compendios/fa2b6a27892df976186be9a54706f3d5148e56e1cc64e7c2a9aae3e822751d02.pdf',byte_size=4654885,checksum_sha256='fa2b6a27892df976186be9a54706f3d5148e56e1cc64e7c2a9aae3e822751d02',storage_state='ready',version_number=4,updated_at=unixepoch()*1000 WHERE id='material-neuro-compendium-no-solutions';
+
+INSERT INTO admin_audit_log(actor_user_id,action,details,created_at)
+SELECT id,'materials_neuro_current_curriculum',
+ '{"source":"authorized-neuro-current-plan-2026-10-10","reviewed":1174,"included":1164,"groups":17,"wholeAP5":true,"replacedMaterials":2,"scientificValidation":"preserved"}',unixepoch()*1000
+FROM users WHERE status='active' AND (commission_position='principal_admin' OR role='admin')
+ AND NOT EXISTS (SELECT 1 FROM admin_audit_log WHERE action='materials_neuro_current_curriculum' AND details LIKE '%authorized-neuro-current-plan-2026-10-10%')
+ORDER BY CASE WHEN commission_position='principal_admin' THEN 0 ELSE 1 END,created_at LIMIT 1;

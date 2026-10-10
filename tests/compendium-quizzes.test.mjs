@@ -54,6 +54,7 @@ test('migrations e API integram perguntas abertas, cinco opções e imagens sem 
     db.run(old.slice(0,old.indexOf('DROP TABLE IF EXISTS _seed_neuro_question_bank_context')));
     db.run("INSERT INTO quiz_attempts(id,user_id,mode,status,question_count,started_at,created_at,updated_at) VALUES('prior','student','quick','completed',5,0,0,0);");
     db.run(await readFile(new URL('../migrations/0113_restore_quizzes_compendium_images.sql',import.meta.url),'utf8'));
+    db.run(await readFile(new URL('../migrations/0136_neuro_anki_card_type.sql',import.meta.url),'utf8'));
     db.run("BEGIN;");
     runScript(db,await readFile(new URL('../migrations/0114_import_fisio_neuro_radiology_compendiums.sql',import.meta.url),'utf8'));
     db.run("COMMIT;");

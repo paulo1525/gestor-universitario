@@ -11,10 +11,14 @@ export function validateCurriculumPlan(plan, bytes) {
   if (plan?.schemaVersion !== 1 || plan.source_sha256 !== digest(bytes)) throw new Error("Curricular baseline checksum mismatch");
   const source = JSON.parse(bytes);
   if (!Array.isArray(plan.assignments) || plan.assignments.length !== source.length || !Array.isArray(plan.groups) || !plan.groups.length) throw new Error("Incomplete curricular coverage");
-  const ids = new Set(), indices = new Set(), topics = new Set();
+  const ids = new Set(), indices = new Set(), topics = new Set(), groupedLessons = new Set();
   for (const group of plan.groups) {
     if (!group.code || !group.title || !group.topic_id || topics.has(group.topic_id) || !Array.isArray(group.indices) || !group.indices.length || !Array.isArray(group.lesson_codes) || !group.lesson_codes.every(code) || !Number.isInteger(group.count) || group.count < 0) throw new Error("Invalid specific lesson group");
     topics.add(group.topic_id);
+    if (plan.grouping === "whole_curricular_lesson") for (const lesson of group.lesson_codes) {
+      if (groupedLessons.has(lesson)) throw new Error("A curricular lesson cannot be split between groups: " + lesson);
+      groupedLessons.add(lesson);
+    }
     for (const index of group.indices) {
       if (!Number.isInteger(index) || index < 0 || indices.has(index)) throw new Error("Overlapping specific lesson groups");
       indices.add(index);
@@ -25,6 +29,7 @@ export function validateCurriculumPlan(plan, bytes) {
     if (!/^Q\d{4}$/.test(assignment.final_id) || ids.has(assignment.final_id) || !assignment.canonical_id || !group || !code(assignment.primary_lesson) || !group.lesson_codes.includes(assignment.primary_lesson)) throw new Error("Invalid question lesson assignment");
     ids.add(assignment.final_id);
     if (assignment.decision === "pendente" || assignment.reviewed !== true || typeof assignment.provisional !== "boolean" || !assignment.justification?.trim() || !assignment.references?.length || !Array.isArray(assignment.associated_lessons)) throw new Error("Unresolved curricular assignment");
+    if (!assignment.associated_lessons.every(code) || new Set(assignment.associated_lessons).size !== assignment.associated_lessons.length || assignment.associated_lessons.includes(assignment.primary_lesson)) throw new Error("Invalid associated lessons");
     for (const ref of assignment.references) {
       if (!ref.file || !Number.isInteger(ref.pdf_page) || ref.pdf_page < 1 || !ref.supports?.trim() || !/^[a-f0-9]{64}$/.test(ref.sha256)) throw new Error("Missing curricular evidence");
     }
@@ -90,6 +95,17 @@ export function reclassifyNeuroCompendium(tables, source, plan, now = Date.now()
     }
   }
   for (const group of plan.groups) if ((counts.get(group.topic_id) || 0) !== group.count) throw new Error("Specific lesson coverage mismatch");
+  // Retain retired identities for saved attempts, while removing empty splits from new sessions.
+  for (const topic of updated.quiz_topics) {
+    if (topic.curricular_unit_id !== unit || updatedRows.has(topic.id) || topic.status === "archived" || jsonDescription(topic).compendiumGroup === undefined) continue;
+    if (updated.quiz_questions.some(q => q.topic_id === topic.id && q.status === "published")) throw new Error("Retired lesson still contains published questions");
+    Object.assign(topic, { status: "archived", archived_at: now, updated_at: now });
+    const bank = updated.question_bank_topics.find(t => t.id === topic.id);
+    if (bank) {
+      if (updated.question_bank_items.some(q => q.topic_id === bank.id && q.status === "published")) throw new Error("Retired bank lesson still contains published questions");
+      Object.assign(bank, { status: "archived", archived_at: now, updated_at: now });
+    }
+  }
   const bankSource = updated.question_bank_sources.find(s => s.id === "compendium-source-neuro" && s.curricular_unit_id === unit);
   if (!bankSource) throw new Error("Missing compendium source");
   const coverage = (() => { try { return JSON.parse(bankSource.coverage_json || "{}"); } catch { return {}; } })();

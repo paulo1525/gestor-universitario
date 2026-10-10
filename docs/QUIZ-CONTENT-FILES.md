@@ -153,14 +153,21 @@ de teste não substitui a conferência dos 3.079 cartões e a QA visual no Chrom
 O compêndio usa uma aula principal por pergunta. A aula que trata especificamente
 da matéria prevalece sobre referências introdutórias; uma prática específica
 também pode ser a principal. Aulas associadas ficam registadas como contexto,
-sem duplicar perguntas. Os conjuntos anteriormente combinados AT4/AT5,
-AT9/AT10, AT12/AT13 e AT16/AT17 ficam separados, e AP5 tem um conjunto próprio
-para os espaços craniofaciais. As associações baseadas apenas no plano provisório
-ou em enunciados ambíguos permanecem identificadas como provisórias.
+sem duplicar perguntas. O plano curricular atual determina os códigos, e o
+conteúdo das aulas determina a associação. As apresentações com numeração
+histórica são usadas como apoio temático, sem substituir a calendarização atual.
+Uma prática mantém o seu conteúdo completo: AP5 reúne os nervos IX–XII e os
+espaços comuns ao crânio e à face. AT4/AT5/AP3, AT9/AT10/AP6,
+AT12/AT13/AP8 e AT16/AT17/AP11 ficam reunidos por tema. AP9 reúne núcleos da
+base e morfologia ventricular; AP10 acompanha a vascularização, meninges e
+sistema linfático. Uma menção introdutória na AP1 não retira a pergunta à aula
+específica. Associações ambíguas mantêm uma ressalva individual.
 
 `scripts/reclassify-neuro-compendium.mjs` recebe uma revisão privada com todos
 os IDs canónicos, aula principal, associações, evidência por página e checksums
-das fontes. Exige cobertura integral, identidade estável e concordância das
+das fontes. O modo `whole_curricular_lesson` impede repartir a mesma aula
+por vários conjuntos e arquiva conjuntos antigos que ficaram vazios, preservando
+as identidades para tentativas anteriores. Exige cobertura integral, identidade estável e concordância das
 respostas entre a base e os testes/banco. Conserva imagens, opções, exclusões,
 soluções, histórico, cartões Anki e conteúdos das outras unidades. Uma partição
 de transcrição exige conferência da fonte e preserva o texto original.
@@ -196,6 +203,10 @@ A versão atual continua a usar `QUIZ_CONTENT_KEY`; só um índice publicado com
 publicar os ficheiros correspondentes e conservar a antiga para rollback.
 
 Respostas, comentários, progresso e snapshots de tentativas permanecem na D1.
+Na origem Anki, `ankiCardType` permite escolher `all`, `label_image` ou
+`short_answer` (cartões textuais). O catálogo fornece contagens por tipo e aula;
+o filtro é aplicado antes da seleção de perguntas novas ou erros e fica guardado
+na configuração da tentativa. A migration 0136 preserva o tipo no fallback D1.
 Os registos antigos são preservados. Para perguntas novas, o início da tentativa
 regista apenas os IDs e relações necessários às chaves estrangeiras, sem copiar
 enunciados, soluções ou opções para as tabelas do catálogo.
