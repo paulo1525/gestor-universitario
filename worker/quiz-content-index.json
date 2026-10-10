@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": "9ee99f7f-1e75-4355-89f1-01be3de93cf5",
+  "revision": "f209419a-8048-4cdf-9737-c2f63d53aca8",
   "encrypted": true,
   "keySlot": "next",
   "counts": {
@@ -514,13 +514,13 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-384.json",
-      "bytes": 17915,
-      "sha256": "df48805bc0fc36edecc33bbb6d1fcfb637ec22e3c60d1c7ae3582598e587db48"
+      "bytes": 18385,
+      "sha256": "582b40068fcef658e952aa8e88a7a90d57f6ff5ef14df85f61b186fa910da132"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-416.json",
-      "bytes": 15684,
-      "sha256": "bcbfac8cdc781e304cb894c47bd3433de9d1b9f2ea684a1fc553683a2832f1f3"
+      "bytes": 16211,
+      "sha256": "e8ee1a9d7cc43a4ab14c48e0298415f6be3a2f509674f446e86c1cf3531cf9e9"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-448.json",
@@ -649,8 +649,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-1248.json",
-      "bytes": 13576,
-      "sha256": "3039fc7dedfe97df5fbf2289a03e15117dafa6aaa0696220ff3e10453a10c1cd"
+      "bytes": 14317,
+      "sha256": "0d0e438c1c4817730c5ec027ab10a3a0a6018aa95ea7e82850b29fc1ce0611c8"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-1280.json",
@@ -684,8 +684,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-1472.json",
-      "bytes": 14625,
-      "sha256": "2706d59ac802663d4e843db0fd992b29fb0b11c52aee36b2b00aa8aa43cd8e93"
+      "bytes": 15170,
+      "sha256": "98b8337df8fd175cbaa2ac71019beebfeb887440bcde408ff846d320128c5087"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/quiz-1504.json",
@@ -1214,8 +1214,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-256.json",
-      "bytes": 16555,
-      "sha256": "24a0f7e27a084bfd691dd5e505740254997a21bbccefa964e00f5a8b7367ca3d"
+      "bytes": 17142,
+      "sha256": "8bc522aaf4d52aefe7fa91c8c34f77505c08f6068ead10dd86c1f85ebd710b23"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-288.json",
@@ -1254,8 +1254,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-512.json",
-      "bytes": 21954,
-      "sha256": "7ee903a09355c925217d4e4a499daf47e9e697ebb3e0d73a9d70ced419a57406"
+      "bytes": 22387,
+      "sha256": "409023b54aaac7dd2fa87935c40476fe31813267523063e3a2a7fa38d0bd8b50"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-544.json",
@@ -1264,8 +1264,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-576.json",
-      "bytes": 17877,
-      "sha256": "7f54e8d71835aa4ca38a5266ae5e54f9e67a3d4e09f07338eb10cc8df6836f9d"
+      "bytes": 18370,
+      "sha256": "da204a0d2696a1df4e6d2b224d12ad2df6250675d2fe2998d191bcb45a9e69da"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-608.json",
@@ -1294,8 +1294,8 @@
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-768.json",
-      "bytes": 18090,
-      "sha256": "db77d884d88eeba83bb0aae2a9f1e50590fbe909469e3d4c2981c723e078e33c"
+      "bytes": 18841,
+      "sha256": "5ea67feacb934d9b4486fa6c924cb7954b9e350ce7ab631febd55465114bfbad"
     },
     {
       "key": "quiz-content/v1/units/cb508046-a763-43fd-a7fd-9386e4781d91/files/bank-800.json",
@@ -1554,8 +1554,8 @@
     },
     {
       "key": "quiz-content/v1/manifest.json",
-      "bytes": 109362,
-      "sha256": "d50f44091b31a27e73d77e6a2d45c8e228f33e71f71428cf6e84b5625cb19412"
+      "bytes": 109361,
+      "sha256": "f5e3d1febe674561f0256b8b2767bc726b7f5a54855e03718c68ddb043e53ca0"
     },
     {
       "key": "quiz-content/v1/media/d69829776464bf9e085e9a5ec787e0517d533e491b561dde2d060be223c28022.json",
