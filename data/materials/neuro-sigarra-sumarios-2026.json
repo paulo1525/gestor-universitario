@@ -1,0 +1,95 @@
+{
+  "academicYear": "2026/2027",
+  "date": "2026-10-10",
+  "zipSha256": "8b7ddd546154518347eabd2304c5e5eb3c2096ddcff6bae4b6d63e7964ccb48e",
+  "source": "SIGARRA · Conteudos.zip fornecido pelo utilizador",
+  "lessonLabels": [
+    {
+      "code": "AT9",
+      "previous": "Diencéfalo e hipófise",
+      "title": "Cerebelo"
+    },
+    {
+      "code": "AT10",
+      "previous": "Cerebelo",
+      "title": "Diencéfalo e hipófise"
+    },
+    {
+      "code": "AP6",
+      "previous": "Aula prática 6",
+      "title": "Cerebelo. Diencéfalo. Hipófise"
+    }
+  ],
+  "files": [
+    {
+      "id": "material-summary-neuro-at7",
+      "unitCode": "NEURO",
+      "lessonCode": "AT7",
+      "title": "AT7 — Nervos trigémio e facial",
+      "description": "Sumário oficial SIGARRA · Neuroanatomia · 2026/2027.",
+      "fileName": "AT7_Sumario_SIGARRA_2026-2027.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 86313,
+      "sha256": "6139f0f61bde6d81266fafb21bbdf3508650d9045a1a27fb08f40ebcc44c43dd",
+      "storageKey": "materials/neuroanatomia/sumarios/sigarra-2026-27/6139f0f61bde6d81266fafb21bbdf3508650d9045a1a27fb08f40ebcc44c43dd.pdf",
+      "pageCount": 4,
+      "sourcePath": "SUMARIO AULAS TEORICAS/AT7 - Nervos trigemio e facial.pdf"
+    },
+    {
+      "id": "material-summary-neuro-at8",
+      "unitCode": "NEURO",
+      "lessonCode": "AT8",
+      "title": "AT8 — Nervos glossofaríngeo, vago, acessório e hipoglosso",
+      "description": "Sumário oficial SIGARRA · Neuroanatomia · 2026/2027.",
+      "fileName": "AT8_Sumario_SIGARRA_2026-2027.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 82848,
+      "sha256": "30db4da00359fa79b082000036146d90853557dae738daf5b3af46d6bb7f6b64",
+      "storageKey": "materials/neuroanatomia/sumarios/sigarra-2026-27/30db4da00359fa79b082000036146d90853557dae738daf5b3af46d6bb7f6b64.pdf",
+      "pageCount": 4,
+      "sourcePath": "SUMARIO AULAS TEORICAS/AT8 - Nervos glossofaringeo, vago, acessorio e hipoglosso.pdf"
+    },
+    {
+      "id": "material-summary-neuro-at9",
+      "unitCode": "NEURO",
+      "lessonCode": "AT9",
+      "title": "AT9 — Cerebelo",
+      "description": "Sumário oficial SIGARRA · Neuroanatomia · 2026/2027.",
+      "fileName": "AT9_Sumario_SIGARRA_2026-2027.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 125341,
+      "sha256": "d6d3a94fe10b2a1651def08609609f6238bf9068ea0836bf3deb12af5b665796",
+      "storageKey": "materials/neuroanatomia/sumarios/sigarra-2026-27/d6d3a94fe10b2a1651def08609609f6238bf9068ea0836bf3deb12af5b665796.pdf",
+      "pageCount": 5,
+      "sourcePath": "SUMARIO AULAS TEORICAS/AT9 - Cerebelo.pdf"
+    },
+    {
+      "id": "material-summary-neuro-ap5",
+      "unitCode": "NEURO",
+      "lessonCode": "AP5",
+      "title": "AP5 — Nervos glossofaríngeo, vago, acessório e hipoglosso. Espaços comuns ao crânio e à face",
+      "description": "Sumário oficial SIGARRA · Neuroanatomia · 2026/2027.",
+      "fileName": "AP5_Sumario_SIGARRA_2026-2027.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 121187,
+      "sha256": "52d874071fa43251458c8496215daf98d043f63b35e53060cb37eb39c3603ce8",
+      "storageKey": "materials/neuroanatomia/sumarios/sigarra-2026-27/52d874071fa43251458c8496215daf98d043f63b35e53060cb37eb39c3603ce8.pdf",
+      "pageCount": 8,
+      "sourcePath": "SUMARIOS AULAS PRATICAS/AP5 - Nervos glossofaringeo, vago, acessorio e hipoglosso. Espacos comuns ao cranio e a face.pdf"
+    },
+    {
+      "id": "material-summary-neuro-ap6",
+      "unitCode": "NEURO",
+      "lessonCode": "AP6",
+      "title": "AP6 — Cerebelo. Diencéfalo. Hipófise",
+      "description": "Sumário oficial SIGARRA · Neuroanatomia · 2026/2027.",
+      "fileName": "AP6_Sumario_SIGARRA_2026-2027.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 109424,
+      "sha256": "d3ec63263bd9ed127c043ada140a6de11626ce36f3066575d3144a073a7115d2",
+      "storageKey": "materials/neuroanatomia/sumarios/sigarra-2026-27/d3ec63263bd9ed127c043ada140a6de11626ce36f3066575d3144a073a7115d2.pdf",
+      "pageCount": 3,
+      "sourcePath": "SUMARIOS AULAS PRATICAS/AP6 - Cerebelo. Diencefalo. Hipofise.pdf"
+    }
+  ]
+}
