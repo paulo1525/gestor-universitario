@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const cervicalAnswer = "C3–T2 ou C5–T1. O Gray e o sumário da AP2 descrevem C3–T2; o Nolte delimita convencionalmente C5–T1 e salienta que os limites da intumescência não são nítidos. São segmentos medulares, não níveis vertebrais.";
-const clarkeAnswer = "C8–L3, C8–L2, T1–L3 ou T1–L2. O núcleo torácico posterior de Clarke situa-se na lâmina VII; os seus limites variam entre descrições anatómicas. O Nolte indica aproximadamente T1–L2 e também T1–L2/L3; a descrição mais abrangente admite C8–L2/L3.";
+const clarkeAnswer = "T1–L2, T1–L3, C8–L2, C8–L3 ou C8–L4. O núcleo dorsal de Clarke encontra-se na lâmina VII. O Nolte descreve aproximadamente T1–L2 e, na tabela do feixe espinocerebeloso posterior, T1–L2/L3. O sumário AT3 admite geralmente T1–L2, podendo alcançar C8–L3; o Gray descreve a identificação de C8 até L3 ou L4. Estes limites são aproximados e dependem da fonte.";
 const gray = (part, pdfPage, printedPage, supports) => ({ title: "Gray’s Anatomy: The Anatomical Basis of Clinical Practice", edition: "42.ª", source_path: `01_Disciplinas/Neuroanatomia/Bibliografia/Oficial/Gray 42/Gray's Anatomy ${part}.pdf`, pdf_page: pdfPage, printed_page: printedPage, supports });
 const nolte = (edition, pdfPage, printedPage, supports) => ({ title: "Nolte: The Human Brain", edition: `${edition}.ª`, source_path: `01_Disciplinas/Neuroanatomia/Bibliografia/Oficial/Nolte/Nolte - The Human Brain, ${edition}th Ed..pdf`, pdf_page: pdfPage, printed_page: printedPage, supports });
 const cervicalReferences = [
@@ -14,6 +14,7 @@ const cervicalReferences = [
   { title: "FMUP — Sumário AP2: Medula espinhal e suas meninges", edition: "2026/2027", pdf_page: 1, supports: "Intumescência cervical: C3 a T2 (variável)." },
 ];
 const clarkeReferences = [
+  gray("0501-1000", 114, 428, "Clarke identificável de C8 ao terceiro ou quarto segmento lombar; base do corno posterior, lâmina VII."),
   gray("0501-1000", 112, 426, "Lâmina VII; segmentos torácicos e lombares superiores. O intervalo T1–L2 é atribuído nesta passagem ao núcleo intermediolateral, não a Clarke."),
   nolte(6, 250, 237, "Núcleo de Clarke: aproximadamente T1–L2."),
   nolte(7, 262, 256, "Tabela 10-5: origem do feixe espinocerebeloso posterior em Clarke (T1–L2/3)."),
@@ -23,8 +24,8 @@ const clarkeReferences = [
 export const SEGMENT_CORRECTIONS = {
   Q0104: { answer: cervicalAnswer, note: "C3–T2 é a delimitação indicada no sumário da AP2 e no Gray; C5–T1 é a convenção do Nolte. Ambas são anatomicamente aceitáveis quando o enunciado não especifica uma fonte.", references: cervicalReferences },
   Q1048: { answer: cervicalAnswer, note: "C3–T2 e C5–T1 são descrições bibliográficas da mesma intumescência; não confundir a sua extensão morfológica com as raízes predominantes do plexo braquial.", references: cervicalReferences },
-  Q1196: { answer: clarkeAnswer, note: "Aceitam-se C8–L2, C8–L3, T1–L2 e T1–L3. Não confundir o núcleo de Clarke com a coluna intermediolateral simpática.", references: clarkeReferences },
-  Q0118: { answer: "O núcleo de Clarke situa-se na lâmina VII, aproximadamente C8/T1–L2/L3; aceitam-se C8–L2, C8–L3, T1–L2 e T1–L3. O núcleo cuneado lateral (acessório), no bolbo raquidiano, é o seu homólogo para o membro superior. O feixe espinocerebeloso posterior ascende ipsilateralmente, entra pelo pedúnculo cerebeloso inferior e termina como fibras musgosas.", note: "Os limites segmentares variam entre descrições anatómicas; T1–L2 não constitui a única delimitação aceitável.", references: clarkeReferences },
+  Q1196: { answer: clarkeAnswer, note: "Aceitam-se C8–L2, C8–L3, C8–L4, T1–L2 e T1–L3. A extensão até L4 é descrita no Gray; não atribuir esse limite ao sumário AT3. Não confundir Clarke com a coluna intermediolateral simpática.", references: clarkeReferences },
+  Q0118: { answer: "a) Lâmina VII. O Nolte descreve T1–L2 e T1–L2/L3; o sumário AT3 admite T1–L2, podendo ser C8–L3; o Gray descreve C8 até L3 ou L4. O homólogo para o membro superior é o núcleo cuneado lateral ou cuneiforme acessório, no bolbo.\nb) Os neurónios de Clarke dão origem ao feixe espinocerebeloso posterior, que ascende ipsilateralmente, sem decussação, e entra pelo corpo restiforme do pedúnculo cerebeloso inferior. Os seus axónios terminam no córtex cerebeloso como fibras musgosas.", note: "Os limites segmentares variam entre descrições anatómicas; L4 é uma extensão descrita no Gray. Conservar a resposta a todas as alíneas.", references: clarkeReferences },
 };
 export function correctedValidation(original, correction) {
   return { ...original, status: "com_ressalvas", verified_answer: correction.answer, note: correction.note, references: correction.references, date: "2026-10-10", method: "leitura direta dos sumários AT3/AP2, Gray 42 e Nolte 6/7; confronto com a tabela da University of Michigan", origin: "revisão bibliográfica dos limites segmentares de 10/10/2026", review_attempt: { date: "2026-10-10", outcome: "com_ressalvas", evidence: correction.note } };

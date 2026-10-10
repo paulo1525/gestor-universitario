@@ -63,6 +63,8 @@ async function main() {
   let transfer = JSON.parse(
     await readFile(path.join(source, "transfer.json"), "utf8"),
   );
+  if (transfer.requiresIndexRebuild && !process.argv.includes("--rebuild"))
+    throw new Error("Reviewed content requires --rebuild to refresh question and bank indexes.");
   if (
     !Array.isArray(transfer.files) ||
     !transfer.files.length ||
