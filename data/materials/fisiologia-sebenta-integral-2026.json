@@ -1,0 +1,156 @@
+{
+  "academicYear": "2026/2027",
+  "date": "2026-10-10",
+  "files": [
+    {
+      "id": "material-fis1-sebenta-integral-cap01-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 1 — Fisiologia das membranas celulares e potenciais de membrana · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 39 páginas. Capítulo 1 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap01_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 7314577,
+      "sha256": "d3c78a8c9f366cc65357a14df834216fdba97ef7c9e55a1de2af6b8d71b65d33",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/d3c78a8c9f366cc65357a14df834216fdba97ef7c9e55a1de2af6b8d71b65d33.pdf",
+      "pageCount": 39,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "T01",
+        "P02"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-cap02-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 2 — Transdução do sinal · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 39 páginas. Capítulo 2 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap02_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 12410114,
+      "sha256": "a3c3c3e96585973be17da0528df8b17a578ebfb348e50f594b7a3f1cb00a735f",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/a3c3c3e96585973be17da0528df8b17a578ebfb348e50f594b7a3f1cb00a735f.pdf",
+      "pageCount": 39,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "TP01"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-cap03-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 3 — Fisiologia muscular · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 50 páginas. Capítulo 3 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap03_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 12954793,
+      "sha256": "0b1b431df0e32935fb360abe9abd18c32533e55a20d45ecefda9f915502bab35",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/0b1b431df0e32935fb360abe9abd18c32533e55a20d45ecefda9f915502bab35.pdf",
+      "pageCount": 50,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "T02",
+        "P03",
+        "T03",
+        "T04"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-cap04-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 4 — Eletrofisiologia cardíaca e eletrocardiograma · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 66 páginas. Capítulo 4 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap04_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 16368494,
+      "sha256": "bb4a5d087711bcb61e33e3b4f38f2966483fdea3187aeb650cb316c8168ec419",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/bb4a5d087711bcb61e33e3b4f38f2966483fdea3187aeb650cb316c8168ec419.pdf",
+      "pageCount": 66,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "T05",
+        "T06",
+        "P06",
+        "P07",
+        "P08"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-cap05-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 5 — Ciclo cardíaco, sons cardíacos e ecocardiografia · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 60 páginas. Capítulo 5 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap05_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 7447378,
+      "sha256": "cfa1b14f90d6f29dfc3961880af3361c734a93bd6f987f55b7301c96a3d9fd77",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/cfa1b14f90d6f29dfc3961880af3361c734a93bd6f987f55b7301c96a3d9fd77.pdf",
+      "pageCount": 60,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "TP02",
+        "P04",
+        "P05",
+        "TP03",
+        "T07",
+        "T09"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-cap06-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Capítulo 6 — Regulação da pressão arterial · 1.ª frequência",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 29 páginas. Capítulo 6 da sebenta integral. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Cap06_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 5938332,
+      "sha256": "ebb324652ef591153e95c0771665d5b1a00d33940273bbf77a50023b55d12d9f",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/ebb324652ef591153e95c0771665d5b1a00d33940273bbf77a50023b55d12d9f.pdf",
+      "pageCount": 29,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "chapter",
+      "lessonCodes": [
+        "TP04"
+      ]
+    },
+    {
+      "id": "material-fis1-sebenta-integral-2026-2027",
+      "unitCode": "FIS1",
+      "title": "Sebenta integral — 1.ª frequência (em construção)",
+      "description": "Documento para a 1.ª frequência de Fisiologia I · 2026/2027 · 274 páginas. Em construção: reúne atualmente os capítulos 1 a 6; ainda não cobre toda a matéria da frequência. Versão de 10/10/2026.",
+      "fileName": "Fisiologia_I_Sebenta_Integral_2026-10-10.pdf",
+      "mimeType": "application/pdf",
+      "byteSize": 56425619,
+      "sha256": "ecc5890e4e14897820767bd9fab3df8a794f74df0a2642ef0e50736d47db3564",
+      "storageKey": "materials/fisiologia-i/sebentas/integral-2026-27/ecc5890e4e14897820767bd9fab3df8a794f74df0a2642ef0e50736d47db3564.pdf",
+      "pageCount": 274,
+      "assessment": "1.ª frequência",
+      "constructionStatus": "incomplete",
+      "lessonCodes": [
+        "T01",
+        "P02",
+        "TP01",
+        "T02",
+        "P03",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "P06",
+        "P07",
+        "P08",
+        "TP02",
+        "P04",
+        "P05",
+        "TP03",
+        "T07",
+        "T09",
+        "TP04"
+      ]
+    }
+  ]
+}
