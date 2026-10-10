@@ -12,6 +12,7 @@ import { subscribeMaterialViews, trackMaterialView } from "@/lib/material-views"
 import { materialReaderHref } from "@/lib/material-reader";
 import { MATERIAL_RESOURCE_CATEGORIES, materialResourceCategory, type MaterialResourceCategory } from "@/lib/material-categories";
 import { MATERIAL_FOLDER_GROUPS, materialFolderCount, materialVideoFolder, VIDEO_FOLDERS, type VideoFolder } from "@/lib/material-folders";
+import { groupSebentas, sebentaChapterRange, sebentaDisplayTitle, sebentaPageCount } from "@/lib/material-sebentas";
 import styles from "@/components/material-catalog.module.css";
 import list from "@/components/record-list.module.css";
 import { RecordSkeleton, useHashRecord } from "@/components/record-list";
@@ -180,6 +181,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
   // Translation-only view is organized by lesson so the sequence is visibly chronological.
   // Other bibliography views stay grouped by book.
   const groups = useMemo(() => {
+    if (activeTab === "sebentas") return groupSebentas(visible, t("community.materials.catalog.otherSebentas"), sortOrder === "lesson");
     if (activeTab.startsWith("video-")) {
       const videoGroups = new Map<string, { key: string; title: string; items: CatalogItem[] }>();
       for (const item of visible) {
@@ -303,10 +305,18 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
     const lessonsOf = item.lessonCodes?.length ? item.lessonCodes : item.lessonCode ? [item.lessonCode] : [];
     const availability = item.viewUrl || item.downloadUrl ? "" : item.kind === "bibliography" && item.storage?.backend === "inline" ? "Referência bibliográfica apenas" : item.storage?.state !== "ready" ? t("community.materials.catalog.storagePending") : t("community.materials.catalog.fileUnavailable");
     const printed = item.pages?.printedStart && !/\bpp?\./.test(item.title) ? `pp. ${item.pages.printedStart}–${item.pages.printedEnd || item.pages.printedStart}` : "";
-    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), printed, item.studyCategory === "sebenta" ? item.description : "", item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · "), availability].filter(Boolean).join(" · ");
+    if (item.studyCategory === "sebenta") {
+      const pages = sebentaPageCount(item);
+      const range = sebentaChapterRange(item);
+      const note = /Nota:\s*(.+)$/i.exec(item.description || "")?.[1];
+      return [pages && t("community.materials.catalog.pageCount", { count: pages }), range ? t("community.materials.catalog.chapterRange", range) : lessonsOf.join(" · "), note, availability].filter(Boolean).join(" · ");
+    }
+    return [item.kind === "bibliography" ? formatBadge(bibliographyFormat(item)) : label(item), printed, item.recommended ? "recomendado" : "", item.source?.author, lessonsOf.join(" · "), availability].filter(Boolean).join(" · ");
   };
   // Full reference (formerly the detail card) as the row's tooltip.
   const resourceFacts = (item: CatalogItem) => [
+    item.studyCategory === "sebenta" && item.description,
+    item.studyCategory === "sebenta" && (item.lessonCodes || []).join(" · "),
     item.source?.title && `Obra: ${item.source.title}${item.source.edition ? ` · ${item.source.edition}` : ""}`,
     item.source?.author && `Autoria: ${item.source.author}`,
     (item.pages?.printedStart || item.pages?.printedEnd) && `Páginas impressas: ${item.pages?.printedStart}–${item.pages?.printedEnd}`,
@@ -419,7 +429,7 @@ export function MaterialCatalog({ activeTab, onTabChange, unitCode, onUnitChange
               <ul className={list.rows}>{group.items.map((item) => <li className={`${list.row} ${styles.materialRow}`} key={item.id} data-completed={item.completed || undefined} data-tone={item.verification === "verified" ? "success" : item.verification === "pending" ? "accent" : undefined}>
                 <span className={list.rowIcon} aria-hidden="true">{(() => { const Icon = SECTION_ICON[catalogSection(item)]; return <Icon />; })()}</span>
                 <div className={list.rowMain}>
-                  <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={materialReaderHref(item.id, item)} target="_blank" rel="noopener">{item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={item.downloadUrl} onClick={() => void recordOpening(item)} download={item.fileName || true}>{item.title}</a> : <span className={`${list.titleLink} ${styles.materialTitle}`}>{item.title}</span>}</h3>
+                  <h3>{item.viewUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={materialReaderHref(item.id, item)} target="_blank" rel="noopener">{activeTab === "sebentas" ? sebentaDisplayTitle(item) : item.title}</a> : item.downloadUrl ? <a className={`link-quiet ${list.titleLink} ${styles.materialTitle}`} href={item.downloadUrl} onClick={() => void recordOpening(item)} download={item.fileName || true}>{activeTab === "sebentas" ? sebentaDisplayTitle(item) : item.title}</a> : <span className={`${list.titleLink} ${styles.materialTitle}`}>{activeTab === "sebentas" ? sebentaDisplayTitle(item) : item.title}</span>}</h3>
                   <div className={styles.metadata}><p className={list.rowMeta} title={resourceFacts(item)}>{resourceMeta(item)}</p><MaterialViews count={item.views} /></div>
                   {catalogSection(item) !== "bibliography" && linkedBibliography(item).length > 0 && <details className={styles.linkedBibliography}><summary><BookOpen aria-hidden="true" />{tabLabel("bibliography")} <span>({linkedBibliography(item).length})</span></summary><div>
                     {linkedBibliography(item).map((excerpt) => <a key={excerpt.id} className={styles.linkedChip} href={excerpt.viewUrl ? materialReaderHref(excerpt.id, excerpt) : excerpt.downloadUrl || undefined} target={excerpt.viewUrl ? "_blank" : undefined} rel="noopener" download={excerpt.viewUrl ? undefined : excerpt.fileName || true} title={excerpt.title} onClick={() => { if (!excerpt.viewUrl) void recordOpening(excerpt); }}>{excerptLabel(excerpt)}</a>)}

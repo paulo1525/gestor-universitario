@@ -152,5 +152,10 @@
         "TP04"
       ]
     }
-  ]
+  ],
+  "collection": {
+    "sourceId": "source-fis1-sebenta-integral-2026-2027",
+    "title": "Sebenta integral — 1.ª frequência",
+    "edition": "2026/2027"
+  }
 }

@@ -15,4 +15,6 @@ A migration 0137 coloca os documentos em **Fisiologia I → Sebentas**, identifi
 
 As associações usam os códigos das aulas existentes no catálogo de 2026/2027. A integral associa-se apenas às aulas destes capítulos. A publicação permanece acessível a utilizadores autorizados (`public_access=0`) e é registada na auditoria administrativa. O estado `original` identifica o material fornecido; a conferência de SHA-256 comprova a integridade do ficheiro, sem representar uma nova revisão científica.
 
+A migration 0138 associa estes ficheiros a uma fonte comum, **Sebenta integral — 1.ª frequência · 2026/2027**, e regista a extensão física de cada PDF. A lista de Sebentas reutiliza os cabeçalhos de grupo da bibliografia: integral primeiro, capítulos por ordem e outras sebentas num grupo próprio. As linhas apresentam páginas e aulas, preservando títulos completos e descrições para pesquisa, leitor e detalhes. O aviso de construção continua no título da integral.
+
 Antes da aplicação remota: testes, lint e build locais; commit e push pelo fluxo de PR; carregar e conferir os sete objetos R2; só então aplicar a migration. O teste `tests/fisiologia-sebentas.test.mjs` valida a publicação, as associações, a indicação de incompletude, a integridade referencial e a repetição da migration sem duplicação ou alteração dos materiais anteriores.

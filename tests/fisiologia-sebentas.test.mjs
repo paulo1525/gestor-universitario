@@ -26,6 +26,9 @@ test('Fisiologia: publica sete sebentas privadas para a primeira frequência, se
     for (const code of new Set(manifest.files.flatMap(file => file.lessonCodes))) insertLesson.run(`fis-${code}`, code);
     db.exec(migration);
     db.exec(migration);
+    const collectionMigration = read('../migrations/0138_fisiologia_sebentas_collection.sql');
+    db.exec(collectionMigration);
+    db.exec(collectionMigration);
     const published = db.prepare("SELECT * FROM material_catalog WHERE id LIKE 'material-fis1-sebenta-integral-%'").all();
     assert.equal(published.length, 7);
     for (const file of manifest.files) {
@@ -38,6 +41,9 @@ test('Fisiologia: publica sete sebentas privadas para a primeira frequência, se
       assert.equal(row.storage_state, 'ready');
       assert.equal(row.checksum_sha256, file.sha256);
       assert.equal(row.byte_size, file.byteSize);
+      assert.equal(row.source_id, manifest.collection.sourceId);
+      assert.equal(row.physical_page_start, '1');
+      assert.equal(row.physical_page_end, String(file.pageCount));
       assert.match(row.title, /1\.ª frequência/);
       assert.match(row.description, /1\.ª frequência/);
       const codes = db.prepare('SELECT l.code FROM material_catalog_lessons a JOIN material_lessons l ON l.id=a.lesson_id WHERE a.material_id=? ORDER BY a.sort_order').all(file.id).map(item => item.code);
@@ -48,6 +54,8 @@ test('Fisiologia: publica sete sebentas privadas para a primeira frequência, se
     assert.match(integral.description, /ainda não cobre toda a matéria/);
     assert.deepEqual(db.prepare("SELECT * FROM material_catalog WHERE id IN ('existing','other-unit') ORDER BY id").all(), original);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM admin_audit_log WHERE action='fisiologia_sebentas_published'").get().n, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM admin_audit_log WHERE action='fisiologia_sebentas_organized'").get().n, 1);
+    assert.equal(db.prepare('SELECT title FROM material_sources WHERE id=?').get(manifest.collection.sourceId).title, manifest.collection.title);
     assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []);
   } finally {
     db.close();

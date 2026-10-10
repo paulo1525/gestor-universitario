@@ -12,7 +12,9 @@
 - Um comando de preview nunca pode publicar nem modificar a aplicação de produção.
 - Nunca fazer push automaticamente após cada pequena alteração; agrupar alterações relacionadas.
 - Testar localmente antes de criar um commit e executar `pnpm run build` antes de publicar.
-- Só fazer commit e push quando o utilizador pedir explicitamente para publicar ou enviar.
+- Fazer commit, push e publicar automaticamente quando o agente confirmar que o trabalho pedido atingiu 100% de conclusão local, sem exigir uma nova confirmação do utilizador.
+- Considerar 100% de conclusão local apenas quando todo o âmbito pedido estiver implementado, os testes, lint e build obrigatórios tiverem passado, a validação visual aplicável estiver concluída e não existirem falhas ou pendências conhecidas. Uma percentagem estimada não substitui estas verificações.
+- Se o utilizador pedir para não publicar, para aguardar ou apenas para preparar/rever alterações, respeitar essa instrução. Depois da publicação automática, confirmar o resultado em produção antes de declarar a tarefa concluída.
 - O único fluxo permitido é: local → teste local → GitHub → Cloudflare.
 - Antes de começar a trabalhar, executar `git fetch origin --prune` e confirmar que o ramo local está atualizado.
 - Ao trabalhar em dois computadores, nunca editar simultaneamente versões desatualizadas do projeto.
